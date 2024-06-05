@@ -1,0 +1,194 @@
+
+
+ -- Import System --
+ 
+ 
+ -- Introduction --
+ 
+ 
+	Yama's 'Import System' describes the frontend abstraction of
+	the Yama API responsible for the identifying and importing
+	of 'Modules' of Yama code from the external environment, for
+	use in a Yama context.
+	
+	
+ -- Modules & Domains --
+ 
+ 
+	Yama code, as stated, is organized into 'Modules', which are
+	flat namespaces containing Yama type information, alongside
+	metadata. Beyond this description, the contents of Yama Modules
+	are beyond the scope of this document.
+	
+	The external environment is abstracted into 'Domains', which
+	describe distinct regions of the external environment, from
+	which Modules may be imported. Domains are filesystem-like, 
+	describing a space in which Modules exist akin to files/directories.
+	
+	An important thing to note however, is that within this system,
+	Modules both act as files, and directories, w/ them having two
+	namespaces: one for Yama types, and one for 'Submodules';
+	Submodules simply being nested Modules.
+	
+	Domains may have Domain-wide metadata, w/ this including the
+	ability to establish dependency relationships w/ other Domains.
+	
+	
+ -- Domain Bindings & Paths --
+ 
+ 
+	Yama contexts define 'Domain Bindings', which are mappings of 
+	string names (ie. 'Domain Names') to associated Domains.
+	
+	Modules are identifed by 'Paths', which describe their location
+	within the Domain in which they reside.
+	
+	Paths start w/ the Domain Name of the Domain the Path is relative 
+	to, followed by a '/'-delimited list of (Sub)module names, the 
+	final one of which is the identified Module itself.
+	
+	Notice that, while filesystem-like, the identified Module does
+	not take any kind of extension-like suffix.
+	
+	
+		<Domain-Name>/<Module>/<Submodule>/...
+		
+		
+	For each context, there may be one special Domain called the
+	context's 'Primary Domain', w/ the Domain Name '$'. The Primary
+	Domain is special because its contents may be referenced w/out
+	need of the Domain Name qualifier.
+	
+	
+		<Module>/<Submodule>/...
+		
+		
+	For situations where there is a name conflict between a Domain 
+	Name and the name of a Module in the Primary Domain, the Domain
+	is given priority over the Module. In order to access the Module,
+	the Primary Domain's Domain Name '$' must be used to disambiguate.
+	
+	
+		$/<Module>/<Submodule>/...
+	
+	
+	The Primary Domain is a quality-of-life feature, to streamline 
+	everyday usage of the Yama API.
+	
+	Domains which are not Primary Domains are 'Secondary Domains'.
+	
+	When Paths are used w/ contexts (ie. not within the interior
+	of the Domain) they are called 'External Paths'. This is in
+	contrast to 'Internal Paths', which will be explained below.
+	
+	
+ -- Dep Bindings, Redirects & Internal Paths --
+ 
+ 
+	Akin to how contexts can define Domain Bindings, Domains are
+	free to define 'Dep(endency) Bindings', which specify another
+	Domain as an external dependency of the Domain in which the
+	binding was established.
+	
+	Dep Bindings exist as entities within the Domain, like Modules.
+	Dep Bindings however may only appear at the top-level of the
+	Domain's namespace, and may not be nested within Modules.
+	
+	Dep Bindings are named the string they were specified w/, prefixed
+	by a '@' character. This '@' character is used to disambiguate
+	them from Modules.
+	
+	TODO: this section is UNFINISHED
+	
+	TODO: what we have here is by far our best design yet, however I'd
+		  like to imorove on two things:
+				1) iterate on Path syntax
+				2) figure out how we'd like to finish this section
+	
+	
+ -- Domain Identity & Instances --
+ 
+ 
+	'Domain Identity' refers to the rules by which the Yama API
+	decides whether two Domains are distinct from one another, and
+	thus that Modules imported from each, even if they, within their
+	respective Domains, have similar names and Paths, are nevertheless
+	distinct entities.
+	
+	The Yama API's policy in this regard is to define objects called
+	'Domain Instances', which encapsulate distinct Domains, and to
+	have all Domain Names bound to the same Domain Instance all be
+	considered aliases of the same Domain, being non-distinct from
+	one another. Likewise, Domain Names which differ in their Domain
+	Instance association are distinct from one another.
+	
+	
+ -- Primary Domain Implementations --
+ 
+ 
+	Being an abstraction, Yama Domains may encapsulate different
+	ways of importing Yama Modules from the external environment,
+	w/ each being free to define in their own way how Modules are
+	represented in the external environment. Likewise, they also
+	allow for the homogenized usage of different implementations
+	of Domains together, as part of a single unified system.
+	
+	To this end, the Yama API will provide the user w/ three primary 
+	Domain implementations:
+	
+		1) Codebases
+		
+		2) Native Libraries
+		
+		3) Parcels
+	
+	Codebases are Domains which abstract access to the filesystem,
+	defining a directory path as the 'root' of the Codebase, w/
+	all subdirectories and *.yama source files therein being
+	the (Sub)modules of the Domain.
+	
+	In order to allow for Modules define by directories to contain
+	Yama code, Codebases will employ a policy of allowing for
+	a source file called 'this.yama', located immediately inside
+	of a given subdirectory, to play the role of defining the
+	Yama code of that subdirectory's associated Module.
+	
+	The reason for using a specific keyword like 'this', instead
+	of using something like the subdirectory's name, is to ensure
+	the subdirectory being renamed does not mess-up the semantics
+	of its Yama code association.
+	
+	Within the Yama API, the 'this' Module that would normally
+	be discerned by the presence of a *.yama source file is to
+	be suppressed. The Yama API is to only acknowledge these files
+	in terms of how they extend their subdirectory's Module.
+	
+	A 'this.yama' source file in the root of a Codebase is treated
+	like any other *.yama source file. However, we could instead
+	forbid having a 'this.yama' in the root of Codebases, in the
+	name of reserving it in case we ever want to do something w/
+	it in the future.
+	
+	Native Libraries are Domains which abstract a C++ API binding,
+	defining a fascade hierarchy of Sub(modules) to represent the
+	contents of the Native Library.
+	
+	There are three main use cases for Native Libraries:
+	
+		1) To define the standard library of the Yama language.
+		
+		2) To define bindings to hand-written C++ APIs.
+		
+		3) To define bindings to Yama code transcompiled into C++.
+		
+	Parcels are Codebases which have been precompiled into immutable
+	portable binaries, defining a hierarchy of Sub(modules) which
+	mirrors the view provided by the compiled Domain (eg. things
+	like the above rules about 'this.yama' would be reflected in
+	the view of the Module hierarchy provided by the Parcel.)
+	
+	These Parcels are thus 'packages' of Yama code. The reason
+	they're called Parcels and not packages is because I wanted
+	them to be called Parcels, so that's the name I went with.
+ 
+ 

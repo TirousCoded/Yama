@@ -1,0 +1,135 @@
+
+
+ -- Parcels --
+ 
+ 
+	Yama employs 'parcels' as its unit of code distribution.
+	
+	
+ -- Filesystem-like Abstraction --
+ 
+ 
+	Parcels are collections of 'modules' accessed via a
+	filesystem-like abstraction who's underlying behaviour
+	is governed by the parcel implementation.
+	
+	Modules are namespaces of type information. Each Yama
+	'*.yama' source code file corresponds to a module.
+	
+	The reason for the abstraction being filesystem-like is
+	to have it interface cleanly w/ actual filesystems.
+	
+	
+ -- Module Systems --
+ 
+ 
+	A 'module system' defines a system capable of 'mounting' 
+	parcels, and then 'importing' modules from these mounted parcels.
+	
+	A module system defines a namespace of mounted parcels, w/ 
+	each having a unique identifier which it is mapped to. These 
+	identifiers are called 'mount identifiers'.
+	
+	
+ -- Module Paths --
+ 
+ 
+	Each module within a parcel has an associated 'module path', 
+	or just 'path', which defines the unique name it is associated 
+	w/ within its parcel.
+	
+	Paths are '.' seperated lists of identifier strings, w/ a
+	special '*' pseudo-identifier referring to the module's 'root'.
+	This root is not given a name prior to the module being
+	imported into some module system.
+	
+	It is perfectly legal for a module's module path to only 
+	contain this root '*' pseudo-identifier. Modules w/ this kind
+	of module path are called 'root modules'.
+	
+	The following are example paths:
+	
+	
+		*
+		*.vectors.vec2
+		*.vectors.vec3
+		*.vectors.vec4
+		*.quaternion
+		*.random
+	
+	
+	These identifiers have no intrinsic meaning except their
+	role in forming unique identifier paths for each module.
+	
+	
+ -- Import Paths --
+ 
+ 
+	When modules are imported from a mounted parcel, the 
+	paths used to identify and import them are 'import paths'.
+	
+	An import path is the mount identifier of the parcel 
+	being imported concatenated w/ the path of the module
+	being identified/imported.
+	
+	An import path is the module path of module being 
+	identified/imported, w/ the '*' root pseudo-identifier
+	being replaced w/ the mount identifier of the parcel
+	of said module.
+	
+	The following are example import paths:
+	
+	
+		math
+		math.vectors.vec2
+		math.vectors.vec3
+		math.vectors.vec4
+		math.quaternion
+		math.random
+		
+		
+ -- Major Parcel Implementations --
+ 
+ 
+	Yama will have certain main parcel implementations:
+	
+		1) A 'codebase parcel' which encapsulates access to a directory
+		   hierarchy as a parcel of modules (each file is a module.)
+		   
+		2) A 'binary parcel' which encapsulates access to a precompiled
+		   binary of modules, organized into a module hierarchy (which
+		   would reflect that of the codebase parcel it was compiled from.)
+		   
+		3) A 'native parcel' which encapsulates access to a C++ binding
+		   expressed as a module hierarchy where each function is a binding
+		   to some corresponding C++ code.
+		   
+		4) A 'dynamic parcel' which encapsulates a special parcel w/ a single
+		   root module who's contents are able to be ammended by dynamically
+		   compiling/uploading new types to it.
+		   
+			TODO: we might, instead of using dynamic parcels, impl this 
+				  behaviour by making it part of the core type system, 
+				  rather than part of the parcel system
+	
+	
+ -- Open Questions --
+ 
+ 
+	- can multiple paths identify one module?
+		- if so, will we need to require one 'canonical' path?
+ 
+	- what happens if a parcel impl forwards to a filesystem,
+	  and said filesystem has two ways to access one file via
+	  use of a symlink?
+	  
+	- wouldn't loading on-demand from filesystem imply mutability 
+	  w/ regards to parcel contents?
+	  
+	- can two mounted parcels identify the same *instance*?
+		- in other words, how does parcel *identity* work?
+	  
+	- what metadata will parcels carry?
+		- how do parcels globally identify themselves?
+		- how do parcels establish dependency relationships?
+

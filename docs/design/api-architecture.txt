@@ -1,0 +1,205 @@
+
+
+ -- API Architecture --
+ 
+ 
+	This document provides a high-level description of the Yama API 
+	architecture, what its major components are, and how they all 
+	fit together.
+	
+	
+ -- API Components --
+ 
+	
+	Yama will provide the following types:
+	
+	
+		yama::debug					<- abstract base class
+	
+		yama::null_debug			<- inert
+		yama::stderr_debug			<- debug log to stderr
+		yama::stdout_debug			<- debug log to stdout
+		yama::sync_debug<T>			<- extends debug T w/ synchronization
+	
+		yama::mas					<- abstract base class
+		yama::mas_allocator			<- C++ allocator provided by MASs
+		
+		yama::null_mas				<- no allocs
+		yama::heap_mas				<- malloc/free
+		yama::pool_mas				<- pool
+		yama::sync_mas<T>			<- extends MAS T w/ synchronization
+	
+		yama::context				<- notably *not* an abstract base class
+		
+		yama::domain				<- abstract base class
+		
+		yama::unsync_domain			<- unsynchronized
+		yama::sync_domain			<- synchronized
+		
+	Yama 'debug (layers)' are virtual method-based event interfaces 
+	used to implement diagnostic layers which report on the behaviour
+	of API components.
+	
+	Yama 'Memory Allocation Systems' or 'MASs' are an abstraction
+	over a memory allocator. This abstraction is similar to C++'s 
+	memory resources, but w/ some key differences.
+ 
+	Yama 'contexts' are the central API components encapsulating
+	individual Yama interpreters and distinct object spaces.
+	
+	Yama 'domains' are API components which provide a collection
+	of backend services to a community of contexts.
+	
+	A domain and its community of contexts define a Yama VM.
+	
+	
+ -- Debug (Layers) --
+ 
+ 
+	The debug layer is a API component which moniters system
+	behaviour and provides diagnostics about it to the end-user.
+	
+	A virtual method-based interface of events is provided to 
+	report diagnostics.
+	
+	The debug layer is not merely a logger, but the Yama API 
+	will also provide quality-of-life utilities to summarize
+	usage of them to being like that of a mere logger if that's
+	all the end-user needs.
+	
+	Another idea is to have bit flags be used to enable/disable
+	debug layer monitering of certain aspects of the system,
+	w/ this also helping avoid things like unneeded overhead
+	w/ regards to virtual method calls.
+	
+	
+ -- Memory Allocation Systems (MASs) --
+ 
+ 
+	Yama MASs operate by returning a C++ standard library conforming
+	allocator of type mas_allocator, which contains pointers to
+	bind it to the MAS. This allocator is then used to perform
+	allocation and deallocation.
+	
+	This has three main advantages:
+	
+		1) It allows for these C++ allocators to be statically injected
+		   into all (multithreading notwithstanding) allocator-aware
+		   containers in whatever API component is in question.
+		   
+		2) It helps avoid unneeded virtual method overhead by placing
+		   pointers inline in the yama::mas_allocator object, rather than
+		   having to access a vtable stored elsewhere.
+		   
+		3) It allows for #1 above to be extended to also allow for the
+		   gathering of useful diagnostics about the system's memory
+		   consumption patterns w/out needing to add extra overhead,
+		   as these diagnostic reporting things can be added directly
+		   to the yama::mas and yama::mas_allocator frontends.
+		   
+	Yama MASs will also operate w/ a notion of having upstream 
+	allocators, similar to C++'s memory resources.
+	
+	
+ -- Contexts --
+ 
+ 
+	The central state machine of the Yama API is the 'context'.
+	
+	Contexts encapsulate the following:
+	
+		1) A MAS.
+		2) An interpreter.
+		3) An object space.
+		4) The command API.
+		
+	The MAS of the context will likely not be injected, instead
+	being a yama::pool_mas internally constructed such that it's
+	downstream of the domain's MAS.
+	
+	Domains are injected into contexts upon initialization, and
+	provide services to them.
+	
+	An important thing conexts need is the ability to inject
+	domains w/out taking ownership of them. This is needed as
+	otherwise it wouldn't be possible to have things like module
+	backends which use contexts (ie. an async/await library) 
+	w/out causing strong reference cycles.
+	
+
+ -- Domains --
+ 
+ 
+	A single domain may act as a backend for a community contexts.
+	
+	Domains encapsulate the following:
+	
+		1) A MAS.
+		2) A type system.
+		3) A module system.
+		4) A parcel system.
+		5) A loader/compiler/validator/etc.
+		6) The query API.
+
+	The MAS of the domain is upstream to context MASs (by default.)
+		
+	Domains are injected into contexts, and for each one it's injected
+	into, the domain is given the ability to store context-local data.
+	
+	
+ -- Command API --
+ 
+ 
+	Yama contexts will expose a low-level API for querying of and
+	transitioning between states, called the 'command API'.
+	
+	This command API will operate procedurally, and will identify
+	context and domain resources via raw pointers.
+	
+	A really important feature of this command API is that all of
+	its commands are to always be memory safe, and to ensure safety
+	in other regards as well.
+	
+	Being part of the frontend, the command API will be unit tested,
+	w/ this being part of the point of making it part of the frontend.
+	
+	Yama bytecode will be implemented as the automated execution of
+	these state query and transition commands, alongside support
+	services provided by the call frame.
+	
+	High-level features for the usage of Yama contexts will be 
+	implemented via use of the command API. This will include both
+	OO wrapper types, and higher-level context methods.
+	
+	
+ -- Query API --
+ 
+ 
+	Yama domains, akin to how contexts expose the command API, will
+	expose a 'query API' for the lazy loading of type information.
+	
+	The query API is intended as a nice and high-level abstraction 
+	which delegates all the *hows* of type information loading to 
+	the domain implementation.
+	
+	Like the command API, type information resources returned from
+	queries will likely come in the form of raw pointers.
+	
+	This query API is to be implemented by the domain via use of
+	the 'query system' explained in 'query-system.txt'.
+	
+	
+ -- Domain Impl API --
+ 
+ 
+	A special subset of the Yama API will be dedicated specifically
+	to providing resources intended for use exclusively in the 
+	development of domain implementations.
+	
+	
+ -- Open Questions --
+ 
+ 
+	n/a
+ 
+ 

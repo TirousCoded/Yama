@@ -1,0 +1,110 @@
+
+
+ -- Objects --
+ 
+ 
+	Yama operates w/ discrete 'objects' which encapsulate state,
+	and associated type information. These objects are referenced
+	by handles called 'references'.
+	
+	In Yama, all objects are 'reference typed', w/ scalar and other
+	primitive-like objects being 'canonicalized' into conforming
+	to reference type semantics.
+	
+	Yama also employs strict 'null safety' semantics.
+	
+	
+ -- Canonicalization --
+ 
+ 
+	In Yama, 'canonicalization' refers to the semantics by which 
+	scalar and other primitive-like objects are brought to operate
+	within a purely reference typed context.
+	
+	Canonicalized objects/types have the following properties:
+	
+		1) They are immutable.
+		
+		2) There is one and only one object which exists for each
+		   unique value of a given canonicalized type.
+		   
+		   This means that for an std:Int value '1', there exists
+		   a singleton w/ the value '1' of type std:Int, which all
+		   references to objects of type std:Int of value '1'
+		   are referencing.
+		   
+		3) The initialization/deinitialization of these singletons
+		   is totally transparent, and are inert, doing nothing
+		   from the perspective of the language frontend.
+		   
+	In the backend, object references encapsulate a pointer which
+	references an object instance memory block, w/ this obviously
+	being how regular objects operate.
+	
+	For canonicalized objects however, the way they are expected to
+	work is by having this pointer-sized integer (or >=64-bit integer)
+	in the reference contain the integer value directly.
+	
+	These reference scalar values can be compared just like pointers
+	to check if two references refer to the same object. This mechanism
+	implements the whole 'for each unique value there is a corresponding
+	singleton object' thing.
+	
+	The initialization/deinitialization being totally transparent
+	and functionally inert is implemented by allowing inert initialization
+	and deinitialization methods to be never called by the system.
+	
+	The above mechanisms taken together implement Yama's canonicalization
+	semantics via the use of *purely conceptual* objects, but w/ no
+	actual object instance state being instantiated in the backend.
+	
+	The backend may also employ implementation-level *boxing* where
+	it is needed.
+	
+	
+ -- Type Association --
+ 
+ 
+	All objects and references carry a unique type association.
+	
+	The types carried by objects describe the type which it was associated
+	w/ at the moment of its creation, which cannot change. This type
+	is the 'underlying type' of the object.
+	
+	The types carried by references describe the frontend type which
+	the objects they reference will actually be interacted w/ as. These
+	types can be the objects' underlying types, or protocol types.
+	
+	The types carried by references are often referred to as the 'type'
+	of the objects referenced by them, conflating the two. To this end,
+	the term 'underlying type' exists to help disambiguate.
+	
+	
+ -- Null Safety --
+	
+	
+	Due to null safety, references cannot take on a 'null' value.
+	
+	Instead, std:Option[T] and std:Result[T, E] monads must be used.
+	
+	
+ -- Automatic Reference Counting (ARC) --
+ 
+ 
+	Yama will use ARC, rather than GC, to manage the lifetimes of objects.
+	
+	I've decided this for a few reasons:
+	
+		1) GCs are hard to build/maintain, and I don't think I can do it.
+		2) I don't want to add a dependency to compensate for #1.
+		3) GCs can prove hard to use in a real time environment.
+		4) I'd like to make extensive use of RAII in Yama.
+		
+	We'll need ways to compensate for the risk of strong reference cycles.
+	
+	
+ -- Open Questions --
+ 
+ 
+	n/a
+

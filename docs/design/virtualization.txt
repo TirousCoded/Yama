@@ -1,0 +1,12 @@
+
+
+ -- Virtualization --
+ 
+ 
+	The Yama VM will be designed in part around the idea of always being
+	explicit w/ the end-user as to what capabilities are and aren't being
+	provided to code executing on the virtual machine.
+	
+	The Yama VM will be designed such that the end-user must explicitly
+	state the capabilities they would like to give virtual machine code.
+

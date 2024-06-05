@@ -1,0 +1,145 @@
+
+
+ -- Multi-Threading --
+ 
+ 
+	Yama will implement a layer of abstraction intended to make the language
+	able to play nicely in a multi-threaded environment. This layer of 
+	abstraction comes alongside support features.
+	
+	
+ -- Context Segregation --
+ 
+ 
+	Yama contexts each encapsulate their own object space and interpreter,
+	and cannot directly share objects w/ one another. These two details
+	remove the need for a Python-like GIL.
+	
+	
+ -- Shared Type Info --
+ 
+ 
+	Yama will employ an RCU-like mechansim to allow for lock-free access
+	to a shared pool of type information encapsulated by the domain.
+	
+	All type information will be encapsulated by immutable resources handled
+	using shared pointers. These resources can be accessed w/out synchronization
+	from any context.
+	
+	The domain will encapsulate a datastructure which is used to perform 
+	lookups of the above type information resources. This datastructure will
+	be immutable too, meaning it to can be accessed w/out synchronization
+	from any context.
+	
+	Every time new type information is added, the datastructure used to lookup
+	type information gets *regengerated*, and the new datastructure gets 
+	copies of the shared pointers to existing type information sent to it,
+	alongside any new type information.
+	
+	This lookup datastructure is the RCU-like mechanism, w/ it being handled
+	using shared-pointers. When a context does a lookup of type information,
+	a copy of this shared pointer is made, and then the datastructure is queried
+	for the type information in question.
+	
+	The above implements the RCU-like mechanism as if the lookup datastructure
+	is replaced mid-lookup, it's fine, as the old one still has the same original
+	type information (even if it doesn't have the new stuff), and once the lookup
+	ends, this old version will be, via ARC, automatically disposed of.
+	
+	Also notice how the above RCU-like mechanism is lock-free, as stated.
+	
+	
+ -- Loader Bottleneck --
+ 
+ 
+	While lookup of type information will, as stated in the section above, be 
+	lock-free, the act of loading new type information will not be.
+	
+	Yama will protect the state relating to the loading of new type information
+	via a simple mutex, w/out vary much more complexity. This decision results
+	in a deliberate bottleneck being created, for simplicity sake, as it avoids
+	much of the complexity that would otherwise arise potentially.
+	
+	More nuanced setups can perhaps be employed, but at present, again, the 
+	plan is to employ a simple setup involving just one mutex.
+	
+	
+ -- Object Marshalling --
+ 
+ 
+	The existence of a pool of type information shared between contexts allow
+	for the defining of a *standardized* system of fast object mashalling.
+	
+	This is a support feature which gets employed by other parts of the system
+	to transmit copies of objects across context boundaries.
+	
+	
+ -- Signals & Polling --
+ 
+ 
+	Contexts will implement a system software interrupt-like 'signals' w/ which
+	to receive messages from the external (though intra-domain) environment.
+	
+	Signals which arise are defined by 'signal functions' defined in Yama code.
+	
+	The arising of signal functions comes in the form of *sponteneous function
+	calls* which can occur in Yama, *interrupting* regular execution w/out 
+	warning. An important property of these signal function calls is that they're
+	*guaranteed* to never arise during another signal function, as otherwise
+	their impact of the state of the system would be nearly impossible to
+	reason about.
+	
+	Contexts will have a method called 'poll' which gets called when it's a 
+	good time to perform signal function calls. The invoking of poll is performed
+	automatically by Yama bytecode. For non-bytecode functions, or use of the
+	context outside the context of a function call, the poll method is expected
+	to be called manually.
+ 
+	
+ -- Module State/Behaviour --
+ 
+ 
+	Modules will have virtual method-based events which can arise in response
+	to things occurring per-context, or on the domain.
+	
+	Alongside the above events, modules will also be able to encapsulate state
+	both per-context, or on the domain, w/ the ladder being expected to be
+	appropriately synchronized.
+	
+	This is also in the context of modules defined in C++, w/ modules defined
+	in actual Yama code being given only a vary limited subset of the features
+	available, again, to those defined w/ C++.
+	
+	
+ -- Coroutines --
+ 
+ 
+	Yama will incorporate coroutines as a built-in part of the language. This will 
+	involve having await/yield syntax be used to interact w/ coroutines.
+	
+	
+ -- Module-Level Asynchrony/Concurrency --
+	
+	
+	The above two about module state/behaviour, and coroutines, come together
+	for the purpose of allowing Yama to implement features like an async/await
+	system as an API exposed by a module, rather than as a core language feature
+	in-and-of-itself. These APIs would then also be aided by the signal system.
+	
+	
+ -- Synchronization Responsibilities --
+ 
+ 
+	Contexts will be completely free of synchronization, from their perspective,
+	w/ any synchronization to occur occurring elsewhere.
+	
+	Synchronization that does occur occurs in two places: the domain, and/or
+	the backend state/behaviour of modules.
+	
+	For domains, this synchronization would occur during calls to poll.
+	
+	For module backend state/behaviour, this synchronization would occur 
+	during either calls to functions of said module, and/or during calls to
+	poll, if it would result in behaviour in the module in question.
+	
+	

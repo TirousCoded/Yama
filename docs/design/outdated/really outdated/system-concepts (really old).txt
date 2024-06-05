@@ -1,0 +1,80 @@
+
+
+ -- system concepts --
+ 
+ 
+ -- engine --
+ 
+ 
+	engines encapsulate loaded type information state, and the 
+	moment-to-moment runtime information state, w/ engines handling
+	execution of loaded code
+ 
+ 
+ -- loader & specs --
+ 
+ 
+	loaders are responsible for taking specs and building loaded type
+	information state from them for usage by the engine
+	
+	loaders acquire specs from imported parcels, accessing them via
+	said spec's type's type signature
+ 
+	specifictions, or "specs" are non-branching instructions sequences
+	which tell the loader, in an *immediate mode* fashion, how to construct
+	a given type via a state machine in the loader
+	
+	during evaluation, spec instructions perform static type checks that
+	the type being created is valid inline w/ the construction of said type,
+	w/ 'compilation' simply being the construction of a spec from source code,
+	and w/ loading thus acting as a kind of deferred compilation stage
+	
+	specs use forward declaring of types depended upon by the spec's type
+	in order to ensure that spec evaluation can be completed in a single pass
+	
+	spec instructions describe eagerly-evaluated expression trees, w/ 
+	expressions which can have nested subexpressions being expressed via
+	an 'open/close' instruction model (see TAUL's specs for what this means)
+	
+	during evaluation, specs will, alongside the above, also operate using
+	a stack machine in order to do two things:
+	
+		1) perform type checking of expression inputs/outputs
+		
+		2) perform partial subexpression evaluation upon precomputable
+		   subexpressions w/ a policy of 'if it can be precomputed, it
+		   will be precomputed'
+		   
+	the #2 above will be used to implement a 'types as objects' policy, where
+	we *abuse* precomputation to let us liberally define types as constant
+	expressions, w/ this being a SUPER POWERFUL tool that will let us 
+	use a hybrid static/dynamic type system for yama, one w/ MANY possible
+	benefits, depending upon the specific design descisions we end up making
+ 
+ 
+ -- importer & parcels --
+ 
+ 
+	importers are used to import parcels from the external environment,
+	for use by the loader
+	
+	importers abstract access to the external environment behind a 
+	package manager-like interface, w/ individual parcels being identified
+	via potentially various different identifiers, such as file paths,
+	UUIDs, string names, whatever is decided upon
+	
+	the importer's abstracting of access to the external environment allows
+	for things like autocompiling of source code, or to abstract access to
+	pre-imported parcels already in memory, or w/ no representation in 
+	the external filesystem at all
+ 
+	parcels are immutable namespaces of types represented by type specs
+	describing how they are to be loaded, w/ each type (and thus type spec)
+	being identified via a type signature
+	
+	type signatures are decorated names which are used to describe types
+	
+	alongside this namespace, parcels encapsulate other metadata such as
+	linkage, and things like maybe a UUID/version of the parcel, or other
+	such information
+

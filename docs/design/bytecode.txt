@@ -1,0 +1,105 @@
+
+
+ -- Bytecode --
+ 
+ 
+	Yama bytecode binaries are statically verified such that thereafter, safety
+	checks need-not be performed in order to execute the bytecode safely (some
+	for basic memory safety might be okay though.)
+	
+	Yama bytecode will strive to employ a reasonably stable bytecode ABI in order 
+	to try as much as possible to have the system be nice to use by the end-user.
+	
+	Yama bytecode is inspired by Lua in that it's 'register based', rather than
+	'stack based', meaning that in Yama bytecode there's a stack of object
+	'registers' which are pushed/popped to/from a register stack. Instructions
+	specify via 'register indices' where their inputs are to come from, and where
+	their outputs are to be put, rather than operating on data copied to/from the
+	*top* of the stack, as would happen in a stack machine.
+	
+	
+ -- Bytecode Data --
+ 
+ 
+	Speaking specifically about instruction information, Yama bytecode has three
+	principle data components:
+	
+		1) Instruction Data (Required)
+		2) Debug Symbol Metadata (Optional)
+		3) Object Register Metadata (Required)
+		
+	Instruction Data refers to the instructions themselves.
+	
+	Debug Symbol Metadata refers to symbol data used help debug code.
+	
+	Debug Symbol Metadata comes in the form of a hash map-like datastructure which 
+	maps instruction locations in Instruction Data to debug symbols.
+	
+	Object Register Metadata refers to metadata which dictates the pushing/popping
+	to/from the object register stack which conceptually occurs during the execution
+	of instructions.
+	
+	Here 'conceptually' is used because in reality the size of the register stack 
+	will be precomputed based on the maximum number the code will ever actually need, 
+	and the types of the object registers at any given point are statically checked
+	during verification, and so aren't represented at runtime.
+	
+	Object Register Metadata is thusly used during static verification in order to
+	check that the instructions of the binary operate as expected.
+	
+	Object Register Metadata comes in the form of a hash map-like datastructure
+	which maps instruction locations in Instruction Data to object register stack
+	pushing/popping behaviour which conceptually occurs *immediately prior to* the
+	execution of the instruction in question.
+	
+	The data mapped to for each Object Register Metadata entry describes two things:
+	(1) a number of object registers to pop from the stack, followed by (2) a list
+	of object registers to push thereafter, each entry defined by its type.
+	
+	There's no need to worry about defining one of these metadata entries for what
+	happens immediately after the final instruction, as the answer is constant: all
+	object registers still outstanding are to be popped from the stack.
+	
+	
+ -- Static Verification --
+ 
+ 
+	Static Verification starts by partitioning the instruction data of the binary
+	into 'basic blocks', and constructing a control-flow graph thereof.
+	
+	Given the entrypoint block, Static Verification performs a 'symbolic execution'
+	of the instructions thereof, operating upon a symbol object register stack, who's
+	contents are nothing more than the types of each object register.
+	
+	Symbolic execution involves performing the stack manipulations of the Object
+	Register Metadata entry of the current instruction, followed by performing a
+	check to see if the object register indices of the instruction are of legal types
+	for the instruction, alongside whatever other checks the instruction may require.
+	
+	Upon finishing symbolic execution of the entrypoint block, Static Verification then
+	processes each block branched-to from it. This involves copying the final object
+	register stack state of the entrypoint block, and then performing continued 
+	symbolic execution on it, using the Instruction Data of the new block.
+	
+	The above semantics regarding branching are repeated for each block, until all
+	blocks reachable from the entrypoint have been processed. All blocks not processed
+	are thus unreachable, and have an indeterminate object register stack state.
+	
+	Finally, in order to account for control-flow graph cycles, when the system 
+	detects that a branch from one block to blocks it branches to involves branching
+	to a block already processed previously, instead of performing symbolic execution
+	on it again, the system instead compares the final object register stack state
+	of the branched-from block to the initial object register stack state of the 
+	(already processed) branched-to block, and asserts that they are equal.
+	
+	
+ -- Yama Assembler (YASM) --
+ 
+ 
+	I'd like the Yama language to come w/ an 'assembler' for its binary form, which
+	I think I'd like to called the 'Yama Assembler', or 'YASM'.
+	
+	YASM will operate w/ a human-readable assembly-like syntax, which I'd like our
+	binaries to be converted to/from, as this syntax could be useful both for sake
+	of writing binaries, and for printing diagnostic readouts of their contents.
+

@@ -1,0 +1,39 @@
+
+
+ -- Principles --
+ 
+ 
+	This document lays out some of the guiding principles behind
+	the design of the Yama language.
+	
+	
+ -- Cost Efficiency --
+ 
+ 
+	The design of the Yama language and API is to be aggressively
+	simple for the sake of saving up *design space points* which
+	can be spent on more ambitious features.
+	
+	The design of Yama, in general, should be cost efficient, focusing
+	on things that providing a lot at a good price.
+	
+	
+ -- End-User Experience --
+ 
+ 
+	The design of the Yama language and API should provide a streamlined
+	frontend interface that makes usage of Yama super easy for common
+	use cases, such that Yama *just works*, and works well.
+	
+	The end-user should also be given the ability to strip away these
+	quality-of-life features to access a more complex, but more powerful,
+	underlying feature set.
+	
+	
+ -- Multi-Threading --
+ 
+ 
+	The design of the Yama language and API should ensure that Yama is
+	able to be used in a multi-threaded environment, and that it not only
+	works, but that its design fits nicely into said context.
+

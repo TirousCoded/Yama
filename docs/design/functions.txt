@@ -1,0 +1,302 @@
+
+
+ -- Functions --
+ 
+ 
+	Yama supports parcel-level function types.
+	
+	
+ -- Basic Syntax --
+	
+	
+	The following is an example function:
+	
+	
+		fn plus(a: Int, b: Int) -> Int {
+			return a + b;
+		}
+		
+		
+	The 'plus' is the name of the function type.
+	
+	The 'a: Int, b: Int' are the parameters of the function.
+	
+	The '-> Int' is the return type of the function.
+	
+	The '{}' pair, and the contents between them is the
+	main body of the function.
+	
+	
+ -- Summarized Parameter Type Annotation Syntax --
+	
+	
+	When a function parameter list contains a subsequence of
+	parameters w/ a common type, then the ': [TYPE]' syntax of 
+	all but the last parameter of the subsequence may be omitted.
+	
+	For example:
+	
+	
+		fn plus(a, b: Int) -> Int {
+			return a + b;
+		}
+		
+		
+ -- Summarized Return Type And Body Syntax --
+ 
+ 
+	The following summary syntax may be used to define 
+	functions who's behaviour and return type can be summarized
+	down to a simple expression:
+	
+	
+		fn plus(a, b: Int) => a + b;
+	
+	
+ -- None Return Types --
+		
+	
+	A function may be written w/out the '-> [TYPE]' syntax,
+	indicating a seeming lack of a return type.
+	
+	
+		fn println_an_int(x: Int) {
+			println(x);
+		}
+		
+	
+	In truth, Yama does not allow for functions which return 
+	nothing. In these cases the function is given a return
+	type of std:None and all control paths of the function
+	end w/ an implicit 'return None()' expression.
+	
+	Thus, the following is equivalent to the above:
+	
+	
+		fn println_an_int(x: Int) -> None {
+			println(x);
+			return None();
+		}
+		
+		
+ -- Yama Lacks 'Ref Parameters' --
+		
+		
+	Yama functions do not support 'ref parameters' in which
+	a *variable* may be passed into a function. Argument values
+	may only be copied into the function.
+	
+	The reason for this is to allow for function parameter
+	packs to be defined by tuples of types, and for argument
+	packs to be defined by tuples of values.
+	
+	These are notable as they, alongside functions always 
+	returning something (as specified above) allow Yama to 
+	implement functional programming features that exploit the 
+	power of the mathematics of type theory, lambda calculus, etc.
+	
+	
+ -- Type & Object Methods --
+ 
+ 
+	Functions may be bound to types, these functions thus 
+	being called 'methods'.
+	
+	Two types of methods are defined: 'type methods' which are
+	equivalent to *static methods*, and 'object methods' which 
+	are equivalent to *instance methods*.
+	
+	By default, methods are type methods, but if a method is
+	given a special '&self' parameter as its first parameter,
+	then it becomes an object method.
+	
+	All methods are type methods, but if a method has parameters,
+	and its first parameter is of the owner type of the method,
+	then it is allowed the ability to be called as though it were
+	a method bound to an object, w/ this first argument being
+	the caller object, and thus the method is then deemed to be
+	an object method having met these qualifications.
+	
+	To summarize designation of a method as an object method,
+	the special pseudo-parameter syntax '&self' may be used to
+	define the first parameter of the method as this owner typed
+	parameter, w/ the name 'self'.
+	
+	
+		// may be called as either 'Person.age(x)' (calling it
+		// as a type method) or 'x.age()' (calling it as an
+		// object method)
+	
+		fn Person.age(&self) -> Int {
+			// ...
+		}
+		
+		// may be called *only* as 'Person.number()' (calling it
+		// as a type method)
+		
+		fn Person.number() -> Int {
+			// ...
+		}
+		
+		
+ -- The 'cleanup' Method --
+ 
+ 
+	A special object method 'cleanup' w/ no params, nor return type,
+	will be used to perform object deinitialization.
+	
+	This 'cleanup' name is not allowed to be used for other types
+	of methods.
+	
+	The 'cleanup' method of a type may NOT be manually invoked. It is
+	restricted to only being called automatically upon deinitialization.
+	
+	
+		fn Person.cleanup() {
+			// ...
+		}
+		
+		
+	This cleanup method, mixed w/ Yama's use of ARC, allow for RAII.
+	
+	As stated in 'error-handling.txt', cleanup methods will not be called 
+	if the Yama VM crashes (see also about 'cleanup guarantees').
+	
+	
+ -- Getters & Setters --
+ 
+ 
+	Yama allows for getter/setter functions/methods to be 
+	explicitly defined using the syntax 'get [NAME]' and 
+	'set [NAME]' for its name.
+	
+	Getter functions/methods must carry no parameters, except
+	that object methods may have a &self parameter. Getter 
+	functions/methods must have the associated type of its 
+	global/property as its return type.
+	
+	Setter functions/methods must carry one parameter, of the
+	associated type of its global/property, except that object
+	methods may have a prior &self parameter.
+	
+	
+		fn Player.get health(&self) -> Float {
+			// ...
+		}
+		
+		fn Player.set health(&self, x: Float) {
+			// ...
+		}
+		
+		fn get pi() => 3.14159;
+		
+		
+ -- Coroutines --
+ 
+ 
+	Yama will support the definition of 'coroutines', or pausable 
+	function calls.
+	
+	These coroutine functions are qualified w/ the keyword 'coop',
+	as in 'cooperative multitasking'.
+	
+	Within coroutines, 'yield' may be used to return values such
+	that the coroutine is paused, rather than exited. Likewise, the
+	'return' keyword is used to return such that the coroutine exits.
+	
+	
+		coop fn even_ints() -> Int {
+			var i = 0;
+			while (true) {
+				yield i;
+				i += 2;
+			}
+			return Int(); // dummy
+		}
+		
+		
+ -- Lambdas & Captures --
+ 
+ 
+	In Yama, anonymous lambda functions may be defined.
+	
+	Yama lambdas may reference local variables external to them.
+	In such cases, the local variable is 'captured', which in Yama
+	means that it is *copied* into the lambda, creating an equivalent
+	local variable w/ its value.
+	
+	
+		fn call_n_times(n: UInt, f: Fn[(), None]) {
+			for (var i = 0u; i < n; i++) {
+				f();
+			}
+		}
+	
+		fn main() {
+			const message = "this should print 5 times!";
+		
+			call_n_times(
+				5, 
+				fn() { 
+					println(message);
+				});
+		}
+		
+		
+	Yama lambdas may be defined as coroutines via the 'coop' keyword,
+	just as usual w/ coroutines.
+		
+		
+ -- Function Objects --
+ 
+ 
+	Functions in Yama are first-class values, meaning you can have
+	a function encapsulated by an object.
+	
+	For regular functions, these objects are stateless.
+	
+	For coroutine functions, these objects encapsulate the execution 
+	state of the coroutine.
+	
+	Yama also allows for any arbitrary type to be made into a callable
+	function object-like type, via the definition of a special 'call'
+	method, as specified in 'protocols.txt'.
+	
+	
+ -- Parameters & Return Type Specifiers --
+ 
+ 
+	In Yama, function are defined as a mapping from an input tuple
+	of arguments to a return type.
+	
+	To this end, Yama will define two special type specifiers which
+	allow for the extraction of the parameter tuple and return type
+	of a given function or function object type.
+	
+	For parameters, this is the 'params_type(x)' specifier, where
+	'x' is a function or equivalent syntactic entity.
+	
+	For return types, this is the 'return_type(x)' specifier, where
+	'x' is a function or equivalent syntactic entity.
+	
+	
+		fn plus(a, b: Int) => a + b;
+		
+		fn get lib_version => "1.41.6";
+		
+		const abc: params_type(plus); // abc's type is 'std:Tuple2[std:Int, std:Int]'
+		
+		const def: return_type(lib_version); // def's type is 'std:Str'
+	
+	
+ -- Open Questions --
+ 
+ 
+	- it could get confusing if a captured var is modified inside of the
+	  lambda function, w/ the change obviously not being reflected in the
+	  variable the capture was made from, so maybe we could make it that
+	  captured vars are 'const', and cannot be changed?
+ 
+	- generics?
+		- relationship between generics and lambdas?
+

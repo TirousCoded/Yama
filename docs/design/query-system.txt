@@ -1,0 +1,214 @@
+
+
+ -- Query System --
+ 
+ 
+	Yama will, particularly in its domains, organize its loading
+	logistics via use of a 'query system' modelled off the one
+	found in the Rust compiler backend.
+	
+		https://rustc-dev-guide.rust-lang.org/query.html
+	
+		
+ -- API Rough-Sketch --
+ 
+	
+	Below details a rough-sketch of what the query system API will look like:
+ 
+ 
+		yama::qtype
+		yama::qtype_traits<yama::qtype QType>
+		
+			yama::qtype is an enum specifying the different query provider types
+			
+			each value of yama::qtype::* is to have a corresponding yama::* quality-of-life
+			constant to ease usage
+			
+			yama::qtype will likely operate as a bitset, rather than an incrementing index,
+			which does add some nuance to consider
+			
+			yama::qtype_traits is a template-specialization-based traits type used to
+			define traits associated w/ each yama::qtype
+			
+			yama::qtype_traits specializations will define the following:
+			
+				key_type
+				result_type
+				
+					these define key/result types of the provider
+					
+					each provider MUST have a special struct unique to it as it's key,
+					so no having just some random data type as the key
+					
+				static constexpr yama::qtype qtype = ...;
+				
+					key_type::qtype is a static constant field used to statically get the 
+					yama::qtype which a given key_type corresponds to
+					
+		yama::key_type<yama::qtype QType> = yama::qtype_traits<QType>::key_type
+		yama::result_type<yama::qtype QType> = yama::qtype_traits<QType>::result_type
+		
+			quality-of-life helpers
+			
+		yama::query_system
+		
+		virtual yama::untyped_query_provider* yama::query_system::get_provider(yama::qtype t) const
+		
+			this returns the a type erased pointer to the yama::query_provider which corresponds
+			to yama::qtype t for the given yama::query_system, w/ this including potentially getting
+			a yama::query_provider from an *upstream* yama::query_system
+			
+			this returns nullptr if no provider could be found
+			
+			this method is protected, being defined by the yama::query_system impl to provide the 
+			method templates of yama::query_system (ie. query, fetch, discard, discard_all, etc.) w/
+			a type erased way to select the appropriate yama::query_provider to use
+			
+			these method templates then take the yama::untyped_query_provider*, and alongside a
+			known yama::qtype value, use yama::query_provider_downcast to get the appropriate
+			yama::query_provider to use
+			
+			following initialization, what a given value of t results in the returning of is to
+			not change, as this is a vary important invariant
+		
+		yama::result_type<Key::qtype> yama::query_system::query<Key>(const yama::key_type<Key::qtype>& key)
+		yama::result_type<Key::qtype> yama::query_system::fetch<Key>(const yama::key_type<Key::qtype>& key)
+		
+			query is the central method of the query system, which performs the main *querying*
+			itself, complete w/ caching
+			
+			fetch operates exactly like query does, except that it does NOT perform computation
+			of data in the event that said data is not already cached
+			
+			these are not virtual methods, they are method templates defined in the base class
+		
+		yama::result_type<Key::qtype>
+		
+		std::tuple<
+			yama::result_type<K1::qtype>, 
+			yama::result_type<K2::qtype>, 
+			yama::result_type<Ks>...
+		>
+		yama::query_system::query<K1, K2, Ks...>(
+			const yama::key_type<K1::qtype>& k1,
+			const yama::key_type<K2::qtype>& k2,
+			yama::key_type<Ks::qtype>&&... ks
+		)
+		std::tuple<
+			yama::result_type<K1::qtype>, 
+			yama::result_type<K2::qtype>, 
+			yama::result_type<Ks>...
+		>
+		yama::query_system::fetch<K1, K2, Ks...>(
+			const yama::key_type<K1::qtype>& k1,
+			const yama::key_type<K2::qtype>& k2,
+			yama::key_type<Ks::qtype>&&... ks
+		)
+		
+			these are some examples of how query/fetch could be expanded upon w/ some
+			overloads which really exploit the power of the system's compile-time info
+			
+			notice how these overloads take in k1 and k2, and then only have ks for
+			all args thereafter, w/ this being needed as sizeof...(Ks) == 0 is possible,
+			which would reduce down only taking in one key otherwise, which is bad as
+			we can't have overloads differ only by return type
+			
+			versions of the above two can be made which take in tuples of keys
+			
+			if these end up working well, perhaps even write some type support types
+			like 'yama::key_type_tuple' and 'yama::result_type_tuple' to ease usage
+		
+		void yama::query_system::discard<Keys...>(Keys&&... keys)
+		void yama::query_system::discard_all(yama::qtype qts)
+		
+			discard instructs the yama::query_system to discard the cached data
+			under keys, failing quietly for keys w/out corresponding data
+			
+			discard_all instructs the yama::query_system to discard all cached data
+			for the query providers specified by the bitset qts
+			
+		bool yama::query_system::exists<Keys...>(Keys&&... keys) const noexcept
+		
+			this returns if the yama::query_system system contains a cached value
+			corresponding to each key in keys
+			
+		size_t yama::query_system::number(yama::qtype qts) const noexcept
+		
+			this returns the total number of cached values in the query providers
+			specified by the bitset qts
+		
+		yama::untyped_query_provider
+		yama::query_provider<yama::qtype QType>
+		yama::query_provider_class<Policy>
+			
+			these three types define the query providers which are used in the backend
+			of yama::query_system impls to encapsulate the state/behaviour of a particular
+			discrete key/result relationship within the yama::query_system
+			
+			these three inherit from one another, w/ yama::untyped_query_provider as the
+			base, and yama::query_provider_class as the most derived
+			
+			yama::untyped_query_provider and yama::query_provider are the types which are
+			expected to be used primarily when interacting w/ query providers
+			
+			yama::query_provider_class is a special class template used to define impls
+			of query providers, via static injection of a policy rather than via more
+			traditional inheritance, which I've chosen to avoid to make it easier to 
+			restrict the query provider implementation
+			
+			the yama::query_provider_class Policy type expects the following:
+			
+				primary_source_type
+				
+					this defines type of struct the query provider uses as its primary
+					information source
+			
+				static constexpr yama::qtype qtype = ...;
+				
+					this defines the qtype of the type of query provider being defined
+					
+				alongside the above, the policy must also include methods which the
+				yama::query_provider_class will then write in virtual method overrides
+				for the query/manipulation behaviour of the provider
+				
+				examples of these methods include query, fetch, discard, discard_all, etc.
+				
+				finally, the policy must define a ctor of the following form:
+				
+					/*policy type name*/(
+						primary_source_type* primary_source,
+						yama::query_system* secondary_source
+					)
+				
+				above, primary_source and secondary_source define the two sources of
+				information the query provider policy has access to in order to operate
+				
+				primary_source and secondary_source will NEVER be nullptr
+				
+				the primary_source is a source of information which is external to the
+				query system itself, and which must remain logically immutable for the
+				lifetime of the query system
+				
+				primary sources may be ammended, but must be immutable w/ regards to
+				any information already present in it
+				
+				the secondary_source is a query system which provides an interface w/
+				which to call upon other query providers to provide information, w/
+				these sources being 'secondary' in the sense that their information is
+				a function directly/indirectly of primary sources
+				
+				the secondary_source can point to the yama::query_system the provider
+				is a part of, or it can refer to some other one, be it a proxy of it,
+				or some totally unrelated one
+			
+		yama::query_provider<QType>* yama::query_provider_downcast<yama::qtype QType>(yama::untyped_query_provider* x)
+		
+			this downcasts x to yama::query_provider<QType>, potentially performing 
+			runtime checks to ensure safety
+			
+			this presumably returns nullptr if the downcast fails
+			
+			likely these runtime checks would involve calling a virtual method defined
+			by yama::untyped_query_provider to discern the expected QType to use w/ it,
+			rather than performing a dynamic_cast
+

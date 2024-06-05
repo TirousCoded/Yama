@@ -1,0 +1,101 @@
+
+
+ -- Pattern Matching --
+ 
+ 
+	Yama may eventually support structural pattern matching, and
+	use it extensively to make code overall more expressive.
+	
+	
+ -- Yama Won't Support Pattern Matching --
+ 
+ 
+	While the below detail ideas regarding pattern matching, take
+	note that I've decided that Yama version 1 will NOT support
+	pattern matching, as it's complex, and not initially needed.
+	
+	
+ -- Future Support Considerations --
+ 
+ 
+	While Yama version 1 will not support pattern matching, the
+	language is to be designed so that later addition of it can
+	be done as cleanly as possible.
+	
+	This means that things like assignment, local variables, 
+	switch statements, and other features that would be touched
+	by pattern matching should be designed such that their semantics
+	can be revised cleanly to be defined in terms of pattern 
+	matching in a future version of Yama.
+	
+	
+ -- Patterns --
+ 
+ 
+	Patterns describe the *shape* of an object, describing 
+	characteristics of it.
+	
+	Patterns may be parameterized w/ subpatterns, w/ these 
+	subpatterns describing the *shape* of specified subobjects 
+	extractable from the original object.
+	
+	Patterns may 'match' objects, and/or 'destructure' objects.
+	
+	Matching asserts that an object has certain expected 
+	characteristics, as described by a pattern.
+	
+	Destructuring extracts subobjects from an object, w/ the
+	pattern detailing *what* subobjects are to be extracted.
+	
+	Some examples of potential patterns:
+	
+	
+		// the below three patterns definitely don't involve
+		// any potential destructuring
+	
+		1		// pattern for Int w/ value 1
+		"abc"	// pattern for Str w/ value "abc"
+		true	// pattern for Bool w/ value true
+		
+		// pattern for identifier 'a'
+		
+		// depending upon context, this could introduce a new
+		// local called 'a', or it could be referencing an
+		// existing 'a' named object
+		
+		a
+		
+		// wildcard pattern, for situations where we don't
+		// care about the nature of a subobject, and aren't
+		// interested in extracting anything from it
+		
+		_
+		
+		// pattern for an array-like object w/ at least 3
+		// elements, w/ these having subpatterns 'a', 'b',
+		// and 'c', respectively, for destructuring
+		
+		var [a, b, c, ...]
+		
+		// pattern for a tuple-like object w/ 2 elements,
+		// w/ the subpattern 'a' performing destructuring 
+		// *immutable* objects and the second subobject being
+		// disregarded via a wildcard subpattern
+		
+		const (a, _)
+		
+		// pattern for incorporating concepts from above
+		
+		// this also shows an example of things like destructuring
+		// in the context of composite patterns
+		
+		[_, (var a, _), const b, ...]
+	
+	
+ -- Open Questions --
+ 
+ 
+	- are patterns a category of expression? or are they different?
+	
+	- what is the relationship between patterns and type specifiers?
+

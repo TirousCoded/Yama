@@ -1,0 +1,214 @@
+
+
+ -- Protocols --
+ 
+ 
+	An important part of Yama's type system are Go-style
+	interface types called 'protocols'.
+	
+	Being 'Go-style', protocols are 'structurally typed',
+	w/ conformance being checked, and metadata generated,
+	at runtime.
+	
+	Protocols are an important part of Yama's type system, which
+	aims to be purely composition driven, lacking traditional
+	OOP-style inheritance.
+	
+	
+ -- The 'Self' Pseudo-Type --
+ 
+ 
+	Within protocol definitions a 'Self' pseudo-type may be used
+	to describe the usage of the type of the object which is 
+	being interacted w/ via the protocol.
+	
+	Since such objects are guaranteed to impl the characteristics
+	required for conformance to the protocol, the characteristics
+	of the Self pseudo-type are those described by the terms of
+	the protocol.
+	
+	When the syntax '&self' is used, the Self pseudo-type is the
+	*type* which &self translates to.
+	
+	
+ -- Protocol Terms --
+ 
+	
+	Protocols are collections of 'terms', each term encapslating
+	a specific detail required for conformance to the protocol.
+	
+	
+		proto Fmt {
+			fn fmt(&self) -> Str,
+		}
+	
+	
+	Type method terms allow for specifying constructors
+	in protocols.
+	
+	Getter & setter methods allow for specifying properties
+	in protocols.
+	
+	
+		proto Point3 {
+			fn new(x, y, z: Float) -> Point3,
+			
+			x: Float, // default needs getter and setter
+			y: Float,
+			z: Float,
+			
+			length: readonly Float, // 'readonly' denotes need only getter
+		}
+		
+		
+	Protocols may specify other protocols which it acts an
+	extension of, w/ all of its terms being added to the
+	dependent protocol.
+	
+	
+		proto Parse {
+			Fmt,
+			fn parse(_: Str) -> Self,
+		}
+	
+	
+	Protocols may also include other special requirements 
+	which may be incorporated into protocols.
+	
+	
+ -- Function Protocols --
+ 
+ 
+	Yama will include a system 'function protocols' as its
+	implementation of 'delegates'.
+	
+	A function protocol is literally just a protocol type,
+	but w/ special syntax to summarize its definition.
+	
+	These function protocols are reference typed, while function 
+	types are value types. This means that converting a function 
+	type into a function protocol type requires boxing.
+	
+	
+		fn proto SumInts(_, _: Int) -> Int
+		
+		
+	Additionally, in order to define the call itself, Yama will
+	allow protocols to specify a special 'call' term.
+	
+	This special 'call' term is satisfied by either a type which
+	has an *inherent* call signature, or which has a 'call' method.
+	
+	This call method must have the expected return type, and it must
+	have the expected parameters, alongside having a '&self' parameter
+	prefixing the main parameter list itself, so as to be able to be
+	passed the function object.
+	
+	
+		proto SumInts {
+			fn(_, _: Int) -> Int,
+		}
+		
+		// SumInts is satisfied by both of the below type
+		
+		fn sum_ints(a, b: Int) => a + b; // <- has *inherent* call signature
+		
+		struct SumIntsAction {
+			a, b: Int,
+		}
+		
+		fn SumIntsAction.new(a, b: Int) => SumIntsAction { a, b };
+		
+		fn SumIntsAction.call(&self, a, b: Int) => a + b;
+	
+	
+ -- Protocol Pulling --
+ 
+ 
+	When writing code in a manner that 'prefers composition over
+	inheritance' often times one finds oneself writing methods to impl
+	an interface for a type which simply forward to equivalent methods
+	of some subobject of objects of the type.
+ 
+	Yama's 'protocol pulling' system automates this process of writing
+	wrapper methods.
+	
+	Protocol pulling in this way is likewise Yama's alternative to
+	inheritance, allowing Yama code to build macroscopic object types
+	w/out so much of the *paperwork* that traditional OOP entails.
+	
+	
+		proto Fmt {
+			fn fmt(&self) -> Str,
+		}
+		
+		struct Abc {}
+		
+		fn Abc.fmt(&self) => "abc";
+		
+		struct Def {
+			abc: Abc,
+		}
+		
+		for Def.abc pull Fmt; // <- *pulls* the Abc impl of Fmt into Def
+		
+		
+ -- Protocol Pulling Optimization --
+	
+	
+	One thing to note is that a naive impl of this system could result
+	in an object's auto-generated methods forwarding to other auto-generated
+	methods, which in turn could likewise forward to other auto-generated
+	methods, w/ this repeating until reaching the underlying method.
+	
+	This issue can be resolved by having the impl instead behave such that
+	when it encounters a scenario where it could make an auto-generated method
+	forward to another auto-generated method, that it instead uses member
+	access to skip the additional method call.
+	
+	This optimization ensures that auto-generated methods always perform
+	only one forward call which directly calls the underlying wrapped method,
+	just w/ perhaps some member accesses where needed.
+	
+	
+ -- Protocol Pulling & Errors --
+ 
+ 
+	One objection one might raise w/ protocol pulling is what happens if
+	an error arises within the auto-generated method body of a method 
+	created via protocol pulling?
+	
+	The simple answer is that this *shouldn't* cause any issues. The reason
+	is that Yama's model of error handling operates on the basis of asserting
+	that 'non-fatal errors' shouldn't actually be *errors*, and instead
+	just valid outputs, w/ error semantics implemented via monads.
+	
+	This means that the body of auto-generated methods should not be able
+	to themselves call std:crash, which causes the system to abort. This ensures
+	that if std:crash does arise, it'll have to arise within the body of a
+	method above the auto-generated method on the call stack, which ensures
+	that the programmer will be able to diagnose the problem, as all info
+	about the call can be tied to that ladder method call in the stack trace.
+	
+	
+ -- Covariance & Contravariance --
+ 
+ 
+	While unlikely to be added initially, one cool feature Yama could have
+	is allowing for covariance and contravariance w/ regards to testing
+	for conformance to a protocol.
+	
+	This would allow for the parameter and return types of a method to
+	not have to be literally the same as is specified in the terms of 
+	the protocol, but instead merely compatible for use w/ it.
+	
+	
+ -- Open Questions --
+ 
+ 
+	- how does protocol pulling allow for the end-user to
+	  selectively provide 'override' methods to use instead of
+	  auto-generating said methods
+ 
+	- how does protocol pulling address name conflicts?
+

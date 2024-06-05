@@ -1,0 +1,17 @@
+
+
+ -- Parcels --
+ 
+ 
+	This document lays out Yama's code style guidelines.
+	
+	
+	TODO: this this document out
+	
+	
+ -- Open Questions --
+ 
+ 
+	n/a
+	
+	

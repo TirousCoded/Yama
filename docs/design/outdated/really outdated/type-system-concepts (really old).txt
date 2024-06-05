@@ -1,0 +1,184 @@
+
+
+ -- type system concepts --
+	
+	
+ -- object types --
+ 
+ 
+	yama's type system homogenizes object types into a single
+	unified type category, w/out a need to distinguish between things
+	like 'value' and 'reference' types
+	
+	object of these types have these characteristics:
+	
+		1) all objects are *reference typed* objects which are instances
+		   to referenced by 'ovalues'
+		
+		2) extending #1, all objects have 'lifetime semantics'
+		
+		3) all objects have an associated 'type' association describing
+		   the underlying type of the object
+		
+		4) they all are 'null safe' in the form of lacking a null state,
+		   w/ monads being expected to be used instead
+ 
+ 
+ -- objects & ovalues --
+ 
+ 
+	in yama, 'objects' encapsulate units of state w/ associated
+	type information
+	
+	objects are instances referenced by 'ovalues', w/ these ovalues being
+	the sole mechanism by which objects may be interacted w/
+	
+	objects have 'lifetime semantics', which describe when an object is 
+	to be destroyed, w/ these semantics being the abstraction behind which
+	ARC or a GC may be implemented for automatic memory management
+	
+	ovalues have an associated 'ovalue type' which describes the type
+	which the object of the ovalue is to interacted w/ as
+	
+	ovalue types may be either the object type of the object of the ovalue,
+	or an interface type which the prior object type conforms to
+	
+	
+ -- lifetime semantics --
+ 
+ 
+	lifetime semantics govern when an object is to be destroyed
+	
+	ARC will be used to manage the lifetimes of objects
+	
+	maybe later we'll look into garbage collection, but at first at
+	least we'll just stick to ARC
+	
+	see below about 'weak types' for info on weak referencing ovalues
+ 
+ 
+ -- weak types --
+ 
+ 
+	in yama, 'weak types' refer to special type's who's ovalues do not 
+	take ownership of their associated object, such that the object's 
+	lifetime may suddenly end w/out warning
+	
+	obviously, these weak types only really make sense to use as the
+	types of ovalues, not of underlying objects, as it doesn't make sense
+	for an underlying object to be of a weak type
+	
+	weak types are a bit like maybe monads, but they'll need special
+	semantics as, unlike maybe monads, they're able to *suddenly* change
+	their underlying state
+	
+	TODO: don't we not have value types?
+	
+	value types may also have corresponding weak types, w/ this being so
+	that generic systems can be created which are transparent w/ regards
+	to the category of said types involved
+	
+	weak value types functionally provide a guarantee that they will 
+	always be good (as they have no instance to keep track of) but will,
+	to keep their usage consistent w/ weak reference types, still require
+	the same safety checks to be performed
+ 
+ 
+ -- null safety --
+ 
+ 
+	as stated, objects/ovalues will *not* have a notion of 'null' state,
+	and are thus guaranteed to always be in a usable state
+	
+	monads will be the preferred method by which objects will implement 
+	the notion of not providing a guarantee of being in a usable state
+	
+	
+ -- primitive typed objects --
+ 
+ 
+	as stated, yama defines a single homogenous type category which
+	encapsulates all types, including 'primitive' types
+	
+	in yama, there is to be only a single primitive object singleton
+	for each unique value of a primitive type, such that if two ovalues
+	reference primitive objects of equal value, they are definitionally
+	referring to the same underlying object
+	
+	furthermore, primitive typed objects are to be immutable, and the 
+	initialization and deinitialization of primitive typed objects is 
+	to be totally transparent to the end-user, and are to thus do nothing
+	
+	the reason for these semantics is that I'd like to implement primitive
+	typed objects by *not* have an actual object instance, but instead
+	just having the immutable primitive value be stored in the ovalue
+	where the object instance pointer would be, and then having the system
+	treat all primitive typed object ovalues of the same type and value
+	as referring to the same *conceptual* object instance
+	
+	due to the referential transparency of primitive typed object 
+	initialization/deinitialization, we needn't actually have any actual
+	object creation/destruction (especially if we make sure to define our
+	semantics such that the implementation is allowed to omit this behaviour
+	for these purposes)
+	
+	I like this design as it lets us have a homogenous type system,
+	but still having the optimization of primitive values being stored
+	directly in the ovalues, w/out actually allocating anything
+	
+	furthermore, to make this implementation work, we'll need to store
+	the underlying object type in the ovalue as well, which should be fine,
+	as that should be an immutable characteristic of each unique ovalue,
+	plus it's probably better for memory locality if it's put there
+	
+	
+ -- ovalue links --
+ 
+ 
+	in order to provide 'ref-parameter' semantics, yama will employ
+	a system of 'ref. ovalue', or 'ovalue links' which are special ovalues 
+	which act as indirect references to other ovalues stored elsewhere 
+	(sorta like symlinks), w/ all operations performed on them being 
+	transparently forwarded to these other ovalues
+	
+	the ovalue indirectly referenced by a ovalue link is its 'target'
+	
+	an important feature of ovalue link is that they *do not* need
+	to have the same ovalue type as their target, w/ such ovalue links
+	thus providing transparent access to their target *as though*
+	said target's ovalue type were actually that type
+	
+	creation of a ovalue link targeting another ovalue link initializes a
+	copy of said other ovalue link, targeting its target
+	
+	
+ -- types as objects --
+ 
+ 
+	in yama, types will be encapsulated by yama objects, w/ these
+	objects being of a special built-in 'type' type
+	
+	type objects encapsulate references to state about a given type
+	stored in the engine, w/ each unique type having a corresponding
+	singleton object instance associated w/ it
+	
+	yama types in code will come in the form of constant expressions
+	of the above 'type' type, which will result in type objects of
+	the types involved
+	
+	the way it will work is that types are acquired via 'type constructors',
+	which instantiate new types, and put their state into the engine, or 
+	fetch existing type data for said type if available
+	
+	in code, defined types define associated type constructors used to
+	instantiate them, w/ their being two primary forms of syntax used
+	to invoke these:
+	
+		1) for non-parameterized types, the identifier for said type is
+		   itself an expression which resolves to the type object of
+		   the singleton for that type
+		   
+		2) for parameterized types, identifiers w/ associated type
+		   arguments are used to specify instantiation of final and usable
+		   types, w/ the their identifiers instantiating their generic types
+

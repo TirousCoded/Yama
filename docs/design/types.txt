@@ -1,0 +1,215 @@
+
+
+ -- Types --
+ 
+ 
+	Yama is a statically typed language in which all values have
+	a well-defined static type association.
+	
+	Yama is also a nominally typed language, w/ exception of 
+	protocols which are typed in a more *structural* manner, 
+	modelled off languages like Go.
+	
+	See docs about modules regarding how types are organized
+	and identified therein.
+	
+	
+ -- Composition Over Inheritance --
+ 
+ 
+	Yama types are not defined in terms of inheritance hierarchies.
+	
+	Instead, Yama will define all types in terms of a *flat* 
+	type system where types are grouped together into 
+	protocol-based type sets.
+	
+	See 'protocols.txt' for details.
+		
+		
+ -- The 'std' Parcel --
+ 
+ 
+	By default a built-in 'std' parcel is mounted into module
+	systems automatically during regular usage. This std parcel 
+	contains modules encapsulating all built-in std types.
+	
+	Within the std parcel is a root module encapsulating the 
+	main standard library itself.
+	
+	
+ -- Built-In Data Types --
+ 
+ 
+	Yama will guarantee that all expressions return something.
+	
+	To this end, it will define the following unit type to
+	encapsulate an otherwise lack of return value:
+	
+	
+		std:None
+		
+		
+	Yama will define the following 'top type':
+	
+	
+		std:Any
+		
+		
+	The std:Any type may be defined as just an empty protocol.
+	
+	
+	TODO: keep std:Never, but I don't think Yama will be a 
+		  'purely expression-based language' however
+	
+	Yama expresses all control flow w/ expressions, being a
+	purely expression-based language.
+	
+	To this end, Yama will define the following 'bottom type':
+	
+	
+		std:Never
+		
+		
+	No objects may be instantiated w/ type std:Never.
+	
+	For every other type, there shall be defined an implicit
+	conversion from std:Never to that other type.
+	
+	These two rules impl the semantics of a bottom type.
+ 
+ 
+	Yama will define the following built-in primitives used to
+	encapsulate basic scalar values:
+	
+	
+		std:Int
+		std:UInt
+		std:Float
+		std:Bool
+		std:Char
+		
+		
+	The std:Int, std:UInt, and std:Float types are all 64-bit.
+	
+	The std:Char type encapsulates a Unicode codepoint.
+	
+	
+	Yama will provide the following size-specialized versions
+	of std:Int and std:UInt.
+	
+	These are not different in terms of storage size, but instead
+	merely exist to allow for specifying of integer types w/ 
+	expected limited value ranges.
+	
+	
+		std:Int8
+		std:Int16
+		std:Int32
+		std:Int64 	<- alias of std:Int
+		
+		std:UInt8
+		std:UInt16
+		std:UInt32
+		std:UInt64 	<- alias of std:UInt
+	
+	
+	Yama will define the following string type:
+	
+	
+		std:Str
+		
+		
+	The std:Str type encapsulates an immutable string of 
+	Unicode characters, perhaps encoded in UTF-32 like Python.
+ 
+ 
+	To impl its null safety policy, Yama will define the 
+	following monadic types:
+	
+	
+		std:Option[T]
+		
+		std:Result[T, E]
+		
+		
+	The std:Option[T] type is an option type.
+	
+	The std:Result[T, E] type is a result type.
+		
+	The std:Option[T] type may be expressed as T?.
+	
+	
+	To impl weak references, Yama will define the following
+	weak reference monadic type:
+	
+	
+		std:Weak[T]
+		
+		
+	The std:Weak[T] type behaves a lot like std:Option[T], 
+	except it can lose its underlying state w/out warning.
+	
+	TODO: do we need the below?
+		
+	The std:Weak[T] type may be expressed as weak(T).
+	
+	
+	In order to impl a 'nil' keyword, Yama will define the
+	following special unit type:
+	
+	
+		std:Nil
+		
+		
+	For each type T, two implicit conversions shall be
+	defined: one from std:Nil to std:Option[T], and one
+	from std:Nil to std:Weak[T].
+	
+	
+	Yama will define the following tuple types:
+	
+	
+		std:Tuple0
+		std:Tuple1[T0]
+		std:Tuple2[T0, T1]
+		...
+		std:Tuple24[T0, T1, ..., T23]
+		
+		
+	The std:Tuple#[...] types encapsulate tuples of objects.
+	
+	The std:Tuple#[...] types may be expressed as (), (T0,),
+	(T0, T1), ..., (T0, T1, ..., T23).
+	
+	Take note of how the form for std:Tuple1[T0] is '(T0,)', 
+	w/ a ',' to differentiate it from an expression in a pair 
+	of round brackets.
+	
+	
+	Yama will define the following basic container types:
+	
+	
+		std:List[T]
+		
+		std:Set[K]
+		
+		std:Map[K, T]
+		
+		
+	The std:List[T], std:Set[K], and std:Map[K, T] types
+	encapsulate resizable array, hash set, and hash map 
+	containers, respectively.
+	
+	
+ -- Open Questions --
+ 
+ 
+	- what's Char's relationship to Unicode codepoint legality?
+		- does it allow representing of UTF-16 surrogate values?
+		- does it allow representing of values above U+10FFFF?
+		
+	- what's String's relationship to Unicode and UTF-8/16/32?
+		- should we use UTF-32 internally like python? for simplicity?
+		- or maybe use UTF-16 internally like .NET?
+		- I think I prefer to either use UTF-8 or UTF-32
+

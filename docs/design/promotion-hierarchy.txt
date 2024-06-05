@@ -1,0 +1,29 @@
+
+
+ -- Promotion Hierarchy --
+ 
+ 
+	One of the big ideas I'd like Yama to be designed around is
+	the idea of a 'promotion hierarchy'.
+	
+	Yama has three major parcel implementations: codebase,
+	binary, and native parcels.
+	
+	The idea is that codebases can be 'promoted' to binaries
+	by precompiling them.
+	
+	Likewise, binaries can be 'promoted' to native parcels by
+	preverifying and then transcompiling them into C++ code.
+	
+	Finally, codebases can thus be 'promoted' to native parcels
+	using a binary parcel intermediate.
+	
+	This ability lets the end-user selectively 'promote' their
+	Yama glue logic codebase from source code to more *embedded*
+	forms, getting benefits like reduced load times, better
+	performance, and the ability to embed their glue logic code
+	in their C++ codebase when they're ready to commit.
+	
+	This is a key concept in Yama, and I'd like the Yama API
+	to be written w/ this core concept in mind.
+

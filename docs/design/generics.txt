@@ -1,0 +1,84 @@
+
+
+ -- Generics --
+ 
+ 
+	Yama supports a simple yet powerful system of generics.
+	
+	
+ -- Basics --
+ 
+ 
+	Yama will support type parameterization of functions, structs, etc.
+	
+	Yama's generics system is heavily inspired by Go's, including its
+	syntax using '[]' rather than '<>' for parameter/argument lists.
+	
+	
+		// here 'std:Ordered' refers to some kind of protocol which is
+		// used to define things like the '<' operator
+	
+		fn min[T: std:Ordered](a, b: T) -> T {
+			if (a < b) {
+				return a;
+			}
+			else {
+				return b;
+			}
+		}
+		
+		fn main() {
+			var a = min[Int](3, 10); // a == 3
+		}
+		
+		
+ -- Type Parameters, Arguments & Constraints --
+ 
+ 
+	Yama 'type parameters' refer to the type parameter variables used
+	within generic types, and 'type arguments' refer to the types 
+	passed into them upon 'instantiation' of a concrete type.
+	
+	Yama 'type constraints' refer to the constraints placed upon type
+	parameters which define what types can and cannot be passed to them
+	during instantiation.
+	
+	Type constraints are defined by protocols, which are used to specify
+	sets of types, and so will work really well in this role.
+	
+	Yama may also end up defining special built-in type constraints which
+	are NOT based on protocols, but instead are special pseudo-protocols
+	provided to imbue type parameters w/ more nuanced semantic properties.
+	
+	
+ -- Type Argument Inference --
+ 
+ 
+	Often it can be really annoying to have to manually specify the type
+	arguments of each-and-every instantiation of a generic type.
+	
+	To this end, Yama will implement a system in which certain circumstances
+	will allow for the type argument list of a generic type to be omitted,
+	and for said type arguments to be instead deduced according to context.
+	
+	Yama will only support this when the *entire* type argument list is 
+	omitted, w/ Yama being unlikely to support *partial* omissions.
+	
+	
+ -- No Generic Methods/Getters/Setters/etc. --
+ 
+ 
+	An important limitation placed deliberately on Yama's generics system
+	is that *subordinated* types like methods, getters, setters, etc. may
+	be subordinated by generic types, but they may *not* be generic themself.
+	
+	This is an important limitation as it *greatly* simplifies the implementation
+	of Yama's generics system, by ensuring that for any given type there is
+	guaranteed to be no more than one type argument list to consider.
+	
+	
+ -- Open Questions --
+ 
+ 
+	n/a
+

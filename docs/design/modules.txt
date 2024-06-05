@@ -1,0 +1,102 @@
+
+
+ -- Modules --
+ 
+ 
+	Yama employs 'modules' as its unit of code organization.
+	
+	
+ -- Code Organization --
+ 
+ 
+	Each module encapsulates a flat namespace of 'types'.
+	
+	Types each have an associated 'name' which they are 
+	mapped to. These are decorated name string identifiers,
+	each uniquely identifying and differentiating a type.
+	
+	
+ -- Information Hiding --
+ 
+ 
+	Modules are used to implement Yama's semantics w/ regards to 
+	information hiding.
+	
+	Types within modules may either be 'public' or 'private'.
+	
+	Types which are public are visible to the external environment,
+	while private types are not.
+	
+	This system is the only form of information hiding Yama provides, 
+	as it's powerful, yet simple.
+	
+	Under this system all types within a module can see all other types.
+	
+	In truth, the actual Yama implementation will likely have information 
+	hiding be a *suggestion* at the C++ API level, w/ the end-user being 
+	free to *peek* inside as they please.
+	
+	Types prefixed w/ the 'hide' keyword are private, all others are public.
+	
+	
+		fn plus_int(a, b: Int) => a + b; // public
+	
+		fn _some_internal_thing() => 51.4312; // private
+		
+		
+	Additional rules apply regarding ensuring things like call signatures
+	for public types not containing private types, or variables existing 
+	which have a private getter, but a public setter.
+	
+	
+		hide struct _Abc {}
+	
+		fn public_fn(abc: _Abc) {} // illegal!
+		
+		hide fn get some_variable() => 0;
+		fn set some_variable(x: Int) {} // illegal!
+		
+	
+ -- Type Systems --
+ 
+ 
+	A 'type system' defines a system capable of 'importing' modules
+	and then 'loading' types from them.
+	
+	Type systems operate relative to an associated module system. When 
+	modules are imported, or interact w/ thereafter, they are identified
+	by their import paths.
+	
+	When loading types, the type system identifies types by their
+	associated type signatures.
+	
+	The act of loading a type may implicitly import its module, which
+	may likewise import dependencies, recursively.
+	
+	
+ -- Type Signatures --
+ 
+ 
+	TODO: maybe make use an intermediate binary form, and make string
+		  forms used via format/parse backend
+ 
+	Within a type system, each type is uniquely identified by a 
+	'type signature' identifier.
+	
+	The type signature of a given type is defined as the import path
+	of its associated module, followed by a colon (ie. ':'), followed
+	by the decorated name of the type.
+	
+	In truth, type signatures may also embed more nuanced information,
+	such as w/ type signatures of parameterized types. In these cases
+	it's not unlikely to find type signatures w/ the type signatures
+	of other types embedded within them.
+	
+	
+ -- Open Questions --
+ 
+ 
+	- how do module dependency relationships work?
+	
+	- shouldn't modules be explicitly immutable?
+

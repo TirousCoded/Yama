@@ -1,0 +1,80 @@
+
+
+ -- Enums --
+ 
+ 
+	Yama supports the definition of tagged unions called 'enums'.
+	
+	
+ -- Cases --
+ 
+ 
+	Enums define a set of 'cases', each encapsulating one of the
+	possible states the enum object may be in.
+	
+	The object of the case of an enum object may be mutable, but
+	the enum object itself is immutable once initialized.
+	
+	Enum cases have an associated object, of the type specified,
+	or None if none is specified.
+	
+	
+		enum Option[T: Any] {
+			none,
+			some: T,
+		}
+		
+		enum Result[T: Any, E: Any] {
+			ok: T,
+			err: E,
+		}
+		
+		enum Colour {
+			rgba: (r, g, b, a: UInt8),
+			code: UInt32,
+		}
+		
+		
+ -- Enum Usage --
+ 
+ 
+	Enums are initialized by explicitly specifying the case which is
+	to be used for initialization and calling it like a type method.
+	
+	
+		var a = Option[Int].some(31);
+		var b = Result[Int, Str].err("some error occurred!");
+		var c = Colour.rgba(31u, 0u, 155u, 200u);
+		
+	
+	Given some enum object, accessing its case like a getter will 
+	result in the accessing of its value.
+ 
+	Attempting to access the value of enum object via a case other than
+	the one active for it will result in a crash.
+	
+	
+		var a_value = a.some; 	// a_value == 31
+		var b_value = b.err; 	// b_value == "some error occurred!"
+		var c_value = c.rgba.b; // c_value == UInt8(155u)
+		
+		
+	The 'is'-expression may be used to check the case of an enum.
+	
+	In these cases, the type specifier prior to the '.[CASE NAME]' portion
+	may be ommitted.
+	
+	
+		var a_is_some 	= a is .some; 	// a_is_some == true
+		var b_is_ok 	= b is .ok; 	// b_is_ok == false
+		var c_is_code 	= c is .code; 	// c_is_code == false
+	
+	
+ -- Open Questions --
+ 
+ 
+	- generics?
+	
+	- pattern matching?
+		- match expressions?
+

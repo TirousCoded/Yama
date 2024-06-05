@@ -1,0 +1,152 @@
+
+
+ -- parcel system concepts --
+ 
+ 
+ -- introduction --
+ 
+ 
+	This document aims to layout the overall design of the 'parcel' 
+	system of the Yama programming language.
+	
+	Not entirely sure what I want to call it in the end. (Maybe the 
+	'import system', or something...)
+	
+	The parcel system refers to the management of units of code 
+	(called in Yama 'modules') w/ regards to things like importing.
+	
+	
+ -- filesystem-like abstraction --
+ 
+ 
+	Yama uses a filesystem-like abstraction to generalize usage of 
+	systems for importing Yama code resources.
+	
+	Within this abstraction, code is seperated into seperate 'modules'.
+	These are flat namespaces of Yama code resources, w/ each namespace
+	being distinct, and itself named.
+	
+	Alongside modules, within this abstraction, modules are
+	organized into 'parcels' and 'subparcels'. These are, likewise,
+	directory-like containers of modules and other subparcels.
+	
+	These parcels/subparcels may also themselves act as modules. It is
+	best to view parcels/subparcels as modules w/ additional semantics.
+	
+	Notice that w/ regards to parcels/subparcels acting as extended
+	versions of modules, the namespaces of code resources within
+	them are semantically seperate from the directory-like namespaces 
+	they have w/ regards to nested modules/subparcels.
+	
+	Finally, w/ regards to the distinction between parcels and 
+	subparcels within the Yama API, the 'importer' is responsible 
+	for the 'importing' of code resources, w/ the end-user having to 
+	'bind' parcels from the external environment to identifiers
+	so that the API can import from them. This binding process 
+	distinguishes between the top-level 'parcels' which can be bound, 
+	and their nested 'subparcels' which cannot be.
+	
+	
+ -- binding & paths --
+ 
+ 
+	This section introduces 'paths', and elaborates on the parcel
+	binding process mentioned above in summary.
+	
+	Within the above abstraction, a 'path' is used to describe the 
+	location of a module/parcel/subparcel within the context of a
+	particular parcel. The syntax for these paths is inspired by
+	the syntax of Linux file paths.
+	
+	Put simply, paths always start w/ the binding name of the parcel
+	they're relative to, followed by a sequence of the subparcels and
+	modules of the path, w/ these elements seperated by '/' characters.
+	
+	This syntax does not have a notion of file extensions, so there's
+	no need for things like '*.yama' extensions.
+	
+		
+		game/math/linear_algebra/vectors
+		
+		
+	As stated above, the first name in a path is the 'binding name'
+	of the parcel the path is in the context of. These bindings are
+	mappings of identifiers to parcels in the external environment,
+	which can be anything from filesystem directories, to purely
+	*virtual* hierarchies for establishing bindings (fyi. this is not 
+	the same notion of 'binding') for C++ code.
+	
+	Finally, these paths may be used to further describe an identifier
+	for a type within a module by appending the path w/ a ':', followed
+	by a string identifier for said type, within its namespace.
+	
+	
+		game/math/linear_algebra/vectors:Vec2.x
+		
+		
+	Beyond the above summary, discussion of these identifiers is beyond
+	the scope of this document, and will not be discussed further.
+	
+	
+ -- implementation ideas --
+ 
+ 
+	The remainder of this document is for detailing some ideas I have
+	regarding what our implementation of this abstraction could look like.
+	
+	
+ -- single-module parcels --
+ 
+ 
+	We may want to just import a single *.yama module file, but w/ it
+	being treated as a whole parcel.
+	
+	Our implementation could support this, allowing individual *.yama
+	modules files to be imported as 'single-module parcels', where 
+	semantically they are represented by a single root parcel, which then 
+	encapsulates the module of the *.yama module file.
+	
+	
+ -- directory parcels --
+ 
+ 
+	One logical thing to do is to allow for directory hierarchies in the
+	external filesystem to be abstracted behind this filesystem-like 
+	abstraction of ours.
+	
+	To this end, our implementation could do just this, w/ the directories
+	being the parcels/subparcels, and *.yama files within them being the
+	modules nested therein.
+	
+	Finally, in order to allow for parcels/subparcels to have module
+	semantics, I think I like the idea of a special *.yama module file
+	immediately within a given directory, named something like 'here.yama'.
+	These module files would be specially interpreted as describing the 
+	module semantics of said directory's associated parcel/subparcel, w/ 
+	these 'here.yama' module files not participating in the system otherwise.
+	
+	
+ -- binary parcels --
+ 
+ 
+	Alongside the above about Yama parcels being represented as directory
+	hierarchies within the external filesystem, I think it also makes a lot
+	of sense to allow these to be pre-compiled into *.parcel binary files.
+	
+	Within Yama, the internals of these pre-compiled binary parcels is 
+	interacted w/ exactly as it was prior to its pre-compilation.
+	
+	
+ -- virtual parcels --
+ 
+ 
+	When working w/ C++ code mixed w/ Yama code, it will often be the case
+	that we'll want to create 'bindings' (again, no relation to above concept)
+	for our C++ code in Yama, to expose an API letting the Yama code to 
+	interface w/ C++.
+	
+	To this end, it makes sense to allow for the creation of 'virtual parcels',
+	which are implementations of our filesystem-like abstraction for module
+	importing which exposes C++ binding modules within the abstraction, where
+	the modules/parcels/subparcels involved are purely *fictional*.
+

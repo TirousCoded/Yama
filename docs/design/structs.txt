@@ -1,0 +1,171 @@
+
+
+ -- Structs --
+ 
+ 
+	Yama supports the definition of named tuples called 'structs'.
+	
+	
+ -- Properties --
+ 
+ 
+	Struct members are called 'properties', and define getter/setter pairs.
+	
+	The properties defined within the body of the struct are called
+	'stored properties', and the end-user may not define getter/setter
+	methods for these manually. Stored properties each define a kind of backing 
+	field to store underlying state.
+	
+	
+		struct Abc {
+			stored_property: Int,
+		}
+		
+	
+	The end-user may define 'computed properties' by defining getter/setter
+	methods for a struct for a property not represented within its body.
+		
+		
+		fn Abc.get computed_property(&self) -> Int {
+			return stored_property;
+		}
+		
+		fn Abc.set computed_property(&self, x: Int) {
+			stored_property = x;
+		}
+		
+		
+	If a stored property's type is prefixed w/ 'readonly', then it is still
+	defined w/ a getter/setter, as usual, but the setter will be private,
+	meaning it'll only be available to code within the struct's module.
+	
+	
+		struct Vec3 {
+			x, y, z: readonly Float, // notice the 'x, y, z' syntax, btw
+		}
+		
+		
+ -- Initialization --
+	
+	
+	Structs are initialized via an explicit list of assignments to their
+	stored properties, initializing each one, called 'explicit initialization'.
+	
+	During explicit initialization the underlying subobjects of stored
+	properties are in an indeterminate state, and so explicit initialization
+	restricts them to only be assigned, ensuring that they're never read from.
+	
+	Stored properties may be initialized in any order. The order they're
+	specified in is the order in which the initializing expressions execute.
+	
+	Explicit initialization requires each stored property to be specified by
+	name, rather than position, so as to ensure initialization is decoupled
+	from the declaration order of stored properties.
+	
+	Computed properties may be initialized during explicit initialization too.
+	However, computed properties must come AFTER stored properties, as the
+	formers' code could reference the ladder, and this rule is thus required
+	to ensure all stored properties are initialized before this happens.
+	
+	
+		struct Vec3 {
+			x, y, z: readonly Float,
+		}
+		
+		const zero_v3 = Vec3{
+			x = 0.0, // explicit initialization
+			y = 0.0,
+			z = 0.0,
+		};
+	
+	
+	By default, a struct w/ no private stored properties is such that its
+	ability to be explicitly initialized is exposed publically, and is thus
+	available to the code's consumers.
+	
+	If a struct is annotated w/ '@hide_explicit', then its ability to be
+	explicitly initialized is not exposed publically, and is private, and
+	thus unavailable to the code's consumers.
+	
+	A struct w/ one or more private stored properties is implicitly annotated
+	w/ '@hide_explicit' automatically if it isn't annotated explicitly.
+	
+	
+		// type 'A' may be explicitly initialized by consumer code
+	
+		struct A {
+			x: Int,
+		}
+		
+		// type 'B' may NOT be explicitly initialized by consumer code
+		
+		struct B { // <- annotation '@hide_explicit' added implicitly
+			hide x: Int,
+		}
+		
+		// type 'C' may NOT be explicitly initialized by consumer code
+		
+		@hide_explicit
+		struct C {
+			x: Int,
+		}
+		
+		
+	One intended pattern of use in Yama is for structs to be defined w/
+	type methods which act as 'constructors' for the struct.
+	
+	These methods are likewise called 'constructor methods'.
+	
+	These are otherwise just regular methods, and this, plus the semantics
+	above about explicit initialization, gives the programmer the ability
+	to properly encapsulate their code as they please.
+
+	Constructor methods also ensure that no constructor code ever occurs 
+	'in the middle of' initialization of the stored properties, only acting 
+	on them after their original *actual* initialization.
+	
+	Finally, take note also that 'Self' may be used for explicit initialization.
+	
+	
+		@hide_explicit
+		struct Vec3 {
+			x, y, z: readonly Float,
+		}
+		
+		fn Vec3.get zero() => Self{
+			x = 0.0,
+			y = 0.0,
+			z = 0.0,
+		};
+		
+		fn Vec3.new(x, y, z: Float) => Self{
+			x = x,
+			y = y,
+			z = z,
+		};
+	
+	
+ -- Anonymous Structs --
+ 
+ 
+	Anonymous struct types may be defined on-demand by specifying a tuple-like
+	type specifier w/ name annotation syntax for each parameter.
+	
+	Alternatively, they may be specified via a tuple-like expression which
+	carries initialization arguments, which are then name annotated.
+	
+	If two anonymous struct types carry the same number of, names of, and 
+	types of properties, then they are the same type.
+	
+	
+		fn point2f(x, y: Float) -> (x, y: Float) { // <- via type specifier
+			return (x: x, y: y); // <- via initialization expr
+		}
+	
+	
+ -- Open Questions --
+ 
+ 
+	- generics?
+		- what's relationship w/ anonymous structs?
+

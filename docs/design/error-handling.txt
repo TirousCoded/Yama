@@ -1,0 +1,84 @@
+
+
+ -- Error Handling --
+ 
+ 
+	Yama will impl error handling in a manner similar to
+	how Rust does it.
+	
+	Yama will handle recoverable errors via the std:Option[T]
+	and std:Result[T, E] monads, w/ recoverable 'errors'
+	thus not having any kind of try-catch exotic control
+	flow mechanism.
+	
+	Yama will handle unrecoverable errors via providing the
+	following function:
+	
+	
+		std:crash(msg: Fmt) -> Never
+		
+		
+	The std:crash function instructs the Yama VM to reset due
+	to the state of the VM having been compromised.
+	
+	
+ -- Crashing --
+ 
+ 
+	When std:crash is called, the Yama VM simply *stops*, w/out
+	calling things like destructors. This means that RAII-based
+	cleanup will NOT occur in the event of a VM crash.
+	
+	For things involving nothing more but the internal state of
+	the VM, this shouldn't matter, as all that state is going
+	to be cleaned up anyway, and so not performing cleanup does
+	not violate any invariants the outside system relies upon.
+	
+	However, in the case of there being invariants which outside
+	code does rely upon (eg. a 'File' typed object which uses RAII 
+	to make a syscall to close a file) then Yama provides VM
+	resources called 'cleanup guarantees' to ensures that these
+	invariants are never violated.
+	
+	
+ -- Cleanup Guarantees --
+	
+	
+	TODO: I think actually we may end up scrapping cleanup guarantees
+		  in favor of just using destructors, as I'm starting to feel
+		  cleanup guarantees may be a bit too *heterodox* an idea
+		  
+		  the reason I think this as it would force the programmer to
+		  know that their cleanup code WON'T FIRE during a crash, which
+		  may slip their mind, causing violated invariants in the
+		  event of a crash if they unknowingly wrote destructor code
+		  to maintain external invariants (ie. closing a file)
+		  
+		  also, forcing the end-user to write all their external resource
+		  releasing code in C++, and then expose it via RAII in Yama
+		  as the only way to do things is super heterodox, and may be
+		  a massive pain in the ass, compared to a more traditional
+		  'destructors firing during crash' approach
+	
+	A 'cleanup guarantee' is a VM resource (ie. it's identified by
+	something like an ID number) which encapsulates a behaviour
+	which is to be performed to ensures that some kind of cleanup
+	occurs such that an invariant is ensured (eg. closing a file.)
+	
+	A cleanup guarantee is *fired* to perform its cleanup behaviour,
+	at which point the cleanup guarantee resource is itself released.
+	
+	Cleanup guarantees are fired either manually (eg. when the
+	RAII-based based 'File' typed object's destructor fires), or
+	automatically when the VM is reset. These semantics ensure that
+	cleanup guarantees ALWAYS fire.
+	
+	I'm thinking right now that we'll restrict cleanup guarantees
+	to being a feature of the Yama API, one not exposed in Yama itself.
+	
+	
+ -- Open Questions --
+ 
+ 
+	n/a
+

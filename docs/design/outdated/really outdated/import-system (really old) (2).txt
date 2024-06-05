@@ -1,0 +1,131 @@
+
+
+ -- Import System --
+ 
+ 
+ -- Introduction --
+ 
+ 
+	Yama's 'Import System' describes the frontend abstraction of
+	the Yama API responsible for the identifying and importing
+	of 'Parcels' of Yama code from the external environment, for
+	use in a Yama context.
+	
+	Once imported, type information may be loaded from a Parcel.
+	Type information loading is, however, beyond the scope of
+	this document.
+	
+	
+ -- Parcels & Modules --
+ 
+ 
+	Yama code is partitioned up into 'Parcels', which encapsulate
+	individual namespaces, and which establish dependency 
+	relationships w/ one another.
+	
+	These Parcels are organized into 'Modules', which are container
+	of Parcels, which organize said Parcels into an internal
+	filesystem-like namespace. Parcels are identified by 'Import Paths',
+	which are used to 'import' a Parcel from the Module.
+	
+	Modules are just an abstraction, and as such do not dictate
+	what particular implementation they employ. To this end, Modules
+	allow for a wide variaty of different forms a provider of Parcels
+	may take, while allowing them to be used together homogenously.
+	
+	Parcels within a Module may, as stated, establish dependency
+	relationships w/ one another. These dependency relationships
+	may include referencing Parcels in other Modules. Such references
+	are defined by dependency relationships established between
+	Modules, which said Parcels may use to identify foreign dependencies.
+	
+	
+ -- Import Environments --
+ 
+ 
+	In Yama, an 'Import Environment' is the context in which Modules
+	may be used to import Parcels.
+	
+	The Import Environment defines a set of 'Module Instances', which 
+	are the unique Modules bound to the Import Environment which may
+	be used for importing. Each Module Instance is assigned a unique
+	identifier, which is used to refer to it.
+	
+	Each Module Instance is, as stated, unique. This means that even if
+	two Module Instances' implementations share some common source of 
+	Parcel information, such as common file references, the Parcels 
+	derived from them will nevertheless be considered distinct. Each 
+	Module Instance may also establish its own relationships w/ regards
+	to its dependency relationships w/ other Modules.
+	
+	Alongside Module Instances, the Parcels imported via them are likewise
+	'Parcel Instances', w/ these encapsulating the semantics of them
+	likewise being distinct from one another.
+	
+	
+ -- Import Paths --
+ 
+ 
+	When a Parcel is imported into an Import Environment via a Module,
+	an 'Import Path' specifies which Parcel should be imported.
+	
+	Each Parcel in a Module is to be associated w/ only a single Import
+	Path, so that Import Environment implementations can more easily
+	deal w/ Parcels due to how they can associate a single string w/
+	each, w/out worry about possible aliases.
+	
+	Import Path syntax is defined by a sequence of identifiers delimited
+	by '/' characters. The first identifier in the sequence specifies 
+	the Module in the Import Environment to access. The remaining 
+	identifiers specify the Parcel in the Module.
+	
+	These identifiers after the Module's identifier do not have any
+	intrinsic meaning. They are simply components of Import Paths used
+	to form unique paths such that each Parcel is thus associated w/
+	its own unique path.
+	
+	
+		<Module-ID>/<ID-1>/<ID-2>/.../<ID-3>
+	
+	
+	As stated, things involving type information are beyond the scope
+	of this document, including how Import Paths are used to help
+	identify types.
+	
+	
+ -- Standard Environment Types --
+	
+	
+ -- Context Environment --
+ 
+ 
+	// TODO
+	
+	
+ -- Compilation Environment --
+ 
+ 
+	// TODO
+	
+	
+ -- Standard Module Implementations --
+	
+	
+ -- Directory Modules --
+ 
+ 
+	// TODO
+	
+	
+ -- Binary Modules --
+ 
+ 
+	// TODO
+	
+	
+ -- Native Modules --
+ 
+ 
+	// TODO
+ 
+ 
