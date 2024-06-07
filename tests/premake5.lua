@@ -18,13 +18,15 @@ project "Tests"
 	
 	includedirs
 	{
-		"../yama",
+		"../yamalib",
+        "../vendor/TAUL/taul",
 		"../vendor/googletest/googletest/include",
 		"../vendor/googletest/googletest/"
 	}
 	
 	links
 	{
-		"YamaLib"
+		"YamaLib",
+		"TAUL"
 	}
 

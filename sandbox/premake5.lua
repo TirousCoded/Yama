@@ -17,11 +17,13 @@ project "Sandbox"
 	
 	includedirs
 	{
-		"../yama"
+		"../yamalib",
+        "../vendor/TAUL/taul"
 	}
 	
 	links
 	{
-		"YamaLib"
+		"YamaLib",
+		"TAUL"
 	}
 
