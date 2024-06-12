@@ -7,6 +7,7 @@
 #include <string>
 
 #include "asserts.h"
+#include "api_component.h"
 
 
 namespace yama {
@@ -40,23 +41,26 @@ namespace yama {
     // MAS allocated memory blocks are guaranteed to be aligned to alignof(std::max_align_t)
     
 
+    class mas;
+
+
     // mas_allocator_info is used to provide information about a MAS to the
     // C++ allocators used to interact w/ it
 
     // mas_allocator_info objects are passed four pieces of information:
-    //      1) 'info_ptr' which points to external state to help define MAS behaviour
+    //      1) 'client_ptr' which points to the MAS the allocator is acting as a proxy of
     //      2) 'alloc_fn' which defines allocation behaviour
     //      3) 'dealloc_fn' which defines deallocation behaviour
     //      4) 'max_size_fn' which defines max size specification behaviour
 
     struct mas_allocator_info final {
-        using info_ptr_t = void*;
-        using alloc_fn_t = void* (*)(info_ptr_t info, size_t bytes);
-        using dealloc_fn_t = void(*)(info_ptr_t info, void* block, size_t bytes) noexcept;
-        using max_size_fn_t = size_t(*)(info_ptr_t info) noexcept;
+        using client_ptr_t = mas*;
+        using alloc_fn_t = void* (*)(client_ptr_t client_ptr, size_t bytes);
+        using dealloc_fn_t = void(*)(client_ptr_t client_ptr, void* block, size_t bytes) noexcept;
+        using max_size_fn_t = size_t(*)(client_ptr_t client_ptr) noexcept;
 
 
-        info_ptr_t info_ptr;
+        client_ptr_t client_ptr;
         alloc_fn_t alloc_fn;
         dealloc_fn_t dealloc_fn;
         max_size_fn_t max_size_fn;
@@ -64,7 +68,7 @@ namespace yama {
 
         constexpr bool equal(const mas_allocator_info& other) const noexcept {
             return
-                info_ptr == other.info_ptr &&
+                client_ptr == other.client_ptr &&
                 alloc_fn == other.alloc_fn &&
                 dealloc_fn == other.dealloc_fn &&
                 max_size_fn == other.max_size_fn;
@@ -131,9 +135,10 @@ namespace yama {
             return *this;
         }
 
-        inline mas_allocator<value_type>& operator=(mas_allocator<value_type>& rhs) noexcept {
-            if (this == &rhs) return *this;
-            _info = std::move(rhs._info);
+        inline mas_allocator<value_type>& operator=(mas_allocator<value_type>&& rhs) noexcept {
+            if (this != &rhs) {
+                _info = std::move(rhs._info);
+            }
             return *this;
         }
 
@@ -154,21 +159,21 @@ namespace yama {
         inline pointer allocate(size_type n) {
             pointer result{};
             YAMA_DEREF_SAFE(_info.alloc_fn) {
-                result = (pointer)_info.alloc_fn(_info.info_ptr, n * sizeof(value_type));
+                result = (pointer)_info.alloc_fn(_info.client_ptr, n * sizeof(value_type));
             }
             return result;
         }
 
         inline void deallocate(pointer p, size_type n) noexcept {
             YAMA_DEREF_SAFE(p && _info.dealloc_fn) {
-                _info.dealloc_fn(_info.info_ptr, (void_pointer)p, n * sizeof(value_type));
+                _info.dealloc_fn(_info.client_ptr, (void_pointer)p, n * sizeof(value_type));
             }
         }
 
         inline size_type max_size() const noexcept {
             size_type result{};
             YAMA_DEREF_SAFE(_info.max_size_fn) {
-                result = _info.max_size_fn(_info.info_ptr);
+                result = _info.max_size_fn(_info.client_ptr);
             }
             return result;
         }
@@ -196,10 +201,11 @@ namespace yama {
 
     // the main MAS abstract base class itself
 
-    class mas {
+    class mas : public api_component {
     public:
 
-        virtual ~mas() noexcept = default;
+        inline mas(std::shared_ptr<debug> dbg = nullptr) 
+            : api_component(dbg) {}
 
 
         // report returns a string encapsulating diagnostic

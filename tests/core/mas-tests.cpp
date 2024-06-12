@@ -105,13 +105,13 @@ TEST(MASTests, AllocatorAllocateAndDeallocate) {
     // hard to really test this stuff outside of see to it that 
     // things don't crash...
 
-    YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+    YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
 
     auto block0 = a.allocate(256);
     auto block1 = a.allocate(1);
     auto block2 = a.allocate(37);
 
-    YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+    YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
 
     EXPECT_TRUE(block0);
     EXPECT_TRUE(block1);
@@ -123,7 +123,7 @@ TEST(MASTests, AllocatorAllocateAndDeallocate) {
     if (block2) a.deallocate(block2, 37);
     if (block0) a.deallocate(block0, 256);
 
-    YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+    YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
 }
 
 TEST(MASTests, AllocatorMasSize) {
@@ -141,17 +141,17 @@ TEST(MASTests, AllocatorUseInAllocatorAwareContainer) {
     {
         std::vector<int, yama::mas_allocator<int>> vec(a);
         for (size_t i = 0; i < 64; i++) {
-            if (i == 0) YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
-            if (i == 16) YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
-            if (i == 32) YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
-            if (i == 48) YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+            if (i == 0) YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
+            if (i == 16) YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
+            if (i == 32) YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
+            if (i == 48) YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
 
             vec.push_back(int(i));
         }
 
-        YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+        YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
     }
     
-    YAMA_LOG(&debug, yama::all_cat, "{}", mas0.report());
+    YAMA_LOG(&debug, yama::all_c, "{}", mas0.report());
 }
 

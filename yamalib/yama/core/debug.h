@@ -37,6 +37,14 @@ namespace yama {
 
         general = 1 << 0,
     };
+
+
+    // these are used to summarize usage of yama::debug_cat
+
+    constexpr auto none_c = debug_cat::none;
+    constexpr auto all_c = debug_cat::all;
+
+    constexpr auto general_c = debug_cat::general;
 }
 
 constexpr yama::debug_cat operator|(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
@@ -46,27 +54,19 @@ constexpr yama::debug_cat operator|(yama::debug_cat lhs, yama::debug_cat rhs) no
 namespace yama {
 
 
-    // these are used to summarize usage of yama::debug_cat
-
-    constexpr auto none_cat = debug_cat::none;
-    constexpr auto all_cat = debug_cat::all;
-
-    constexpr auto general_cat = debug_cat::general;
-
-
     // check returns if cat contains the flags of expect
 
     constexpr bool check(debug_cat cat, debug_cat expect) noexcept {
         return debug_cat(uint32_t(cat) & uint32_t(expect)) == expect;
     }
 
-    static_assert(check(none_cat, none_cat));
-    static_assert(check(all_cat, none_cat));
-    static_assert(check(all_cat, all_cat));
+    static_assert(check(none_c, none_c));
+    static_assert(check(all_c, none_c));
+    static_assert(check(all_c, all_c));
 
-    static_assert(!check(none_cat, all_cat));
+    static_assert(!check(none_c, all_c));
 
-    static_assert(check(all_cat, general_cat)); // TODO: add more tests when we add more categories
+    static_assert(check(all_c, general_c)); // TODO: add more tests when we add more categories
 
 
     // the base class of Yama debug layers
@@ -112,5 +112,7 @@ namespace yama {
 // these expect debug_layer_ptr to be some kind of pointer
 
 #define YAMA_LOG(debug_layer_ptr, cat, fmt, ...) \
-YAMA_COND(((debug_layer_ptr) && (debug_layer_ptr)->has_cat((cat))), (debug_layer_ptr)->log((cat), (fmt), __VA_ARGS__))
+YAMA_COND( \
+((debug_layer_ptr) && (debug_layer_ptr)->has_cat((cat))), \
+(debug_layer_ptr)->log((cat), (fmt), __VA_ARGS__))
 

@@ -12,7 +12,7 @@ namespace yama {
     class null_debug final : public debug {
     public:
 
-        null_debug(debug_cat cats = all_cat);
+        null_debug(debug_cat cats = all_c);
 
 
     protected:
