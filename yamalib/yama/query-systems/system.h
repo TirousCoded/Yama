@@ -43,6 +43,22 @@ namespace yama::qs {
 
         template<typename Key>
         inline size_t number() const noexcept;
+
+        // exists returns if cached result data exists under keys ks
+
+        // exists only returns true if all specified keys have corresponding
+        // cached result data
+
+        // exists will deduce what providers to use from the types of ks,
+        // allowing for a heterogeneous mixture of key types.
+
+        // exists returns false if no providers could be found for >=1 keys
+
+        // exists returns true if sizeof...(ks) == 0, as in that scenario
+        // there's no scenario where the keys in question can't be found
+
+        template<typename... Keys>
+        inline bool exists(const Keys&... ks) const noexcept;
         
         // query queries the result under key k, returning the result, if any
 
@@ -51,7 +67,9 @@ namespace yama::qs {
 
         // query will deduce what provider to use from the type of k
 
-        // query returns nullptr if no provider could be found
+        // query returns std::nullopt if computation fails
+
+        // query returns std::nullopt if no provider could be found
 
         template<typename Key>
         inline auto query(const Key& k);
@@ -63,7 +81,9 @@ namespace yama::qs {
 
         // fetch will deduce what provider to use from the type of k
 
-        // fetch returns nullptr if no provider could be found
+        // fetch returns std::nullopt if no cached result data was found
+
+        // fetch returns std::nullopt if no provider could be found
 
         template<typename Key>
         inline auto fetch(const Key& k);
@@ -71,21 +91,24 @@ namespace yama::qs {
         // discard suggests to the query system to discard any cached result
         // data under the keys ks, if any
 
-        // discard will deduce what providers to use from the types of ks
+        // discard will deduce what providers to use from the types of ks,
+        // allowing for a heterogeneous mixture of key types.
 
         // discard will fail quietly for the keys for which no provider
         // could be found
 
-        // whether discard calls propagate to upstream query systems is 
-        // implementation specific
+        // discard calls are just suggestions, and the impl is free to decide
+        // what data should/shouldn't be deleted, and whether or not calls
+        // should be propagated upstream
 
         template<typename... Keys>
         inline void discard(const Keys&... ks);
 
         // discard_all discards all cached results from all providers
 
-        // whether discard_all calls propagate to upstream query systems is 
-        // implementation specific
+        // discard_all calls are just suggestions, and the impl is free to 
+        // decide what data should/shouldn't be deleted, and whether or not 
+        // calls should be propagated upstream
 
         inline void discard_all();
 
@@ -131,8 +154,14 @@ namespace yama::qs {
         inline provider<QTypes, QType>* _get_provider_as() const noexcept;
 
         template<typename Key>
+        inline bool _exists_check(const Key& k) const noexcept;
+        inline bool _exists() const noexcept; // <- here to stop recursion
+        template<typename Key, typename... Keys>
+        inline bool _exists(const Key& k, const Keys&... ks) const noexcept;
+
+        template<typename Key>
         inline void _discard_data(const Key& k);
-        inline void _discard(); // <- stops the recursion
+        inline void _discard(); // <- here to stop recursion
         template<typename Key, typename... Keys>
         inline void _discard(const Key& k, const Keys&... ks);
     };
@@ -158,11 +187,17 @@ namespace yama::qs {
     }
 
     template<typename QTypes>
+    template<typename... Keys>
+    inline bool system<QTypes>::exists(const Keys&... ks) const noexcept {
+        return _exists(ks...); // <- recursive
+    }
+
+    template<typename QTypes>
     template<typename Key>
     inline auto system<QTypes>::query(const Key& k) {
         constexpr auto qtype = key_traits<QTypes, Key>::qtype;
-        using return_t = std::shared_ptr<result<QTypes, qtype>>;
-        return_t result = nullptr;
+        using return_t = std::optional<result<QTypes, qtype>>;
+        return_t result = std::nullopt;
         if (const auto prov = _get_provider_as<qtype>()) {
             result = prov->query(k);
         }
@@ -173,8 +208,8 @@ namespace yama::qs {
     template<typename Key>
     inline auto system<QTypes>::fetch(const Key& k) {
         constexpr auto qtype = key_traits<QTypes, Key>::qtype;
-        using return_t = std::shared_ptr<result<QTypes, qtype>>;
-        return_t result = nullptr;
+        using return_t = std::optional<result<QTypes, qtype>>;
+        return_t result = std::nullopt;
         if (const auto prov = _get_provider_as<qtype>()) {
             result = prov->fetch(k);
         }
@@ -214,6 +249,29 @@ namespace yama::qs {
             (ptr && ptr->is_qtype(QType))
             ? (provider<QTypes, QType>*)ptr
             : nullptr;
+    }
+
+    template<typename QTypes>
+    template<typename Key>
+    inline bool system<QTypes>::_exists_check(const Key& k) const noexcept {
+        constexpr auto qtype = key_traits<QTypes, Key>::qtype;
+        if (const auto prov = _get_provider_as<qtype>()) {
+            return prov->exists(k);
+        }
+        return false;
+    }
+
+    template<typename QTypes>
+    inline bool system<QTypes>::_exists() const noexcept {
+        return true;
+    }
+
+    template<typename QTypes>
+    template<typename Key, typename ...Keys>
+    inline bool system<QTypes>::_exists(const Key& k, const Keys&... ks) const noexcept {
+        return 
+            _exists_check(k) && // <- short-circuit to skip rest of eval if check fails
+            _exists(ks...); // <- recurse
     }
 
     template<typename QTypes>

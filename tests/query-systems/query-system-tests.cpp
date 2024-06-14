@@ -147,7 +147,7 @@ struct provider_a_policy final {
     primary_source* primary;
     system_t* secondary;
 
-    std::unordered_map<std::string, std::shared_ptr<result_t>> cache;
+    std::unordered_map<std::string, result_t> cache;
 
 
     provider_a_policy(primary_source& primary_src, system_t& secondary_src) 
@@ -158,27 +158,31 @@ struct provider_a_policy final {
     size_t number() const noexcept {
         return cache.size();
     }
+
+    bool exists(const key_t& k) const noexcept {
+        return cache.contains(k.s);
+    }
     
-    std::shared_ptr<result_t> query(const key_t& key) {
-        std::shared_ptr<result_t> result = nullptr;
+    std::optional<result_t> query(const key_t& k) {
+        std::optional<result_t> result = std::nullopt;
         YAMA_DEREF_SAFE(primary && secondary) {
-            if (key.s != "illegal" && key.s != "illegal-for-a") {
-                result = std::make_shared<result_t>(std::format("a({}, {})", key.s, primary->name));
-                cache[key.s] = result;
+            if (k.s != "illegal" && k.s != "illegal-for-a") {
+                result = std::make_optional<result_t>(std::format("a({}, {})", k.s, primary->name));
+                cache[k.s] = *result; // dirty copy
             }
         }
         return result;
     }
     
-    std::shared_ptr<result_t> fetch(const key_t& key) {
-        if (cache.contains(key.s)) {
-            return cache.at(key.s);
-        }
-        return nullptr;
+    std::optional<result_t> fetch(const key_t& k) {
+        return
+            exists(k)
+            ? std::make_optional(cache.at(k.s))
+            : std::nullopt;
     }
     
-    void discard(const key_t& key) {
-        cache.erase(key.s);
+    void discard(const key_t& k) {
+        cache.erase(k.s);
     }
     
     void discard_all() {
@@ -197,7 +201,7 @@ struct provider_b_policy final {
     primary_source* primary;
     system_t* secondary;
 
-    std::unordered_map<std::string, std::shared_ptr<result_t>> cache;
+    std::unordered_map<std::string, result_t> cache;
 
 
     provider_b_policy(primary_source& primary_src, system_t& secondary_src) 
@@ -208,30 +212,34 @@ struct provider_b_policy final {
     size_t number() const noexcept {
         return cache.size();
     }
-    
-    std::shared_ptr<result_t> query(const key_t& key) {
-        std::shared_ptr<result_t> result = nullptr;
+
+    bool exists(const key_t& k) const noexcept {
+        return cache.contains(k.s);
+    }
+
+    std::optional<result_t> query(const key_t& k) {
+        std::optional<result_t> result = std::nullopt;
         YAMA_DEREF_SAFE(primary && secondary) {
-            if (key.s != "illegal") {
-                auto res_a = secondary->query(key_a{ key.s });
+            if (k.s != "illegal") {
+                auto res_a = secondary->query(key_a{ k.s });
                 if (res_a) {
-                    result = std::make_shared<result_t>(std::format("{} b({}, {})", res_a->s, key.s, primary->name));
-                    cache[key.s] = result;
+                    result = std::make_optional<result_t>(std::format("{} b({}, {})", res_a->s, k.s, primary->name));
+                    cache[k.s] = *result; // dirty copy
                 }
             }
         }
         return result;
     }
     
-    std::shared_ptr<result_t> fetch(const key_t& key) {
-        if (cache.contains(key.s)) {
-            return cache.at(key.s);
-        }
-        return nullptr;
+    std::optional<result_t> fetch(const key_t& k) {
+        return
+            exists(k)
+            ? std::make_optional(cache.at(k.s))
+            : std::nullopt;
     }
     
-    void discard(const key_t& key) {
-        cache.erase(key.s);
+    void discard(const key_t& k) {
+        cache.erase(k.s);
     }
     
     void discard_all() {
@@ -370,6 +378,23 @@ TEST_F(QuerySystemTests, Provider_Number) {
     prov.query(key_a{ "b" });
 
     EXPECT_EQ(prov.number(), 2);
+}
+
+TEST_F(QuerySystemTests, Provider_Exists) {
+    primary_source_a primary{ "src" };
+    regular_system_impl secondary{};
+    provider_a prov(primary, secondary);
+
+    EXPECT_FALSE(prov.exists(key_a{ "abc" }));
+    EXPECT_FALSE(prov.exists(key_a{ "def" }));
+    EXPECT_FALSE(prov.exists(key_a{ "ghi" }));
+
+    ASSERT_TRUE(prov.query(key_a{ "abc" }));
+    ASSERT_TRUE(prov.query(key_a{ "ghi" }));
+
+    EXPECT_TRUE(prov.exists(key_a{ "abc" }));
+    EXPECT_FALSE(prov.exists(key_a{ "def" }));
+    EXPECT_TRUE(prov.exists(key_a{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, Provider_Query) {
@@ -554,6 +579,69 @@ TEST_F(QuerySystemTests, System_Regular_Number_ByKey_ReturnZeroIfNoProvider) {
     EXPECT_EQ(sys.number<key_c>(), 0);
 }
 
+TEST_F(QuerySystemTests, System_Regular_Exists) {
+    regular_system_impl sys(dbg);
+
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }));
+    EXPECT_FALSE(sys.exists(key_a{ "def" }));
+    EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
+    EXPECT_FALSE(sys.exists(key_b{ "abc" }));
+    EXPECT_FALSE(sys.exists(key_b{ "def" }));
+    EXPECT_FALSE(sys.exists(key_b{ "ghi" }));
+    
+    // heterogeneous arg types
+
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
+
+    ASSERT_TRUE(sys.query(key_b{ "abc" }));
+    ASSERT_TRUE(sys.query(key_b{ "def" }));
+    ASSERT_TRUE(sys.query(key_b{ "ghi" }));
+
+    EXPECT_TRUE(sys.exists(key_a{ "abc" }));
+    EXPECT_TRUE(sys.exists(key_a{ "def" }));
+    EXPECT_TRUE(sys.exists(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.exists(key_b{ "abc" }));
+    EXPECT_TRUE(sys.exists(key_b{ "def" }));
+    EXPECT_TRUE(sys.exists(key_b{ "ghi" }));
+
+    // heterogeneous arg types
+    
+    EXPECT_TRUE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
+}
+
+TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
+    regular_system_impl sys(dbg);
+
+    ASSERT_TRUE(sys.query(key_b{ "abc" }));
+    ASSERT_TRUE(sys.query(key_b{ "def" }));
+    ASSERT_TRUE(sys.query(key_b{ "ghi" }));
+
+    // there is no resource a under 'jkl'
+
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_a{ "jkl" }));
+}
+
+TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoProvider_AndWhileOtherArgsSucceed) {
+    regular_system_impl sys(dbg);
+
+    ASSERT_TRUE(sys.query(key_b{ "abc" }));
+    ASSERT_TRUE(sys.query(key_b{ "def" }));
+    ASSERT_TRUE(sys.query(key_b{ "ghi" }));
+
+    // there is no provider for resource c
+
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_c{ "abc" }));
+}
+
+TEST_F(QuerySystemTests, System_Regular_Exists_ZeroArgsEdgeCase) {
+    regular_system_impl sys(dbg);
+
+    // if we don't have any keys, then exists should always succeed, as there's
+    // no scenario where the keys in question will not be found
+
+    EXPECT_TRUE(sys.exists());
+}
+
 TEST_F(QuerySystemTests, System_Regular_Query) {
     regular_system_impl sys(dbg);
 
@@ -679,24 +767,18 @@ TEST_F(QuerySystemTests, System_Regular_Discard) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.fetch(key_a{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "ghi" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "ghi" }));
+    ASSERT_TRUE(sys.exists(
+        key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
+        key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
     sys.discard(key_a{ "def" }, key_b{ "abc" }, key_a{ "abc" });
 
     EXPECT_EQ(sys.number<key_a>(), 1);
     EXPECT_EQ(sys.number<key_b>(), 2);
 
-    //EXPECT_TRUE(sys.fetch(key_a{ "abc" }));
-    //EXPECT_TRUE(sys.fetch(key_a{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_a{ "ghi" }));
-    //EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+    EXPECT_TRUE(sys.exists(
+        /*key_a{"abc"}, key_a{"def"},*/ key_a{"ghi"},
+        /*key_b{"abc"},*/ key_b{"def"}, key_b{"ghi"}));
 }
 
 TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
@@ -709,12 +791,9 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoCachedResultDa
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.fetch(key_a{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "ghi" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "ghi" }));
+    ASSERT_TRUE(sys.exists(
+        key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
+        key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
     // there is no resource a under 'jkl'
 
@@ -723,12 +802,10 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoCachedResultDa
     EXPECT_EQ(sys.number<key_a>(), 1);
     EXPECT_EQ(sys.number<key_b>(), 2);
 
-    //EXPECT_TRUE(sys.fetch(key_a{ "abc" }));
-    //EXPECT_TRUE(sys.fetch(key_a{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_a{ "ghi" }));
-    //EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+
+    EXPECT_TRUE(sys.exists(
+        /*key_a{"abc"}, key_a{"def"},*/ key_a{ "ghi" },
+        /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoProvider_AndWhileOtherArgsSucceed) {
@@ -742,12 +819,9 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoProvider_AndWh
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
-    ASSERT_TRUE(sys.fetch(key_a{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "ghi" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "ghi" }));
+    ASSERT_TRUE(sys.exists(
+        key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
+        key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
     // there is no provider for resource c
 
@@ -757,15 +831,12 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoProvider_AndWh
     EXPECT_EQ(sys.number<key_b>(), 2);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
-    //EXPECT_TRUE(sys.fetch(key_a{ "abc" }));
-    //EXPECT_TRUE(sys.fetch(key_a{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_a{ "ghi" }));
-    //EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+    EXPECT_TRUE(sys.exists(
+        /*key_a{"abc"}, key_a{"def"},*/ key_a{ "ghi" },
+        /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToZeroArgs) {
+TEST_F(QuerySystemTests, System_Regular_Discard_ZeroArgsEdgeCase) {
     regular_system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
@@ -775,24 +846,18 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToZeroArgs) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.fetch(key_a{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_a{ "ghi" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "abc" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "def" }));
-    ASSERT_TRUE(sys.fetch(key_b{ "ghi" }));
+    ASSERT_TRUE(sys.exists(
+        key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
+        key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
     sys.discard();
 
     EXPECT_EQ(sys.number<key_a>(), 3);
     EXPECT_EQ(sys.number<key_b>(), 3);
 
-    EXPECT_TRUE(sys.fetch(key_a{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_a{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_a{ "ghi" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+    EXPECT_TRUE(sys.exists(
+        key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
+        key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForAllProviders) {
@@ -830,12 +895,10 @@ TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByQType) 
     EXPECT_EQ(sys.number<key_b>(), 3);
     EXPECT_EQ(sys.number<key_c>(), 0);
 
-    EXPECT_FALSE(sys.fetch(key_a{ "abc" }));
-    EXPECT_FALSE(sys.fetch(key_a{ "def" }));
-    EXPECT_FALSE(sys.fetch(key_a{ "ghi" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }));
+    EXPECT_FALSE(sys.exists(key_a{ "def" }));
+    EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.exists(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByKey) {
@@ -855,12 +918,10 @@ TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByKey) {
     EXPECT_EQ(sys.number<key_b>(), 3);
     EXPECT_EQ(sys.number<key_c>(), 0);
 
-    EXPECT_FALSE(sys.fetch(key_a{ "abc" }));
-    EXPECT_FALSE(sys.fetch(key_a{ "def" }));
-    EXPECT_FALSE(sys.fetch(key_a{ "ghi" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "abc" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "def" }));
-    EXPECT_TRUE(sys.fetch(key_b{ "ghi" }));
+    EXPECT_FALSE(sys.exists(key_a{ "abc" }));
+    EXPECT_FALSE(sys.exists(key_a{ "def" }));
+    EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.exists(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 }
 
 

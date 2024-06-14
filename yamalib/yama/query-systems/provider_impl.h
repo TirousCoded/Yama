@@ -62,8 +62,9 @@ namespace yama::qs {
     //          * this constructor gets wrapped in the constructor of the yama::provider_impl
     //            constructor w/ the same parameters
     //      size_t number() const noexcept;
-    //      std::shared_ptr<yama::qs::result<...>> query(const yama::qs::key<...>& key);
-    //      std::shared_ptr<yama::qs::result<...>> fetch(const yama::qs::key<...>& key);
+    //      bool exists(const yama::qs::key<...>& k) const noexcept;
+    //      std::optional<yama::qs::result<...>> query(const yama::qs::key<...>& key);
+    //      std::optional<yama::qs::result<...>> fetch(const yama::qs::key<...>& key);
     //      void discard(const yama::qs::key<...>& key);
     //      void discard_all();
     //          * these define the behaviour of the provider's interface of methods
@@ -90,16 +91,20 @@ namespace yama::qs {
             return _policy.number();
         }
 
-        inline std::shared_ptr<result_t> query(const key_t& key) override final {
-            return _policy.query(key);
+        inline bool exists(const key_t& k) const noexcept override final {
+            return _policy.exists(k);
+        }
+
+        inline std::optional<result_t> query(const key_t& k) override final {
+            return _policy.query(k);
         }
         
-        inline std::shared_ptr<result_t> fetch(const key_t& key) override final {
-            return _policy.fetch(key);
+        inline std::optional<result_t> fetch(const key_t& k) override final {
+            return _policy.fetch(k);
         }
         
-        inline void discard(const key_t& key) override final {
-            _policy.discard(key);
+        inline void discard(const key_t& k) override final {
+            _policy.discard(k);
         }
         
         inline void discard_all() override final {

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <format>
+#include <iostream>
 
 #include "../query-systems/system_traits.h"
 
