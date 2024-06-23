@@ -201,6 +201,10 @@ namespace yama::qs {
         inline system(std::shared_ptr<yama::debug> dbg = nullptr);
 
 
+        // upstream returns the upstream query system, if any
+
+        inline std::shared_ptr<system<QTypes>> upstream() const noexcept;
+
         // number returns the number of cached results in the provider for QType
 
         // number returns 0 if no provider could be found
@@ -314,6 +318,15 @@ namespace yama::qs {
 
     protected:
 
+        // this defines query system behaviour in regards to the upstream method
+
+        // this defaults to returning nullptr as this is the expected behaviour of
+        // query system impls w/out a notion of an upstream system
+
+        virtual std::shared_ptr<system<QTypes>> get_upstream() const noexcept {
+            return nullptr;
+        }
+
         // the main job of a query system impl is to define a get_provider override
         // which maps a given qtype to a specific query provider, if any
 
@@ -323,13 +336,13 @@ namespace yama::qs {
 
         virtual untyped_provider<QTypes>* get_provider(QTypes qtype) const noexcept = 0;
 
-        // this defines the query system's behaviour in regards to the discard_all
+        // this defines query system behaviour in regards to the discard_all
         // overload w/out any parameters, which discards all secondary information
         // from all local providers
 
         virtual void do_discard_all() = 0;
 
-        // this defines the query system's behaviour in regards to the reset method
+        // this defines query system behaviour in regards to the reset method
 
         virtual void do_reset() = 0;
 
@@ -358,6 +371,11 @@ namespace yama::qs {
     template<typename QTypes>
     inline system<QTypes>::system(std::shared_ptr<yama::debug> dbg) 
         : api_component(dbg) {}
+
+    template<typename QTypes>
+    inline std::shared_ptr<system<QTypes>> system<QTypes>::upstream() const noexcept {
+        return get_upstream();
+    }
 
     template<typename QTypes>
     template<QTypes QType>

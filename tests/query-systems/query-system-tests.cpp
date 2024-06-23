@@ -262,8 +262,9 @@ public:
     provider_a prov_a;
     provider_b prov_b;
 
-    // these help for detecting do_discard_all and do_reset calls
+    // these help for detecting get_upstream, do_discard_all and do_reset calls
 
+    mutable bool called_get_upstream = false;
     bool called_do_discard_all = false;
     bool called_do_reset = false;
 
@@ -277,6 +278,11 @@ public:
 
 
 protected:
+
+    std::shared_ptr<system<test_qtype>> get_upstream() const noexcept override final {
+        called_get_upstream = true;
+        return nullptr;
+    }
 
     yama::qs::untyped_provider<test_qtype>* get_provider(test_qtype qtype) const noexcept override final {
         using return_t = yama::qs::untyped_provider<test_qtype>*;
@@ -468,6 +474,16 @@ TEST_F(QuerySystemTests, Provider_DiscardAll) {
 
 
 // system tests
+
+TEST_F(QuerySystemTests, System_Upstream) {
+    system_impl sys(dbg);
+
+    ASSERT_FALSE(sys.called_get_upstream);
+
+    EXPECT_EQ(sys.upstream(), nullptr);
+
+    EXPECT_TRUE(sys.called_get_upstream);
+}
 
 TEST_F(QuerySystemTests, System_Number_ByQType) {
     system_impl sys(dbg);
@@ -816,6 +832,8 @@ TEST_F(QuerySystemTests, System_DiscardAll_ForAllProviders) {
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
+    ASSERT_FALSE(sys.called_do_discard_all);
+
     sys.discard_all();
 
     EXPECT_EQ(sys.number<key_a>(), 0);
@@ -835,6 +853,8 @@ TEST_F(QuerySystemTests, System_DiscardAll_ForSpecificProvider_ByQType) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
+
+    ASSERT_FALSE(sys.called_do_discard_all);
 
     sys.discard_all<test_qtype::a>();
 
@@ -861,6 +881,8 @@ TEST_F(QuerySystemTests, System_DiscardAll_ForSpecificProvider_ByKey) {
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
+    ASSERT_FALSE(sys.called_do_discard_all);
+
     sys.discard_all<key_a>();
 
     EXPECT_EQ(sys.number<key_a>(), 0);
@@ -885,6 +907,8 @@ TEST_F(QuerySystemTests, System_Reset) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
+
+    ASSERT_FALSE(sys.called_do_reset);
 
     sys.reset();
 
