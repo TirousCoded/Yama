@@ -17,7 +17,7 @@
 // individual components tested in isolation
 
 // to this end, these tests will hereafter define a small self-contained
-// query system which the behaviour of the impl will then be tested in 
+// query system which the behaviour of the Yama API will then be tested in 
 // relation to
 
 // I like this as it lets us comprehensively test things, while still
@@ -251,21 +251,24 @@ using provider_a = yama::qs::provider_impl<test_qtype, test_qtype::a, provider_a
 using provider_b = yama::qs::provider_impl<test_qtype, test_qtype::b, provider_b_policy>;
 
 
-// below tests the two frontend portions of the query system: providers and systems
-
-// these tests will involve two query system impls: one 'regular' and one 'irregular'
-
-// the regular impl encapsulates two providers for resources 'a' and 'b', and these
-// providers are passed the query system itself as their secondary information source
-
-// the irregular impl is almost identical to the regular one, except that its provider
-// for resource 'b' will be passed a totally different query system as its secondary
-// information source, in order to test more nuanced scenarios where this may be a factor
-
-class regular_system_impl final : public yama::qs::system<test_qtype> {
+class system_impl final : public yama::qs::system<test_qtype> {
 public:
 
-    regular_system_impl(std::shared_ptr<yama::debug> dbg = nullptr) 
+    // making these public so we can use them in our provider tests to
+    // tests the internal behaviour of a basic system impl
+
+    primary_source_a src_a;
+    primary_source_b src_b;
+    provider_a prov_a;
+    provider_b prov_b;
+
+    // these help for detecting do_discard_all and do_reset calls
+
+    bool called_do_discard_all = false;
+    bool called_do_reset = false;
+
+
+    system_impl(std::shared_ptr<yama::debug> dbg = nullptr) 
         : system(dbg), 
         src_a{ "src1" }, 
         src_b{ "src2" }, 
@@ -285,53 +288,14 @@ protected:
     void do_discard_all() override final {
         prov_a.discard_all();
         prov_b.discard_all();
+        called_do_discard_all = true;
     }
 
-
-private:
-
-    primary_source_a src_a;
-    primary_source_b src_b;
-    provider_a prov_a;
-    provider_b prov_b;
-};
-
-class irregular_system_impl final : public yama::qs::system<test_qtype> {
-public:
-
-    regular_system_impl prov_b_upstream;
-
-
-    irregular_system_impl(std::shared_ptr<yama::debug> dbg = nullptr) 
-        : system(dbg), 
-        prov_b_upstream(dbg),
-        src_a{ "src1-original" }, 
-        src_b{ "src2" }, 
-        prov_a(src_a, *this), 
-        prov_b(src_b, prov_b_upstream) {}
-
-
-protected:
-
-    yama::qs::untyped_provider<test_qtype>* get_provider(test_qtype qtype) const noexcept override final {
-        using return_t = yama::qs::untyped_provider<test_qtype>*;
-        if (qtype == test_qtype::a) return (return_t)&prov_a;
-        else if (qtype == test_qtype::b) return (return_t)&prov_b;
-        else return nullptr;
-    }
-
-    void do_discard_all() override final {
+    void do_reset() override final {
         prov_a.discard_all();
         prov_b.discard_all();
+        called_do_reset = true;
     }
-
-
-private:
-
-    primary_source_a src_a;
-    primary_source_b src_b;
-    provider_a prov_a;
-    provider_b prov_b;
 };
 
 
@@ -361,170 +325,152 @@ protected:
 // provider tests
 
 TEST_F(QuerySystemTests, Provider_Number) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    EXPECT_EQ(prov.number(), 0);
+    EXPECT_EQ(sys.prov_a.number(), 0);
 
-    prov.query(key_a{ "a" });
+    sys.prov_a.query(key_a{ "a" });
 
-    EXPECT_EQ(prov.number(), 1);
+    EXPECT_EQ(sys.prov_a.number(), 1);
 
-    prov.query(key_a{ "b" });
+    sys.prov_a.query(key_a{ "b" });
 
-    EXPECT_EQ(prov.number(), 2);
+    EXPECT_EQ(sys.prov_a.number(), 2);
 
-    prov.query(key_a{ "b" });
+    sys.prov_a.query(key_a{ "b" });
 
-    EXPECT_EQ(prov.number(), 2);
+    EXPECT_EQ(sys.prov_a.number(), 2);
 }
 
 TEST_F(QuerySystemTests, Provider_Exists) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    EXPECT_FALSE(prov.exists(key_a{ "abc" }));
-    EXPECT_FALSE(prov.exists(key_a{ "def" }));
-    EXPECT_FALSE(prov.exists(key_a{ "ghi" }));
+    EXPECT_FALSE(sys.prov_a.exists(key_a{ "abc" }));
+    EXPECT_FALSE(sys.prov_a.exists(key_a{ "def" }));
+    EXPECT_FALSE(sys.prov_a.exists(key_a{ "ghi" }));
 
-    ASSERT_TRUE(prov.query(key_a{ "abc" }));
-    ASSERT_TRUE(prov.query(key_a{ "ghi" }));
+    ASSERT_TRUE(sys.prov_a.query(key_a{ "abc" }));
+    ASSERT_TRUE(sys.prov_a.query(key_a{ "ghi" }));
 
-    EXPECT_TRUE(prov.exists(key_a{ "abc" }));
-    EXPECT_FALSE(prov.exists(key_a{ "def" }));
-    EXPECT_TRUE(prov.exists(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.prov_a.exists(key_a{ "abc" }));
+    EXPECT_FALSE(sys.prov_a.exists(key_a{ "def" }));
+    EXPECT_TRUE(sys.prov_a.exists(key_a{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, Provider_Query) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    auto result0 = prov.query(key_a{ "abc" });
+    auto result0 = sys.prov_a.query(key_a{ "abc" });
 
-    EXPECT_EQ(prov.number(), 1);
+    EXPECT_EQ(sys.prov_a.number(), 1);
 
-    auto result1 = prov.query(key_a{ "def" });
+    auto result1 = sys.prov_a.query(key_a{ "def" });
 
-    EXPECT_EQ(prov.number(), 2);
+    EXPECT_EQ(sys.prov_a.number(), 2);
 
-    auto result2 = prov.query(key_a{ "def" });
+    auto result2 = sys.prov_a.query(key_a{ "def" });
 
-    EXPECT_EQ(prov.number(), 2);
+    EXPECT_EQ(sys.prov_a.number(), 2);
 
     EXPECT_TRUE(result0);
     EXPECT_TRUE(result1);
     EXPECT_TRUE(result2);
 
-    if (result0) EXPECT_EQ(result0->s, "a(abc, src)");
-    if (result1) EXPECT_EQ(result1->s, "a(def, src)");
-    if (result2) EXPECT_EQ(result2->s, "a(def, src)");
+    if (result0) EXPECT_EQ(result0->s, "a(abc, src1)");
+    if (result1) EXPECT_EQ(result1->s, "a(def, src1)");
+    if (result2) EXPECT_EQ(result2->s, "a(def, src1)");
 }
 
 TEST_F(QuerySystemTests, Provider_Query_FailDueToQueryFailure) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    auto result = prov.query(key_a{ "illegal" });
+    auto result = sys.prov_a.query(key_a{ "illegal" });
 
-    EXPECT_EQ(prov.number(), 0);
+    EXPECT_EQ(sys.prov_a.number(), 0);
 
     EXPECT_FALSE(result);
 }
 
 TEST_F(QuerySystemTests, Provider_Fetch) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    prov.query(key_a{ "def" }); // <- add new info
+    sys.prov_a.query(key_a{ "def" }); // <- add new info
 
-    ASSERT_EQ(prov.number(), 1);
+    ASSERT_EQ(sys.prov_a.number(), 1);
 
-    auto result = prov.fetch(key_a{ "def" });
+    auto result = sys.prov_a.fetch(key_a{ "def" });
 
-    EXPECT_EQ(prov.number(), 1);
+    EXPECT_EQ(sys.prov_a.number(), 1);
 
     EXPECT_TRUE(result);
 
-    if (result) EXPECT_EQ(result->s, "a(def, src)");
+    if (result) EXPECT_EQ(result->s, "a(def, src1)");
 }
 
 TEST_F(QuerySystemTests, Provider_Fetch_FailDueToNoCachedResultData) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    auto result = prov.fetch(key_a{ "abc" });
+    auto result = sys.prov_a.fetch(key_a{ "abc" });
 
-    EXPECT_EQ(prov.number(), 0);
+    EXPECT_EQ(sys.prov_a.number(), 0);
 
     EXPECT_FALSE(result);
 }
 
 TEST_F(QuerySystemTests, Provider_Discard) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    prov.query(key_a{ "abc" });
-    prov.query(key_a{ "def" });
-    prov.query(key_a{ "ghi" });
+    sys.prov_a.query(key_a{ "abc" });
+    sys.prov_a.query(key_a{ "def" });
+    sys.prov_a.query(key_a{ "ghi" });
 
-    ASSERT_EQ(prov.number(), 3);
+    ASSERT_EQ(sys.prov_a.number(), 3);
 
-    prov.discard(key_a{ "def" });
+    sys.prov_a.discard(key_a{ "def" });
 
-    EXPECT_EQ(prov.number(), 2);
+    EXPECT_EQ(sys.prov_a.number(), 2);
 
-    EXPECT_TRUE(prov.fetch(key_a{ "abc" }));
-    EXPECT_TRUE(prov.fetch(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.prov_a.fetch(key_a{ "abc" }));
+    EXPECT_TRUE(sys.prov_a.fetch(key_a{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, Provider_Discard_FailQuietlyDueToNoCachedResultDataFound) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    prov.query(key_a{ "abc" });
-    prov.query(key_a{ "def" });
-    prov.query(key_a{ "ghi" });
+    sys.prov_a.query(key_a{ "abc" });
+    sys.prov_a.query(key_a{ "def" });
+    sys.prov_a.query(key_a{ "ghi" });
 
-    ASSERT_EQ(prov.number(), 3);
+    ASSERT_EQ(sys.prov_a.number(), 3);
 
-    prov.discard(key_a{ "jkl" });
+    sys.prov_a.discard(key_a{ "jkl" });
 
-    EXPECT_EQ(prov.number(), 3);
+    EXPECT_EQ(sys.prov_a.number(), 3);
 
-    EXPECT_TRUE(prov.fetch(key_a{ "abc" }));
-    EXPECT_TRUE(prov.fetch(key_a{ "def" }));
-    EXPECT_TRUE(prov.fetch(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.prov_a.fetch(key_a{ "abc" }));
+    EXPECT_TRUE(sys.prov_a.fetch(key_a{ "def" }));
+    EXPECT_TRUE(sys.prov_a.fetch(key_a{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, Provider_DiscardAll) {
-    primary_source_a primary{ "src" };
-    regular_system_impl secondary{};
-    provider_a prov(primary, secondary);
+    system_impl sys(dbg);
 
-    prov.query(key_a{ "abc" });
-    prov.query(key_a{ "def" });
-    prov.query(key_a{ "ghi" });
+    sys.prov_a.query(key_a{ "abc" });
+    sys.prov_a.query(key_a{ "def" });
+    sys.prov_a.query(key_a{ "ghi" });
 
-    ASSERT_EQ(prov.number(), 3);
+    ASSERT_EQ(sys.prov_a.number(), 3);
 
-    prov.discard_all();
+    sys.prov_a.discard_all();
 
-    EXPECT_EQ(prov.number(), 0);
+    EXPECT_EQ(sys.prov_a.number(), 0);
 }
 
 
-// regular system tests
+// system tests
 
-TEST_F(QuerySystemTests, System_Regular_Number_ByQType) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Number_ByQType) {
+    system_impl sys(dbg);
 
     EXPECT_EQ(sys.number<test_qtype::a>(), 0);
     EXPECT_EQ(sys.number<test_qtype::b>(), 0);
@@ -545,14 +491,14 @@ TEST_F(QuerySystemTests, System_Regular_Number_ByQType) {
     EXPECT_EQ(sys.number<test_qtype::b>(), 0);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Number_ByQType_ReturnZeroIfNoProvider) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Number_ByQType_ReturnZeroIfNoProvider) {
+    system_impl sys(dbg);
 
     EXPECT_EQ(sys.number<test_qtype::c>(), 0);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Number_ByKey) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Number_ByKey) {
+    system_impl sys(dbg);
 
     EXPECT_EQ(sys.number<key_a>(), 0);
     EXPECT_EQ(sys.number<key_b>(), 0);
@@ -573,14 +519,14 @@ TEST_F(QuerySystemTests, System_Regular_Number_ByKey) {
     EXPECT_EQ(sys.number<key_b>(), 0);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Number_ByKey_ReturnZeroIfNoProvider) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Number_ByKey_ReturnZeroIfNoProvider) {
+    system_impl sys(dbg);
 
     EXPECT_EQ(sys.number<key_c>(), 0);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Exists) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Exists) {
+    system_impl sys(dbg);
 
     EXPECT_FALSE(sys.exists(key_a{ "abc" }));
     EXPECT_FALSE(sys.exists(key_a{ "def" }));
@@ -609,8 +555,8 @@ TEST_F(QuerySystemTests, System_Regular_Exists) {
     EXPECT_TRUE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Exists_FailDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
+    system_impl sys(dbg);
 
     ASSERT_TRUE(sys.query(key_b{ "abc" }));
     ASSERT_TRUE(sys.query(key_b{ "def" }));
@@ -621,8 +567,8 @@ TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoCachedResultDataFound_
     EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_a{ "jkl" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoProvider_AndWhileOtherArgsSucceed) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Exists_FailDueToNoProvider_AndWhileOtherArgsSucceed) {
+    system_impl sys(dbg);
 
     ASSERT_TRUE(sys.query(key_b{ "abc" }));
     ASSERT_TRUE(sys.query(key_b{ "def" }));
@@ -633,8 +579,8 @@ TEST_F(QuerySystemTests, System_Regular_Exists_FailDueToNoProvider_AndWhileOther
     EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_c{ "abc" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Exists_ZeroArgsEdgeCase) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Exists_ZeroArgsEdgeCase) {
+    system_impl sys(dbg);
 
     // if we don't have any keys, then exists should always succeed, as there's
     // no scenario where the keys in question will not be found
@@ -642,8 +588,8 @@ TEST_F(QuerySystemTests, System_Regular_Exists_ZeroArgsEdgeCase) {
     EXPECT_TRUE(sys.exists());
 }
 
-TEST_F(QuerySystemTests, System_Regular_Query) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Query) {
+    system_impl sys(dbg);
 
     auto result0 = sys.query(key_a{ "abc" });
 
@@ -669,8 +615,8 @@ TEST_F(QuerySystemTests, System_Regular_Query) {
     if (result2) EXPECT_EQ(result2->s, "a(def, src1)");
 }
 
-TEST_F(QuerySystemTests, System_Regular_Query_IndirectQueryByAnotherQuery) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Query_IndirectQueryByAnotherQuery) {
+    system_impl sys(dbg);
 
     auto result0 = sys.query(key_b{ "abc" });
 
@@ -686,8 +632,8 @@ TEST_F(QuerySystemTests, System_Regular_Query_IndirectQueryByAnotherQuery) {
     if (result1) EXPECT_EQ(result1->s, "a(abc, src1)");
 }
 
-TEST_F(QuerySystemTests, System_Regular_Query_FailDueToQueryFailure) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Query_FailDueToQueryFailure) {
+    system_impl sys(dbg);
 
     auto result = sys.query(key_a{ "illegal" });
 
@@ -697,8 +643,8 @@ TEST_F(QuerySystemTests, System_Regular_Query_FailDueToQueryFailure) {
     EXPECT_FALSE(result);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Query_FailDueToIndirectQueryFailure) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Query_FailDueToIndirectQueryFailure) {
+    system_impl sys(dbg);
 
     // this test tests that querying resource b will fail if the upstream
     // query to resource a fails
@@ -714,8 +660,8 @@ TEST_F(QuerySystemTests, System_Regular_Query_FailDueToIndirectQueryFailure) {
     EXPECT_FALSE(result);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Query_FailDueToNoProvider) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Query_FailDueToNoProvider) {
+    system_impl sys(dbg);
 
     // there is no provider for resource c
 
@@ -728,8 +674,8 @@ TEST_F(QuerySystemTests, System_Regular_Query_FailDueToNoProvider) {
     EXPECT_FALSE(result);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Fetch) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Fetch) {
+    system_impl sys(dbg);
 
     sys.query(key_a{ "def" }); // <- add new info
 
@@ -746,8 +692,8 @@ TEST_F(QuerySystemTests, System_Regular_Fetch) {
     if (result) EXPECT_EQ(result->s, "a(def, src1)");
 }
 
-TEST_F(QuerySystemTests, System_Regular_Fetch_FailDueToNoCachedResultData) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Fetch_FailDueToNoCachedResultData) {
+    system_impl sys(dbg);
 
     auto result = sys.fetch(key_a{ "abc" });
 
@@ -757,8 +703,8 @@ TEST_F(QuerySystemTests, System_Regular_Fetch_FailDueToNoCachedResultData) {
     EXPECT_FALSE(result);
 }
 
-TEST_F(QuerySystemTests, System_Regular_Discard) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Discard) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -781,8 +727,8 @@ TEST_F(QuerySystemTests, System_Regular_Discard) {
         /*key_b{"abc"},*/ key_b{"def"}, key_b{"ghi"}));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -802,14 +748,13 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoCachedResultDa
     EXPECT_EQ(sys.number<key_a>(), 1);
     EXPECT_EQ(sys.number<key_b>(), 2);
 
-
     EXPECT_TRUE(sys.exists(
         /*key_a{"abc"}, key_a{"def"},*/ key_a{ "ghi" },
         /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoProvider_AndWhileOtherArgsSucceed) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoProvider_AndWhileOtherArgsSucceed) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -836,8 +781,8 @@ TEST_F(QuerySystemTests, System_Regular_Discard_FailQuietlyDueToNoProvider_AndWh
         /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_Discard_ZeroArgsEdgeCase) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_Discard_ZeroArgsEdgeCase) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -860,8 +805,8 @@ TEST_F(QuerySystemTests, System_Regular_Discard_ZeroArgsEdgeCase) {
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 }
 
-TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForAllProviders) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_DiscardAll_ForAllProviders) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -876,10 +821,12 @@ TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForAllProviders) {
     EXPECT_EQ(sys.number<key_a>(), 0);
     EXPECT_EQ(sys.number<key_b>(), 0);
     EXPECT_EQ(sys.number<key_c>(), 0);
+
+    EXPECT_TRUE(sys.called_do_discard_all);
 }
 
-TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByQType) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_DiscardAll_ForSpecificProvider_ByQType) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -899,10 +846,12 @@ TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByQType) 
     EXPECT_FALSE(sys.exists(key_a{ "def" }));
     EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
     EXPECT_TRUE(sys.exists(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
+
+    EXPECT_FALSE(sys.called_do_discard_all);
 }
 
-TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByKey) {
-    regular_system_impl sys(dbg);
+TEST_F(QuerySystemTests, System_DiscardAll_ForSpecificProvider_ByKey) {
+    system_impl sys(dbg);
 
     sys.query(key_b{ "abc" });
     sys.query(key_b{ "def" });
@@ -922,30 +871,27 @@ TEST_F(QuerySystemTests, System_Regular_DiscardAll_ForSpecificProvider_ByKey) {
     EXPECT_FALSE(sys.exists(key_a{ "def" }));
     EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
     EXPECT_TRUE(sys.exists(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
+
+    EXPECT_FALSE(sys.called_do_discard_all);
 }
 
+TEST_F(QuerySystemTests, System_Reset) {
+    system_impl sys(dbg);
 
-// irregular system tests
+    sys.query(key_b{ "abc" });
+    sys.query(key_b{ "def" });
+    sys.query(key_b{ "ghi" });
 
-// this is just gonna test what makes the irregular_system_impl 'irregular', as the
-// rest is already covered by the above
+    ASSERT_EQ(sys.number<key_a>(), 3);
+    ASSERT_EQ(sys.number<key_b>(), 3);
+    ASSERT_EQ(sys.number<key_c>(), 0);
 
-TEST_F(QuerySystemTests, System_Irregular_Query_QueryProviderHasSecondarySourceWhichIsNotTheSystemWhichOwnsTheProvider) {
-    irregular_system_impl sys(dbg);
-
-    auto result = sys.query(key_b{ "abc" });
-
-    // provider for resource b is not pulling upstream from the provider for
-    // resource a from the system which owns it, instead pulling upstream
-    // from a totally different system, and thus provider
+    sys.reset();
 
     EXPECT_EQ(sys.number<key_a>(), 0);
-    EXPECT_EQ(sys.number<key_b>(), 1);
-    EXPECT_EQ(sys.prov_b_upstream.number<key_a>(), 1);
-    EXPECT_EQ(sys.prov_b_upstream.number<key_b>(), 0);
+    EXPECT_EQ(sys.number<key_b>(), 0);
+    EXPECT_EQ(sys.number<key_c>(), 0);
 
-    EXPECT_TRUE(result);
-
-    if (result) EXPECT_EQ(result->s, "a(abc, src1) b(abc, src2)");
+    EXPECT_TRUE(sys.called_do_reset);
 }
 

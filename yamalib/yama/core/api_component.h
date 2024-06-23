@@ -18,16 +18,27 @@ namespace yama {
     class api_component {
     public:
 
-        // this is immutable as otherwise an API component who's debug association
-        // can be modified would need to deal w/ the nuances of then having to
-        // also ensure that its subcomponents get updated
-
-        const std::shared_ptr<debug> dbg;
-
-
         api_component(std::shared_ptr<debug> dbg = nullptr);
 
         virtual ~api_component() noexcept = default;
+
+
+        // IMPORTANT:
+        //      debug layer association is immutable as otherwise an API component who's 
+        //      association can be modified isn't as straightforward to use w/ regards
+        //      to propagating this association down to subcomponents
+
+        // get_debug returns the debug layer associated w/ this API component, if any
+
+        // dbg is get_debug, but w/ a shorter name
+
+        std::shared_ptr<debug> get_debug() const noexcept;
+        std::shared_ptr<debug> dbg() const noexcept;
+
+
+    private:
+
+        const std::shared_ptr<debug> _dbg;
     };
 }
 

@@ -19,6 +19,8 @@ namespace yama {
 
     enum class qtype : uint8_t {
         todo, // TODO: also be sure to update fmt_qtype too
+
+        num, // this is not a valid qtype
     };
 
 

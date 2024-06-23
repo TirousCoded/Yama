@@ -18,7 +18,7 @@ namespace yama {
     //          1) basic alloc/dealloc functionality
     //          2) max size querying functionality
     //          3) allocs being aligned as required
-    //          4) anything required of the MAS impl
+    //          4) anything specific to the MAS impl
 
 
     // 'Memory Allocation Systems', or 'MASs', are Yama's alternative to std::memory_resource

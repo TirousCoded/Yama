@@ -26,8 +26,8 @@ namespace yama::qs {
     //      query provider may then employ information which is a function of other
     //      query providers elsewhere
     //
-    //      the secondary source query system can be a pointer to the same query system
-    //      which the provider is a part of the impl of, or a totally different one
+    //      the secondary source query system must be the the same query system which
+    //      the provider is a part of the impl of
 
 
     // when a provider has no primary information source, it's suppose to use this
@@ -61,6 +61,8 @@ namespace yama::qs {
     //            and secondary source object
     //          * this constructor gets wrapped in the constructor of the yama::provider_impl
     //            constructor w/ the same parameters
+    //          * the secondary_src must be an lvalue of the query system object the provider
+    //            is a part of
     //      size_t number() const noexcept;
     //      bool exists(const yama::qs::key<...>& k) const noexcept;
     //      std::optional<yama::qs::result<...>> query(const yama::qs::key<...>& key);
@@ -82,6 +84,9 @@ namespace yama::qs {
         using key_t = key<QTypes, QType>;
         using result_t = result<QTypes, QType>;
 
+
+        // behaviour is undefined if secondary_src is not an lvalue of the 
+        // query system object which this provider is part of
 
         inline provider_impl(primary_source_t& primary_src, system_t& secondary_src)
             : _policy(primary_src, secondary_src) {}
