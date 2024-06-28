@@ -3,7 +3,7 @@
 #pragma once
 
 
-//
+#include <concepts>
 
 
 namespace yama::qs {
