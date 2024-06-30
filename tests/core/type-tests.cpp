@@ -18,42 +18,50 @@ static bool span_eq(std::span<T, Extent> a, std::span<T, Extent> b) noexcept {
 }
 
 
+// just some data that appears in our tests over-and-over
+
+static std::vector<yama::linksym> linksyms0{
+    yama::make_linksym("a"_str, yama::kind::primitive),
+    yama::make_linksym("b"_str, yama::kind::primitive),
+    yama::make_linksym("c"_str, yama::kind::primitive),
+};
+
+static std::vector<yama::linksym> linksyms1{
+    yama::make_linksym("aa"_str, yama::kind::primitive),
+    yama::make_linksym("bb"_str, yama::kind::primitive),
+    yama::make_linksym("cc"_str, yama::kind::primitive),
+    yama::make_linksym("dd"_str, yama::kind::primitive),
+};
+
+
 TEST(TypeTests, TypeInstanceCtor) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
     EXPECT_FALSE(a.complete());
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.refs().size(), 3);
-    EXPECT_FALSE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_FALSE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(a.links().size(), 3);
+    EXPECT_FALSE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_FALSE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, CopyCtor) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -62,35 +70,31 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_FALSE(a.complete());
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.refs().size(), 3);
-    EXPECT_FALSE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_FALSE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(a.links().size(), 3);
+    EXPECT_FALSE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_FALSE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.refs().size(), 3);
-    EXPECT_FALSE(b.refs()[0]);
-    EXPECT_FALSE(b.refs()[1]);
-    EXPECT_FALSE(b.refs()[2]);
-    EXPECT_FALSE(b.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(b.links().size(), 3);
+    EXPECT_FALSE(b.links()[0]);
+    EXPECT_FALSE(b.links()[1]);
+    EXPECT_FALSE(b.links()[2]);
+    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, MoveCtor) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -99,36 +103,27 @@ TEST(TypeTests, MoveCtor) {
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.refs().size(), 3);
-    EXPECT_FALSE(b.refs()[0]);
-    EXPECT_FALSE(b.refs()[1]);
-    EXPECT_FALSE(b.refs()[2]);
-    EXPECT_FALSE(b.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(b.links().size(), 3);
+    EXPECT_FALSE(b.links()[0]);
+    EXPECT_FALSE(b.links()[1]);
+    EXPECT_FALSE(b.links()[2]);
+    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, CopyAssign) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
     yama::type_data b_data(
         yama::primitive_info{
             "def"_str,
-            {
-                "aa"_str,
-                "bb"_str,
-                "cc"_str,
-                "dd"_str,
-            },
+            linksyms1,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
-    yama::type_instance b_inst(b_data.fullname(), b_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -138,46 +133,37 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_FALSE(a.complete());
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.refs().size(), 3);
-    EXPECT_FALSE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_FALSE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(a.links().size(), 3);
+    EXPECT_FALSE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_FALSE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.refs().size(), 3);
-    EXPECT_FALSE(b.refs()[0]);
-    EXPECT_FALSE(b.refs()[1]);
-    EXPECT_FALSE(b.refs()[2]);
-    EXPECT_FALSE(b.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(b.links().size(), 3);
+    EXPECT_FALSE(b.links()[0]);
+    EXPECT_FALSE(b.links()[1]);
+    EXPECT_FALSE(b.links()[2]);
+    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, MoveAssign) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
     yama::type_data b_data(
         yama::primitive_info{
             "def"_str,
-            {
-                "aa"_str,
-                "bb"_str,
-                "cc"_str,
-                "dd"_str,
-            },
+            linksyms1,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
-    yama::type_instance b_inst(b_data.fullname(), b_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -187,38 +173,34 @@ TEST(TypeTests, MoveAssign) {
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.refs().size(), 3);
-    EXPECT_FALSE(b.refs()[0]);
-    EXPECT_FALSE(b.refs()[1]);
-    EXPECT_FALSE(b.refs()[2]);
-    EXPECT_FALSE(b.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(b.links().size(), 3);
+    EXPECT_FALSE(b.links()[0]);
+    EXPECT_FALSE(b.links()[1]);
+    EXPECT_FALSE(b.links()[2]);
+    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, Complete_IncompleteType) {
-    yama::type_data ref_data(
+    yama::type_data link_data(
         yama::primitive_info{
-            "ref"_str,
+            "link"_str,
             {},
         });
-    yama::type_instance ref_inst(ref_data.fullname(), ref_data);
+    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
-    yama::type ref(ref_inst);
+    yama::type link(link_inst);
 
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
-    a_inst.put_ref(0, ref);
-    //a_inst.put_ref(1, ref); <- incomplete
-    a_inst.put_ref(2, ref);
+    a_inst.put_link(0, link);
+    //a_inst.put_link(1, link); <- incomplete
+    a_inst.put_link(2, link);
 
     yama::type a(a_inst);
 
@@ -226,42 +208,38 @@ TEST(TypeTests, Complete_IncompleteType) {
 }
 
 TEST(TypeTests, Complete_CompleteType) {
-    yama::type_data ref_data(
+    yama::type_data link_data(
         yama::primitive_info{
-            "ref"_str,
+            "link"_str,
             {},
         });
-    yama::type_instance ref_inst(ref_data.fullname(), ref_data);
+    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
-    yama::type ref(ref_inst);
+    yama::type link(link_inst);
 
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
-    a_inst.put_ref(0, ref);
-    a_inst.put_ref(1, ref);
-    a_inst.put_ref(2, ref);
+    a_inst.put_link(0, link);
+    a_inst.put_link(1, link);
+    a_inst.put_link(2, link);
 
     yama::type a(a_inst);
 
     EXPECT_TRUE(a.complete());
 }
 
-TEST(TypeTests, Complete_CompleteType_ZeroRefSyms) {
+TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {}, // <- zero refsyms
+            {}, // <- zero linksyms
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -274,7 +252,7 @@ TEST(TypeTests, Fullname) {
             "abc"_str,
             {},
         });
-    yama::type_instance a_inst(
+    yama::type_instance a_inst(std::allocator<void>(), 
         "def"_str, // <- fullname *differs* from a_data.fullname()
         a_data);
 
@@ -284,100 +262,92 @@ TEST(TypeTests, Fullname) {
     EXPECT_EQ(a.fullname(), "def"_str);
 }
 
-TEST(TypeTests, Refs) {
-    yama::type_data ref_data(
+TEST(TypeTests, Links) {
+    yama::type_data link_data(
         yama::primitive_info{
-            "ref"_str,
+            "link"_str,
             {},
         });
-    yama::type_instance ref_inst(ref_data.fullname(), ref_data);
+    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
-    yama::type ref(ref_inst);
+    yama::type link(link_inst);
 
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
-    a_inst.put_ref(0, ref);
-    //a_inst.put_ref(1, ref); <- incomplete
-    a_inst.put_ref(2, ref);
+    a_inst.put_link(0, link);
+    //a_inst.put_link(1, link); <- incomplete
+    a_inst.put_link(2, link);
 
     yama::type a(a_inst);
 
 
-    EXPECT_EQ(a.refs().size(), 3);
+    EXPECT_EQ(a.links().size(), 3);
 
-    EXPECT_TRUE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_TRUE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_TRUE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
 
-    if (a.refs()[0]) EXPECT_EQ(a.refs()[0].value(), ref);
-    if (a.refs()[2]) EXPECT_EQ(a.refs()[2].value(), ref);
+    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
+    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
 
-    EXPECT_TRUE(a.refs().ref(0));
-    EXPECT_FALSE(a.refs().ref(1));
-    EXPECT_TRUE(a.refs().ref(2));
-    EXPECT_FALSE(a.refs().ref(3)); // <- fail due to out-of-bounds
+    EXPECT_TRUE(a.links().link(0));
+    EXPECT_FALSE(a.links().link(1));
+    EXPECT_TRUE(a.links().link(2));
+    EXPECT_FALSE(a.links().link(3)); // <- fail due to out-of-bounds
 
-    if (a.refs().ref(0)) EXPECT_EQ(a.refs().ref(0).value(), ref);
-    if (a.refs().ref(2)) EXPECT_EQ(a.refs().ref(2).value(), ref);
+    if (a.links().link(0)) EXPECT_EQ(a.links().link(0).value(), link);
+    if (a.links().link(2)) EXPECT_EQ(a.links().link(2).value(), link);
 }
 
-TEST(TypeTests, Refs_ZeroRefSyms) {
+TEST(TypeTests, Links_ZeroLinkSyms) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {}, // <- zero refsyms
+            {}, // <- zero linksyms
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
 
-    EXPECT_EQ(a.refs().size(), 0);
+    EXPECT_EQ(a.links().size(), 0);
 
-    EXPECT_FALSE(a.refs()[0]); // <- fail due to out-of-bounds
-    EXPECT_FALSE(a.refs().ref(0)); // <- fail due to out-of-bounds
+    EXPECT_FALSE(a.links()[0]); // <- fail due to out-of-bounds
+    EXPECT_FALSE(a.links().link(0)); // <- fail due to out-of-bounds
 }
 
-TEST(TypeTests, RefSyms) {
+TEST(TypeTests, LinkSyms) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
 
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
-TEST(TypeTests, RefSyms_ZeroRefSyms) {
+TEST(TypeTests, LinkSyms_ZeroLinkSyms) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {}, // <- zero refsyms
+            {}, // <- zero linksyms
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
 
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>()));
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>()));
 }
 
 TEST(TypeTests, Equality) {
@@ -386,10 +356,10 @@ TEST(TypeTests, Equality) {
             "abc"_str,
             {},
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
     // b_inst is a clone of a_inst, and exists to ensure that yama::type objects
     // of a_inst are not equal to those of b_inst
-    yama::type_instance b_inst("def"_str, a_inst);
+    yama::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst);
 
     yama::type a0(a_inst);
     yama::type a1(a_inst);
@@ -429,53 +399,45 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
     EXPECT_FALSE(a.complete());
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.refs().size(), 3);
-    EXPECT_FALSE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_FALSE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(a.links().size(), 3);
+    EXPECT_FALSE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_FALSE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, TypeInstance_CloneCtor) {
-    yama::type_data ref_data(
+    yama::type_data link_data(
         yama::primitive_info{
-            "ref"_str,
+            "link"_str,
             {},
         });
-    yama::type_instance ref_inst(ref_data.fullname(), ref_data);
+    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
-    yama::type ref(ref_inst);
+    yama::type link(link_inst);
 
     yama::type_data a_data(
         yama::primitive_info{
             "abc"_str,
-            {
-                "a"_str,
-                "b"_str,
-                "c"_str,
-            },
+            linksyms0,
         });
-    yama::type_instance a_inst(a_data.fullname(), a_data);
+    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
-    a_inst.put_ref(0, ref);
-    //a_inst.put_ref(1, ref);
-    a_inst.put_ref(2, ref);
+    a_inst.put_link(0, link);
+    //a_inst.put_link(1, link);
+    a_inst.put_link(2, link);
 
-    yama::type_instance b_inst("def"_str, a_inst); // clone ctor
+    yama::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
 
     yama::type a(a_inst);
     yama::type b(b_inst); // <- gotten from b_inst
@@ -483,26 +445,26 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_FALSE(a.complete());
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.refs().size(), 3);
-    EXPECT_TRUE(a.refs()[0]);
-    EXPECT_FALSE(a.refs()[1]);
-    EXPECT_TRUE(a.refs()[2]);
-    EXPECT_FALSE(a.refs()[3]); // <- fail due to out-of-bounds
-    if (a.refs()[0]) EXPECT_EQ(a.refs()[0].value(), ref);
-    if (a.refs()[2]) EXPECT_EQ(a.refs()[2].value(), ref);
-    EXPECT_TRUE(span_eq(a.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(a.links().size(), 3);
+    EXPECT_TRUE(a.links()[0]);
+    EXPECT_FALSE(a.links()[1]);
+    EXPECT_TRUE(a.links()[2]);
+    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
+    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
+    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "def"_str); // <- clone uses new fullname
     EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.refs().size(), 3);
-    EXPECT_TRUE(b.refs()[0]);
-    EXPECT_FALSE(b.refs()[1]);
-    EXPECT_TRUE(b.refs()[2]);
-    EXPECT_FALSE(b.refs()[3]); // <- fail due to out-of-bounds
-    if (b.refs()[0]) EXPECT_EQ(b.refs()[0].value(), ref);
-    if (b.refs()[2]) EXPECT_EQ(b.refs()[2].value(), ref);
-    EXPECT_TRUE(span_eq(b.refsyms(), std::span<const yama::str>({ "a"_str, "b"_str, "c"_str })));
+    EXPECT_EQ(b.links().size(), 3);
+    EXPECT_TRUE(b.links()[0]);
+    EXPECT_FALSE(b.links()[1]);
+    EXPECT_TRUE(b.links()[2]);
+    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    if (b.links()[0]) EXPECT_EQ(b.links()[0].value(), link);
+    if (b.links()[2]) EXPECT_EQ(b.links()[2].value(), link);
+    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     // equality tests already cover this, but just for completeness...
 

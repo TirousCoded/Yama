@@ -82,49 +82,59 @@ struct result_c final {
 
 template<>
 struct yama::qs::system_traits<test_qtype> final {
-    using qtypes = test_qtype;
+    using qtype_enum = test_qtype;
 };
+
+static_assert(yama::qs::system_traits_conforms<test_qtype>);
 
 template<>
 struct yama::qs::provider_traits<test_qtype, test_qtype::a> final {
-    using qtypes = test_qtype;
+    using qtype_enum = test_qtype;
     static constexpr auto qtype = test_qtype::a;
     using key = key_a;
     using result = result_a;
 };
 template<>
 struct yama::qs::provider_traits<test_qtype, test_qtype::b> final {
-    using qtypes = test_qtype;
-    static constexpr auto qtype = test_qtype::b;
+    using qtype_enum = test_qtype;
+    static constexpr test_qtype qtype = test_qtype::b;
     using key = key_b;
     using result = result_b;
 };
 template<>
 struct yama::qs::provider_traits<test_qtype, test_qtype::c> final {
-    using qtypes = test_qtype;
-    static constexpr auto qtype = test_qtype::c;
+    using qtype_enum = test_qtype;
+    static constexpr test_qtype qtype = test_qtype::c;
     using key = key_c;
     using result = result_c;
 };
 
+static_assert(yama::qs::provider_traits_conforms<test_qtype, test_qtype::a>);
+static_assert(yama::qs::provider_traits_conforms<test_qtype, test_qtype::b>);
+static_assert(yama::qs::provider_traits_conforms<test_qtype, test_qtype::c>);
+
 template<>
 struct yama::qs::key_traits<test_qtype, key_a> final {
-    using qtypes = test_qtype;
+    using qtype_enum = test_qtype;
     using key = key_a;
     static constexpr auto qtype = test_qtype::a;
 };
 template<>
 struct yama::qs::key_traits<test_qtype, key_b> final {
-    using qtypes = test_qtype;
+    using qtype_enum = test_qtype;
     using key = key_b;
     static constexpr auto qtype = test_qtype::b;
 };
 template<>
 struct yama::qs::key_traits<test_qtype, key_c> final {
-    using qtypes = test_qtype;
+    using qtype_enum = test_qtype;
     using key = key_c;
     static constexpr auto qtype = test_qtype::c;
 };
+
+static_assert(yama::qs::key_traits_conforms<test_qtype, key_a>);
+static_assert(yama::qs::key_traits_conforms<test_qtype, key_b>);
+static_assert(yama::qs::key_traits_conforms<test_qtype, key_c>);
 
 
 struct primary_source_a final {

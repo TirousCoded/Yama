@@ -5,6 +5,8 @@
 
 #include "res.h"
 #include "kind.h"
+#include "callsig.h"
+#include "linksym.h"
 #include "qs.h"
 
 #include "../query-systems/provider_traits.h"
@@ -24,32 +26,15 @@ namespace yama {
 
 template<>
 struct yama::qs::key_traits<yama::qtype, yama::type_data_k> final {
-    using qtypes = yama::qtype;
+    using qtype_enum = yama::qtype;
     using key = yama::type_data_k;
     static constexpr auto qtype = yama::type_data_qt;
 };
 
+static_assert(yama::qs::key_traits_conforms<yama::qtype, yama::type_data_k>);
+
 
 namespace yama {
-
-
-    /*
-        -- reference (symbol) tables --
-
-            the behaviour of a type (especially a function-like type) is governed
-            in part by said type's 'reference table', which provides an array of
-            references to other types which the type may access in order to operate
-
-            reference tables make it so that within their associated types, the
-            types the table references can be identified by an index value
-
-            these reference tables are generated from 'reference symbol tables',
-            which get linked into reference tables during type instantation
-
-            each reference symbol is a decorated fullname string which is used to
-            query a corresponding type, according to the semantics of the system
-            performing the instantiation
-    */
 
 
     // type_info is a base struct used to derive *aggregate initializable*
@@ -59,8 +44,8 @@ namespace yama {
     // the Yama API frontend for end-users thereof to use to define types
 
     struct type_info {
-        str                 fullname;   // the fullname of the type
-        std::vector<str>    refsyms;    // the reference symbol vector
+        str                     fullname;   // the fullname of the type
+        std::vector<linksym>    linksyms;   // the link symbol vector
     };
 
 
@@ -125,9 +110,9 @@ namespace yama {
 
         str fullname() const noexcept;
 
-        // refsyms returns the reference symbol table of the type encapsulated
+        // linksyms returns the link symbol table of the type encapsulated
 
-        std::span<const str> refsyms() const noexcept;
+        std::span<const linksym> linksyms() const noexcept;
 
 
         // kind returns the kind of type encapsulated
@@ -164,9 +149,11 @@ namespace yama {
 
 template<>
 struct yama::qs::provider_traits<yama::qtype, yama::type_data_qt> final {
-    using qtypes = yama::qtype;
+    using qtype_enum = yama::qtype;
     static constexpr auto qtype = yama::type_data_qt;
     using key = yama::type_data_k;
     using result = yama::type_data;
 };
+
+static_assert(yama::qs::provider_traits_conforms<yama::qtype, yama::type_data_qt>);
 

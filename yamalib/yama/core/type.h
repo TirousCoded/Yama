@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "kind.h"
+#include "link_index.h"
 #include "qs.h"
 #include "type_data.h"
 
@@ -28,10 +29,12 @@ namespace yama {
 
 template<>
 struct yama::qs::key_traits<yama::qtype, yama::type_k> final {
-    using qtypes = yama::qtype;
+    using qtype_enum = yama::qtype;
     using key = yama::type_k;
     static constexpr auto qtype = yama::type_qt;
 };
+
+static_assert(yama::qs::key_traits_conforms<yama::qtype, yama::type_k>);
 
 
 namespace yama {
@@ -52,40 +55,46 @@ namespace yama {
     class type final {
     public:
 
+        template<typename Allocator>
         friend class type_instance;
 
 
-        // ref_view is meant to be short-lived, w/ undefined behaviour if
+        // link_view is meant to be short-lived, w/ undefined behaviour if
         // it outlives the yama::type which created it
 
-        struct refs_view final {
+        struct links_view final {
             internal::type_mem _mem; // internal, do not use
 
 
-            // size returns the number of references in the table
+            // size returns the number of links in the table
 
             size_t size() const noexcept;
             
-            // ref returns reference at index in the table, if any
+            // link returns the link at index in the table, if any
 
-            // ref returns std::nullopt if index is out-of-bounds
+            // link returns std::nullopt if index is out-of-bounds
 
-            // ref returns std::nullopt if index is in-bounds, but 
+            // link returns std::nullopt if index is in-bounds, but 
             // refers to a stub
 
-            std::optional<type> ref(size_t index) const noexcept;
+            std::optional<type> link(link_index index) const noexcept;
 
-            std::optional<type> operator[](size_t index) const noexcept;
+            std::optional<type> operator[](link_index index) const noexcept;
         };
 
-        static_assert(std::is_trivially_copyable_v<refs_view>);
+        static_assert(std::is_trivially_copyable_v<links_view>);
 
-        friend struct refs_view;
+        friend struct links_view;
 
 
         // ctor for init via type_instance (for query provider impls)
 
-        explicit type(const type_instance& instance) noexcept;
+        // notice how yama::type isn't concerned about how its underlying 
+        // memory is allocated/deallocated, and so is not coupled to any 
+        // particular allocator
+
+        template<typename Allocator>
+        explicit inline type(const type_instance<Allocator>& instance) noexcept;
 
         type() = delete;
         type(const type&) = default;
@@ -97,9 +106,8 @@ namespace yama {
         type& operator=(type&& other) noexcept;
 
 
-        // complete returns if the type is 'complete', meaning that it
-        // has no stubs in its reference table, and is in general
-        // ready for use
+        // complete returns if the type is 'complete', meaning that it has
+        // no stubs in its link table, and is in general ready for use
 
         bool complete() const noexcept;
 
@@ -113,14 +121,14 @@ namespace yama {
         kind kind() const noexcept;
 
 
-        // refs returns a view of the reference table of the type
+        // links returns a view of the link table of the type
 
-        refs_view refs() const noexcept;
+        links_view links() const noexcept;
 
-        // refsyms returns a span of the reference symbol table used
+        // linksyms returns a span of the link symbol table used
         // during this type's instantiation
 
-        std::span<const str> refsyms() const noexcept;
+        std::span<const linksym> linksyms() const noexcept;
 
 
         bool operator==(const type& other) const noexcept;
@@ -133,16 +141,23 @@ namespace yama {
 
         explicit type(internal::type_mem mem) noexcept;
     };
+
+
+    // NOTE: I wanna enforce yama::type being no more than a pointer in size
+
+    static_assert(sizeof(type) <= sizeof(void*));
 }
 
 
 template<>
 struct yama::qs::provider_traits<yama::qtype, yama::type_qt> final {
-    using qtypes = yama::qtype;
+    using qtype_enum = yama::qtype;
     static constexpr auto qtype = yama::type_qt;
     using key = yama::type_k;
     using result = yama::type;
 };
+
+static_assert(yama::qs::provider_traits_conforms<yama::qtype, yama::type_qt>);
 
 
 namespace yama {
@@ -155,9 +170,10 @@ namespace yama {
     // impl backends, and should not appear outside that context
 
     // type_instance is mutable so that the query provider impl can
-    // populate its reference table as needed, w/ unfilled entries
+    // populate its link table as needed, w/ unfilled entries
     // being default 'stub' values
 
+    template<typename Allocator>
     class type_instance final {
     public:
 
@@ -166,8 +182,8 @@ namespace yama {
 
         // ctor for instantiating a type_instance
 
-        // the reference table of the type instance will have the expected
-        // number of reference stubs, which are to then be filled out manually
+        // the link table of the type instance will have the expected
+        // number of link stubs, which are to then be filled out manually
 
         // TODO: what are these semantics? who's responsibility is it to check them?
 
@@ -176,7 +192,8 @@ namespace yama {
         // describing a type using the other information used to instantiate
         // the type_instance
 
-        type_instance(
+        inline type_instance(
+            Allocator al,
             str fullname,
             const type_data& data);
 
@@ -186,46 +203,112 @@ namespace yama {
         // to allow for *incomplete* types (ie. things like generic types w/out
         // resolved params) to be used to derive more *complete* types
 
-        type_instance(
+        inline type_instance(
+            Allocator al,
             str new_fullname,
             const type_instance& other);
 
         type_instance() = delete;
         type_instance(type_instance&&) noexcept = delete;
 
-        ~type_instance() noexcept;
+        inline ~type_instance() noexcept;
 
         type_instance& operator=(const type_instance&) = delete;
         type_instance& operator=(type_instance&&) noexcept = delete;
 
 
-        // put_ref assigns x to the reference at index in the reference 
-        // table of the type of the type_instance, overwriting any existing
-        // reference value
+        // TODO: get_allocator hasn't been unit tested
+
+        // get_allocator returns the allocator of the type_instance
+
+        inline Allocator get_allocator() const noexcept { return _al; }
+
+
+        // put_link assigns x to the link at index in the link table of the
+        // type of the type_instance, overwriting any existing link value
 
         // behaviour is undefined if index is out-of-bounds
 
-        // behaviour is undefined if put_ref is used after the initialization
+        // behaviour is undefined if put_link is used after the initialization
         // of a yama::type via this type_instance
 
-        void put_ref(size_t index, type x) noexcept;
+        inline void put_link(link_index index, type x) noexcept;
 
 
     private:
+
+        Allocator _al;
 
         // the type_instance will handle _mem via RAII handled by it
 
         internal::type_mem _mem;
 
 
-        static internal::type_mem _create_mem(
+        static inline internal::type_mem _create_mem(
+            Allocator al,
             str fullname,
             const type_data& data);
-        static internal::type_mem _create_mem(
+        static inline internal::type_mem _create_mem(
+            Allocator al,
             str new_fullname,
             const type_instance& other);
 
-        static void _destroy_mem(internal::type_mem mem) noexcept;
+        static inline void _destroy_mem(
+            Allocator al,
+            internal::type_mem mem) noexcept;
     };
+
+
+    template<typename Allocator>
+    inline type::type(const type_instance<Allocator>& instance) noexcept
+        : _mem(instance._mem) {}
+
+
+    template<typename Allocator>
+    type_instance<Allocator>::type_instance(Allocator al, str fullname, const type_data& data)
+        : _al(al),
+        _mem(_create_mem(al, std::move(fullname), data)) {}
+
+    template<typename Allocator>
+    type_instance<Allocator>::type_instance(Allocator al, str new_fullname, const type_instance& other)
+        : _al(al),
+        _mem(_create_mem(al, std::move(new_fullname), other)) {}
+
+    template<typename Allocator>
+    type_instance<Allocator>::~type_instance() noexcept {
+        _destroy_mem(get_allocator(), _mem); // RAII cleanup of _mem
+    }
+
+    template<typename Allocator>
+    void type_instance<Allocator>::put_link(link_index index, type x) noexcept {
+        if (index >= _mem.elems().size()) return;
+        // decr stubs if we're assigning to a stub
+        if (!_mem.elems()[index]) _mem->stubs--;
+        _mem.elems()[index] = x._mem.anon_ref();
+    }
+
+    template<typename Allocator>
+    yama::internal::type_mem type_instance<Allocator>::_create_mem(Allocator al, str fullname, const type_data& data) {
+        internal::type_mem_header header{
+            .fullname = fullname,
+            .data = data,
+            .links = data.linksyms().size(),
+            .kind = data.kind(),
+            .stubs = data.linksyms().size(),
+        };
+        return internal::type_mem::create(al, std::move(header));
+    }
+
+    template<typename Allocator>
+    yama::internal::type_mem type_instance<Allocator>::_create_mem(Allocator al, str new_fullname, const type_instance& other) {
+        auto result = internal::type_mem::clone(al, other._mem);
+        result->fullname = std::move(new_fullname);
+        return result;
+    }
+
+    template<typename Allocator>
+    void type_instance<Allocator>::_destroy_mem(Allocator al, internal::type_mem mem) noexcept {
+        internal::type_mem::destroy(al, mem);
+    }
 }
 

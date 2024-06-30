@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include <utility>
+
 #include <taul/str.h>
 
 
@@ -26,9 +28,24 @@ namespace yama {
     // some useful concepts
 
     template<typename T>
-    concept hashable = requires(T a)
+    concept hashable_type = 
+        requires(T a)
     {
         { std::hash<T>{}(a) } -> std::convertible_to<size_t>;
+    };
+
+    template<typename T, typename... Args>
+    concept callable_type =
+        requires(T f, Args&&... args)
+    {
+        f(std::forward<Args>(args)...);
+    };
+
+    template<typename T, typename Returns, typename... Args>
+    concept callable_r_type =
+        requires(T f, Args&&... args)
+    {
+        { f(std::forward<Args>(args)...) } -> std::convertible_to<Returns>;
     };
 }
 

@@ -51,8 +51,10 @@ namespace yama {
 
 template<>
 struct yama::qs::system_traits<yama::qtype> final {
-    using qtypes = yama::qtype;
+    using qtype_enum = yama::qtype;
 };
+
+static_assert(yama::qs::system_traits_type<yama::qs::system_traits<yama::qtype>, yama::qtype>);
 
 
 template<>

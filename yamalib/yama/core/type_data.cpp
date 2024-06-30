@@ -18,8 +18,8 @@ yama::str yama::type_data::fullname() const noexcept {
     return _info->fullname;
 }
 
-std::span<const yama::str> yama::type_data::refsyms() const noexcept {
-    return std::span(_info->refsyms);
+std::span<const yama::linksym> yama::type_data::linksyms() const noexcept {
+    return std::span(_info->linksyms);
 }
 
 yama::kind yama::type_data::kind() const noexcept {

@@ -17,6 +17,9 @@
 #include "mas.h"
 
 #include "kind.h"
+#include "link_index.h"
+#include "callsig.h"
+#include "linksym.h"
 
 #include "qs.h"
 #include "type_data.h"
