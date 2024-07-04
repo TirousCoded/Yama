@@ -20,7 +20,7 @@ yama::res<yama::mas> yama::context::get_mas() const noexcept {
     return _mas;
 }
 
-yama::qs::untyped_provider<yama::qtype>* yama::context::get_provider(qtype qtype) const noexcept {
+yama::qs::untyped_provider* yama::context::get_provider(qs::qtype_t qtype) const noexcept {
     // TODO
     return nullptr;
 }

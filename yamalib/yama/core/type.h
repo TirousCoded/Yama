@@ -7,34 +7,10 @@
 
 #include "kind.h"
 #include "link_index.h"
-#include "qs.h"
+#include "type_k.h"
 #include "type_data.h"
 
-#include "../query-systems/provider_traits.h"
-#include "../query-systems/key_traits.h"
-
 #include "../internal-api/type_mem.h"
-
-
-namespace yama {
-
-
-    // query key
-
-    struct type_k final {
-        str fullname;   // the fullname of the type
-    };
-}
-
-
-template<>
-struct yama::qs::key_traits<yama::qtype, yama::type_k> final {
-    using qtype_enum = yama::qtype;
-    using key = yama::type_k;
-    static constexpr auto qtype = yama::type_qt;
-};
-
-static_assert(yama::qs::key_traits_conforms<yama::qtype, yama::type_k>);
 
 
 namespace yama {
@@ -146,21 +122,6 @@ namespace yama {
     // NOTE: I wanna enforce yama::type being no more than a pointer in size
 
     static_assert(sizeof(type) <= sizeof(void*));
-}
-
-
-template<>
-struct yama::qs::provider_traits<yama::qtype, yama::type_qt> final {
-    using qtype_enum = yama::qtype;
-    static constexpr auto qtype = yama::type_qt;
-    using key = yama::type_k;
-    using result = yama::type;
-};
-
-static_assert(yama::qs::provider_traits_conforms<yama::qtype, yama::type_qt>);
-
-
-namespace yama {
 
 
     // yama::type_instance encapsulates the state of an instantiated

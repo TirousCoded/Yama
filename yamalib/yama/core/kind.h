@@ -8,6 +8,8 @@
 #include <format>
 #include <iostream>
 
+#include "macros.h"
+
 
 namespace yama {
 
@@ -28,16 +30,5 @@ namespace yama {
 }
 
 
-template<>
-struct std::formatter<yama::kind> final : std::formatter<std::string> {
-    auto format(yama::kind x, format_context& ctx) const {
-        return formatter<string>::format(yama::fmt_kind(x), ctx);
-    }
-};
-
-namespace std {
-    inline std::ostream& operator<<(std::ostream& stream, const yama::kind& x) {
-        return stream << yama::fmt_kind(x);
-    }
-}
+YAMA_SETUP_FORMAT(yama::kind, yama::fmt_kind(x));
 

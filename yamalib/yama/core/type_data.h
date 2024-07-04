@@ -7,36 +7,12 @@
 #include "kind.h"
 #include "callsig.h"
 #include "linksym.h"
-#include "qs.h"
-
-#include "../query-systems/provider_traits.h"
-#include "../query-systems/key_traits.h"
+#include "type_data_k.h"
 
 
 namespace yama {
 
-
-    // query key
-
-    struct type_data_k final {
-        str fullname;   // the fullname of the type
-    };
-}
-
-
-template<>
-struct yama::qs::key_traits<yama::qtype, yama::type_data_k> final {
-    using qtype_enum = yama::qtype;
-    using key = yama::type_data_k;
-    static constexpr auto qtype = yama::type_data_qt;
-};
-
-static_assert(yama::qs::key_traits_conforms<yama::qtype, yama::type_data_k>);
-
-
-namespace yama {
-
-
+    
     // type_info is a base struct used to derive *aggregate initializable*
     // structs which encapsulate pre-instantiation information about a type
 
@@ -145,15 +121,4 @@ namespace yama {
         return *(const T*)_info.get();
     }
 }
-
-
-template<>
-struct yama::qs::provider_traits<yama::qtype, yama::type_data_qt> final {
-    using qtype_enum = yama::qtype;
-    static constexpr auto qtype = yama::type_data_qt;
-    using key = yama::type_data_k;
-    using result = yama::type_data;
-};
-
-static_assert(yama::qs::provider_traits_conforms<yama::qtype, yama::type_data_qt>);
 

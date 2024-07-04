@@ -11,7 +11,7 @@
 namespace yama {
 
 
-    class context final : public qs::system<qtype> {
+    class context final : public qs::system {
     public:
 
         context(
@@ -39,7 +39,7 @@ namespace yama {
 
     protected:
 
-        qs::untyped_provider<qtype>* get_provider(qtype qtype) const noexcept override final;
+        qs::untyped_provider* get_provider(qs::qtype_t qtype) const noexcept override final;
         void do_discard_all() override final;
 
 

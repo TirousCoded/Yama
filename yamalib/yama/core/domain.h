@@ -3,7 +3,6 @@
 #pragma once
 
 
-#include "qs.h"
 #include "res.h"
 #include "mas.h"
 
@@ -16,7 +15,7 @@ namespace yama {
     class context;
 
 
-    class domain : public qs::system<qtype> {
+    class domain : public qs::system {
     public:
 
         friend class yama::context;

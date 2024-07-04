@@ -21,7 +21,9 @@
 #include "callsig.h"
 #include "linksym.h"
 
-#include "qs.h"
+#include "type_data_k.h"
+#include "type_k.h"
+
 #include "type_data.h"
 #include "type.h"
 
