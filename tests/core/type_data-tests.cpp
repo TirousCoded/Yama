@@ -22,12 +22,18 @@ static bool span_eq(std::span<T, Extent> a, std::span<T, Extent> b) noexcept {
 
 struct test_primitive_info final : yama::type_info {
     size_t value;
+
+
     static constexpr auto kind() noexcept { return yama::kind::primitive; }
+    static constexpr bool uses_callsig() noexcept { return false; }
 };
 
 struct test_function_info final : yama::type_info {
     size_t value;
+
+
     static constexpr auto kind() noexcept { return yama::kind::function; }
+    static constexpr bool uses_callsig() noexcept { return true; }
 };
 
 
@@ -46,16 +52,22 @@ static std::vector<yama::linksym> linksyms1{
     yama::make_linksym("dd"_str, yama::kind::primitive),
 };
 
+static yama::callsig_info callsig_info0 = yama::make_callsig_info({ 0, 1, 2 }, 1);
+
+static yama::callsig_info callsig_info1 = yama::make_callsig_info({ 2, 0, 1 }, 0);
+
 
 TEST(TypeDataTests, TypeInfoInjectionCtor) {
     yama::type_data a(
         test_primitive_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
             31,
         });
 
     EXPECT_EQ(a.fullname(), "abc"_str);
+    EXPECT_EQ(a.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
@@ -66,6 +78,7 @@ TEST(TypeDataTests, CopyCtor) {
     yama::type_data a(
         test_primitive_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
             31,
         });
@@ -73,12 +86,14 @@ TEST(TypeDataTests, CopyCtor) {
     yama::type_data b(a);
 
     EXPECT_EQ(a.fullname(), "abc"_str);
+    EXPECT_EQ(a.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<test_primitive_info>().value, 31);
 
     EXPECT_EQ(b.fullname(), "abc"_str);
+    EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
@@ -89,6 +104,7 @@ TEST(TypeDataTests, MoveCtor) {
     yama::type_data a(
         test_primitive_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
             31,
         });
@@ -96,6 +112,7 @@ TEST(TypeDataTests, MoveCtor) {
     yama::type_data b(std::move(a));
 
     EXPECT_EQ(b.fullname(), "abc"_str);
+    EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
@@ -106,12 +123,14 @@ TEST(TypeDataTests, CopyAssign) {
     yama::type_data a(
         test_primitive_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
             31,
         });
     yama::type_data b(
         test_function_info{
             "def"_str,
+            std::make_optional(callsig_info1),
             linksyms1,
             100,
         });
@@ -119,12 +138,14 @@ TEST(TypeDataTests, CopyAssign) {
     b = a;
 
     EXPECT_EQ(a.fullname(), "abc"_str);
+    EXPECT_EQ(a.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<test_primitive_info>().value, 31);
 
     EXPECT_EQ(b.fullname(), "abc"_str);
+    EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
@@ -135,12 +156,14 @@ TEST(TypeDataTests, MoveAssign) {
     yama::type_data a(
         test_primitive_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
             31,
         });
     yama::type_data b(
         test_function_info{
             "def"_str,
+            std::make_optional(callsig_info1),
             linksyms1,
             100,
         });
@@ -148,13 +171,14 @@ TEST(TypeDataTests, MoveAssign) {
     b = std::move(a);
 
     EXPECT_EQ(b.fullname(), "abc"_str);
+    EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(b.info<test_primitive_info>().value, 31);
 }
 
-static_assert(yama::kind_count == 2);
+static_assert(yama::kinds == 2);
 
 // here we use the actual yama::***_info types
 
@@ -162,10 +186,12 @@ TEST(TypeDataTests, PrimitiveInfo) {
     yama::type_data a(
         yama::primitive_info{
             "abc"_str,
+            std::nullopt,
             linksyms0,
         });
 
     EXPECT_EQ(a.fullname(), "abc"_str);
+    EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<yama::primitive_info>().fullname, "abc"_str);
@@ -175,10 +201,12 @@ TEST(TypeDataTests, FunctionInfo) {
     yama::type_data a(
         yama::function_info{
             "abc"_str,
+            std::make_optional(callsig_info0),
             linksyms0,
         });
 
     EXPECT_EQ(a.fullname(), "abc"_str);
+    EXPECT_EQ(a.callsig(), std::make_optional(callsig_info0));
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.info<yama::function_info>().fullname, "abc"_str);

@@ -112,19 +112,22 @@ public:
     yama::qs::system* sys;
     std::string name;
 
+    size_t reset_calls;
+
     std::unordered_map<std::string, result_t> cache;
 
 
     provider_a(yama::qs::system& sys, std::string name)
         : sys(&sys), 
-        name(std::move(name)) {}
+        name(std::move(name)), 
+        reset_calls(0) {}
 
 
     size_t number() const noexcept override final {
         return cache.size();
     }
 
-    bool exists(const key_t& k) const noexcept override final {
+    bool is_cached(const key_t& k) const noexcept override final {
         return cache.contains(k.s);
     }
 
@@ -139,9 +142,9 @@ public:
         return result;
     }
 
-    std::optional<result_t> fetch(const key_t& k) override final {
+    std::optional<result_t> fetch(const key_t& k) const override final {
         return
-            exists(k)
+            is_cached(k)
             ? std::make_optional(cache.at(k.s))
             : std::nullopt;
     }
@@ -152,6 +155,11 @@ public:
 
     void discard_all() override final {
         cache.clear();
+    }
+
+    void reset() override final {
+        discard_all();
+        reset_calls++;
     }
 };
 
@@ -165,19 +173,22 @@ public:
     yama::qs::system* sys;
     std::string name;
 
+    size_t reset_calls;
+
     std::unordered_map<std::string, result_t> cache;
 
 
     provider_b(yama::qs::system& sys, std::string name)
         : sys(&sys),
-        name(std::move(name)) {}
+        name(std::move(name)), 
+        reset_calls(0) {}
 
 
     size_t number() const noexcept override final {
         return cache.size();
     }
 
-    bool exists(const key_t& k) const noexcept override final {
+    bool is_cached(const key_t& k) const noexcept override final {
         return cache.contains(k.s);
     }
 
@@ -195,9 +206,9 @@ public:
         return result;
     }
 
-    std::optional<result_t> fetch(const key_t& k) override final {
+    std::optional<result_t> fetch(const key_t& k) const override final {
         return
-            exists(k)
+            is_cached(k)
             ? std::make_optional(cache.at(k.s))
             : std::nullopt;
     }
@@ -208,6 +219,11 @@ public:
 
     void discard_all() override final {
         cache.clear();
+    }
+
+    void reset() override final {
+        discard_all();
+        reset_calls++;
     }
 };
 
@@ -255,8 +271,8 @@ protected:
     }
 
     void do_reset() override final {
-        prov_a.discard_all();
-        prov_b.discard_all();
+        prov_a.reset();
+        prov_b.reset();
         called_do_reset = true;
     }
 };
@@ -305,19 +321,19 @@ TEST_F(QuerySystemTests, Provider_Number) {
     EXPECT_EQ(sys.prov_a.number(), 2);
 }
 
-TEST_F(QuerySystemTests, Provider_Exists) {
+TEST_F(QuerySystemTests, Provider_IsCached) {
     system_impl sys(dbg);
 
-    EXPECT_FALSE(sys.prov_a.exists(key_a{ "abc" }));
-    EXPECT_FALSE(sys.prov_a.exists(key_a{ "def" }));
-    EXPECT_FALSE(sys.prov_a.exists(key_a{ "ghi" }));
+    EXPECT_FALSE(sys.prov_a.is_cached(key_a{ "abc" }));
+    EXPECT_FALSE(sys.prov_a.is_cached(key_a{ "def" }));
+    EXPECT_FALSE(sys.prov_a.is_cached(key_a{ "ghi" }));
 
     ASSERT_TRUE(sys.prov_a.query(key_a{ "abc" }));
     ASSERT_TRUE(sys.prov_a.query(key_a{ "ghi" }));
 
-    EXPECT_TRUE(sys.prov_a.exists(key_a{ "abc" }));
-    EXPECT_FALSE(sys.prov_a.exists(key_a{ "def" }));
-    EXPECT_TRUE(sys.prov_a.exists(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.prov_a.is_cached(key_a{ "abc" }));
+    EXPECT_FALSE(sys.prov_a.is_cached(key_a{ "def" }));
+    EXPECT_TRUE(sys.prov_a.is_cached(key_a{ "ghi" }));
 }
 
 TEST_F(QuerySystemTests, Provider_Query) {
@@ -429,6 +445,22 @@ TEST_F(QuerySystemTests, Provider_DiscardAll) {
     EXPECT_EQ(sys.prov_a.number(), 0);
 }
 
+TEST_F(QuerySystemTests, Provider_Reset) {
+    system_impl sys(dbg);
+
+    sys.prov_a.query(key_a{ "abc" });
+    sys.prov_a.query(key_a{ "def" });
+    sys.prov_a.query(key_a{ "ghi" });
+
+    ASSERT_EQ(sys.prov_a.number(), 3);
+    ASSERT_EQ(sys.prov_a.reset_calls, 0);
+
+    sys.prov_a.reset();
+
+    EXPECT_EQ(sys.prov_a.number(), 0);
+    EXPECT_EQ(sys.prov_a.reset_calls, 1);
+}
+
 
 // system tests
 
@@ -470,37 +502,37 @@ TEST_F(QuerySystemTests, System_Number_ByKey_ReturnZeroIfNoProvider) {
     EXPECT_EQ(sys.number<key_c>(), 0);
 }
 
-TEST_F(QuerySystemTests, System_Exists) {
+TEST_F(QuerySystemTests, System_IsCached) {
     system_impl sys(dbg);
 
-    EXPECT_FALSE(sys.exists(key_a{ "abc" }));
-    EXPECT_FALSE(sys.exists(key_a{ "def" }));
-    EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
-    EXPECT_FALSE(sys.exists(key_b{ "abc" }));
-    EXPECT_FALSE(sys.exists(key_b{ "def" }));
-    EXPECT_FALSE(sys.exists(key_b{ "ghi" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "abc" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "def" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "ghi" }));
+    EXPECT_FALSE(sys.is_cached(key_b{ "abc" }));
+    EXPECT_FALSE(sys.is_cached(key_b{ "def" }));
+    EXPECT_FALSE(sys.is_cached(key_b{ "ghi" }));
     
     // heterogeneous arg types
 
-    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
 
     ASSERT_TRUE(sys.query(key_b{ "abc" }));
     ASSERT_TRUE(sys.query(key_b{ "def" }));
     ASSERT_TRUE(sys.query(key_b{ "ghi" }));
 
-    EXPECT_TRUE(sys.exists(key_a{ "abc" }));
-    EXPECT_TRUE(sys.exists(key_a{ "def" }));
-    EXPECT_TRUE(sys.exists(key_a{ "ghi" }));
-    EXPECT_TRUE(sys.exists(key_b{ "abc" }));
-    EXPECT_TRUE(sys.exists(key_b{ "def" }));
-    EXPECT_TRUE(sys.exists(key_b{ "ghi" }));
+    EXPECT_TRUE(sys.is_cached(key_a{ "abc" }));
+    EXPECT_TRUE(sys.is_cached(key_a{ "def" }));
+    EXPECT_TRUE(sys.is_cached(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.is_cached(key_b{ "abc" }));
+    EXPECT_TRUE(sys.is_cached(key_b{ "def" }));
+    EXPECT_TRUE(sys.is_cached(key_b{ "ghi" }));
 
     // heterogeneous arg types
     
-    EXPECT_TRUE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
+    EXPECT_TRUE(sys.is_cached(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }));
 }
 
-TEST_F(QuerySystemTests, System_Exists_FailDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
+TEST_F(QuerySystemTests, System_IsCached_FailDueToNoCachedResultDataFound_AndWhileOtherArgsSucceed) {
     system_impl sys(dbg);
 
     ASSERT_TRUE(sys.query(key_b{ "abc" }));
@@ -509,10 +541,10 @@ TEST_F(QuerySystemTests, System_Exists_FailDueToNoCachedResultDataFound_AndWhile
 
     // there is no resource a under 'jkl'
 
-    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_a{ "jkl" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_a{ "jkl" }));
 }
 
-TEST_F(QuerySystemTests, System_Exists_FailDueToNoProvider_AndWhileOtherArgsSucceed) {
+TEST_F(QuerySystemTests, System_IsCached_FailDueToNoProvider_AndWhileOtherArgsSucceed) {
     system_impl sys(dbg);
 
     ASSERT_TRUE(sys.query(key_b{ "abc" }));
@@ -521,16 +553,16 @@ TEST_F(QuerySystemTests, System_Exists_FailDueToNoProvider_AndWhileOtherArgsSucc
 
     // there is no provider for resource c
 
-    EXPECT_FALSE(sys.exists(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_c{ "abc" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "abc" }, key_b{ "ghi" }, key_a{ "def" }, key_c{ "abc" }));
 }
 
-TEST_F(QuerySystemTests, System_Exists_ZeroArgsEdgeCase) {
+TEST_F(QuerySystemTests, System_IsCached_ZeroArgsEdgeCase) {
     system_impl sys(dbg);
 
     // if we don't have any keys, then exists should always succeed, as there's
     // no scenario where the keys in question will not be found
 
-    EXPECT_TRUE(sys.exists());
+    EXPECT_TRUE(sys.is_cached());
 }
 
 TEST_F(QuerySystemTests, System_Query) {
@@ -658,7 +690,7 @@ TEST_F(QuerySystemTests, System_Discard) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.exists(
+    ASSERT_TRUE(sys.is_cached(
         key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
@@ -667,7 +699,7 @@ TEST_F(QuerySystemTests, System_Discard) {
     EXPECT_EQ(sys.number<key_a>(), 1);
     EXPECT_EQ(sys.number<key_b>(), 2);
 
-    EXPECT_TRUE(sys.exists(
+    EXPECT_TRUE(sys.is_cached(
         /*key_a{"abc"}, key_a{"def"},*/ key_a{"ghi"},
         /*key_b{"abc"},*/ key_b{"def"}, key_b{"ghi"}));
 }
@@ -682,7 +714,7 @@ TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoCachedResultDataFound_
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.exists(
+    ASSERT_TRUE(sys.is_cached(
         key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
@@ -693,7 +725,7 @@ TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoCachedResultDataFound_
     EXPECT_EQ(sys.number<key_a>(), 1);
     EXPECT_EQ(sys.number<key_b>(), 2);
 
-    EXPECT_TRUE(sys.exists(
+    EXPECT_TRUE(sys.is_cached(
         /*key_a{"abc"}, key_a{"def"},*/ key_a{ "ghi" },
         /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
@@ -709,7 +741,7 @@ TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoProvider_AndWhileOther
     ASSERT_EQ(sys.number<key_b>(), 3);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
-    ASSERT_TRUE(sys.exists(
+    ASSERT_TRUE(sys.is_cached(
         key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
@@ -721,7 +753,7 @@ TEST_F(QuerySystemTests, System_Discard_FailQuietlyDueToNoProvider_AndWhileOther
     EXPECT_EQ(sys.number<key_b>(), 2);
     ASSERT_EQ(sys.number<key_c>(), 0);
 
-    EXPECT_TRUE(sys.exists(
+    EXPECT_TRUE(sys.is_cached(
         /*key_a{"abc"}, key_a{"def"},*/ key_a{ "ghi" },
         /*key_b{"abc"},*/ key_b{ "def" }, key_b{ "ghi" }));
 }
@@ -736,7 +768,7 @@ TEST_F(QuerySystemTests, System_Discard_ZeroArgsEdgeCase) {
     ASSERT_EQ(sys.number<key_a>(), 3);
     ASSERT_EQ(sys.number<key_b>(), 3);
 
-    ASSERT_TRUE(sys.exists(
+    ASSERT_TRUE(sys.is_cached(
         key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
@@ -745,7 +777,7 @@ TEST_F(QuerySystemTests, System_Discard_ZeroArgsEdgeCase) {
     EXPECT_EQ(sys.number<key_a>(), 3);
     EXPECT_EQ(sys.number<key_b>(), 3);
 
-    EXPECT_TRUE(sys.exists(
+    EXPECT_TRUE(sys.is_cached(
         key_a{ "abc" }, key_a{ "def" }, key_a{ "ghi" },
         key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 }
@@ -791,10 +823,10 @@ TEST_F(QuerySystemTests, System_DiscardAll_ForSpecificProvider_ByKey) {
     EXPECT_EQ(sys.number<key_b>(), 3);
     EXPECT_EQ(sys.number<key_c>(), 0);
 
-    EXPECT_FALSE(sys.exists(key_a{ "abc" }));
-    EXPECT_FALSE(sys.exists(key_a{ "def" }));
-    EXPECT_FALSE(sys.exists(key_a{ "ghi" }));
-    EXPECT_TRUE(sys.exists(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "abc" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "def" }));
+    EXPECT_FALSE(sys.is_cached(key_a{ "ghi" }));
+    EXPECT_TRUE(sys.is_cached(key_b{ "abc" }, key_b{ "def" }, key_b{ "ghi" }));
 
     EXPECT_FALSE(sys.called_do_discard_all);
 }

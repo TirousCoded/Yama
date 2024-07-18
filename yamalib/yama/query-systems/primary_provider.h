@@ -37,22 +37,19 @@ namespace yama::qs {
 
         inline bool push(key_t k, result_t r);
 
-        // reset resets the provider's primary info, discarding all of it, 
-        // and by extension resetting the provider's secondary info as well
-
-        inline void reset() noexcept;
-
 
         inline size_t number() const noexcept override final;
-        inline bool exists(const key_t& k) const noexcept override final;
+        inline bool is_cached(const key_t& k) const noexcept override final;
         inline std::optional<result_t> query(const key_t& k) override final;
-        inline std::optional<result_t> fetch(const key_t& k) override final;
+        inline std::optional<result_t> fetch(const key_t& k) const override final;
 
         // discard and discard_all are noops in this impl, as the provider's
         // secondary info related behaviour is transparent
 
         inline void discard(const key_t&) override final;
         inline void discard_all() override final;
+
+        inline void reset() override final;
 
 
     private:
@@ -70,17 +67,12 @@ namespace yama::qs {
     }
     
     template<typename Key>
-    inline void primary_provider<Key>::reset() noexcept {
-        _data.clear();
-    }
-    
-    template<typename Key>
     inline size_t primary_provider<Key>::number() const noexcept {
         return _data.size();
     }
     
     template<typename Key>
-    inline bool primary_provider<Key>::exists(const key_t& k) const noexcept {
+    inline bool primary_provider<Key>::is_cached(const key_t& k) const noexcept {
         return _data.contains(k);
     }
     
@@ -90,7 +82,7 @@ namespace yama::qs {
     }
     
     template<typename Key>
-    inline std::optional<typename primary_provider<Key>::result_t> primary_provider<Key>::fetch(const key_t& k) {
+    inline std::optional<typename primary_provider<Key>::result_t> primary_provider<Key>::fetch(const key_t& k) const {
         auto found = _data.find(k);
         return
             found != _data.end()
@@ -106,6 +98,11 @@ namespace yama::qs {
     template<typename Key>
     inline void primary_provider<Key>::discard_all() {
         // do nothing
+    }
+
+    template<typename Key>
+    inline void primary_provider<Key>::reset() {
+        _data.clear();
     }
 }
 

@@ -7,6 +7,8 @@
 #include "mas.h"
 #include "domain.h"
 
+#include "../query-systems/system.h"
+
 
 namespace yama {
 
@@ -45,8 +47,8 @@ namespace yama {
 
     private:
 
-        res<mas> _mas;
         res<domain> _dm;
+        res<mas> _mas;
     };
 }
 

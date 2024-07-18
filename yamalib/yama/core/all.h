@@ -18,11 +18,11 @@
 
 #include "kind.h"
 #include "link_index.h"
-#include "callsig.h"
 #include "linksym.h"
+#include "links_view.h"
 
-#include "type_data_k.h"
-#include "type_k.h"
+#include "callsig_info.h"
+#include "callsig.h"
 
 #include "type_data.h"
 #include "type.h"

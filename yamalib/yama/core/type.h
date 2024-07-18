@@ -7,10 +7,11 @@
 
 #include "kind.h"
 #include "link_index.h"
-#include "type_k.h"
+#include "links_view.h"
+#include "callsig.h"
 #include "type_data.h"
 
-#include "../internal-api/type_mem.h"
+#include "../internals/type_mem.h"
 
 
 namespace yama {
@@ -34,36 +35,10 @@ namespace yama {
         template<typename Allocator>
         friend class type_instance;
 
-
-        // link_view is meant to be short-lived, w/ undefined behaviour if
-        // it outlives the yama::type which created it
-
-        struct links_view final {
-            internal::type_mem _mem; // internal, do not use
-
-
-            // size returns the number of links in the table
-
-            size_t size() const noexcept;
-            
-            // link returns the link at index in the table, if any
-
-            // link returns std::nullopt if index is out-of-bounds
-
-            // link returns std::nullopt if index is in-bounds, but 
-            // refers to a stub
-
-            std::optional<type> link(link_index index) const noexcept;
-
-            std::optional<type> operator[](link_index index) const noexcept;
-        };
-
-        static_assert(std::is_trivially_copyable_v<links_view>);
-
         friend struct links_view;
 
 
-        // ctor for init via type_instance (for query provider impls)
+        // ctor for init via type_instance
 
         // notice how yama::type isn't concerned about how its underlying 
         // memory is allocated/deallocated, and so is not coupled to any 
@@ -74,12 +49,12 @@ namespace yama {
 
         type() = delete;
         type(const type&) = default;
-        type(type&& other) noexcept;
+        type(type&&) noexcept = default;
 
         ~type() noexcept = default;
 
         type& operator=(const type&) = default;
-        type& operator=(type&& other) noexcept;
+        type& operator=(type&&) noexcept = default;
 
 
         // complete returns if the type is 'complete', meaning that it has
@@ -96,6 +71,10 @@ namespace yama {
 
         kind kind() const noexcept;
 
+        // callsig returns the call signature of the type, if any
+
+        std::optional<callsig> callsig() const noexcept;
+
 
         // links returns a view of the link table of the type
 
@@ -106,6 +85,8 @@ namespace yama {
 
         std::span<const linksym> linksyms() const noexcept;
 
+
+        // yama::type equality compares by reference
 
         bool operator==(const type& other) const noexcept;
 
@@ -127,10 +108,10 @@ namespace yama {
     // yama::type_instance encapsulates the state of an instantiated
     // Yama language type, being responsible for the ownership of it
 
-    // type_instance exists for use ONLY in yama::type query provider 
-    // impl backends, and should not appear outside that context
+    // type_instance exists for use ONLY in yama::domain impl backends, 
+    // and should not appear outside that context
 
-    // type_instance is mutable so that the query provider impl can
+    // type_instance is mutable so that the yama::domain impl can
     // populate its link table as needed, w/ unfilled entries
     // being default 'stub' values
 
@@ -185,13 +166,27 @@ namespace yama {
         inline Allocator get_allocator() const noexcept { return _al; }
 
 
+        // TODO: fullname hasn't been unit tested
+
+        // fullname returns the fullname of the type of the type_instance
+
+        inline const str& fullname() const noexcept;
+
+
+        // TODO: get_type_data hasn't been unit tested
+
+        // get_type_data returns the underlying type_data of the type_instance
+
+        inline const type_data& get_type_data() const noexcept;
+
+
         // put_link assigns x to the link at index in the link table of the
         // type of the type_instance, overwriting any existing link value
 
-        // behaviour is undefined if index is out-of-bounds
+        // the change in type_instance state caused by put_link will be
+        // visible to any yama::type which exist of the type_instance
 
-        // behaviour is undefined if put_link is used after the initialization
-        // of a yama::type via this type_instance
+        // behaviour is undefined if index is out-of-bounds
 
         inline void put_link(link_index index, type x) noexcept;
 
@@ -238,6 +233,16 @@ namespace yama {
     template<typename Allocator>
     type_instance<Allocator>::~type_instance() noexcept {
         _destroy_mem(get_allocator(), _mem); // RAII cleanup of _mem
+    }
+
+    template<typename Allocator>
+    inline const str& type_instance<Allocator>::fullname() const noexcept {
+        return _mem->fullname;
+    }
+
+    template<typename Allocator>
+    inline const type_data& type_instance<Allocator>::get_type_data() const noexcept {
+        return _mem->data;
     }
 
     template<typename Allocator>

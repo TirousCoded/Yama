@@ -5,7 +5,6 @@
 
 #include "general.h"
 #include "kind.h"
-#include "callsig.h"
 
 
 namespace yama {
@@ -34,14 +33,15 @@ namespace yama {
 
                 2) a yama::kind detailing the expected kind of type
 
-                3) (optionally) a yama::callsig detailing the expected type call signature
+                3) (optionally) a callsig string detailing the expected type call signature
+                    * this uses a yama::str formatted string of the expected yama::callsig_info
     */
 
 
     struct linksym final {
         str                     fullname;   // the fullname of the type
         kind                    kind;       // the expected kind of type
-        std::optional<callsig>  callsig;    // the expected call signature, if any
+        std::optional<str>      callsig;    // the expected call signature, if any
 
 
         // TODO: operator== has not been unit tested
@@ -54,11 +54,10 @@ namespace yama {
         }
 
 
-        template<link_formatter Formatter>
-        inline std::string fmt(Formatter fmt) const {
+        inline std::string fmt() const {
             return
                 callsig
-                ? std::format("({}) {} ( {} )", kind, fullname, callsig->fmt(fmt))
+                ? std::format("({}) {} [{}]", kind, fullname, *callsig)
                 : std::format("({}) {}", kind, fullname);
         }
     };
@@ -70,8 +69,11 @@ namespace yama {
         return linksym{ std::move(fullname), kind, std::nullopt };
     }
 
-    inline linksym make_linksym(str fullname, kind kind, callsig callsig) {
+    inline linksym make_linksym(str fullname, kind kind, str callsig) {
         return linksym{ std::move(fullname), kind, std::make_optional(std::move(callsig)) };
     }
 }
+
+
+YAMA_SETUP_FORMAT(yama::linksym, x.fmt());
 

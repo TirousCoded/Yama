@@ -15,7 +15,7 @@ namespace yama {
     // Yama 'API components', which are macroscopic classes in the Yama
     // API frontend into which a yama::debug may be optionally injected
 
-    class api_component {
+    class api_component : public std::enable_shared_from_this<api_component> {
     public:
 
         api_component(std::shared_ptr<debug> dbg = nullptr);

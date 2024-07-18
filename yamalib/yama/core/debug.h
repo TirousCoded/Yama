@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <format>
+#include <memory>
 
 #include "macros.h"
 
@@ -32,10 +33,11 @@ namespace yama {
     enum class debug_cat : uint32_t {
         // this enum is intended to define bit flags
 
-        none    = 0,
-        all     = uint32_t(-1),
+        none            = 0,
+        all             = uint32_t(-1),
 
-        general = 1 << 0,
+        general         = 1 << 0,           // general is for all non-specific debug logs
+        type_instant    = 1 << 1,           // type instantiation debug logs
     };
 
 
@@ -45,6 +47,7 @@ namespace yama {
     constexpr auto all_c = debug_cat::all;
 
     constexpr auto general_c = debug_cat::general;
+    constexpr auto type_instant_c = debug_cat::type_instant;
 }
 
 constexpr yama::debug_cat operator|(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
@@ -60,18 +63,23 @@ namespace yama {
         return debug_cat(uint32_t(cat) & uint32_t(expect)) == expect;
     }
 
+    // TODO: maybe update the below later to be properly comprehensive
+
+    // NOTE: some quick-n'-dirty (and notably non-comprehensive) static_assert-based
+    //       unit tests of yama::check
+
     static_assert(check(none_c, none_c));
     static_assert(check(all_c, none_c));
     static_assert(check(all_c, all_c));
 
     static_assert(!check(none_c, all_c));
 
-    static_assert(check(all_c, general_c)); // TODO: add more tests when we add more categories
+    static_assert(check(all_c, general_c));
 
 
     // the base class of Yama debug layers
 
-    class debug {
+    class debug : public std::enable_shared_from_this<debug> {
     public:
 
         // categories to filter by

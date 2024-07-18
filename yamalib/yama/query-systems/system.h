@@ -214,21 +214,21 @@ namespace yama::qs {
         template<key_type Key>
         inline size_t number() const noexcept;
 
-        // exists returns if cached result data exists under keys ks
+        // is_cached returns if cached result data exists under keys ks
 
-        // exists only returns true if all specified keys have corresponding
+        // is_cached only returns true if all specified keys have corresponding
         // cached result data
 
-        // exists will deduce what providers to use from the types of ks,
+        // is_cached will deduce what providers to use from the types of ks,
         // allowing for a heterogeneous mixture of key types
 
-        // exists returns false if no providers could be found for >=1 keys
+        // is_cached returns false if no providers could be found for >=1 keys
 
-        // exists returns true if sizeof...(ks) == 0, as in that scenario
+        // is_cached returns true if sizeof...(ks) == 0, as in that scenario
         // there's no scenario where the keys in question can't be found
 
         template<key_type... Keys>
-        inline bool exists(const Keys&... ks) const noexcept;
+        inline bool is_cached(const Keys&... ks) const noexcept;
         
         // query queries the result under key k, returning the result, if any
 
@@ -256,7 +256,7 @@ namespace yama::qs {
         // fetch returns std::nullopt if no provider could be found
 
         template<key_type Key>
-        inline auto fetch(const Key& k);
+        inline auto fetch(const Key& k) const;
 
         // discard suggests to the query system to discard any cached result
         // data under the keys ks, if any
@@ -350,10 +350,10 @@ namespace yama::qs {
         inline provider<Key>* _get_provider_as() const noexcept;
 
         template<key_type Key>
-        inline bool _exists_check(const Key& k) const noexcept;
-        inline bool _exists() const noexcept; // <- here to stop recursion
+        inline bool _is_cached_check(const Key& k) const noexcept;
+        inline bool _is_cached() const noexcept; // <- here to stop recursion
         template<key_type Key, key_type... Keys>
-        inline bool _exists(const Key& k, const Keys&... ks) const noexcept;
+        inline bool _is_cached(const Key& k, const Keys&... ks) const noexcept;
 
         template<key_type Key>
         inline void _discard_data(const Key& k);
@@ -380,8 +380,8 @@ namespace yama::qs {
     }
 
     template<key_type... Keys>
-    inline bool system::exists(const Keys&... ks) const noexcept {
-        return _exists(ks...); // <- recursive
+    inline bool system::is_cached(const Keys&... ks) const noexcept {
+        return _is_cached(ks...); // <- recursive
     }
 
     template<key_type Key>
@@ -395,7 +395,7 @@ namespace yama::qs {
     }
 
     template<key_type Key>
-    inline auto system::fetch(const Key& k) {
+    inline auto system::fetch(const Key& k) const {
         using return_t = std::optional<result<Key>>;
         return_t result = std::nullopt;
         if (const auto prov = _get_provider_as<Key>()) {
@@ -434,22 +434,22 @@ namespace yama::qs {
     }
 
     template<key_type Key>
-    inline bool system::_exists_check(const Key& k) const noexcept {
+    inline bool system::_is_cached_check(const Key& k) const noexcept {
         if (const auto prov = _get_provider_as<Key>()) {
-            return prov->exists(k);
+            return prov->is_cached(k);
         }
         return false;
     }
 
-    inline bool system::_exists() const noexcept {
+    inline bool system::_is_cached() const noexcept {
         return true;
     }
 
     template<key_type Key, key_type... Keys>
-    inline bool system::_exists(const Key& k, const Keys&... ks) const noexcept {
-        return 
-            _exists_check(k) && // <- short-circuit to skip rest of eval if check fails
-            _exists(ks...); // <- recurse
+    inline bool system::_is_cached(const Key& k, const Keys&... ks) const noexcept {
+        return
+            _is_cached_check(k) && // <- short-circuit to skip rest of eval if check fails
+            _is_cached(ks...); // <- recurse
     }
 
     template<key_type Key>

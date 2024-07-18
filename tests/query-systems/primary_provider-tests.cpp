@@ -51,66 +51,40 @@ TEST(PrimaryProviderTests, Push) {
     test_primary_provider prov{};
 
     EXPECT_EQ(prov.number(), 0);
-    EXPECT_FALSE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
+    EXPECT_FALSE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
 
     EXPECT_TRUE(prov.push(a_k, a));
 
     EXPECT_EQ(prov.number(), 1);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
 
     EXPECT_TRUE(prov.push(b_k, b));
 
     EXPECT_EQ(prov.number(), 2);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
 }
 
 TEST(PrimaryProviderTests, Push_FailDueToKeyAlreadyTaken) {
     test_primary_provider prov{};
 
     EXPECT_EQ(prov.number(), 0);
-    EXPECT_FALSE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
+    EXPECT_FALSE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
 
     EXPECT_TRUE(prov.push(a_k, a));
 
     EXPECT_EQ(prov.number(), 1);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
 
     EXPECT_FALSE(prov.push(a_k, result2{ "different result data" })); // <- already pushed w/ 'a_k'
 
     EXPECT_EQ(prov.number(), 1);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
-}
-
-TEST(PrimaryProviderTests, Reset) {
-    test_primary_provider prov{};
-
-    ASSERT_TRUE(prov.push(a_k, a));
-    ASSERT_TRUE(prov.push(b_k, b));
-
-    ASSERT_EQ(prov.number(), 2);
-    ASSERT_TRUE(prov.exists(a_k));
-    ASSERT_TRUE(prov.exists(b_k));
-
-    prov.reset();
-
-    EXPECT_EQ(prov.number(), 0);
-    EXPECT_FALSE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
-
-    // should be able to re-add things after reset
-
-    EXPECT_TRUE(prov.push(a_k, a));
-    EXPECT_TRUE(prov.push(b_k, b));
-
-    EXPECT_EQ(prov.number(), 2);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
 }
 
 TEST(PrimaryProviderTests, Number) {
@@ -135,36 +109,36 @@ TEST(PrimaryProviderTests, Number) {
     EXPECT_EQ(prov.number(), 0);
 }
 
-TEST(PrimaryProviderTests, Exists) {
+TEST(PrimaryProviderTests, IsCached) {
     test_primary_provider prov{};
 
-    EXPECT_FALSE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
-    EXPECT_FALSE(prov.exists(c_k));
+    EXPECT_FALSE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
+    EXPECT_FALSE(prov.is_cached(c_k));
 
     prov.push(a_k, a);
 
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
-    EXPECT_FALSE(prov.exists(c_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
+    EXPECT_FALSE(prov.is_cached(c_k));
 
     prov.push(b_k, b);
 
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
-    EXPECT_FALSE(prov.exists(c_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
+    EXPECT_FALSE(prov.is_cached(c_k));
 
     prov.push(c_k, c);
 
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
-    EXPECT_TRUE(prov.exists(c_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
+    EXPECT_TRUE(prov.is_cached(c_k));
 
     prov.reset();
 
-    EXPECT_FALSE(prov.exists(a_k));
-    EXPECT_FALSE(prov.exists(b_k));
-    EXPECT_FALSE(prov.exists(c_k));
+    EXPECT_FALSE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
+    EXPECT_FALSE(prov.is_cached(c_k));
 }
 
 TEST(PrimaryProviderTests, Query) {
@@ -174,9 +148,9 @@ TEST(PrimaryProviderTests, Query) {
     //prov.push(b_k, b); <- excluded for test
     prov.push(c_k, c);
 
-    ASSERT_TRUE(prov.exists(a_k));
-    ASSERT_FALSE(prov.exists(b_k));
-    ASSERT_TRUE(prov.exists(c_k));
+    ASSERT_TRUE(prov.is_cached(a_k));
+    ASSERT_FALSE(prov.is_cached(b_k));
+    ASSERT_TRUE(prov.is_cached(c_k));
 
     auto result_a = prov.query(a_k);
     auto result_b = prov.query(b_k);
@@ -197,9 +171,9 @@ TEST(PrimaryProviderTests, Fetch) {
     //prov.push(b_k, b); <- excluded for test
     prov.push(c_k, c);
 
-    ASSERT_TRUE(prov.exists(a_k));
-    ASSERT_FALSE(prov.exists(b_k));
-    ASSERT_TRUE(prov.exists(c_k));
+    ASSERT_TRUE(prov.is_cached(a_k));
+    ASSERT_FALSE(prov.is_cached(b_k));
+    ASSERT_TRUE(prov.is_cached(c_k));
 
     auto result_a = prov.fetch(a_k);
     auto result_b = prov.fetch(b_k);
@@ -220,9 +194,9 @@ TEST(PrimaryProviderTests, Discard) {
     prov.push(b_k, b);
     prov.push(c_k, c);
 
-    ASSERT_TRUE(prov.exists(a_k));
-    ASSERT_TRUE(prov.exists(b_k));
-    ASSERT_TRUE(prov.exists(c_k));
+    ASSERT_TRUE(prov.is_cached(a_k));
+    ASSERT_TRUE(prov.is_cached(b_k));
+    ASSERT_TRUE(prov.is_cached(c_k));
 
     // discard impl is a noop
 
@@ -230,9 +204,9 @@ TEST(PrimaryProviderTests, Discard) {
     prov.discard(b_k);
     prov.discard(c_k);
 
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
-    EXPECT_TRUE(prov.exists(c_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
+    EXPECT_TRUE(prov.is_cached(c_k));
 }
 
 TEST(PrimaryProviderTests, DiscardAll) {
@@ -243,17 +217,43 @@ TEST(PrimaryProviderTests, DiscardAll) {
     prov.push(c_k, c);
 
     ASSERT_EQ(prov.number(), 3);
-    ASSERT_TRUE(prov.exists(a_k));
-    ASSERT_TRUE(prov.exists(b_k));
-    ASSERT_TRUE(prov.exists(c_k));
+    ASSERT_TRUE(prov.is_cached(a_k));
+    ASSERT_TRUE(prov.is_cached(b_k));
+    ASSERT_TRUE(prov.is_cached(c_k));
 
     // discard_all impl is a noop
 
     prov.discard_all();
 
     EXPECT_EQ(prov.number(), 3);
-    EXPECT_TRUE(prov.exists(a_k));
-    EXPECT_TRUE(prov.exists(b_k));
-    EXPECT_TRUE(prov.exists(c_k));
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
+    EXPECT_TRUE(prov.is_cached(c_k));
+}
+
+TEST(PrimaryProviderTests, Reset) {
+    test_primary_provider prov{};
+
+    ASSERT_TRUE(prov.push(a_k, a));
+    ASSERT_TRUE(prov.push(b_k, b));
+
+    ASSERT_EQ(prov.number(), 2);
+    ASSERT_TRUE(prov.is_cached(a_k));
+    ASSERT_TRUE(prov.is_cached(b_k));
+
+    prov.reset();
+
+    EXPECT_EQ(prov.number(), 0);
+    EXPECT_FALSE(prov.is_cached(a_k));
+    EXPECT_FALSE(prov.is_cached(b_k));
+
+    // should be able to re-add things after reset
+
+    EXPECT_TRUE(prov.push(a_k, a));
+    EXPECT_TRUE(prov.push(b_k, b));
+
+    EXPECT_EQ(prov.number(), 2);
+    EXPECT_TRUE(prov.is_cached(a_k));
+    EXPECT_TRUE(prov.is_cached(b_k));
 }
 

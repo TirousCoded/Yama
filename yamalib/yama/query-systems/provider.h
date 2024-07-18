@@ -70,12 +70,12 @@ namespace yama::qs {
 
         virtual size_t number() const noexcept = 0;
 
-        // exists returns if the provider has cached result data under k
+        // is_cached returns if the provider has cached result data under k
 
-        // exists is useful for scenarios where we want to check whether cached 
+        // is_cached is useful for scenarios where we want to check whether cached 
         // result data exists, but we don't want to actually copy the data
 
-        virtual bool exists(const key_t& k) const noexcept = 0;
+        virtual bool is_cached(const key_t& k) const noexcept = 0;
 
         // query queries a result under k, returning it, if any, and performs 
         // computation and (maybe) caching of new result data
@@ -85,7 +85,7 @@ namespace yama::qs {
         // fetch queries a result under k, returning it, if any, but does not 
         // perform computation/caching of new result data
 
-        virtual std::optional<result_t> fetch(const key_t& k) = 0;
+        virtual std::optional<result_t> fetch(const key_t& k) const = 0;
 
         // discard discards the cached result under k, if any, failing quietly 
         // if there is no such result data
@@ -101,6 +101,15 @@ namespace yama::qs {
         // to decide whether cached result data should actually be discarded
 
         virtual void discard_all() = 0;
+
+        // reset discards all cached results AND any primary info the provider
+        // impl may be carrying, resetting the provider (at least locally)
+
+        // reset is simply a suggestion to the impl, and the impl is free
+        // to decide whether cached result data and/or primary info should 
+        // actually be discarded
+
+        virtual void reset() = 0;
     };
 }
 
