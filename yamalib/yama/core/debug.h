@@ -37,7 +37,8 @@ namespace yama {
         all             = uint32_t(-1),
 
         general         = 1 << 0,           // general is for all non-specific debug logs
-        type_instant    = 1 << 1,           // type instantiation debug logs
+        static_verif    = 1 << 1,           // static verification debug logs
+        type_instant    = 1 << 2,           // type instantiation debug logs
     };
 
 
@@ -47,6 +48,7 @@ namespace yama {
     constexpr auto all_c = debug_cat::all;
 
     constexpr auto general_c = debug_cat::general;
+    constexpr auto static_verif_c = debug_cat::static_verif;
     constexpr auto type_instant_c = debug_cat::type_instant;
 }
 

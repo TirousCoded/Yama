@@ -6,10 +6,12 @@
 #include <format>
 
 #include "link_index.h"
-#include "linksym.h"
 
 
 namespace yama {
+
+
+    struct linksym;
 
 
     // yama::callsig_info encapsulates a 'call signature' of a function-like type

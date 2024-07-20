@@ -173,13 +173,6 @@ namespace yama {
         inline const str& fullname() const noexcept;
 
 
-        // TODO: get_type_data hasn't been unit tested
-
-        // get_type_data returns the underlying type_data of the type_instance
-
-        inline const type_data& get_type_data() const noexcept;
-
-
         // put_link assigns x to the link at index in the link table of the
         // type of the type_instance, overwriting any existing link value
 
@@ -238,11 +231,6 @@ namespace yama {
     template<typename Allocator>
     inline const str& type_instance<Allocator>::fullname() const noexcept {
         return _mem->fullname;
-    }
-
-    template<typename Allocator>
-    inline const type_data& type_instance<Allocator>::get_type_data() const noexcept {
-        return _mem->data;
     }
 
     template<typename Allocator>

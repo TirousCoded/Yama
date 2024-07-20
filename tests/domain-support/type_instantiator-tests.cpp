@@ -567,14 +567,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
     // the above bout of *cleverness*
     const auto clever_callsig_info_for_test = yama::make_callsig_info({ 0 }, 0);
 
-    // I encountered a bit of a chicken-and-egg problem w/ getting the fmt
-    // of clever_callsig_info_for_test for a_linksyms, so I'm just gonna
-    // write it out by hand here
-    const auto clever_callsig_info_for_test_fmt_for_a = "fn(b) -> b"_str;
-
     static const std::vector<yama::linksym> a_linksyms{
         // callsig is intended to mismatch w/ the indirectly linked type b
-        yama::make_linksym("b"_str, yama::kind::function, clever_callsig_info_for_test_fmt_for_a),
+        yama::make_linksym("b"_str, yama::kind::function, clever_callsig_info_for_test),
     };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("c"_str, yama::kind::primitive), // <- c exists for b's link indices to differ from a's
@@ -585,126 +580,6 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
     type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str }));
 
     const auto result = instant->instantiate("a"_str); // <- will fail due to callsig mismatch between 'a' and 'b'
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigLinkIndexOutOfBounds_ParamType_ForTypeItself) {
-    // link graph:
-    //      a -> b
-
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-    };
-
-    // illegal out-of-bounds link index (for param type of a)
-    type_data_db.push(yama::type_data(yama::function_info{ "a"_str, yama::make_callsig_info({ 1 }, 0), a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigLinkIndexOutOfBounds_ReturnType_ForTypeItself) {
-    // link graph:
-    //      a -> b
-
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-    };
-
-    // illegal out-of-bounds link index (for return type of a)
-    type_data_db.push(yama::type_data(yama::function_info{ "a"_str, yama::make_callsig_info({}, 1), a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-// NOTE: need a ***_ForTypeItself and ***_ForLinkSymbol for each kind
-
-static_assert(yama::kinds == 2);
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToPrimitiveTypesMustHaveNoCallSig_ForTypeItself) {
-    // link graph:
-    //      a -> b
-
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-    };
-
-    // illegal primitive type w/ callsig
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, yama::make_callsig_info({ 0 }, 0), a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToPrimitiveTypesMustHaveNoCallSig_ForLinkSymbol) {
-    // link graph:
-    //      a -> b
-    //        -> c
-
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal primitive type w/ callsig
-        yama::make_linksym("b"_str, yama::kind::primitive, "fn(c) -> c"_str),
-        yama::make_linksym("c"_str, yama::kind::primitive),
-    };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, std::nullopt, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, std::nullopt }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToFunctionTypesMustHaveCallSig_ForTypeItself) {
-    // link graph:
-    //      a
-
-    // illegal function type w/out callsig
-    type_data_db.push(yama::type_data(yama::function_info{ "a"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToFunctionTypesMustHaveCallSig_ForLinkSymbol) {
-    // link graph:
-    //      a -> b -> c
-
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal function type w/out callsig
-        yama::make_linksym("b"_str, yama::kind::function),
-    };
-    const std::vector<yama::linksym> b_linksyms{
-        yama::make_linksym("c"_str, yama::kind::primitive),
-    };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, std::nullopt, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::function_info{ "b"_str, yama::make_callsig_info({ 0 }, 0), b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str, std::nullopt }));
-
-    const auto result = instant->instantiate("a"_str);
 
     EXPECT_EQ(result, 0);
 

@@ -11,6 +11,13 @@
 
 namespace yama {
 
+
+    namespace dm {
+
+
+        class static_verifier;
+    }
+
     
     // type_info is a base struct used to derive *aggregate initializable*
     // structs which encapsulate pre-instantiation information about a type
@@ -64,6 +71,9 @@ namespace yama {
     class type_data final {
     public:
 
+        friend class yama::dm::static_verifier;
+
+
         // ctor for init via injecting the info for it
 
         template<type_info_derived_type T>
@@ -106,16 +116,34 @@ namespace yama {
         inline const T& info() const noexcept;
 
 
+        // verified returns if the type_data has been statically verified
+
+        bool verified() const noexcept;
+
+
     private:
 
+        // NOTE: _other_state exists so modifying verified is reflected across
+        //       all type_data to the same underlying type_info
+        
+        // NOTE: keep _kind out of _other_state to minimize memory indirection,
+        //       as we want yama::type to be able to access it liberally
+
+        struct _other_state final {
+            bool verified = false;
+        };
+
+
         res<type_info> _info;
+        res<_other_state> _other;
         yama::kind _kind;
     };
 
 
     template<type_info_derived_type T>
     inline type_data::type_data(T info) noexcept 
-        : _info(make_res<T>(std::move(info))), 
+        : _info(make_res<T>(std::move(info))),
+        _other(make_res<_other_state>()),
         _kind(kind_of<T>()) {}
 
     template<type_info_derived_type T>

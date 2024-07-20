@@ -19,3 +19,7 @@ yama::kind yama::type_data::kind() const noexcept {
     return _kind;
 }
 
+bool yama::type_data::verified() const noexcept {
+    return _other->verified;
+}
+

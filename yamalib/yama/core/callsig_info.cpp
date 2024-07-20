@@ -2,6 +2,8 @@
 
 #include "callsig_info.h"
 
+#include "linksym.h"
+
 
 bool yama::callsig_info::verify_indices(std::span<const linksym> linksyms) const noexcept {
     for (const auto& I : params) {

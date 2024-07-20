@@ -76,10 +76,6 @@ namespace yama::dm {
         inline bool _add_type(const str& type_fullname);
         inline std::optional<type_data> _pull_type_data(const str& type_fullname);
         inline res<type_instance<Allocator>> _create_instance(const str& type_fullname, const type_data& data);
-        inline bool _check_type_callsig(const type_instance<Allocator>& instance);
-        inline bool _check_type_callsig_indices(const type_instance<Allocator>& instance);
-        inline bool _check_linksym_callsigs(const type_instance<Allocator>& instance);
-        inline bool _check_linksym_callsig(const type_instance<Allocator>& instance, const linksym& linksym, link_index index);
         inline void _add_to_batch(res<type_instance<Allocator>> instance);
         inline bool _resolve_links(type_instance<Allocator>& instance);
         inline bool _resolve_link(type_instance<Allocator>& instance, type witness, link_index index);
@@ -120,7 +116,7 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline void type_instantiator<Allocator>::_instantiate_begin() {
-        YAMA_LOG(dbg(), type_instant_c, "beginning type instant. batch...");
+        YAMA_LOG(dbg(), type_instant_c, "type instant. batch...");
     }
 
     template<typename Allocator>
@@ -192,21 +188,6 @@ namespace yama::dm {
         }
         // create our new type instance
         const auto new_instance = _create_instance(type_fullname, *data);
-        // check if the type has a callsig, and whether or not what is found is
-        // correct for the kind of type it is
-        if (!_check_type_callsig(*new_instance)) {
-            return false;
-        }
-        // if type has a callsig, check whether its param and return type indices
-        // are in-bounds
-        if (!_check_type_callsig_indices(*new_instance)) {
-            return false;
-        }
-        // check each link symbol to see if it has a callsig, and whether or not
-        // what is found is correct for the kind of type it is
-        if (!_check_linksym_callsigs(*new_instance)) {
-            return false;
-        }
         // add new_instance to the batch so it can be linked against by others,
         // w/ us doing this up-front, since mutually recursive _add_type calls
         // arising from _resolve_links may need this info
@@ -231,70 +212,6 @@ namespace yama::dm {
     template<typename Allocator>
     inline res<type_instance<Allocator>> type_instantiator<Allocator>::_create_instance(const str& type_fullname, const type_data& data) {
         return make_res<type_instance<Allocator>>(_al, type_fullname, data);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_type_callsig(const type_instance<Allocator>& instance) {
-        const auto t = type(instance);
-        const bool type_has_callsig = (bool)t.callsig();
-        const bool kind_uses_callsig = uses_callsig(t.kind());
-        if (type_has_callsig && !kind_uses_callsig) {
-            YAMA_LOG(dbg(), type_instant_c, "error: {} has a callsig, but for {} types this is illegal!", t.fullname(), t.kind());
-        }
-        if (!type_has_callsig && kind_uses_callsig) {
-            YAMA_LOG(dbg(), type_instant_c, "error: {} has no callsig, but for {} types this is illegal!", t.fullname(), t.kind());
-        }
-        return type_has_callsig == kind_uses_callsig;
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_type_callsig_indices(const type_instance<Allocator>& instance) {
-        const auto t = type(instance);
-        const auto& data = instance.get_type_data();
-        const bool type_has_callsig = (bool)t.callsig();
-        if (!type_has_callsig) {
-            // if no callsig to check, default to returning successful
-            return true;
-        }
-        if (!data.callsig()->verify_indices(t.linksyms())) {
-            YAMA_LOG(dbg(), type_instant_c, "error: {} callsig (expressed using link symbols) {} contains out-of-bounds link indices!", t.fullname(), data.callsig()->fmt(t.linksyms()));
-            return false;
-        }
-        return true;
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_linksym_callsigs(const type_instance<Allocator>& instance) {
-        const auto t = type(instance);
-        bool success = true;
-        link_index index = 0;
-        for (const auto& I : t.linksyms()) {
-            // keep iterating if we find a failure so as to get a chance
-            // to log all issues found
-            if (!_check_linksym_callsig(instance, I, index)) {
-                success = false;
-            }
-            index++;
-        }
-        return success;
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_linksym_callsig(const type_instance<Allocator>& instance, const linksym& linksym, link_index index) {
-        const auto t = type(instance);
-        const bool type_has_callsig = (bool)linksym.callsig;
-        const bool kind_uses_callsig = uses_callsig(linksym.kind);
-        if (type_has_callsig && !kind_uses_callsig) {
-            YAMA_LOG(dbg(), type_instant_c, 
-                "error: {} link symbol {} (at link index {}) has a callsig, but for {} types this is illegal!", 
-                t.fullname(), linksym, index, t.kind());
-        }
-        if (!type_has_callsig && kind_uses_callsig) {
-            YAMA_LOG(dbg(), type_instant_c,
-                "error: {} link symbol {} (at link index {}) has no callsig, but for {} types this is illegal!",
-                t.fullname(), linksym, index, t.kind());
-        }
-        return type_has_callsig == kind_uses_callsig;
     }
 
     template<typename Allocator>
@@ -346,9 +263,10 @@ namespace yama::dm {
         const auto resolved_kind = resolved.kind();
         const bool success = linksym_kind == resolved_kind;
         if (!success) {
-            YAMA_LOG(dbg(), type_instant_c,
+            YAMA_LOG(
+                dbg(), type_instant_c,
                 "error: {} link symbol {} (at link index {}) has corresponding type {} matched against it, but the link symbol describes a {}, and the resolved type is a {}!",
-                t.fullname(), linksym_v, index, resolved.fullname(),
+                t.fullname(), linksym_v.fullname, index, resolved.fullname(),
                 linksym_kind, resolved_kind);
         }
         return success;
@@ -358,7 +276,6 @@ namespace yama::dm {
     inline bool type_instantiator<Allocator>::_check_for_callsig_mismatch(type_instance<Allocator>& instance, link_index index, const type& resolved) {
         const auto t = type(instance);
         const auto& linksym_v = t.linksyms()[index];
-        const auto& linksym_callsig = linksym_v.callsig;
         // TODO: right now linksym callsig strings are identical to the fmt of the callsig of
         //       the instantiated type's they specify (due to Yama's current lack of qualifiers 
         //       or generics)
@@ -366,6 +283,7 @@ namespace yama::dm {
         //       so, for right now, the *correct* thing to do is to compare the linksym's
         //       callsig string against the callsig of the resolved instantiated type, however,
         //       later on it won't be this simple and this code will need to be revised
+        const auto& linksym_callsig = linksym_v.callsig;
         const auto resolved_callsig = resolved.callsig();
         // if either is std::nullopt, return whether they both are
         if (!(bool)linksym_callsig || !(bool)resolved_callsig) {
@@ -373,14 +291,14 @@ namespace yama::dm {
             return (bool)linksym_callsig == (bool)resolved_callsig;
         }
         // get fmt string of resolved_callsig and compare it against type_callsig's string
-        const auto& linksym_callsig_s = *linksym_callsig;
+        const auto& linksym_callsig_s = linksym_callsig->fmt(t.linksyms());
         const auto resolved_callsig_s = resolved_callsig->fmt();
-        // use std::string_view to compare yama::str w/ std::string w/out extra heap alloc
-        const bool result = std::string_view(linksym_callsig_s) == std::string_view(resolved_callsig_s);
+        const bool result = linksym_callsig_s == resolved_callsig_s;
         if (!result) {
-            YAMA_LOG(dbg(), type_instant_c, 
+            YAMA_LOG(
+                dbg(), type_instant_c, 
                 "error: {} link symbol {} (at link index {}) has corresponding type {} matched against it, but the link symbol's callsig {} does not match the resolved type's callsig {}!",
-                t.fullname(), linksym_v.fmt(), index, resolved.fullname(), 
+                t.fullname(), linksym_v.fullname, index, resolved.fullname(), 
                 linksym_callsig_s, resolved_callsig_s);
         }
         return result;

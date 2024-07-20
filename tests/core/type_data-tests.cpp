@@ -9,6 +9,10 @@
 using namespace yama::string_literals;
 
 
+// TODO: the 'verified' method's underlying state has not been tested w/ regards
+//       to copying/moving when it's been set to *true* by static verification
+
+
 template<typename T, size_t Extent>
 static bool span_eq(std::span<T, Extent> a, std::span<T, Extent> b) noexcept {
     return
@@ -72,6 +76,7 @@ TEST(TypeDataTests, TypeInfoInjectionCtor) {
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(a.verified());
 }
 
 TEST(TypeDataTests, CopyCtor) {
@@ -91,6 +96,7 @@ TEST(TypeDataTests, CopyCtor) {
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(a.verified());
 
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
@@ -98,6 +104,7 @@ TEST(TypeDataTests, CopyCtor) {
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(b.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(b.verified());
 }
 
 TEST(TypeDataTests, MoveCtor) {
@@ -117,6 +124,7 @@ TEST(TypeDataTests, MoveCtor) {
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(b.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(b.verified());
 }
 
 TEST(TypeDataTests, CopyAssign) {
@@ -143,6 +151,7 @@ TEST(TypeDataTests, CopyAssign) {
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(a.verified());
 
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.callsig(), std::make_optional(callsig_info0));
@@ -150,6 +159,7 @@ TEST(TypeDataTests, CopyAssign) {
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(b.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(b.verified());
 }
 
 TEST(TypeDataTests, MoveAssign) {
@@ -176,6 +186,7 @@ TEST(TypeDataTests, MoveAssign) {
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.info<test_primitive_info>().fullname, "abc"_str);
     EXPECT_EQ(b.info<test_primitive_info>().value, 31);
+    EXPECT_FALSE(b.verified());
 }
 
 static_assert(yama::kinds == 2);
@@ -195,6 +206,7 @@ TEST(TypeDataTests, PrimitiveInfo) {
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<yama::primitive_info>().fullname, "abc"_str);
+    EXPECT_FALSE(a.verified());
 }
 
 TEST(TypeDataTests, FunctionInfo) {
@@ -210,5 +222,6 @@ TEST(TypeDataTests, FunctionInfo) {
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.info<yama::function_info>().fullname, "abc"_str);
+    EXPECT_FALSE(a.verified());
 }
 
