@@ -28,10 +28,6 @@ yama::links_view yama::type::links() const noexcept {
     return links_view{ _mem };
 }
 
-std::span<const yama::linksym> yama::type::linksyms() const noexcept {
-    return _mem->data.linksyms();
-}
-
 bool yama::type::operator==(const type& other) const noexcept {
     return _mem == other._mem;
 }

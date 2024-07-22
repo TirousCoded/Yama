@@ -3,66 +3,31 @@
 #pragma once
 
 
+#include <atomic>
+
 #include "res.h"
 #include "kind.h"
 #include "linksym.h"
 #include "callsig_info.h"
+#include "type_info.h"
 
 
 namespace yama {
 
 
+    // IMPORTANT:
+    //      this code is provided to allow for the end-user to define their own
+    //      types, which they can then push to a yama::domain
+    //
+    //      this is part of the frontend, but being technical and niche, should
+    //      avoid being liberally exposed on the interfaces of things like 
+    //      yama::type, yama::callsig, etc.
+
+
     namespace dm {
-
-
         class static_verifier;
     }
 
-    
-    // type_info is a base struct used to derive *aggregate initializable*
-    // structs which encapsulate pre-instantiation information about a type
-
-    // these are meant to be really clean and nice to use, so as to be put in
-    // the Yama API frontend for end-users thereof to use to define types
-
-    struct type_info {
-        str                             fullname;   // the fullname of the type
-        std::optional<callsig_info>     callsig;    // the call signature of the type, if any
-        std::vector<linksym>            linksyms;   // the link symbol vector
-    };
-
-
-    template<typename T>
-    concept type_info_derived_type =
-        std::is_base_of_v<type_info, T> &&
-        std::is_aggregate_v<T> &&
-        requires
-    {
-        // each derivative of type_info must define a static 'kind' method which
-        // returns the kind of the type_info
-
-        // this static method ensures that the kind of a type can be deduced at
-        // compile-time from the type_info derivative's type, rather than having
-        // to use a virtual method (which would prevent the quality-of-life that
-        // comes w/ simple aggregate initialization), or having to have the end-user
-        // specify the kind in a field (which could result in the system breaking
-        // if the end-user makes a mistake + forcing them to write this reduces
-        // how nice and clean the frontend API is)
-        { T::kind() } noexcept -> std::convertible_to<kind>;
-    };
-
-
-    // kind_of helps force the above methods to be constexpr, as I couldn't find
-    // a way to make the concept require this
-
-    template<type_info_derived_type T>
-    constexpr kind kind_of() noexcept {
-        return T::kind();
-    }
-    template<type_info_derived_type T>
-    constexpr kind kind_of(const T&) noexcept {
-        return kind_of<T>();
-    }
 
     // type_data wraps type_info in a type-erased object which encapsulates 
     // a handle to it alongside storing runtime information about its kind of type,
@@ -130,7 +95,11 @@ namespace yama {
         //       as we want yama::type to be able to access it liberally
 
         struct _other_state final {
-            bool verified = false;
+            // NOTE: using an atomic_bool here as we do want to impl multithreading
+            //       stuff WAY later on in this project, so I decided to make this
+            //       atomic now so I need-not worry about forgetting to later
+
+            std::atomic_bool verified = false;
         };
 
 

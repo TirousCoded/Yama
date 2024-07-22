@@ -2,8 +2,9 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/core/linksym.h>
+#include <yama/core/general.h>
 #include <yama/core/callsig_info.h>
+#include <yama/core/linksym.h>
 
 
 using namespace yama::string_literals;

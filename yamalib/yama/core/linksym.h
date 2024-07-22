@@ -11,6 +11,15 @@
 namespace yama {
 
 
+    // IMPORTANT:
+    //      this code is provided to allow for the end-user to define their own
+    //      types, which they can then push to a yama::domain
+    //
+    //      this is part of the frontend, but being technical and niche, should
+    //      avoid being liberally exposed on the interfaces of things like 
+    //      yama::type, yama::callsig, etc.
+
+
     /*
         -- link (symbol) tables --
 

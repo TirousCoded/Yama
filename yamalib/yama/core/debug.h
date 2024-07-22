@@ -35,6 +35,7 @@ namespace yama {
 
         none            = 0,
         all             = uint32_t(-1),
+        defaults        = all,
 
         general         = 1 << 0,           // general is for all non-specific debug logs
         static_verif    = 1 << 1,           // static verification debug logs
@@ -46,6 +47,7 @@ namespace yama {
 
     constexpr auto none_c = debug_cat::none;
     constexpr auto all_c = debug_cat::all;
+    constexpr auto defaults_c = debug_cat::defaults;
 
     constexpr auto general_c = debug_cat::general;
     constexpr auto static_verif_c = debug_cat::static_verif;

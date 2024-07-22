@@ -2,9 +2,10 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/core/type-info-structs.h>
-#include <yama/debug-layers/stderr_debug.h>
-#include <yama/domain-support/static_verifier.h>
+#include <yama/core/general.h>
+#include <yama/core/type_info.h>
+#include <yama/dm/static_verifier.h>
+#include <yama/debug-impls/stderr_debug.h>
 
 
 using namespace yama::string_literals;

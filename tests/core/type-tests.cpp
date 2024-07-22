@@ -3,19 +3,12 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/general.h>
+#include <yama/core/type_info.h>
 #include <yama/core/type.h>
-#include <yama/core/type-info-structs.h>
+#include <yama/dm/type_instance.h>
 
 
 using namespace yama::string_literals;
-
-
-template<typename T, size_t Extent>
-static bool span_eq(std::span<T, Extent> a, std::span<T, Extent> b) noexcept {
-    return
-        a.size() == b.size() &&
-        std::equal(a.begin(), a.end(), b.begin());
-}
 
 
 // just some data that appears in our tests over-and-over
@@ -45,7 +38,7 @@ TEST(TypeTests, TypeInstanceCtor) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -58,7 +51,6 @@ TEST(TypeTests, TypeInstanceCtor) {
     EXPECT_FALSE(a.links()[1]);
     EXPECT_FALSE(a.links()[2]);
     EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, CopyCtor) {
@@ -68,7 +60,7 @@ TEST(TypeTests, CopyCtor) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -83,7 +75,6 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_FALSE(a.links()[1]);
     EXPECT_FALSE(a.links()[2]);
     EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
@@ -94,7 +85,6 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_FALSE(b.links()[1]);
     EXPECT_FALSE(b.links()[2]);
     EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, MoveCtor) {
@@ -104,7 +94,7 @@ TEST(TypeTests, MoveCtor) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -119,7 +109,6 @@ TEST(TypeTests, MoveCtor) {
     EXPECT_FALSE(b.links()[1]);
     EXPECT_FALSE(b.links()[2]);
     EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, CopyAssign) {
@@ -135,8 +124,8 @@ TEST(TypeTests, CopyAssign) {
             std::make_optional(callsig_info1),
             linksyms1,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
-    yama::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -152,7 +141,6 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_FALSE(a.links()[1]);
     EXPECT_FALSE(a.links()[2]);
     EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
@@ -163,7 +151,6 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_FALSE(b.links()[1]);
     EXPECT_FALSE(b.links()[2]);
     EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, MoveAssign) {
@@ -179,8 +166,8 @@ TEST(TypeTests, MoveAssign) {
             std::make_optional(callsig_info1),
             linksyms1,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
-    yama::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -196,7 +183,6 @@ TEST(TypeTests, MoveAssign) {
     EXPECT_FALSE(b.links()[1]);
     EXPECT_FALSE(b.links()[2]);
     EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, Complete_IncompleteType) {
@@ -206,7 +192,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
+    yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
     yama::type link(link_inst);
 
@@ -216,7 +202,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     a_inst.put_link(0, link);
     //a_inst.put_link(1, link); <- incomplete
@@ -234,7 +220,7 @@ TEST(TypeTests, Complete_CompleteType) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
+    yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
     yama::type link(link_inst);
 
@@ -244,7 +230,7 @@ TEST(TypeTests, Complete_CompleteType) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     a_inst.put_link(0, link);
     a_inst.put_link(1, link);
@@ -262,7 +248,7 @@ TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
             std::make_optional(callsig_info0),
             {}, // <- zero linksyms
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -276,7 +262,7 @@ TEST(TypeTests, Fullname) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance a_inst(std::allocator<void>(), 
+    yama::dm::type_instance a_inst(std::allocator<void>(), 
         "def"_str, // <- fullname *differs* from a_data.fullname()
         a_data);
 
@@ -293,7 +279,7 @@ TEST(TypeTests, Links) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
+    yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
     yama::type link(link_inst);
 
@@ -303,7 +289,7 @@ TEST(TypeTests, Links) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     a_inst.put_link(0, link);
     //a_inst.put_link(1, link); <- incomplete
@@ -338,7 +324,7 @@ TEST(TypeTests, Links_ZeroLinkSyms) {
             std::make_optional(callsig_info0),
             {}, // <- zero linksyms
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -349,36 +335,6 @@ TEST(TypeTests, Links_ZeroLinkSyms) {
     EXPECT_FALSE(a.links().link(0)); // <- fail due to out-of-bounds
 }
 
-TEST(TypeTests, LinkSyms) {
-    yama::type_data a_data(
-        yama::primitive_info{
-            "abc"_str,
-            std::make_optional(callsig_info0),
-            linksyms0,
-        });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
-
-    yama::type a(a_inst);
-
-
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
-}
-
-TEST(TypeTests, LinkSyms_ZeroLinkSyms) {
-    yama::type_data a_data(
-        yama::primitive_info{
-            "abc"_str,
-            std::make_optional(callsig_info0),
-            {}, // <- zero linksyms
-        });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
-
-    yama::type a(a_inst);
-
-
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>()));
-}
-
 TEST(TypeTests, Equality) {
     yama::type_data a_data(
         yama::primitive_info{
@@ -386,10 +342,10 @@ TEST(TypeTests, Equality) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
     // b_inst is a clone of a_inst, and exists to ensure that yama::type objects
     // of a_inst are not equal to those of b_inst
-    yama::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst);
+    yama::dm::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst);
 
     yama::type a0(a_inst);
     yama::type a1(a_inst);
@@ -423,7 +379,7 @@ TEST(TypeTests, Equality) {
 
 TEST(TypeTests, TypeInstance_RegularCtor) {
     // this is literally just a copy of TypeInstanceCtor, but I
-    // have this here to test specifically the yama::type_instance
+    // have this here to test specifically the yama::dm::type_instance
     // side of things, for *completeness*
 
     yama::type_data a_data(
@@ -432,7 +388,7 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
@@ -445,7 +401,6 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
     EXPECT_FALSE(a.links()[1]);
     EXPECT_FALSE(a.links()[2]);
     EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 }
 
 TEST(TypeTests, TypeInstance_CloneCtor) {
@@ -455,7 +410,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
+    yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
     yama::type link(link_inst);
 
@@ -465,13 +420,13 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     a_inst.put_link(0, link);
     //a_inst.put_link(1, link);
     a_inst.put_link(2, link);
 
-    yama::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
+    yama::dm::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
 
     yama::type a(a_inst);
     yama::type b(b_inst); // <- gotten from b_inst
@@ -487,7 +442,6 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
     if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
     if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
-    EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "def"_str); // <- clone uses new fullname
@@ -500,7 +454,6 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
     if (b.links()[0]) EXPECT_EQ(b.links()[0].value(), link);
     if (b.links()[2]) EXPECT_EQ(b.links()[2].value(), link);
-    EXPECT_TRUE(span_eq(b.linksyms(), std::span<const yama::linksym>(linksyms0)));
 
     // equality tests already cover this, but just for completeness...
 
@@ -514,7 +467,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
             std::make_optional(callsig_info0),
             {},
         });
-    yama::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
+    yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
     yama::type link(link_inst);
 
@@ -524,7 +477,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
             std::make_optional(callsig_info0),
             linksyms0,
         });
-    yama::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 

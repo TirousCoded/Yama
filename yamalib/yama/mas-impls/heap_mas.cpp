@@ -5,6 +5,9 @@
 #include <format>
 
 
+yama::heap_mas::heap_mas(std::shared_ptr<debug> dbg) 
+    : mas(dbg) {}
+
 std::string yama::heap_mas::report() const {
     return std::format("memory in use: {} bytes", _mem_in_use);
 }

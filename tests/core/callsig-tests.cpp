@@ -2,20 +2,22 @@
 
 #include <gtest/gtest.h>
 
+#include <yama/core/general.h>
 #include <yama/core/callsig.h>
+#include <yama/core/type_info.h>
 #include <yama/core/type_data.h>
 #include <yama/core/type.h>
-#include <yama/core/type-info-structs.h>
+#include <yama/dm/type_instance.h>
 
 
 using namespace yama::string_literals;
 
 
-yama::type_instance<std::allocator<void>> make_type_inst_1(
+yama::dm::type_instance<std::allocator<void>> make_type_inst_1(
     yama::str fullname,
     std::vector<yama::linksym>&& linksyms) {
     return
-        yama::type_instance<std::allocator<void>>(
+        yama::dm::type_instance<std::allocator<void>>(
             std::allocator<void>{}, fullname, yama::type_data(
                 yama::primitive_info{
                     fullname,
@@ -24,12 +26,12 @@ yama::type_instance<std::allocator<void>> make_type_inst_1(
                 }));
 }
 
-yama::type_instance<std::allocator<void>> make_type_inst_2(
+yama::dm::type_instance<std::allocator<void>> make_type_inst_2(
     yama::str fullname,
     std::optional<yama::callsig_info> callsig,
     std::vector<yama::linksym>&& linksyms) {
     return
-        yama::type_instance<std::allocator<void>>(
+        yama::dm::type_instance<std::allocator<void>>(
             std::allocator<void>{}, fullname, yama::type_data(
                 yama::function_info{
                     fullname,

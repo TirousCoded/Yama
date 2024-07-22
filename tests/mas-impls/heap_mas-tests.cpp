@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/MASs/heap_mas.h>
+#include <yama/mas-impls/heap_mas.h>
 
 
 TEST(HeapMASTests, AllocatorAllocateAndDeallocate) {

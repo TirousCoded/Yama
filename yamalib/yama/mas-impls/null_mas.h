@@ -12,6 +12,9 @@ namespace yama {
     class null_mas final : public mas {
     public:
 
+        null_mas(std::shared_ptr<debug> dbg = nullptr);
+
+
         std::string report() const override final;
 
 

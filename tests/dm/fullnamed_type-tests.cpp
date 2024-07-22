@@ -2,8 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <yama/core/general.h>
 #include <yama/core/res.h>
-#include <yama/domain-support/fullnamed_type.h>
+#include <yama/dm/fullnamed_type.h>
 
 
 using namespace yama::string_literals;

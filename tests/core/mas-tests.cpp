@@ -4,8 +4,8 @@
 
 #include <yama/core/debug.h>
 #include <yama/core/mas.h>
-#include <yama/debug-layers/stderr_debug.h>
-#include <yama/MASs/heap_mas.h>
+#include <yama/debug-impls/stderr_debug.h>
+#include <yama/mas-impls/heap_mas.h>
 
 
 TEST(MASTests, AllocatorCopyCtor) {

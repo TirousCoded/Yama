@@ -11,6 +11,11 @@
 #include "type_data.h"
 #include "type.h"
 
+// NOTE: this is so things like yama::primitive_info are available to end-user
+//       w/out forcing them to include type_info.h first
+
+#include "type_info.h"
+
 
 namespace yama {
 
@@ -26,11 +31,6 @@ namespace yama {
         virtual res<mas> get_mas() = 0;
 
 
-        // get_type_data returns the type_data under fullname, if any
-
-        virtual std::optional<type_data> get_type_data(const str& fullname) = 0;
-
-
         // get_type returns the type under fullname, if any
 
         virtual std::optional<type> get_type(const str& fullname) = 0;
@@ -41,8 +41,6 @@ namespace yama {
 
         virtual bool push(type_data x) = 0;
 
-        // this overload generates a type_data from x, then pushing it
-
         template<type_info_derived_type T>
         inline bool push(T&& x);
     };
@@ -50,7 +48,7 @@ namespace yama {
 
     template<type_info_derived_type T>
     inline bool domain::push(T&& x) {
-        return do_push(type_data(std::forward<T&&>(x)));
+        return push(type_data(std::forward<T&&>(x)));
     }
 }
 

@@ -2,11 +2,11 @@
 
 #include <gtest/gtest.h>
 
+#include <yama/core/type_info.h>
 #include <yama/core/type_data.h>
-#include <yama/core/type-info-structs.h>
-#include <yama/debug-layers/stderr_debug.h>
-#include <yama/domain-support/res_db.h>
-#include <yama/domain-support/type_instantiator.h>
+#include <yama/dm/res_db.h>
+#include <yama/dm/type_instantiator.h>
+#include <yama/debug-impls/stderr_debug.h>
 
 
 using namespace yama::string_literals;
@@ -16,8 +16,8 @@ class TypeInstantiatorTests : public testing::Test {
 public:
 
     yama::dm::res_db<yama::type_data> type_data_db;
-    yama::dm::res_db<yama::res<yama::type_instance<std::allocator<void>>>> type_db;
-    yama::dm::res_db<yama::res<yama::type_instance<std::allocator<void>>>> type_batch_db;
+    yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_db;
+    yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_batch_db;
 
     std::unique_ptr<yama::dm::type_instantiator<std::allocator<void>>> instant;
 
@@ -72,7 +72,6 @@ TEST_F(TypeInstantiatorTests, Instantiate_NoLinks) {
     EXPECT_EQ(aa.fullname(), "a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.links().size(), 0);
-    EXPECT_EQ(aa.linksyms().size(), 0);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Links) {
@@ -119,26 +118,19 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links) {
     EXPECT_EQ(aa.fullname(), "a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.links().size(), 2);
-    EXPECT_EQ(aa.linksyms().size(), 2);
 
     if (aa.links()[0]) EXPECT_EQ(*(aa.links()[0]), bb);
     if (aa.links()[1]) EXPECT_EQ(*(aa.links()[1]), cc);
-    if (aa.linksyms().size() == 2) {
-        EXPECT_EQ(aa.linksyms()[0], a_linksyms[0]);
-        EXPECT_EQ(aa.linksyms()[1], a_linksyms[1]);
-    }
 
     EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.links().size(), 0);
-    EXPECT_EQ(bb.linksyms().size(), 0);
 
     EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.links().size(), 0);
-    EXPECT_EQ(cc.linksyms().size(), 0);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Links_WithIndirectlyLinkedTypes) {
@@ -208,56 +200,39 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_WithIndirectlyLinkedTypes) {
     EXPECT_EQ(aa.fullname(), "a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.links().size(), 2);
-    EXPECT_EQ(aa.linksyms().size(), 2);
 
     if (aa.links()[0]) EXPECT_EQ(*(aa.links()[0]), bb);
     if (aa.links()[1]) EXPECT_EQ(*(aa.links()[1]), cc);
-    if (aa.linksyms().size() == 2) {
-        EXPECT_EQ(aa.linksyms()[0], a_linksyms[0]);
-        EXPECT_EQ(aa.linksyms()[1], a_linksyms[1]);
-    }
 
     EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.links().size(), 2);
-    EXPECT_EQ(bb.linksyms().size(), 2);
 
     if (bb.links()[0]) EXPECT_EQ(*(bb.links()[0]), dd);
     if (bb.links()[1]) EXPECT_EQ(*(bb.links()[1]), ee);
-    if (bb.linksyms().size() == 2) {
-        EXPECT_EQ(bb.linksyms()[0], b_linksyms[0]);
-        EXPECT_EQ(bb.linksyms()[1], b_linksyms[1]);
-    }
 
     EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.links().size(), 1);
-    EXPECT_EQ(cc.linksyms().size(), 1);
 
     if (cc.links()[0]) EXPECT_EQ(*(cc.links()[0]), ff);
-    if (cc.linksyms().size() == 1) {
-        EXPECT_EQ(cc.linksyms()[0], c_linksyms[0]);
-    }
 
     EXPECT_TRUE(dd.complete());
     EXPECT_EQ(dd.fullname(), "d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.links().size(), 0);
-    EXPECT_EQ(dd.linksyms().size(), 0);
 
     EXPECT_TRUE(ee.complete());
     EXPECT_EQ(ee.fullname(), "e"_str);
     EXPECT_EQ(ee.kind(), yama::kind::primitive);
     EXPECT_EQ(ee.links().size(), 0);
-    EXPECT_EQ(ee.linksyms().size(), 0);
 
     EXPECT_TRUE(ff.complete());
     EXPECT_EQ(ff.fullname(), "f"_str);
     EXPECT_EQ(ff.kind(), yama::kind::primitive);
     EXPECT_EQ(ff.links().size(), 0);
-    EXPECT_EQ(ff.linksyms().size(), 0);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Links_TypeLinkedMultipleTimesInAcyclicLinkGraph) {
@@ -320,46 +295,30 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_TypeLinkedMultipleTimesInAcyclic
     EXPECT_EQ(aa.fullname(), "a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.links().size(), 2);
-    EXPECT_EQ(aa.linksyms().size(), 2);
 
     if (aa.links()[0]) EXPECT_EQ(*(aa.links()[0]), bb);
     if (aa.links()[1]) EXPECT_EQ(*(aa.links()[1]), cc);
-    if (aa.linksyms().size() == 2) {
-        EXPECT_EQ(aa.linksyms()[0], a_linksyms[0]);
-        EXPECT_EQ(aa.linksyms()[1], a_linksyms[1]);
-    }
 
     EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.links().size(), 1);
-    EXPECT_EQ(bb.linksyms().size(), 1);
 
     if (bb.links()[0]) EXPECT_EQ(*(bb.links()[0]), dd);
-    if (bb.linksyms().size() == 1) {
-        EXPECT_EQ(bb.linksyms()[0], b_linksyms[0]);
-    }
 
     EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.links().size(), 3);
-    EXPECT_EQ(cc.linksyms().size(), 3);
 
     if (cc.links()[0]) EXPECT_EQ(*(cc.links()[0]), dd);
     if (cc.links()[1]) EXPECT_EQ(*(cc.links()[1]), dd);
     if (cc.links()[2]) EXPECT_EQ(*(cc.links()[2]), dd);
-    if (cc.linksyms().size() == 3) {
-        EXPECT_EQ(cc.linksyms()[0], c_linksyms[0]);
-        EXPECT_EQ(cc.linksyms()[1], c_linksyms[1]);
-        EXPECT_EQ(cc.linksyms()[2], c_linksyms[2]);
-    }
 
     EXPECT_TRUE(dd.complete());
     EXPECT_EQ(dd.fullname(), "d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.links().size(), 0);
-    EXPECT_EQ(dd.linksyms().size(), 0);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Links_LinkGraphCycle) {
@@ -404,25 +363,16 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_LinkGraphCycle) {
     EXPECT_EQ(aa.fullname(), "a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.links().size(), 2);
-    EXPECT_EQ(aa.linksyms().size(), 2);
 
     if (aa.links()[0]) EXPECT_EQ(*(aa.links()[0]), bb);
     if (aa.links()[1]) EXPECT_EQ(*(aa.links()[1]), aa);
-    if (aa.linksyms().size() == 2) {
-        EXPECT_EQ(aa.linksyms()[0], a_linksyms[0]);
-        EXPECT_EQ(aa.linksyms()[1], a_linksyms[1]);
-    }
 
     EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.links().size(), 1);
-    EXPECT_EQ(bb.linksyms().size(), 1);
 
     if (bb.links()[0]) EXPECT_EQ(*(bb.links()[0]), aa);
-    if (bb.linksyms().size() == 1) {
-        EXPECT_EQ(bb.linksyms()[0], b_linksyms[0]);
-    }
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeAlreayInstantiated) {

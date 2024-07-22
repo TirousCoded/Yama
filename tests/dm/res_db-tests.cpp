@@ -2,7 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/domain-support/res_db.h>
+#include <yama/core/general.h>
+#include <yama/dm/res_db.h>
 
 
 using namespace yama::string_literals;

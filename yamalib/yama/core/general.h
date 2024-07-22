@@ -29,21 +29,25 @@ namespace yama {
 
     template<typename T>
     concept hashable_type = 
-        requires(T a)
+        requires (const T v)
     {
-        { std::hash<T>{}(a) } -> std::convertible_to<size_t>;
+        { std::hash<T>{}(v) } -> std::convertible_to<size_t>;
     };
+
+    template<typename To, typename From>
+    concept convertible_from =
+        std::convertible_to<From, To>;
 
     template<typename T, typename... Args>
     concept callable_type =
-        requires(T f, Args&&... args)
+        requires (T f, Args&&... args)
     {
         f(std::forward<Args>(args)...);
     };
 
     template<typename T, typename Returns, typename... Args>
     concept callable_r_type =
-        requires(T f, Args&&... args)
+        requires (T f, Args&&... args)
     {
         { f(std::forward<Args>(args)...) } -> std::convertible_to<Returns>;
     };

@@ -63,13 +63,14 @@ namespace yama {
 
         // yama::callsig are compared by value
 
-        // TODO: rewrite the below to be less verbose
+        // equality comparisons between *this and other, given a situation where
+        // they have param/return types which are not actually defined (ie. their
+        // param_type/return_type calls return std::nullopt), equality will be
+        // established if each undefined param/return type has a corresponding
+        // type in the other callsig which is also not defined
 
-        // param_type/return_type usages which resolve to std::nullopt are 
-        // considered equal if their corresponding usages in the other callsig
-        // also resolve to std::nullopt, w/out regard for why they both resulted
-        // in std::nullopt (ie. they can be for different reasons and still be
-        // considered equal)
+        // also, in the above scenarios, it does not matter if the two corresponding
+        // undefined param/return types are undefined for *different reasons*
 
         bool operator==(const callsig& other) const noexcept;
 

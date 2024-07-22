@@ -6,10 +6,22 @@
 #include <stdexcept>
 #include <memory>
 
+#include "general.h"
 #include "asserts.h"
 
 
 namespace yama {
+
+
+    // IMPORTANT:
+    //      it's not actually suitable to use std::convertible_to in yama::res
+    //
+    //      given two types: A and B, such that B is derived from A, if A is
+    //      an abstract base class, and so can't be instantiated, then we can
+    //      conclude that std::convertible_to<B, A> == false
+    //
+    //      the above fact is why std::convertible_to is unsuitable for use
+    //      in the below use case
 
 
     // herein, 'res' is short for 'resource'
@@ -56,9 +68,9 @@ namespace yama {
         inline res(const res<T>& other);
         inline res(res<T>&& other) noexcept;
 
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline res(const res<U>& other);
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline res(res<U>&& other) noexcept;
 
         // ctor for explicit convert to yama::res
@@ -67,7 +79,7 @@ namespace yama {
 
         inline explicit res(std::shared_ptr<T> other);
 
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline explicit res(std::shared_ptr<U> other);
 
         // ctor for illegal init w/ std::nullptr_t
@@ -83,9 +95,9 @@ namespace yama {
         inline res<T>& operator=(const res<T>& other);
         inline res<T>& operator=(res<T>&& other) noexcept;
         
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline res<T>& operator=(const res<U>& other);
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline res<T>& operator=(res<U>&& other) noexcept;
 
 
@@ -120,9 +132,9 @@ namespace yama {
         inline bool operator==(const res<T>& other) const noexcept;
         inline bool operator==(const std::shared_ptr<T>& other) const noexcept;
         
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline bool operator==(const res<U>& other) const noexcept;
-        template<std::convertible_to<T> U>
+        template<typename U>
         inline bool operator==(const std::shared_ptr<U>& other) const noexcept;
 
         constexpr bool operator==(std::nullptr_t) const noexcept { return false; }
@@ -156,14 +168,14 @@ namespace yama {
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline res<T>::res(const res<U>& other)
         : _base(other._base) {
         YAMA_ASSERT(_base);
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline res<T>::res(res<U>&& other) noexcept
         // note how this puts other in an invalid state!
         : _base(std::move(other._base)) {
@@ -177,7 +189,7 @@ namespace yama {
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline res<T>::res(std::shared_ptr<U> other)
         : _base(other) {
         if (!other) _throw();
@@ -203,14 +215,14 @@ namespace yama {
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline res<T>& res<T>::operator=(const res<U>& other) {
         _base = other._base;
         return *this;
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline res<T>& res<T>::operator=(res<U>&& other) noexcept {
         //if (this == &other) return *this;
         // note how this puts other in an invalid state!
@@ -229,13 +241,13 @@ namespace yama {
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline bool res<T>::operator==(const res<U>& other) const noexcept {
         return get() == (U*)other.get();
     }
     
     template<typename T>
-    template<std::convertible_to<T> U>
+    template<typename U>
     inline bool res<T>::operator==(const std::shared_ptr<U>& other) const noexcept {
         return get() == (U*)other.get();
     }

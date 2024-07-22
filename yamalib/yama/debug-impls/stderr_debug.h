@@ -12,7 +12,7 @@ namespace yama {
     class stderr_debug final : public debug {
     public:
 
-        stderr_debug(debug_cat cats = all_c);
+        stderr_debug(debug_cat cats = defaults_c);
 
 
     protected:

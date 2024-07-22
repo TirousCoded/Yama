@@ -2,8 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <yama/core/general.h>
+#include <yama/core/type_info.h>
 #include <yama/core/type_data.h>
-#include <yama/core/type-info-structs.h>
 
 
 using namespace yama::string_literals;

@@ -13,8 +13,11 @@ namespace yama {
 
 
     class type;
-    template<typename Allocator>
-    class type_instance;
+
+    namespace dm {
+        template<typename Allocator>
+        class type_instance;
+    }
 
 
     namespace internal {

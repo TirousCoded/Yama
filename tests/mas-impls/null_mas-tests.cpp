@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/MASs/null_mas.h>
+#include <yama/mas-impls/null_mas.h>
 
 
 TEST(NullMASTests, AllocatorAllocateAndDeallocate) {

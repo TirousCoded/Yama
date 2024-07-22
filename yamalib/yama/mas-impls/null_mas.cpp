@@ -3,6 +3,9 @@
 #include "null_mas.h"
 
 
+yama::null_mas::null_mas(std::shared_ptr<debug> dbg) 
+    : mas(dbg) {}
+
 std::string yama::null_mas::report() const {
     return "";
 }

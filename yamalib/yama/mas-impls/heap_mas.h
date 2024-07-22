@@ -12,6 +12,9 @@ namespace yama {
     class heap_mas final : public mas {
     public:
 
+        heap_mas(std::shared_ptr<debug> dbg = nullptr);
+
+
         std::string report() const override final;
 
 

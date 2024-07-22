@@ -11,23 +11,22 @@
 #include "opaque.h"
 #include "res.h"
 
-#include "api_component.h"
 #include "debug.h"
+#include "api_component.h"
 
 #include "mas.h"
 
 #include "kind.h"
 #include "link_index.h"
-#include "linksym.h"
-#include "links_view.h"
+#include "type_info.h"
 
 #include "callsig_info.h"
-#include "callsig.h"
-
+#include "linksym.h"
 #include "type_data.h"
-#include "type.h"
 
-#include "type-info-structs.h"
+#include "callsig.h"
+#include "links_view.h"
+#include "type.h"
 
 #include "domain.h"
 #include "context.h"

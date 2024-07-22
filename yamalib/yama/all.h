@@ -4,7 +4,8 @@
 
 
 #include "core/all.h"
-#include "domain-support/all.h"
-#include "debug-layers/all.h"
-#include "MASs/all.h"
+#include "dm/all.h"
+#include "debug-impls/all.h"
+#include "mas-impls/all.h"
+#include "domain-impls/all.h"
 
