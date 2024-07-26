@@ -31,7 +31,7 @@ namespace yama {
 
 
         res<mas> get_mas() override final;
-        std::optional<type> get_type(const str& fullname) override final;
+        std::optional<type> load(const str& fullname) override final;
         bool push(type_data x) override final;
 
 

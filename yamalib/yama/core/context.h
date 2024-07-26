@@ -7,6 +7,7 @@
 #include "api_component.h"
 #include "mas.h"
 #include "domain.h"
+#include "command_api.h"
 
 
 namespace yama {
@@ -36,7 +37,13 @@ namespace yama {
         res<mas> get_mas() const noexcept;
 
 
-        //
+        // TODO: while the methods of command_api will be unit tested, the
+        //       yama::context::cmd method itself hasn't really been
+
+        // cmd returns a command API object used to query/manipulate
+        // the state of the context at a low-level
+
+        command_api cmd() noexcept;
 
 
     private:

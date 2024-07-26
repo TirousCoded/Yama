@@ -48,12 +48,12 @@ static const yama::function_info bad{
 
 
 // IMPORTANT:
-//      get_type tests presume that since type_instantiator is so well tested, that
+//      load tests presume that since type_instantiator is so well tested, that
 //      so long as *basic* behaviour can be *broadly* ensured, that it can be presumed
 //      that type_instantiator is the mechanism by which this behaviour is implemented,
 //      such that its guarantees can be presumed to likewise apply here
 
-TEST_P(DomainImplTests, GetType) {
+TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
 
     ASSERT_TRUE(dm->push(decltype(f)(f)));
@@ -62,10 +62,10 @@ TEST_P(DomainImplTests, GetType) {
     ASSERT_TRUE(dm->push(decltype(c)(c)));
 
 
-    const auto result_f = dm->get_type("f"_str);
-    const auto result_a = dm->get_type("a"_str);
-    const auto result_b = dm->get_type("b"_str);
-    const auto result_c = dm->get_type("c"_str);
+    const auto result_f = dm->load("f"_str);
+    const auto result_a = dm->load("a"_str);
+    const auto result_b = dm->load("b"_str);
+    const auto result_c = dm->load("c"_str);
 
     EXPECT_TRUE(result_f);
     EXPECT_TRUE(result_a);
@@ -113,7 +113,7 @@ TEST_P(DomainImplTests, GetType) {
     }
 }
 
-TEST_P(DomainImplTests, GetType_FailDueToInstantiationError) {
+TEST_P(DomainImplTests, Load_FailDueToInstantiationError) {
     const auto dm = GetParam().factory(dbg);
 
     // f will fail instantiation due to type b not being available
@@ -124,9 +124,9 @@ TEST_P(DomainImplTests, GetType_FailDueToInstantiationError) {
     ASSERT_TRUE(dm->push(decltype(c)(c)));
 
 
-    const auto result_f = dm->get_type("f"_str);
-    const auto result_a = dm->get_type("a"_str);
-    const auto result_c = dm->get_type("c"_str);
+    const auto result_f = dm->load("f"_str);
+    const auto result_a = dm->load("a"_str);
+    const auto result_c = dm->load("c"_str);
 
 
     // we don't care about the details of types a and c
@@ -160,10 +160,10 @@ TEST_P(DomainImplTests, Push) {
 
     // test that pushed types are acknowledged by the domain impl correctly
 
-    const auto ff = dm->get_type("f"_str);
-    const auto aa = dm->get_type("a"_str);
-    const auto bb = dm->get_type("b"_str);
-    const auto cc = dm->get_type("c"_str);
+    const auto ff = dm->load("f"_str);
+    const auto aa = dm->load("a"_str);
+    const auto bb = dm->load("b"_str);
+    const auto cc = dm->load("c"_str);
     ASSERT_TRUE(ff);
     ASSERT_TRUE(aa);
     ASSERT_TRUE(bb);
@@ -197,6 +197,61 @@ TEST_P(DomainImplTests, Push_FailDueToStaticVerificationError) {
 
     // test that no new type was made available
 
-    EXPECT_FALSE(dm->get_type("bad"_str));
+    EXPECT_FALSE(dm->load("bad"_str));
+}
+
+TEST_P(DomainImplTests, PushBuiltins) {
+    const auto dm = GetParam().factory(dbg);
+
+    dm->push_builtins();
+
+    const auto _None = dm->load("None"_str);
+    const auto _Int = dm->load("Int"_str);
+    const auto _UInt = dm->load("UInt"_str);
+    const auto _Float = dm->load("Float"_str);
+    const auto _Bool = dm->load("Bool"_str);
+    const auto _Char = dm->load("Char"_str);
+
+    ASSERT_TRUE(_None);
+    ASSERT_TRUE(_Int);
+    ASSERT_TRUE(_UInt);
+    ASSERT_TRUE(_Float);
+    ASSERT_TRUE(_Bool);
+    ASSERT_TRUE(_Char);
+
+    EXPECT_TRUE(_None->complete());
+    EXPECT_TRUE(_Int->complete());
+    EXPECT_TRUE(_UInt->complete());
+    EXPECT_TRUE(_Float->complete());
+    EXPECT_TRUE(_Bool->complete());
+    EXPECT_TRUE(_Char->complete());
+    
+    EXPECT_EQ(_None->fullname(), "None"_str);
+    EXPECT_EQ(_Int->fullname(), "Int"_str);
+    EXPECT_EQ(_UInt->fullname(), "UInt"_str);
+    EXPECT_EQ(_Float->fullname(), "Float"_str);
+    EXPECT_EQ(_Bool->fullname(), "Bool"_str);
+    EXPECT_EQ(_Char->fullname(), "Char"_str);
+    
+    EXPECT_EQ(_None->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Int->kind(), yama::kind::primitive);
+    EXPECT_EQ(_UInt->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Float->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Bool->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Char->kind(), yama::kind::primitive);
+    
+    EXPECT_FALSE(_None->callsig());
+    EXPECT_FALSE(_Int->callsig());
+    EXPECT_FALSE(_UInt->callsig());
+    EXPECT_FALSE(_Float->callsig());
+    EXPECT_FALSE(_Bool->callsig());
+    EXPECT_FALSE(_Char->callsig());
+
+    EXPECT_EQ(_None->ptype(), std::make_optional(yama::ptype::unit));
+    EXPECT_EQ(_Int->ptype(), std::make_optional(yama::ptype::int0));
+    EXPECT_EQ(_UInt->ptype(), std::make_optional(yama::ptype::uint));
+    EXPECT_EQ(_Float->ptype(), std::make_optional(yama::ptype::float0));
+    EXPECT_EQ(_Bool->ptype(), std::make_optional(yama::ptype::bool0));
+    EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
 }
 

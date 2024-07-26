@@ -24,6 +24,13 @@ std::optional<yama::callsig> yama::type::callsig() const noexcept {
         : std::nullopt;
 }
 
+std::optional<yama::ptype> yama::type::ptype() const noexcept {
+    return
+        kind() == yama::kind::primitive
+        ? std::make_optional(_mem->data.info<primitive_info>().ptype)
+        : std::nullopt;
+}
+
 yama::links_view yama::type::links() const noexcept {
     return links_view{ _mem };
 }

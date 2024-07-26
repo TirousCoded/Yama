@@ -200,6 +200,7 @@ TEST(TypeDataTests, PrimitiveInfo) {
             "abc"_str,
             std::nullopt,
             linksyms0,
+            yama::ptype::float0,
         });
 
     EXPECT_EQ(a.fullname(), "abc"_str);
@@ -207,15 +208,20 @@ TEST(TypeDataTests, PrimitiveInfo) {
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.info<yama::primitive_info>().fullname, "abc"_str);
+    EXPECT_EQ(a.info<yama::primitive_info>().ptype, yama::ptype::float0);
     EXPECT_FALSE(a.verified());
 }
 
 TEST(TypeDataTests, FunctionInfo) {
+    auto _our_cf = [](yama::command_api&) {};
+
     yama::type_data a(
         yama::function_info{
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            _our_cf,
+            15,
         });
 
     EXPECT_EQ(a.fullname(), "abc"_str);
@@ -223,6 +229,8 @@ TEST(TypeDataTests, FunctionInfo) {
     EXPECT_TRUE(span_eq(a.linksyms(), std::span<const yama::linksym>(linksyms0)));
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.info<yama::function_info>().fullname, "abc"_str);
+    EXPECT_EQ(a.info<yama::function_info>().cf, _our_cf);
+    EXPECT_EQ(a.info<yama::function_info>().objs, 15);
     EXPECT_FALSE(a.verified());
 }
 

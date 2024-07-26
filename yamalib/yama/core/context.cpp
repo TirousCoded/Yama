@@ -20,3 +20,7 @@ yama::res<yama::mas> yama::context::get_mas() const noexcept {
     return _mas;
 }
 
+yama::command_api yama::context::cmd() noexcept {
+    return command_api{ this };
+}
+

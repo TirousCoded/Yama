@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "kind.h"
+#include "ptype.h"
 #include "link_index.h"
 #include "type_data.h"
 #include "callsig.h"
@@ -83,6 +84,11 @@ namespace yama {
         // callsig returns the call signature of the type, if any
 
         std::optional<callsig> callsig() const noexcept;
+
+
+        // ptype returns the type of primitive type this is, if any
+
+        std::optional<ptype> ptype() const noexcept;
 
 
         // links returns a view of the link table of the type

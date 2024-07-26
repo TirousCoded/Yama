@@ -37,6 +37,7 @@ TEST(TypeTests, TypeInstanceCtor) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -46,6 +47,7 @@ TEST(TypeTests, TypeInstanceCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(callsig_info0, a.links())));
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -59,6 +61,7 @@ TEST(TypeTests, CopyCtor) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -70,6 +73,7 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(callsig_info0, a.links())));
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -80,6 +84,7 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.callsig(), std::make_optional(yama::callsig(callsig_info0, b.links())));
+    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(b.links().size(), 3);
     EXPECT_FALSE(b.links()[0]);
     EXPECT_FALSE(b.links()[1]);
@@ -93,6 +98,7 @@ TEST(TypeTests, MoveCtor) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -104,6 +110,7 @@ TEST(TypeTests, MoveCtor) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.callsig(), std::make_optional(yama::callsig(callsig_info0, b.links())));
+    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(b.links().size(), 3);
     EXPECT_FALSE(b.links()[0]);
     EXPECT_FALSE(b.links()[1]);
@@ -117,12 +124,14 @@ TEST(TypeTests, CopyAssign) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::type_data b_data(
         yama::primitive_info{
             "def"_str,
             std::make_optional(callsig_info1),
             linksyms1,
+            yama::ptype::bool0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
     yama::dm::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
@@ -136,6 +145,7 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(callsig_info0, a.links())));
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -146,6 +156,7 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.callsig(), std::make_optional(yama::callsig(callsig_info0, b.links())));
+    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(b.links().size(), 3);
     EXPECT_FALSE(b.links()[0]);
     EXPECT_FALSE(b.links()[1]);
@@ -159,12 +170,14 @@ TEST(TypeTests, MoveAssign) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::type_data b_data(
         yama::primitive_info{
             "def"_str,
             std::make_optional(callsig_info1),
             linksyms1,
+            yama::ptype::bool0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
     yama::dm::type_instance b_inst(std::allocator<void>(), b_data.fullname(), b_data);
@@ -178,6 +191,7 @@ TEST(TypeTests, MoveAssign) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.callsig(), std::make_optional(yama::callsig(callsig_info0, b.links())));
+    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(b.links().size(), 3);
     EXPECT_FALSE(b.links()[0]);
     EXPECT_FALSE(b.links()[1]);
@@ -191,6 +205,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             "link"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
@@ -201,6 +216,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -219,6 +235,7 @@ TEST(TypeTests, Complete_CompleteType) {
             "link"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
@@ -229,6 +246,7 @@ TEST(TypeTests, Complete_CompleteType) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -247,6 +265,7 @@ TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
             "abc"_str,
             std::make_optional(callsig_info0),
             {}, // <- zero linksyms
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -261,6 +280,7 @@ TEST(TypeTests, Fullname) {
             "abc"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), 
         "def"_str, // <- fullname *differs* from a_data.fullname()
@@ -272,12 +292,43 @@ TEST(TypeTests, Fullname) {
     EXPECT_EQ(a.fullname(), "def"_str);
 }
 
+TEST(TypeTests, PType) {
+    yama::type_data a_data(
+        yama::primitive_info{
+            "abc"_str,
+            std::make_optional(callsig_info0),
+            {},
+            yama::ptype::uint,
+        });
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+
+    yama::type a(a_inst);
+
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::uint));
+}
+
+TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
+    yama::type_data a_data(
+        yama::function_info{
+            "abc"_str,
+            std::make_optional(callsig_info0),
+            {},
+            yama::noop_call_fn,
+        });
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+
+    yama::type a(a_inst);
+
+    EXPECT_EQ(a.ptype(), std::nullopt);
+}
+
 TEST(TypeTests, Links) {
     yama::type_data link_data(
         yama::primitive_info{
             "link"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
@@ -288,6 +339,7 @@ TEST(TypeTests, Links) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -323,6 +375,7 @@ TEST(TypeTests, Links_ZeroLinkSyms) {
             "abc"_str,
             std::make_optional(callsig_info0),
             {}, // <- zero linksyms
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -341,6 +394,7 @@ TEST(TypeTests, Equality) {
             "abc"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
     // b_inst is a clone of a_inst, and exists to ensure that yama::type objects
@@ -387,6 +441,7 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -396,6 +451,7 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(callsig_info0, a.links())));
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -409,6 +465,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             "link"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
@@ -419,6 +476,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
@@ -435,6 +493,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(callsig_info0, a.links())));
+    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_TRUE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -447,6 +506,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_EQ(b.fullname(), "def"_str); // <- clone uses new fullname
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.callsig(), std::make_optional(yama::callsig(callsig_info0, b.links())));
+    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(b.links().size(), 3);
     EXPECT_TRUE(b.links()[0]);
     EXPECT_FALSE(b.links()[1]);
@@ -466,6 +526,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
             "link"_str,
             std::make_optional(callsig_info0),
             {},
+            yama::ptype::float0,
         });
     yama::dm::type_instance link_inst(std::allocator<void>(), link_data.fullname(), link_data);
 
@@ -476,6 +537,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
             "abc"_str,
             std::make_optional(callsig_info0),
             linksyms0,
+            yama::ptype::float0,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 

@@ -17,7 +17,9 @@
 #include "mas.h"
 
 #include "kind.h"
+#include "ptype.h"
 #include "link_index.h"
+#include "call_fn.h"
 #include "type_info.h"
 
 #include "callsig_info.h"
@@ -29,5 +31,7 @@
 #include "type.h"
 
 #include "domain.h"
+
+#include "command_api.h"
 #include "context.h"
 

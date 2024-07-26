@@ -16,13 +16,3 @@ std::string yama::fmt_kind(kind x) {
     return result;
 }
 
-bool yama::uses_callsig(kind x) noexcept {
-    static_assert(kinds == 2);
-    switch (x) {
-    case kind::primitive:   return false;   break;
-    case kind::function:    return true;    break;
-    }
-    YAMA_DEADEND;
-    return {};
-}
-

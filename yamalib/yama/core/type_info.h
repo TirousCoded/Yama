@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "kind.h"
+#include "ptype.h"
+#include "call_fn.h"
 #include "linksym.h"
 #include "callsig_info.h"
 
@@ -70,7 +72,7 @@ namespace yama {
 
 
     struct primitive_info final : public type_info {
-        // TODO
+        ptype ptype;   // the type of primitive value objects of this type encapsulate
 
 
         static constexpr auto kind() noexcept { return kind::primitive; }
@@ -80,7 +82,8 @@ namespace yama {
 
 
     struct function_info final : public type_info {
-        // TODO
+        call_fn cf; // the call_fn encapsulating function call behaviour
+        size_t objs; // the number of objects in the call frame of this function
 
 
         static constexpr auto kind() noexcept { return kind::function; }

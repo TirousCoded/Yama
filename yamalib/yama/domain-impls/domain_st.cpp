@@ -16,7 +16,7 @@ yama::res<yama::mas> yama::domain_st::get_mas() {
     return _mas;
 }
 
-std::optional<yama::type> yama::domain_st::get_type(const str& fullname) {
+std::optional<yama::type> yama::domain_st::load(const str& fullname) {
     const auto first_attempt = _type_db.pull(fullname);
     if (first_attempt) {
         return std::make_optional(type(**first_attempt));

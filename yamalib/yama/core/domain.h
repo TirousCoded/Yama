@@ -31,9 +31,9 @@ namespace yama {
         virtual res<mas> get_mas() = 0;
 
 
-        // get_type returns the type under fullname, if any
+        // load returns the type under fullname, if any
 
-        virtual std::optional<type> get_type(const str& fullname) = 0;
+        virtual std::optional<type> load(const str& fullname) = 0;
 
 
         // push attempts to push new type information to the domain,
@@ -43,6 +43,12 @@ namespace yama {
 
         template<type_info_derived_type T>
         inline bool push(T&& x);
+
+        // TODO: push_builtins will be replaced later w/ modules/parcels
+
+        // push_builtins pushes built-in Yama types to the domain
+
+        void push_builtins();
     };
 
 

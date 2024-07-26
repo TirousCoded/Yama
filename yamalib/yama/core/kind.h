@@ -34,7 +34,29 @@ namespace yama {
     // uses_callsig returns if the kind of type x is defined w/
     // or w/out a call signature
 
-    bool uses_callsig(kind x) noexcept;
+    constexpr bool uses_callsig(kind x) noexcept {
+        static_assert(kinds == 2);
+        switch (x) {
+        case kind::primitive:   return false;   break;
+        case kind::function:    return true;    break;
+        default:                return bool{};  break;
+        }
+    }
+
+
+    // TODO: is_canonical has not been unit tested
+
+    // is_canonicalized returns if objects of types of kind x 
+    // are 'canonical' objects
+
+    constexpr bool is_canonical(kind x) noexcept {
+        static_assert(kinds == 2);
+        switch (x) {
+        case kind::primitive:   return true;    break;
+        case kind::function:    return true;    break;
+        default:                return bool{};  break;
+        }
+    }
 }
 
 
