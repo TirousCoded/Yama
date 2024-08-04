@@ -314,12 +314,44 @@ TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
             std::make_optional(callsig_info0),
             {},
             yama::noop_call_fn,
+            10,
         });
     yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
 
     yama::type a(a_inst);
 
     EXPECT_EQ(a.ptype(), std::nullopt);
+}
+
+TEST(TypeTests, MaxLocals) {
+    yama::type_data a_data(
+        yama::function_info{
+            "abc"_str,
+            std::make_optional(callsig_info0),
+            {},
+            yama::noop_call_fn,
+            10,
+        });
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+
+    yama::type a(a_inst);
+
+    EXPECT_EQ(a.max_locals(), 10);
+}
+
+TEST(TypeTests, MaxLocals_ZeroForNonFunctionTypes) {
+    yama::type_data a_data(
+        yama::primitive_info{
+            "abc"_str,
+            std::make_optional(callsig_info0),
+            {},
+            yama::ptype::uint,
+        });
+    yama::dm::type_instance a_inst(std::allocator<void>(), a_data.fullname(), a_data);
+
+    yama::type a(a_inst);
+
+    EXPECT_EQ(a.max_locals(), 0);
 }
 
 TEST(TypeTests, Links) {

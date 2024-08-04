@@ -3,14 +3,18 @@
 #include "domain_st.h"
 
 
-yama::domain_st::domain_st(res<mas> mas, std::shared_ptr<debug> dbg) 
+yama::domain_st::domain_st(res<mas> mas, std::shared_ptr<debug> dbg)
     : domain(dbg),
     _mas(mas),
     _type_data_db(),
     _type_db(),
     _type_batch_db(),
     _verif(dbg),
-    _instant(_type_data_db, _type_db, _type_batch_db, std::allocator<void>{}, dbg) {}
+    _instant(_type_data_db, _type_db, _type_batch_db, std::allocator<void>{}, dbg) {
+    if (!setup_domain()) {
+        fail_domain_setup();
+    }
+}
 
 yama::res<yama::mas> yama::domain_st::get_mas() {
     return _mas;

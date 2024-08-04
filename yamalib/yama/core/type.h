@@ -90,6 +90,22 @@ namespace yama {
 
         std::optional<ptype> ptype() const noexcept;
 
+        // TODO: the below two methods being needed I think indicates that
+        //       the way yama::type works is in need of revision
+
+        // max_locals returns the max size of the local object stack for
+        // calls to this type
+
+        // max_locals returns 0 if the type is not callable
+
+        size_t max_locals() const noexcept;
+
+        // TODO: call_fn has not been unit tested
+
+        // call_fn returns the call behaviour function of the type, if any
+
+        std::optional<call_fn> call_fn() const noexcept;
+
 
         // links returns a view of the link table of the type
 
@@ -98,7 +114,10 @@ namespace yama {
 
         // yama::type equality compares by reference
 
-        bool operator==(const type& other) const noexcept;
+        bool operator==(const type&) const noexcept = default;
+
+
+        std::string fmt() const;
 
 
     private:
@@ -113,8 +132,13 @@ namespace yama {
     // NOTE: I wanna enforce yama::type being no more than a pointer in size
 
     static_assert(sizeof(type) <= sizeof(void*));
+}
 
 
+YAMA_SETUP_FORMAT(yama::type, x.fmt());
+
+
+namespace yama {
     namespace dm {
 
 

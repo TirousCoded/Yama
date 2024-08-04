@@ -7,8 +7,8 @@
 #include "asserts.h"
 
 #include "general.h"
+#include "scalars.h"
 
-#include "opaque.h"
 #include "res.h"
 
 #include "debug.h"
@@ -30,8 +30,8 @@
 #include "links_view.h"
 #include "type.h"
 
-#include "domain.h"
+#include "object_ref.h"
 
-#include "command_api.h"
+#include "domain.h"
 #include "context.h"
 

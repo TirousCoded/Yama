@@ -20,7 +20,7 @@ namespace yama {
     // the usage of '0' below is to avoid conflicts w/ C++ keywords
 
     enum class ptype : uint8_t {
-        unit,       // for unit types like None
+        none,
         int0,
         uint,
         float0,

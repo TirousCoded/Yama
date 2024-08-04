@@ -37,8 +37,14 @@ TEST_F(StaticVerifierTests, Verify) {
         yama::make_linksym("c"_str, yama::kind::function, yama::make_callsig_info({ 0 }, 1)), // <- callsig 'fn(b) -> c'
         yama::make_linksym("d"_str, yama::kind::primitive),
     };
-
-    const auto a = yama::type_data(yama::function_info{ "a"_str, yama::make_callsig_info({ 0, 1, 2 }, 0), a_linksyms });
+    yama::function_info a_info{
+        "a"_str,
+        yama::make_callsig_info({ 0, 1, 2 }, 0),
+        a_linksyms,
+        yama::noop_call_fn,
+        4,
+    };
+    const auto a = yama::type_data(a_info);
 
     ASSERT_FALSE(a.verified());
 
@@ -54,8 +60,14 @@ TEST_F(StaticVerifierTests, Verify_AlreadyVerifiedTypeData) {
         yama::make_linksym("c"_str, yama::kind::function, yama::make_callsig_info({ 0 }, 1)), // <- callsig 'fn(b) -> c'
         yama::make_linksym("d"_str, yama::kind::primitive),
     };
-
-    const auto a = yama::type_data(yama::function_info{ "a"_str, yama::make_callsig_info({ 0, 1, 2 }, 0), a_linksyms });
+    yama::function_info a_info{
+        "a"_str,
+        yama::make_callsig_info({ 0, 1, 2 }, 0),
+        a_linksyms,
+        yama::noop_call_fn,
+        4,
+    };
+    const auto a = yama::type_data(a_info);
 
     ASSERT_TRUE(verif->verify(a));
     ASSERT_TRUE(a.verified());
@@ -138,7 +150,9 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnTy
 
 static_assert(yama::kinds == 2);
 
-TEST_F(StaticVerifierTests, Verify_FailDueToPrimitiveTypesMustHaveNoCallSig_ForTypeItself) {
+// primitives
+
+TEST_F(StaticVerifierTests, Verify_Primitive_FailDueToMustHaveNoCallSig_ForTypeItself) {
     const std::vector<yama::linksym> a_linksyms{
         yama::make_linksym("b"_str, yama::kind::primitive),
     };
@@ -155,7 +169,7 @@ TEST_F(StaticVerifierTests, Verify_FailDueToPrimitiveTypesMustHaveNoCallSig_ForT
     EXPECT_FALSE(a.verified());
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToPrimitiveTypesMustHaveNoCallSig_ForLinkSymbol) {
+TEST_F(StaticVerifierTests, Verify_Primitive_FailDueToMustHaveNoCallSig_ForLinkSymbol) {
     const std::vector<yama::linksym> a_linksyms{
         // illegal primitive type w/ callsig
         yama::make_linksym("b"_str, yama::kind::primitive, yama::make_callsig_info({ 1 }, 1)), // <- callsig 'fn(c) -> c'
@@ -172,7 +186,9 @@ TEST_F(StaticVerifierTests, Verify_FailDueToPrimitiveTypesMustHaveNoCallSig_ForL
     EXPECT_FALSE(a.verified());
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToFunctionTypesMustHaveCallSig_ForTypeItself) {
+// functions
+
+TEST_F(StaticVerifierTests, Verify_Function_FailDueToMustHaveCallSig_ForTypeItself) {
     // illegal function type w/out callsig
 
     const auto a = yama::type_data(yama::function_info{ "a"_str, std::nullopt });
@@ -185,13 +201,37 @@ TEST_F(StaticVerifierTests, Verify_FailDueToFunctionTypesMustHaveCallSig_ForType
     EXPECT_FALSE(a.verified());
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToFunctionTypesMustHaveCallSig_ForLinkSymbol) {
+TEST_F(StaticVerifierTests, Verify_Function_FailDueToMustHaveCallSig_ForLinkSymbol) {
     const std::vector<yama::linksym> a_linksyms{
         // illegal function type w/out callsig
         yama::make_linksym("b"_str, yama::kind::function),
     };
 
     const auto a = yama::type_data(yama::primitive_info{ "a"_str, std::nullopt, a_linksyms });
+
+    ASSERT_FALSE(a.verified());
+
+    const auto result = verif->verify(a);
+
+    EXPECT_FALSE(result);
+    EXPECT_FALSE(a.verified());
+}
+
+TEST_F(StaticVerifierTests, Verify_Function_FailDueToMaxLocalsNotBeingLargeEnoughForCallObjAndArgs) {
+    // illegal function type due to max_locals not being large enough for call obj + args
+
+    const std::vector<yama::linksym> a_linksyms{
+        yama::make_linksym("None"_str, yama::kind::primitive),
+    };
+    const auto a_callsig_info = yama::make_callsig_info({ 0, 0, 0 }, 0); // expects 3 args
+    yama::function_info a_info{
+        "a"_str,
+        std::make_optional(a_callsig_info),
+        a_linksyms,
+        yama::noop_call_fn,
+        3, // <- static verif. error: 3 (max_locals) < 1 (call obj) + 3 (args)
+    };
+    const auto a = yama::type_data(a_info);
 
     ASSERT_FALSE(a.verified());
 

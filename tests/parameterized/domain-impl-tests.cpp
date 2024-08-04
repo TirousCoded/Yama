@@ -25,6 +25,8 @@ static const yama::function_info f{
     "f"_str,
     std::make_optional(f_callsig),
     f_linksyms,
+    yama::noop_call_fn,
+    4,
 };
 
 // the type 'bad' will fail static verification during push
@@ -39,6 +41,8 @@ static const yama::function_info bad{
     "bad"_str,
     std::make_optional(bad_callsig),
     bad_linksyms,
+    yama::noop_call_fn,
+    4,
 };
 
 
@@ -52,6 +56,59 @@ static const yama::function_info bad{
 //      so long as *basic* behaviour can be *broadly* ensured, that it can be presumed
 //      that type_instantiator is the mechanism by which this behaviour is implemented,
 //      such that its guarantees can be presumed to likewise apply here
+
+TEST_P(DomainImplTests, Builtins) {
+    const auto dm = GetParam().factory(dbg);
+
+    const auto _None = dm->load("None"_str);
+    const auto _Int = dm->load("Int"_str);
+    const auto _UInt = dm->load("UInt"_str);
+    const auto _Float = dm->load("Float"_str);
+    const auto _Bool = dm->load("Bool"_str);
+    const auto _Char = dm->load("Char"_str);
+
+    ASSERT_TRUE(_None);
+    ASSERT_TRUE(_Int);
+    ASSERT_TRUE(_UInt);
+    ASSERT_TRUE(_Float);
+    ASSERT_TRUE(_Bool);
+    ASSERT_TRUE(_Char);
+
+    EXPECT_TRUE(_None->complete());
+    EXPECT_TRUE(_Int->complete());
+    EXPECT_TRUE(_UInt->complete());
+    EXPECT_TRUE(_Float->complete());
+    EXPECT_TRUE(_Bool->complete());
+    EXPECT_TRUE(_Char->complete());
+
+    EXPECT_EQ(_None->fullname(), "None"_str);
+    EXPECT_EQ(_Int->fullname(), "Int"_str);
+    EXPECT_EQ(_UInt->fullname(), "UInt"_str);
+    EXPECT_EQ(_Float->fullname(), "Float"_str);
+    EXPECT_EQ(_Bool->fullname(), "Bool"_str);
+    EXPECT_EQ(_Char->fullname(), "Char"_str);
+
+    EXPECT_EQ(_None->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Int->kind(), yama::kind::primitive);
+    EXPECT_EQ(_UInt->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Float->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Bool->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Char->kind(), yama::kind::primitive);
+
+    EXPECT_FALSE(_None->callsig());
+    EXPECT_FALSE(_Int->callsig());
+    EXPECT_FALSE(_UInt->callsig());
+    EXPECT_FALSE(_Float->callsig());
+    EXPECT_FALSE(_Bool->callsig());
+    EXPECT_FALSE(_Char->callsig());
+
+    EXPECT_EQ(_None->ptype(), std::make_optional(yama::ptype::none));
+    EXPECT_EQ(_Int->ptype(), std::make_optional(yama::ptype::int0));
+    EXPECT_EQ(_UInt->ptype(), std::make_optional(yama::ptype::uint));
+    EXPECT_EQ(_Float->ptype(), std::make_optional(yama::ptype::float0));
+    EXPECT_EQ(_Bool->ptype(), std::make_optional(yama::ptype::bool0));
+    EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
+}
 
 TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
@@ -136,6 +193,42 @@ TEST_P(DomainImplTests, Load_FailDueToInstantiationError) {
     ASSERT_TRUE(result_c);
 }
 
+TEST_P(DomainImplTests, LoadNone) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_none(), dm->load("None"_str).value());
+}
+
+TEST_P(DomainImplTests, LoadInt) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_int(), dm->load("Int"_str).value());
+}
+
+TEST_P(DomainImplTests, LoadUInt) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_uint(), dm->load("UInt"_str).value());
+}
+
+TEST_P(DomainImplTests, LoadFloat) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_float(), dm->load("Float"_str).value());
+}
+
+TEST_P(DomainImplTests, LoadBool) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_bool(), dm->load("Bool"_str).value());
+}
+
+TEST_P(DomainImplTests, LoadChar) {
+    const auto dm = GetParam().factory(dbg);
+
+    EXPECT_EQ(dm->load_char(), dm->load("Char"_str).value());
+}
+
 
 // IMPORTANT:
 //      push tests presume that since static_verifier is so well tested, that so
@@ -198,60 +291,5 @@ TEST_P(DomainImplTests, Push_FailDueToStaticVerificationError) {
     // test that no new type was made available
 
     EXPECT_FALSE(dm->load("bad"_str));
-}
-
-TEST_P(DomainImplTests, PushBuiltins) {
-    const auto dm = GetParam().factory(dbg);
-
-    dm->push_builtins();
-
-    const auto _None = dm->load("None"_str);
-    const auto _Int = dm->load("Int"_str);
-    const auto _UInt = dm->load("UInt"_str);
-    const auto _Float = dm->load("Float"_str);
-    const auto _Bool = dm->load("Bool"_str);
-    const auto _Char = dm->load("Char"_str);
-
-    ASSERT_TRUE(_None);
-    ASSERT_TRUE(_Int);
-    ASSERT_TRUE(_UInt);
-    ASSERT_TRUE(_Float);
-    ASSERT_TRUE(_Bool);
-    ASSERT_TRUE(_Char);
-
-    EXPECT_TRUE(_None->complete());
-    EXPECT_TRUE(_Int->complete());
-    EXPECT_TRUE(_UInt->complete());
-    EXPECT_TRUE(_Float->complete());
-    EXPECT_TRUE(_Bool->complete());
-    EXPECT_TRUE(_Char->complete());
-    
-    EXPECT_EQ(_None->fullname(), "None"_str);
-    EXPECT_EQ(_Int->fullname(), "Int"_str);
-    EXPECT_EQ(_UInt->fullname(), "UInt"_str);
-    EXPECT_EQ(_Float->fullname(), "Float"_str);
-    EXPECT_EQ(_Bool->fullname(), "Bool"_str);
-    EXPECT_EQ(_Char->fullname(), "Char"_str);
-    
-    EXPECT_EQ(_None->kind(), yama::kind::primitive);
-    EXPECT_EQ(_Int->kind(), yama::kind::primitive);
-    EXPECT_EQ(_UInt->kind(), yama::kind::primitive);
-    EXPECT_EQ(_Float->kind(), yama::kind::primitive);
-    EXPECT_EQ(_Bool->kind(), yama::kind::primitive);
-    EXPECT_EQ(_Char->kind(), yama::kind::primitive);
-    
-    EXPECT_FALSE(_None->callsig());
-    EXPECT_FALSE(_Int->callsig());
-    EXPECT_FALSE(_UInt->callsig());
-    EXPECT_FALSE(_Float->callsig());
-    EXPECT_FALSE(_Bool->callsig());
-    EXPECT_FALSE(_Char->callsig());
-
-    EXPECT_EQ(_None->ptype(), std::make_optional(yama::ptype::unit));
-    EXPECT_EQ(_Int->ptype(), std::make_optional(yama::ptype::int0));
-    EXPECT_EQ(_UInt->ptype(), std::make_optional(yama::ptype::uint));
-    EXPECT_EQ(_Float->ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(_Bool->ptype(), std::make_optional(yama::ptype::bool0));
-    EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
 }
 

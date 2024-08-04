@@ -5,6 +5,7 @@
 #include <yama/core/general.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type_data.h>
+#include <yama/core/context.h>
 
 
 using namespace yama::string_literals;
@@ -213,7 +214,7 @@ TEST(TypeDataTests, PrimitiveInfo) {
 }
 
 TEST(TypeDataTests, FunctionInfo) {
-    auto _our_cf = [](yama::command_api&) {};
+    auto _our_cf = [](yama::context&, yama::links_view) {};
 
     yama::type_data a(
         yama::function_info{
@@ -230,7 +231,7 @@ TEST(TypeDataTests, FunctionInfo) {
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.info<yama::function_info>().fullname, "abc"_str);
     EXPECT_EQ(a.info<yama::function_info>().cf, _our_cf);
-    EXPECT_EQ(a.info<yama::function_info>().objs, 15);
+    EXPECT_EQ(a.info<yama::function_info>().max_locals, 15);
     EXPECT_FALSE(a.verified());
 }
 

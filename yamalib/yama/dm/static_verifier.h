@@ -47,6 +47,7 @@ namespace yama::dm {
         inline bool _verify_linksym_callsigs(const type_data& subject);
         inline bool _verify_linksym_callsig(const type_data& subject, link_index index);
         inline bool _verify_linksym_callsig_indices(const type_data& subject, link_index index);
+        inline bool _verify_fn_type_max_locals(const type_data& subject);
     };
 }
 

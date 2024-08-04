@@ -83,7 +83,7 @@ namespace yama {
 
     struct function_info final : public type_info {
         call_fn cf; // the call_fn encapsulating function call behaviour
-        size_t objs; // the number of objects in the call frame of this function
+        size_t max_locals; // the function call frame's max local object stack height
 
 
         static constexpr auto kind() noexcept { return kind::function; }

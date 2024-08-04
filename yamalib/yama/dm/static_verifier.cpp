@@ -37,6 +37,11 @@ bool yama::dm::static_verifier::_verify(const type_data& subject) {
     if (!_verify_linksym_callsigs(subject)) {
         return false;
     }
+    // if type is a function, check that its max_locals value is big enough
+    // to contain the call object and argument objects
+    if (!_verify_fn_type_max_locals(subject)) {
+        return false;
+    }
     return true;
 }
 
@@ -139,6 +144,27 @@ inline bool yama::dm::static_verifier::_verify_linksym_callsig_indices(const typ
             dbg(), static_verif_c,
             "error: {} link symbol {} (at link index {}) callsig (expressed using link symbols) {} contains out-of-bounds link indices!",
             subject.fullname(), linksym.fullname, index, linksym.callsig->fmt(subject.linksyms()));
+        return false;
+    }
+    return true;
+}
+
+inline bool yama::dm::static_verifier::_verify_fn_type_max_locals(const type_data& subject) {
+    if (subject.kind() != kind::function) {
+        // if not a function, default to returning successful
+        return true;
+    }
+    if (!subject.callsig()) {
+        // if malformed function type, return failure *by default*
+        return false;
+    }
+    const auto minimum = 1 + subject.callsig()->params.size();
+    const auto actual = subject.info<function_info>().max_locals;
+    if (actual < minimum) {
+        YAMA_LOG(
+            dbg(), static_verif_c,
+            "error: {} requires minimum max_locals of {} to be able to contain call object and arguments, but its max_locals is {}!",
+            subject.fullname(), minimum, actual);
         return false;
     }
     return true;

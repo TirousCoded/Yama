@@ -40,6 +40,7 @@ namespace yama {
         general         = 1 << 0,           // general is for all non-specific debug logs
         static_verif    = 1 << 1,           // static verification debug logs
         type_instant    = 1 << 2,           // type instantiation debug logs
+        ctx_crash       = 1 << 3,           // context crash debug logs
     };
 
 
@@ -52,6 +53,7 @@ namespace yama {
     constexpr auto general_c = debug_cat::general;
     constexpr auto static_verif_c = debug_cat::static_verif;
     constexpr auto type_instant_c = debug_cat::type_instant;
+    constexpr auto ctx_crash_c = debug_cat::ctx_crash;
 }
 
 constexpr yama::debug_cat operator|(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
