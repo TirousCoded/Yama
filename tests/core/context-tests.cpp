@@ -150,7 +150,7 @@ TEST_F(ContextTests, LoadChar) {
 
 // TODO: add tests for 'll_#_ref' methods later
 
-TEST_F(ContextTests, StrongRef_Equality_None) {
+TEST_F(ContextTests, ObjectRef_Equality_None) {
     const yama::object_ref a = ctx->ll_new_none();
     const yama::object_ref b = ctx->ll_new_none();
 
@@ -160,7 +160,7 @@ TEST_F(ContextTests, StrongRef_Equality_None) {
     EXPECT_EQ(b, b);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_Int) {
+TEST_F(ContextTests, ObjectRef_Equality_Int) {
     const yama::object_ref a = ctx->ll_new_int(-41);
     const yama::object_ref b = ctx->ll_new_int(-41);
     const auto c = ctx->ll_new_int(106);
@@ -175,7 +175,7 @@ TEST_F(ContextTests, StrongRef_Equality_Int) {
     EXPECT_EQ(c, c);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_UInt) {
+TEST_F(ContextTests, ObjectRef_Equality_UInt) {
     const yama::object_ref a = ctx->ll_new_uint(41);
     const yama::object_ref b = ctx->ll_new_uint(41);
     const auto c = ctx->ll_new_uint(106);
@@ -190,7 +190,7 @@ TEST_F(ContextTests, StrongRef_Equality_UInt) {
     EXPECT_EQ(c, c);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_Float) {
+TEST_F(ContextTests, ObjectRef_Equality_Float) {
     const yama::object_ref a = ctx->ll_new_float(-41.19);
     const yama::object_ref b = ctx->ll_new_float(-41.19);
     const auto c = ctx->ll_new_float(106.141);
@@ -205,7 +205,7 @@ TEST_F(ContextTests, StrongRef_Equality_Float) {
     EXPECT_EQ(c, c);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_Bool) {
+TEST_F(ContextTests, ObjectRef_Equality_Bool) {
     const yama::object_ref a = ctx->ll_new_bool(true);
     const yama::object_ref b = ctx->ll_new_bool(true);
     const auto c = ctx->ll_new_bool(false);
@@ -220,7 +220,7 @@ TEST_F(ContextTests, StrongRef_Equality_Bool) {
     EXPECT_EQ(c, c);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_Char) {
+TEST_F(ContextTests, ObjectRef_Equality_Char) {
     const yama::object_ref a = ctx->ll_new_char(U'a');
     const yama::object_ref b = ctx->ll_new_char(U'a');
     const auto c = ctx->ll_new_char(U'魂');
@@ -235,11 +235,11 @@ TEST_F(ContextTests, StrongRef_Equality_Char) {
     EXPECT_EQ(c, c);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_Functions) {
+TEST_F(ContextTests, ObjectRef_Equality_Functions) {
     // remember that each fn type used w/ ll_new_fn creates a object_ref
     // of a DIFFERENT TYPE, so the *correct* place to test inequality
     // between differing function typed object_ref is below in the
-    // StrongRef_Equality_InequalityIfTypesDiffer test
+    // ObjectRef_Equality_InequalityIfTypesDiffer test
 
     // just quick-n'-dirty use this to get type f
     ASSERT_TRUE(build_push_and_load_f_type_for_call_tests());
@@ -254,7 +254,7 @@ TEST_F(ContextTests, StrongRef_Equality_Functions) {
     EXPECT_EQ(b, b);
 }
 
-TEST_F(ContextTests, StrongRef_Equality_InequalityIfTypesDiffer) {
+TEST_F(ContextTests, ObjectRef_Equality_InequalityIfTypesDiffer) {
     // just quick-n'-dirty use this to get types f and g
     ASSERT_TRUE(build_push_and_load_f_type_for_call_tests());
     ASSERT_TRUE(build_push_and_load_g_type_for_call_tests());
@@ -424,6 +424,8 @@ TEST_F(ContextTests, LLCrash) {
         globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
         ctx.ll_crash();
         globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        ctx.ll_crash(); // should fail quietly
+        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, links));
         };
     yama::function_info f_info{
         "f"_str,
@@ -461,11 +463,21 @@ TEST_F(ContextTests, LLCrash) {
         EXPECT_EQ(ss.crashes, 1);
         EXPECT_TRUE(ss.is_crashing);
     }
+    EXPECT_TRUE(globals.snapshot_2);
+    if (globals.snapshot_2) {
+        const auto& ss = *globals.snapshot_2;
+        EXPECT_EQ(ss.crashes, 1); // didn't incr
+        EXPECT_TRUE(ss.is_crashing);
+    }
 }
 
 TEST_F(ContextTests, LLCrash_OutsideOfCall) {
     EXPECT_EQ(ctx->ll_crashes(), 0);
     EXPECT_FALSE(ctx->ll_is_crashing());
+
+    // don't need to test ll_crash failing quietly, as another ll_crash
+    // call *should* succeed here, as the initial crash will have 
+    // completed by time the first ll_crash returned
 
     ctx->ll_crash();
 
@@ -507,6 +519,8 @@ TEST_F(ContextTests, LLCrash_MultiLevelCallStack) {
         globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
         ctx.ll_crash();
         globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        ctx.ll_crash(); // should fail quietly
+        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, links));
         };
     yama::function_info fb_info{
         "fb"_str,
@@ -551,6 +565,12 @@ TEST_F(ContextTests, LLCrash_MultiLevelCallStack) {
     if (globals.snapshot_1) {
         const auto& ss = *globals.snapshot_1;
         EXPECT_EQ(ss.crashes, 1);
+        EXPECT_TRUE(ss.is_crashing);
+    }
+    EXPECT_TRUE(globals.snapshot_2);
+    if (globals.snapshot_2) {
+        const auto& ss = *globals.snapshot_2;
+        EXPECT_EQ(ss.crashes, 1); // didn't incr
         EXPECT_TRUE(ss.is_crashing);
     }
 }
@@ -868,7 +888,7 @@ TEST_F(ContextTests, LLCall_OverloadsWithParamXAsStackIndex_CrashIfNotCallable) 
     EXPECT_FALSE(globals.even_reached_0);
 }
 
-TEST_F(ContextTests, LLCall_OverloadsWithParamXAsStrongRef) {
+TEST_F(ContextTests, LLCall_OverloadsWithParamXAsObjectRef) {
     ASSERT_TRUE(build_push_and_load_f_type_for_call_tests());
     const yama::type f = dm->load("f"_str).value();
 
@@ -906,7 +926,7 @@ TEST_F(ContextTests, LLCall_OverloadsWithParamXAsStrongRef) {
     }
 }
 
-TEST_F(ContextTests, LLCall_OverloadsWithParamXAsStrongRef_CrashIfNotCallable) {
+TEST_F(ContextTests, LLCall_OverloadsWithParamXAsObjectRef_CrashIfNotCallable) {
     ASSERT_TRUE(build_push_and_load_f_type_for_call_tests());
     const yama::type f = dm->load("f"_str).value();
 
@@ -1228,7 +1248,7 @@ TEST_F(ContextTests, LLPut_OverloadsWithParamSrcAsStackIndex_CrashIfOutOfBounds)
     EXPECT_EQ(ctx->ll_crashes(), 1);
 }
 
-TEST_F(ContextTests, LLPut_OverloadsWithParamSrcAsStrongRef) {
+TEST_F(ContextTests, LLPut_OverloadsWithParamSrcAsObjectRef) {
     ASSERT_TRUE(ctx->ll_put(ctx->ll_new_int(0), yama::newtop).good()); // target
 
     ASSERT_TRUE(ctx->ll_put(ctx->ll_new_int(-14), 0).good());

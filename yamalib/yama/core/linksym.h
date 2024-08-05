@@ -82,5 +82,39 @@ namespace yama {
     inline linksym make_linksym(str fullname, kind kind, callsig_info callsig) {
         return linksym{ std::move(fullname), kind, std::make_optional(std::move(callsig)) };
     }
+
+
+    // TODO: linksyms_factory has not been unit tested
+
+    class linksyms_factory final {
+    public:
+
+        linksyms_factory() = default;
+        linksyms_factory(const linksyms_factory&) = delete;
+        linksyms_factory(linksyms_factory&&) noexcept = default;
+        ~linksyms_factory() noexcept = default;
+        linksyms_factory& operator=(const linksyms_factory&) = delete;
+        linksyms_factory& operator=(linksyms_factory&&) noexcept = default;
+
+
+        static_assert(kinds == 2);
+
+        // these are used to add new linksym objects to the linksyms vector
+
+        linksyms_factory& primitive(str fullname);
+        linksyms_factory& function(str fullname, callsig_info callsig);
+
+
+        // done returns the linksyms vector produced
+
+        // linksyms_factory behaviour is undefined after calling done
+
+        std::vector<linksym> done();
+
+
+    private:
+
+        std::vector<linksym> _result;
+    };
 }
 
