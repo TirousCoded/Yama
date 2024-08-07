@@ -17,17 +17,19 @@
 #include "mas.h"
 
 #include "kind.h"
+#include "kind-features.h"
+
 #include "ptype.h"
 #include "link_index.h"
 #include "call_fn.h"
-#include "type_info.h"
+
+#include "linksym.h"
+#include "links_view.h"
 
 #include "callsig_info.h"
-#include "linksym.h"
-#include "type_data.h"
-
 #include "callsig.h"
-#include "links_view.h"
+
+#include "type_info.h"
 #include "type.h"
 
 #include "object_ref.h"

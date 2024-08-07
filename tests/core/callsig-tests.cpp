@@ -5,7 +5,6 @@
 #include <yama/core/general.h>
 #include <yama/core/callsig.h>
 #include <yama/core/type_info.h>
-#include <yama/core/type_data.h>
 #include <yama/core/type.h>
 #include <yama/dm/type_instance.h>
 
@@ -16,28 +15,34 @@ using namespace yama::string_literals;
 yama::dm::type_instance<std::allocator<void>> make_type_inst_1(
     yama::str fullname,
     std::vector<yama::linksym>&& linksyms) {
+    yama::type_info info{
+        .fullname = fullname,
+        .linksyms = std::forward<decltype(linksyms)&&>(linksyms),
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     return
         yama::dm::type_instance<std::allocator<void>>(
-            std::allocator<void>{}, fullname, yama::type_data(
-                yama::primitive_info{
-                    fullname,
-                    std::nullopt,
-                    std::forward<decltype(linksyms)&&>(linksyms),
-                }));
+            std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
 }
 
 yama::dm::type_instance<std::allocator<void>> make_type_inst_2(
     yama::str fullname,
-    std::optional<yama::callsig_info> callsig,
+    yama::callsig_info callsig,
     std::vector<yama::linksym>&& linksyms) {
+    yama::type_info info{
+        .fullname = fullname,
+        .linksyms = std::forward<decltype(linksyms)&&>(linksyms),
+        .info = yama::function_info{
+            .callsig = callsig,
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 10,
+        },
+    };
     return
         yama::dm::type_instance<std::allocator<void>>(
-            std::allocator<void>{}, fullname, yama::type_data(
-                yama::function_info{
-                    fullname,
-                    callsig,
-                    std::forward<decltype(linksyms)&&>(linksyms),
-                }));
+            std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
 }
 
 

@@ -4,7 +4,8 @@
 
 
 #include "../core/general.h"
-#include "../core/type_data.h"
+#include "../core/res.h"
+#include "../core/type_info.h"
 
 #include "ha_struct.h"
 
@@ -25,7 +26,7 @@ namespace yama {
 
         struct type_mem_header final {
             str fullname; // the fullname of this type
-            type_data data; // the underlying type_data this type is based on
+            res<type_info> info; // the underlying type_info this type is based on
             size_t links; // the number of links in the link table
 
             // storing the kind here for fast RTTI access if we need it

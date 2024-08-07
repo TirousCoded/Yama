@@ -14,7 +14,7 @@
 namespace yama {
 
 
-    // NOTE: object_ref isunit tested in context-tests.cpp
+    // NOTE: object_ref is unit tested in context-tests.cpp
 
     // object_ref encapsulates a strong reference to a Yama object which
     // resides within the state of some context

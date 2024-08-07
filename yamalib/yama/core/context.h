@@ -118,6 +118,22 @@ namespace yama {
     //      'symbols' take the form of either local object stack indices, or
     //      an lvalue to a particular yama::object_ref
     // 
+    //      as stated in object_ref.h, Yama employs Python conventions in order
+    //      to keep ref counting straightforward, w/ these conventions also
+    //      applying to transactions
+    // 
+    //      this means that 'in(x)' and 'in(x)...' terms are equiv to function
+    //      params regarding these conventions, and likewise 'out(x)' is equiv
+    //      to function returning regarding these conventions
+    // 
+    //      transactions may express borrowed and stolen references
+    // 
+    //      for borrowed references, convert the 'in(x)', 'in(x)...', and 
+    //      'out(x)' to the forms '&in(x)', '&in(x)...', or '&out(x)', respectively
+    // 
+    //      for stolen references, convert the 'in(x)' and 'in(x)...' to the
+    //      forms '!in(x)' and '!in(x)...', respectively
+    // 
     //      examples:
     //
     //          transaction: plus in(v0) in(v1) out(r)
@@ -147,7 +163,7 @@ namespace yama {
     //
     //      (crashing)
     //
-    //      Yama VMs 'crash' when they are declared to be irrecoverably in error
+    //      Yama contexts 'crash' when they are irrecoverably in error
     //
     //      crashing results in Yama-related behaviour being aborted, and the
     //      entire object state, call stack, etc. of the context being reset
@@ -200,19 +216,25 @@ namespace yama {
     constexpr auto forget = forget_t{};
 
 
-    // TODO: replace these later w/ more proper config options
+    // ctx_config defines init config options for contexts
 
-    constexpr size_t max_call_frames = 32;
-    constexpr size_t user_max_locals = 32;
+    struct ctx_config final {
+        size_t max_call_frames = 32; // max call frames before overflow
+        size_t user_max_locals = 32; // user call frame's max locals before overflow
 
 
-    // the terms 'context' and 'Yama VM' may be used interchangeably
+        bool operator==(const ctx_config&) const noexcept = default;
+    };
+
+    const ctx_config default_ctx_config = ctx_config{};
+
 
     class context final : public api_component {
     public:
 
         context(
-            res<domain> dm, 
+            res<domain> dm,
+            ctx_config config = default_ctx_config,
             std::shared_ptr<debug> dbg = nullptr);
 
 
@@ -223,6 +245,11 @@ namespace yama {
         // dm provides summary access to the domain of the context
 
         domain& dm() const noexcept;
+
+
+        // get_config returns the config details of this context
+
+        const ctx_config& get_config() const noexcept;
 
 
         // get_mas returns the MAS used internally by this context
@@ -413,6 +440,7 @@ namespace yama {
     private:
 
         res<domain> _dm;
+        ctx_config _config;
         res<mas> _mas;
 
         std::allocator<void> _al;

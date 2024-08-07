@@ -11,9 +11,27 @@ using namespace yama::string_literals;
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplTests);
 
 
-static const yama::primitive_info a{ "a"_str, std::nullopt, {} };
-static const yama::primitive_info b{ "b"_str, std::nullopt, {} };
-static const yama::primitive_info c{ "c"_str, std::nullopt, {} };
+yama::type_info a_info{
+    .fullname = "a"_str,
+    .linksyms = {},
+    .info = yama::primitive_info{
+        .ptype = yama::ptype::bool0,
+    },
+};
+yama::type_info b_info{
+    .fullname = "b"_str,
+    .linksyms = {},
+    .info = yama::primitive_info{
+        .ptype = yama::ptype::bool0,
+    },
+};
+yama::type_info c_info{
+    .fullname = "c"_str,
+    .linksyms = {},
+    .info = yama::primitive_info{
+        .ptype = yama::ptype::bool0,
+    },
+};
 
 static const std::vector<yama::linksym> f_linksyms{
     yama::make_linksym("a"_str, yama::kind::primitive),
@@ -21,12 +39,14 @@ static const std::vector<yama::linksym> f_linksyms{
     yama::make_linksym("c"_str, yama::kind::primitive),
 };
 static const auto f_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
-static const yama::function_info f{
-    "f"_str,
-    std::make_optional(f_callsig),
-    f_linksyms,
-    yama::noop_call_fn,
-    4,
+yama::type_info f_info{
+    .fullname = "f"_str,
+    .linksyms = f_linksyms,
+    .info = yama::function_info{
+        .callsig = f_callsig,
+        .call_fn = yama::noop_call_fn,
+        .max_locals = 4,
+    },
 };
 
 // the type 'bad' will fail static verification during push
@@ -37,12 +57,14 @@ static const std::vector<yama::linksym> bad_linksyms{
     yama::make_linksym("c"_str, yama::kind::primitive),
 };
 static const auto bad_callsig = yama::make_callsig_info({ 0, 7, 2 }, 1); // <- link index 7 is out-of-bounds!
-static const yama::function_info bad{
-    "bad"_str,
-    std::make_optional(bad_callsig),
-    bad_linksyms,
-    yama::noop_call_fn,
-    4,
+yama::type_info bad_info{
+    .fullname = "bad"_str,
+    .linksyms = bad_linksyms,
+    .info = yama::function_info{
+        .callsig = bad_callsig,
+        .call_fn = yama::noop_call_fn,
+        .max_locals = 4,
+    },
 };
 
 
@@ -95,13 +117,6 @@ TEST_P(DomainImplTests, Builtins) {
     EXPECT_EQ(_Bool->kind(), yama::kind::primitive);
     EXPECT_EQ(_Char->kind(), yama::kind::primitive);
 
-    EXPECT_FALSE(_None->callsig());
-    EXPECT_FALSE(_Int->callsig());
-    EXPECT_FALSE(_UInt->callsig());
-    EXPECT_FALSE(_Float->callsig());
-    EXPECT_FALSE(_Bool->callsig());
-    EXPECT_FALSE(_Char->callsig());
-
     EXPECT_EQ(_None->ptype(), std::make_optional(yama::ptype::none));
     EXPECT_EQ(_Int->ptype(), std::make_optional(yama::ptype::int0));
     EXPECT_EQ(_UInt->ptype(), std::make_optional(yama::ptype::uint));
@@ -113,10 +128,10 @@ TEST_P(DomainImplTests, Builtins) {
 TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
 
-    ASSERT_TRUE(dm->push(decltype(f)(f)));
-    ASSERT_TRUE(dm->push(decltype(a)(a)));
-    ASSERT_TRUE(dm->push(decltype(b)(b)));
-    ASSERT_TRUE(dm->push(decltype(c)(c)));
+    ASSERT_TRUE(dm->push(f_info));
+    ASSERT_TRUE(dm->push(a_info));
+    ASSERT_TRUE(dm->push(b_info));
+    ASSERT_TRUE(dm->push(c_info));
 
 
     const auto result_f = dm->load("f"_str);
@@ -175,10 +190,10 @@ TEST_P(DomainImplTests, Load_FailDueToInstantiationError) {
 
     // f will fail instantiation due to type b not being available
 
-    ASSERT_TRUE(dm->push(decltype(f)(f)));
-    ASSERT_TRUE(dm->push(decltype(a)(a)));
-    //ASSERT_TRUE(dm->push(decltype(b)(b)));
-    ASSERT_TRUE(dm->push(decltype(c)(c)));
+    ASSERT_TRUE(dm->push(f_info));
+    ASSERT_TRUE(dm->push(a_info));
+    //ASSERT_TRUE(dm->push(b_info));
+    ASSERT_TRUE(dm->push(c_info));
 
 
     const auto result_f = dm->load("f"_str);
@@ -246,10 +261,10 @@ TEST_P(DomainImplTests, Push) {
 
     // push types f, a, b, and c, to test that push works broadly
 
-    ASSERT_TRUE(dm->push(f));
-    ASSERT_TRUE(dm->push(a));
-    ASSERT_TRUE(dm->push(b));
-    ASSERT_TRUE(dm->push(c));
+    ASSERT_TRUE(dm->push(f_info));
+    ASSERT_TRUE(dm->push(a_info));
+    ASSERT_TRUE(dm->push(b_info));
+    ASSERT_TRUE(dm->push(c_info));
 
     // test that pushed types are acknowledged by the domain impl correctly
 
@@ -286,7 +301,7 @@ TEST_P(DomainImplTests, Push) {
 TEST_P(DomainImplTests, Push_FailDueToStaticVerificationError) {
     const auto dm = GetParam().factory(dbg);
 
-    EXPECT_FALSE(dm->push(bad));
+    EXPECT_FALSE(dm->push(bad_info));
 
     // test that no new type was made available
 

@@ -5,10 +5,11 @@
 
 #include <optional>
 
+#include "res.h"
 #include "kind.h"
 #include "ptype.h"
 #include "link_index.h"
-#include "type_data.h"
+#include "type_info.h"
 #include "callsig.h"
 #include "links_view.h"
 
@@ -77,39 +78,19 @@ namespace yama {
 
         str fullname() const noexcept;
 
+        // links returns a view of the link table of the type
+
+        links_view links() const noexcept;
+
         // kind returns the kind of type this is
 
         kind kind() const noexcept;
 
-        // callsig returns the call signature of the type, if any
-
-        std::optional<callsig> callsig() const noexcept;
-
-
-        // ptype returns the type of primitive type this is, if any
 
         std::optional<ptype> ptype() const noexcept;
-
-        // TODO: the below two methods being needed I think indicates that
-        //       the way yama::type works is in need of revision
-
-        // max_locals returns the max size of the local object stack for
-        // calls to this type
-
-        // max_locals returns 0 if the type is not callable
-
-        size_t max_locals() const noexcept;
-
-        // TODO: call_fn has not been unit tested
-
-        // call_fn returns the call behaviour function of the type, if any
-
+        std::optional<callsig> callsig() const noexcept;
         std::optional<call_fn> call_fn() const noexcept;
-
-
-        // links returns a view of the link table of the type
-
-        links_view links() const noexcept;
+        size_t max_locals() const noexcept; // returns 0 if the type is not callable
 
 
         // yama::type equality compares by reference
@@ -184,7 +165,7 @@ namespace yama {
             inline type_instance(
                 Allocator al,
                 str fullname,
-                const type_data& data);
+                res<type_info> info);
 
             // ctor for cloning a type_instance, w/ clone being under a new name
 
@@ -243,7 +224,7 @@ namespace yama {
             static inline internal::type_mem _create_mem(
                 Allocator al,
                 str fullname,
-                const type_data& data);
+                res<type_info> info);
             static inline internal::type_mem _create_mem(
                 Allocator al,
                 str new_fullname,
@@ -263,9 +244,9 @@ inline yama::type::type(const dm::type_instance<Allocator>& instance) noexcept
 
 
 template<typename Allocator>
-yama::dm::type_instance<Allocator>::type_instance(Allocator al, str fullname, const type_data& data)
+yama::dm::type_instance<Allocator>::type_instance(Allocator al, str fullname, res<type_info> info)
     : _al(al),
-    _mem(_create_mem(al, std::move(fullname), data)) {}
+    _mem(_create_mem(al, std::move(fullname), info)) {}
 
 template<typename Allocator>
 yama::dm::type_instance<Allocator>::type_instance(Allocator al, str new_fullname, const type_instance& other)
@@ -291,13 +272,13 @@ void yama::dm::type_instance<Allocator>::put_link(link_index index, type x) noex
 }
 
 template<typename Allocator>
-yama::internal::type_mem yama::dm::type_instance<Allocator>::_create_mem(Allocator al, str fullname, const type_data& data) {
+yama::internal::type_mem yama::dm::type_instance<Allocator>::_create_mem(Allocator al, str fullname, res<type_info> info) {
     internal::type_mem_header header{
         .fullname = fullname,
-        .data = data,
-        .links = data.linksyms().size(),
-        .kind = data.kind(),
-        .stubs = data.linksyms().size(),
+        .info = info,
+        .links = info->linksyms.size(),
+        .kind = info->kind(),
+        .stubs = info->linksyms.size(),
     };
     return internal::type_mem::create(al, std::move(header));
 }

@@ -8,7 +8,7 @@
 
 #include "../core/api_component.h"
 #include "../core/linksym.h"
-#include "../core/type_data.h"
+#include "../core/type_info.h"
 #include "../core/type.h"
 
 
@@ -22,7 +22,7 @@ namespace yama::dm {
     class type_instantiator final : public api_component {
     public:
 
-        // type_data_db is the database of type_data
+        // type_info_db is the database of type_info
         
         // type_db is the database of instantiated types, both to
         // be pulled, and pushed
@@ -32,7 +32,7 @@ namespace yama::dm {
         // to type_db upon success, or just reset on failure
 
         inline type_instantiator(
-            const res_db<type_data>& type_data_db,
+            const res_db<res<type_info>>& type_info_db,
             res_db<res<type_instance<Allocator>>>& type_db,
             res_db<res<type_instance<Allocator>>>& type_batch_db,
             Allocator al,
@@ -61,7 +61,7 @@ namespace yama::dm {
 
     private:
 
-        const res_db<type_data>* _type_data_db = nullptr;
+        const res_db<res<type_info>>* _type_info_db = nullptr;
         res_db<res<type_instance<Allocator>>>* _type_db = nullptr;
         res_db<res<type_instance<Allocator>>>* _type_batch_db = nullptr;
         Allocator _al;
@@ -76,13 +76,13 @@ namespace yama::dm {
 
         inline bool _check_already_instantiated(const str& type_fullname) const;
         inline bool _add_type(const str& type_fullname);
-        inline std::optional<type_data> _pull_type_data(const str& type_fullname);
-        inline res<type_instance<Allocator>> _create_instance(const str& type_fullname, const type_data& data);
+        inline std::optional<res<type_info>> _pull_type_info(const str& type_fullname);
+        inline res<type_instance<Allocator>> _create_instance(const str& type_fullname, res<type_info> info);
         inline void _add_to_batch(res<type_instance<Allocator>> instance);
-        inline bool _resolve_links(type_instance<Allocator>& instance, const type_data& data);
-        inline bool _resolve_link(type_instance<Allocator>& instance, const type_data& data, link_index index);
-        inline bool _check_for_kind_mismatch(type_instance<Allocator>& instance, const type_data& data, link_index index, const type& resolved);
-        inline bool _check_for_callsig_mismatch(type_instance<Allocator>& instance, const type_data& data, link_index index, const type& resolved);
+        inline bool _resolve_links(type_instance<Allocator>& instance, res<type_info> info);
+        inline bool _resolve_link(type_instance<Allocator>& instance, res<type_info> info, link_index index);
+        inline bool _check_for_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, link_index index, const type& resolved);
+        inline bool _check_for_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, link_index index, const type& resolved);
         inline void _transfer_batch_into_instances();
         inline void _dump_batch() noexcept;
     };
@@ -90,13 +90,13 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline type_instantiator<Allocator>::type_instantiator(
-        const res_db<type_data>& type_data_db, 
+        const res_db<res<type_info>>& type_info_db,
         res_db<res<type_instance<Allocator>>>& type_db, 
         res_db<res<type_instance<Allocator>>>& type_batch_db, 
         Allocator al, 
         std::shared_ptr<debug> dbg) 
         : api_component(dbg), 
-        _type_data_db(&type_data_db), 
+        _type_info_db(&type_info_db), 
         _type_db(&type_db), 
         _type_batch_db(&type_batch_db), 
         _al(std::move(al)) {}
@@ -183,19 +183,19 @@ namespace yama::dm {
         if (_fetch_with_batch(type_fullname)) {
             return true;
         }
-        // query type_data to link
-        const auto data = _pull_type_data(type_fullname);
-        if (!data) {
+        // query res<type_info> to link
+        const auto info = _pull_type_info(type_fullname);
+        if (!info) {
             return false;
         }
         // create our new type instance
-        const auto new_instance = _create_instance(type_fullname, *data);
+        const auto new_instance = _create_instance(type_fullname, *info);
         // add new_instance to the batch so it can be linked against by others,
         // w/ us doing this up-front, since mutually recursive _add_type calls
         // arising from _resolve_links may need this info
         _add_to_batch(new_instance);
         // link the type instance, recursively adding/linking dependencies
-        if (!_resolve_links(*new_instance, *data)) {
+        if (!_resolve_links(*new_instance, *info)) {
             return false;
         }
         // if we survived to here, then we've succeeded
@@ -203,17 +203,17 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline std::optional<type_data> type_instantiator<Allocator>::_pull_type_data(const str& type_fullname) {
-        std::optional<type_data> data{};
-        YAMA_DEREF_SAFE(_type_data_db) {
-            data = _type_data_db->pull(type_fullname);
+    inline std::optional<res<type_info>> type_instantiator<Allocator>::_pull_type_info(const str& type_fullname) {
+        std::optional<res<type_info>> info{};
+        YAMA_DEREF_SAFE(_type_info_db) {
+            info = _type_info_db->pull(type_fullname);
         }
-        return data;
+        return info;
     }
 
     template<typename Allocator>
-    inline res<type_instance<Allocator>> type_instantiator<Allocator>::_create_instance(const str& type_fullname, const type_data& data) {
-        return make_res<type_instance<Allocator>>(_al, type_fullname, data);
+    inline res<type_instance<Allocator>> type_instantiator<Allocator>::_create_instance(const str& type_fullname, res<type_info> info) {
+        return make_res<type_instance<Allocator>>(_al, type_fullname, info);
     }
 
     template<typename Allocator>
@@ -224,10 +224,10 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_links(type_instance<Allocator>& instance, const type_data& data) {
+    inline bool type_instantiator<Allocator>::_resolve_links(type_instance<Allocator>& instance, res<type_info> info) {
         const auto t = type(instance);
         for (link_index i = 0; i < t.links().size(); i++) {
-            if (!_resolve_link(instance, data, i)) {
+            if (!_resolve_link(instance, info, i)) {
                 return false;
             }
         }
@@ -235,23 +235,23 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_link(type_instance<Allocator>& instance, const type_data& data, link_index index) {
+    inline bool type_instantiator<Allocator>::_resolve_link(type_instance<Allocator>& instance, res<type_info> info, link_index index) {
         // TODO: when we add *incomplete type cloning*-using stuff, this
         //       method may need to be revised
         const auto t = type(instance);
         YAMA_ASSERT(!t.links()[index]);
-        if (!_add_type(data.linksyms()[index].fullname)) {
+        if (!_add_type(info->linksyms[index].fullname)) {
             return false;
         }
-        YAMA_ASSERT(_fetch_with_batch(data.linksyms()[index].fullname));
-        const auto& resolved = type(**_fetch_with_batch(data.linksyms()[index].fullname));
-        if (!_check_for_kind_mismatch(instance, data, index, resolved)) {
+        YAMA_ASSERT(_fetch_with_batch(info->linksyms[index].fullname));
+        const auto& resolved = type(**_fetch_with_batch(info->linksyms[index].fullname));
+        if (!_check_for_kind_mismatch(instance, info, index, resolved)) {
             return false;
         }
         // NOTE: note how we skip the below check in the event of a kind mismatch,
         //       as w/out kind matching, callsig mismatch checking I feel is no
         //       longer all that meaningful
-        if (!_check_for_callsig_mismatch(instance, data, index, resolved)) {
+        if (!_check_for_callsig_mismatch(instance, info, index, resolved)) {
             return false;
         }
         instance.put_link(index, resolved);
@@ -259,9 +259,9 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_for_kind_mismatch(type_instance<Allocator>& instance, const type_data& data, link_index index, const type& resolved) {
+    inline bool type_instantiator<Allocator>::_check_for_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, link_index index, const type& resolved) {
         const auto t = type(instance);
-        const auto& linksym_v = data.linksyms()[index];
+        const auto& linksym_v = info->linksyms[index];
         const auto linksym_kind = linksym_v.kind;
         const auto resolved_kind = resolved.kind();
         const bool success = linksym_kind == resolved_kind;
@@ -276,9 +276,9 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_for_callsig_mismatch(type_instance<Allocator>& instance, const type_data& data, link_index index, const type& resolved) {
+    inline bool type_instantiator<Allocator>::_check_for_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, link_index index, const type& resolved) {
         const auto t = type(instance);
-        const auto& linksym_v = data.linksyms()[index];
+        const auto& linksym_v = info->linksyms[index];
         // TODO: right now linksym callsig strings are identical to the fmt of the callsig of
         //       the instantiated type's they specify (due to Yama's current lack of namespaces 
         //       or generics)
@@ -294,7 +294,7 @@ namespace yama::dm {
             return (bool)linksym_callsig == (bool)resolved_callsig;
         }
         // get fmt string of resolved_callsig and compare it against type_callsig's string
-        const auto& linksym_callsig_s = linksym_callsig->fmt(data.linksyms());
+        const auto& linksym_callsig_s = linksym_callsig->fmt(info->linksyms);
         const auto resolved_callsig_s = resolved_callsig->fmt();
         const bool result = linksym_callsig_s == resolved_callsig_s;
         if (!result) {

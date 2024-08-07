@@ -8,7 +8,6 @@
 #include "res.h"
 #include "api_component.h"
 #include "mas.h"
-#include "type_data.h"
 #include "type.h"
 
 // NOTE: this is so things like yama::primitive_info are available to end-user
@@ -56,10 +55,7 @@ namespace yama {
         // push attempts to push new type information to the domain,
         // returning if successful
 
-        virtual bool push(type_data x) = 0;
-
-        template<type_info_derived_type T>
-        inline bool push(T&& x);
+        virtual bool push(type_info x) = 0;
 
 
     protected:
@@ -110,11 +106,5 @@ namespace yama {
 
         std::optional<_quick_access_t> _quick_access;
     };
-
-
-    template<type_info_derived_type T>
-    inline bool domain::push(T&& x) {
-        return push(type_data(std::forward<T&&>(x)));
-    }
 }
 

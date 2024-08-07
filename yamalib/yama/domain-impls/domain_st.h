@@ -4,7 +4,7 @@
 
 
 #include "../core/mas.h"
-#include "../core/type_data.h"
+#include "../core/type_info.h"
 #include "../core/type.h"
 #include "../core/domain.h"
 
@@ -32,14 +32,14 @@ namespace yama {
 
         res<mas> get_mas() override final;
         std::optional<type> load(const str& fullname) override final;
-        bool push(type_data x) override final;
+        bool push(type_info x) override final;
 
 
     private:
 
         res<mas> _mas;
 
-        dm::res_db<type_data> _type_data_db;
+        dm::res_db<res<type_info>> _type_info_db;
         dm::res_db<res<dm::type_instance<std::allocator<void>>>> _type_db;
         dm::res_db<res<dm::type_instance<std::allocator<void>>>> _type_batch_db;
         dm::static_verifier _verif;

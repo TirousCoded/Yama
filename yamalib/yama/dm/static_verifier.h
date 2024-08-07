@@ -4,7 +4,7 @@
 
 
 #include "../core/api_component.h"
-#include "../core/type_data.h"
+#include "../core/type_info.h"
 
 
 namespace yama::dm {
@@ -18,9 +18,6 @@ namespace yama::dm {
     // static verification occurs in the absence of linkage info, which
     // is established later during instantiation
 
-    // once statically verified, type_data will be *marked* as verified,
-    // which allows for easy checking of type_data validity
-
 
     class static_verifier final : public api_component {
     public:
@@ -30,24 +27,20 @@ namespace yama::dm {
 
         // verify returns if subject passes static verification
 
-        // verify returns true immediately if subject.verified() == true
-
-        bool verify(const type_data& subject);
+        bool verify(const type_info& subject);
 
 
     private:
 
-        bool _verify(const type_data& subject);
-        void _begin_verify(const type_data& subject);
+        bool _verify(const type_info& subject);
+        void _begin_verify(const type_info& subject);
         void _end_verify(bool success);
-        void _mark_as_verified(const type_data& subject);
 
-        inline bool _verify_type_callsig(const type_data& subject);
-        inline bool _verify_type_callsig_indices(const type_data& subject);
-        inline bool _verify_linksym_callsigs(const type_data& subject);
-        inline bool _verify_linksym_callsig(const type_data& subject, link_index index);
-        inline bool _verify_linksym_callsig_indices(const type_data& subject, link_index index);
-        inline bool _verify_fn_type_max_locals(const type_data& subject);
+        inline bool _verify_type_callsig_indices(const type_info& subject);
+        inline bool _verify_linksym_callsigs(const type_info& subject);
+        inline bool _verify_linksym_callsig(const type_info& subject, link_index index);
+        inline bool _verify_linksym_callsig_indices(const type_info& subject, link_index index);
+        inline bool _verify_fn_type_max_locals(const type_info& subject);
     };
 }
 

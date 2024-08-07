@@ -10,41 +10,47 @@ yama::domain::domain(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
 
 bool yama::domain::setup_domain() {
-    yama::primitive_info _None_info{
-        "None"_str,
-        std::nullopt,
-        {},
-        ptype::none,
+    type_info _None_info{
+        .fullname = "None"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::none,
+        },
     };
-    yama::primitive_info _Int_info{
-        "Int"_str,
-        std::nullopt,
-        {},
-        ptype::int0,
+    type_info _Int_info{
+        .fullname = "Int"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::int0,
+        },
     };
-    yama::primitive_info _UInt_info{
-        "UInt"_str,
-        std::nullopt,
-        {},
-        ptype::uint,
+    type_info _UInt_info{
+        .fullname = "UInt"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::uint,
+        },
     };
-    yama::primitive_info _Float_info{
-        "Float"_str,
-        std::nullopt,
-        {},
-        ptype::float0,
+    type_info _Float_info{
+        .fullname = "Float"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::float0,
+        },
     };
-    yama::primitive_info _Bool_info{
-        "Bool"_str,
-        std::nullopt,
-        {},
-        ptype::bool0,
+    type_info _Bool_info{
+        .fullname = "Bool"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::bool0,
+        },
     };
-    yama::primitive_info _Char_info{
-        "Char"_str,
-        std::nullopt,
-        {},
-        ptype::char0,
+    type_info _Char_info{
+        .fullname = "Char"_str,
+        .linksyms = {},
+        .info = primitive_info{
+            .ptype = ptype::char0,
+        },
     };
 
     if (!push(_None_info)) return false;

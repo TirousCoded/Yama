@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/type_info.h>
-#include <yama/core/type_data.h>
 #include <yama/dm/res_db.h>
 #include <yama/dm/type_instantiator.h>
 #include <yama/debug-impls/stderr_debug.h>
@@ -15,7 +14,7 @@ using namespace yama::string_literals;
 class TypeInstantiatorTests : public testing::Test {
 public:
 
-    yama::dm::res_db<yama::type_data> type_data_db;
+    yama::dm::res_db<yama::res<yama::type_info>> type_info_db;
     yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_db;
     yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_batch_db;
 
@@ -26,7 +25,7 @@ protected:
 
     void SetUp() override final {
         instant = std::make_unique<yama::dm::type_instantiator<std::allocator<void>>>(
-            type_data_db, type_db, type_batch_db, 
+            type_info_db, type_db, type_batch_db, 
             std::allocator<void>{},
             std::make_shared<yama::stderr_debug>());
     }
@@ -48,7 +47,14 @@ TEST_F(TypeInstantiatorTests, Instantiate_NoLinks) {
     // link graph:
     //      a
 
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str }));
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
 
     const size_t result = instant->instantiate("a"_str);
 
@@ -83,10 +89,30 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links) {
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str }));
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
     const size_t result = instant->instantiate("a"_str);
 
@@ -143,20 +169,61 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_WithIndirectlyLinkedTypes) {
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("d"_str, yama::kind::primitive),
         yama::make_linksym("e"_str, yama::kind::primitive),
     };
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> c_linksyms{
         yama::make_linksym("f"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, {}, b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str, {}, c_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "d"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "e"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "f"_str }));
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = c_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info d_info{
+        .fullname = "d"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info e_info{
+        .fullname = "e"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
+    type_info_db.push(yama::make_res<yama::type_info>(d_info));
+    type_info_db.push(yama::make_res<yama::type_info>(e_info));
+    type_info_db.push(yama::make_res<yama::type_info>(f_info));
 
     const size_t result = instant->instantiate("a"_str);
 
@@ -246,20 +313,46 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_TypeLinkedMultipleTimesInAcyclic
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
-
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("d"_str, yama::kind::primitive),
+    };
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
     };
     static const std::vector<yama::linksym> c_linksyms{
         yama::make_linksym("d"_str, yama::kind::primitive),
         yama::make_linksym("d"_str, yama::kind::primitive),
         yama::make_linksym("d"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, {}, b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str, {}, c_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "d"_str }));
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = c_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info d_info{
+        .fullname = "d"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
+    type_info_db.push(yama::make_res<yama::type_info>(d_info));
 
     const size_t result = instant->instantiate("a"_str);
 
@@ -330,12 +423,25 @@ TEST_F(TypeInstantiatorTests, Instantiate_Links_LinkGraphCycle) {
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("a"_str, yama::kind::primitive),
     };
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("a"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, {}, b_linksyms }));
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
 
     const size_t result = instant->instantiate("a"_str);
 
@@ -379,7 +485,14 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeAlreayInstantiate
     // link graph:
     //      a
 
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str }));
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
 
     // instantiate 'a' up-front, then ensure instantiating 'a' again fails
     // as it's already been instantiated
@@ -419,10 +532,30 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToLinkedTypeNotFound) {
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    //type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str }));
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    //yama::type_info b_info{
+    //    .fullname = "b"_str,
+    //    .linksyms = {},
+    //    .info = yama::primitive_info{
+    //        .ptype = yama::ptype::bool0,
+    //    },
+    //};
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    //type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
     const auto result = instant->instantiate("a"_str); // <- will fail due to no 'b'
 
@@ -441,20 +574,61 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToIndirectlyLinkedTypeNotFound)
         yama::make_linksym("b"_str, yama::kind::primitive),
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("d"_str, yama::kind::primitive),
         yama::make_linksym("e"_str, yama::kind::primitive),
     };
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> c_linksyms{
         yama::make_linksym("f"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, {}, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, {}, b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str, {}, c_linksyms }));
-    //type_data_db.push(yama::type_data(yama::primitive_info{ "d"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "e"_str }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "f"_str }));
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = c_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    //yama::type_info d_info{
+    //    .fullname = "d"_str,
+    //    .linksyms = {},
+    //    .info = yama::primitive_info{
+    //        .ptype = yama::ptype::bool0,
+    //    },
+    //};
+    yama::type_info e_info{
+        .fullname = "e"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
+    //type_info_db.push(yama::make_res<yama::type_info>(d_info));
+    type_info_db.push(yama::make_res<yama::type_info>(e_info));
+    type_info_db.push(yama::make_res<yama::type_info>(f_info));
 
     const auto result = instant->instantiate("a"_str); // <- will fail due to no 'd'
 
@@ -474,13 +648,35 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToKindMismatch) {
         // kind is intended to mismatch w/ the indirectly linked type b
         yama::make_linksym("b"_str, yama::kind::primitive),
     };
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("c"_str, yama::kind::primitive),
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, std::nullopt, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::function_info{ "b"_str, yama::make_callsig_info({ 0 }, 0), b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str }));
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 10,
+        },
+    };
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
     const auto result = instant->instantiate("a"_str); // <- will fail due to kind mismatch between 'a' and 'b'
 
@@ -521,13 +717,37 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
         // callsig is intended to mismatch w/ the indirectly linked type b
         yama::make_linksym("b"_str, yama::kind::function, clever_callsig_info_for_test),
     };
+    yama::type_info a_info{
+        .fullname = "a"_str,
+        .linksyms = a_linksyms,
+        .info = yama::function_info{
+            .callsig = clever_callsig_info_for_test,
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 10,
+        },
+    };
     static const std::vector<yama::linksym> b_linksyms{
         yama::make_linksym("c"_str, yama::kind::primitive), // <- c exists for b's link indices to differ from a's
     };
-
-    type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str, clever_callsig_info_for_test, a_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "b"_str, clever_callsig_info_for_test, b_linksyms }));
-    type_data_db.push(yama::type_data(yama::primitive_info{ "c"_str }));
+    yama::type_info b_info{
+        .fullname = "b"_str,
+        .linksyms = b_linksyms,
+        .info = yama::function_info{
+            .callsig = clever_callsig_info_for_test,
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 10,
+        },
+    };
+    yama::type_info c_info{
+        .fullname = "c"_str,
+        .linksyms = {},
+        .info = yama::primitive_info{
+            .ptype = yama::ptype::bool0,
+        },
+    };
+    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    type_info_db.push(yama::make_res<yama::type_info>(b_info));
+    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
     const auto result = instant->instantiate("a"_str); // <- will fail due to callsig mismatch between 'a' and 'b'
 

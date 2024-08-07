@@ -8,9 +8,10 @@
 using namespace yama::string_literals;
 
 
-yama::context::context(res<domain> dm, std::shared_ptr<debug> dbg)
+yama::context::context(res<domain> dm, ctx_config config, std::shared_ptr<debug> dbg)
     : api_component(dbg),
     _dm(dm),
+    _config(config),
     _mas(dm->get_mas()),
     _al(std::allocator<void>{}),
     _callstk(_al) {
@@ -23,6 +24,10 @@ yama::res<yama::domain> yama::context::get_domain() const noexcept {
 
 yama::domain& yama::context::dm() const noexcept {
     return *_dm;
+}
+
+const yama::ctx_config& yama::context::get_config() const noexcept {
+    return _config;
 }
 
 yama::res<yama::mas> yama::context::get_mas() const noexcept {
@@ -172,7 +177,7 @@ bool yama::context::ll_is_user() noexcept {
 }
 
 size_t yama::context::ll_max_call_frames() noexcept {
-    return max_call_frames;
+    return _config.max_call_frames;
 }
 
 size_t yama::context::ll_call_frames() noexcept {
@@ -296,7 +301,7 @@ void yama::context::_pop_cf() noexcept {
 
 void yama::context::_push_user_cf() {
     YAMA_ASSERT(_callstk.empty());
-    const bool success = _push_cf(user_max_locals);
+    const bool success = _push_cf(_config.user_max_locals);
     YAMA_ASSERT(success);
 }
 

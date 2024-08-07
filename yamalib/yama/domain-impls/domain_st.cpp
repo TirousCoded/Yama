@@ -6,11 +6,11 @@
 yama::domain_st::domain_st(res<mas> mas, std::shared_ptr<debug> dbg)
     : domain(dbg),
     _mas(mas),
-    _type_data_db(),
+    _type_info_db(),
     _type_db(),
     _type_batch_db(),
     _verif(dbg),
-    _instant(_type_data_db, _type_db, _type_batch_db, std::allocator<void>{}, dbg) {
+    _instant(_type_info_db, _type_db, _type_batch_db, std::allocator<void>{}, dbg) {
     if (!setup_domain()) {
         fail_domain_setup();
     }
@@ -36,9 +36,9 @@ std::optional<yama::type> yama::domain_st::load(const str& fullname) {
     return std::nullopt;
 }
 
-bool yama::domain_st::push(type_data x) {
+bool yama::domain_st::push(type_info x) {
     if (!_verif.verify(x)) return false;
-    _type_data_db.push(x);
+    _type_info_db.push(make_res<type_info>(std::move(x)));
     return true;
 }
 

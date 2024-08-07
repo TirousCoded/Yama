@@ -2,31 +2,20 @@
 
 #include "static_verifier.h"
 
+#include "../core/kind-features.h"
+
 
 yama::dm::static_verifier::static_verifier(std::shared_ptr<debug> dbg) 
     : api_component(dbg) {}
 
-bool yama::dm::static_verifier::verify(const type_data& subject) {
+bool yama::dm::static_verifier::verify(const type_info& subject) {
     _begin_verify(subject);
     const bool success = _verify(subject);
     _end_verify(success);
-    if (success) {
-        _mark_as_verified(subject);
-    }
     return success;
 }
 
-bool yama::dm::static_verifier::_verify(const type_data& subject) {
-    // if subject has already been verified, return successful
-    if (subject.verified()) {
-        YAMA_LOG(dbg(), static_verif_c, "type {} already statically verified!", subject.fullname());
-        return true;
-    }
-    // check if the type has a callsig, and whether or not what is found is
-    // correct for the kind of type it is
-    if (!_verify_type_callsig(subject)) {
-        return false;
-    }
+bool yama::dm::static_verifier::_verify(const type_info& subject) {
     // if type has a callsig, check whether its param and return type indices
     // are in-bounds
     if (!_verify_type_callsig_indices(subject)) {
@@ -45,8 +34,8 @@ bool yama::dm::static_verifier::_verify(const type_data& subject) {
     return true;
 }
 
-void yama::dm::static_verifier::_begin_verify(const type_data& subject) {
-    YAMA_LOG(dbg(), static_verif_c, "static verif. {} type {}...", subject.kind(), subject.fullname());
+void yama::dm::static_verifier::_begin_verify(const type_info& subject) {
+    YAMA_LOG(dbg(), static_verif_c, "static verif. {} type {}...", subject.kind(), subject.fullname);
 }
 
 void yama::dm::static_verifier::_end_verify(bool success) {
@@ -58,47 +47,25 @@ void yama::dm::static_verifier::_end_verify(bool success) {
     }
 }
 
-void yama::dm::static_verifier::_mark_as_verified(const type_data& subject) {
-    subject._other->verified = true;
-}
-
-inline bool yama::dm::static_verifier::_verify_type_callsig(const type_data& subject) {
-    const bool type_has_callsig = (bool)subject.callsig();
-    const bool kind_uses_callsig = uses_callsig(subject.kind());
-    if (type_has_callsig && !kind_uses_callsig) {
-        YAMA_LOG(
-            dbg(), static_verif_c, 
-            "error: {} has a callsig, but for {} types this is illegal!", 
-            subject.fullname(), subject.kind());
-    }
-    if (!type_has_callsig && kind_uses_callsig) {
-        YAMA_LOG(
-            dbg(), static_verif_c, 
-            "error: {} has no callsig, but for {} types this is illegal!", 
-            subject.fullname(), subject.kind());
-    }
-    return type_has_callsig == kind_uses_callsig;
-}
-
-inline bool yama::dm::static_verifier::_verify_type_callsig_indices(const type_data& subject) {
+inline bool yama::dm::static_verifier::_verify_type_callsig_indices(const type_info& subject) {
     const bool type_has_callsig = (bool)subject.callsig();
     if (!type_has_callsig) {
         // if no callsig to check, default to returning successful
         return true;
     }
-    if (!subject.callsig()->verify_indices(subject.linksyms())) {
+    if (!subject.callsig()->verify_indices(subject.linksyms)) {
         YAMA_LOG(
             dbg(), static_verif_c, 
             "error: {} callsig (expressed using link symbols) {} contains out-of-bounds link indices!", 
-            subject.fullname(), subject.callsig()->fmt(subject.linksyms()));
+            subject.fullname, subject.callsig()->fmt(subject.linksyms));
         return false;
     }
     return true;
 }
 
-inline bool yama::dm::static_verifier::_verify_linksym_callsigs(const type_data& subject) {
+inline bool yama::dm::static_verifier::_verify_linksym_callsigs(const type_info& subject) {
     bool success = true;
-    for (link_index i = 0; i < subject.linksyms().size(); i++) {
+    for (link_index i = 0; i < subject.linksyms.size(); i++) {
         // keep iterating if we find a failure so as to get a chance
         // to log all issues found
         if (!_verify_linksym_callsig(subject, i)) {
@@ -113,44 +80,44 @@ inline bool yama::dm::static_verifier::_verify_linksym_callsigs(const type_data&
     return success;
 }
 
-inline bool yama::dm::static_verifier::_verify_linksym_callsig(const type_data& subject, link_index index) {
-    const auto& linksym = subject.linksyms()[index];
+inline bool yama::dm::static_verifier::_verify_linksym_callsig(const type_info& subject, link_index index) {
+    const auto& linksym = subject.linksyms[index];
     const bool type_has_callsig = (bool)linksym.callsig;
-    const bool kind_uses_callsig = uses_callsig(linksym.kind);
+    const bool kind_uses_callsig = is_callable(linksym.kind);
     if (type_has_callsig && !kind_uses_callsig) {
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} link symbol {} (at link index {}) has a callsig, but for {} types this is illegal!",
-            subject.fullname(), linksym.fullname, index, subject.kind());
+            subject.fullname, linksym.fullname, index, subject.kind());
     }
     if (!type_has_callsig && kind_uses_callsig) {
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} link symbol {} (at link index {}) has no callsig, but for {} types this is illegal!",
-            subject.fullname(), linksym.fullname, index, subject.kind());
+            subject.fullname, linksym.fullname, index, subject.kind());
     }
     return type_has_callsig == kind_uses_callsig;
 }
 
-inline bool yama::dm::static_verifier::_verify_linksym_callsig_indices(const type_data& subject, link_index index) {
-    const auto& linksym = subject.linksyms()[index];
+inline bool yama::dm::static_verifier::_verify_linksym_callsig_indices(const type_info& subject, link_index index) {
+    const auto& linksym = subject.linksyms[index];
     const bool linksym_has_callsig = (bool)linksym.callsig;
     if (!linksym_has_callsig) {
         // if no callsig to check, default to returning successful
         return true;
     }
-    if (!linksym.callsig->verify_indices(subject.linksyms())) {
+    if (!linksym.callsig->verify_indices(subject.linksyms)) {
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} link symbol {} (at link index {}) callsig (expressed using link symbols) {} contains out-of-bounds link indices!",
-            subject.fullname(), linksym.fullname, index, linksym.callsig->fmt(subject.linksyms()));
+            subject.fullname, linksym.fullname, index, linksym.callsig->fmt(subject.linksyms));
         return false;
     }
     return true;
 }
 
-inline bool yama::dm::static_verifier::_verify_fn_type_max_locals(const type_data& subject) {
-    if (subject.kind() != kind::function) {
+inline bool yama::dm::static_verifier::_verify_fn_type_max_locals(const type_info& subject) {
+    if (!is_function(subject.kind())) {
         // if not a function, default to returning successful
         return true;
     }
@@ -159,12 +126,12 @@ inline bool yama::dm::static_verifier::_verify_fn_type_max_locals(const type_dat
         return false;
     }
     const auto minimum = 1 + subject.callsig()->params.size();
-    const auto actual = subject.info<function_info>().max_locals;
+    const auto actual = subject.max_locals();
     if (actual < minimum) {
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} requires minimum max_locals of {} to be able to contain call object and arguments, but its max_locals is {}!",
-            subject.fullname(), minimum, actual);
+            subject.fullname, minimum, actual);
         return false;
     }
     return true;
