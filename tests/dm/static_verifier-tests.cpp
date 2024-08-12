@@ -43,7 +43,7 @@ TEST_F(StaticVerifierTests, Verify) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 0),
             .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
+            .locals = 4,
         },
     };
 
@@ -61,7 +61,7 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ParamTyp
             // illegal out-of-bounds link index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
+            .locals = 4,
         },
     };
 
@@ -96,7 +96,7 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnTy
             // illegal out-of-bounds link index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
+            .locals = 4,
         },
     };
 
@@ -159,25 +159,6 @@ TEST_F(StaticVerifierTests, Verify_Function_FailDueToMustHaveCallSig_ForLinkSymb
         .linksyms = a_linksyms,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
-        },
-    };
-
-    EXPECT_FALSE(verif->verify(a));
-}
-
-TEST_F(StaticVerifierTests, Verify_Function_FailDueToMaxLocalsNotBeingLargeEnoughForCallObjAndArgs) {
-    // illegal function type due to max_locals not being large enough for call obj + args
-
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
-    yama::type_info a{
-        .fullname = "a"_str,
-        .linksyms = a_linksyms,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0, 0, 0 }, 0), // expects 3 args
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 3, // <- static verif. error: 3 (max_locals) < 1 (call obj) + 3 (args)
         },
     };
 

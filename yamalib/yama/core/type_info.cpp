@@ -36,10 +36,10 @@ std::optional<yama::call_fn> yama::type_info::call_fn() const noexcept {
         : std::nullopt;
 }
 
-size_t yama::type_info::max_locals() const noexcept {
+size_t yama::type_info::locals() const noexcept {
     return
         std::holds_alternative<function_info>(info)
-        ? std::get<function_info>(info).max_locals
+        ? std::get<function_info>(info).locals
         : 0;
 }
 

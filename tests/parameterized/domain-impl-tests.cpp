@@ -45,7 +45,7 @@ yama::type_info f_info{
     .info = yama::function_info{
         .callsig = f_callsig,
         .call_fn = yama::noop_call_fn,
-        .max_locals = 4,
+        .locals = 4,
     },
 };
 
@@ -63,7 +63,7 @@ yama::type_info bad_info{
     .info = yama::function_info{
         .callsig = bad_callsig,
         .call_fn = yama::noop_call_fn,
-        .max_locals = 4,
+        .locals = 4,
     },
 };
 

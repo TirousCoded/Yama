@@ -90,7 +90,7 @@ namespace yama {
         std::optional<ptype> ptype() const noexcept;
         std::optional<callsig> callsig() const noexcept;
         std::optional<call_fn> call_fn() const noexcept;
-        size_t max_locals() const noexcept; // returns 0 if the type is not callable
+        size_t locals() const noexcept; // returns 0 if the type is not callable
 
 
         // yama::type equality compares by reference

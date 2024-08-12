@@ -307,7 +307,7 @@ TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
@@ -326,7 +326,7 @@ TEST(TypeTests, CallFn) {
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = cf,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
@@ -358,14 +358,14 @@ TEST(TypeTests, MaxLocals) {
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
-    EXPECT_EQ(a.max_locals(), 10);
+    EXPECT_EQ(a.locals(), 10);
 }
 
 TEST(TypeTests, MaxLocals_ZeroForNonCallableTypes) {
@@ -380,7 +380,7 @@ TEST(TypeTests, MaxLocals_ZeroForNonCallableTypes) {
 
     yama::type a(a_inst);
 
-    EXPECT_EQ(a.max_locals(), 0);
+    EXPECT_EQ(a.locals(), 0);
 }
 
 TEST(TypeTests, Links) {
@@ -660,7 +660,7 @@ TEST(TypeTests, Primitive) {
     EXPECT_EQ(a.ptype(), yama::ptype::float0);
     EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_EQ(a.call_fn(), std::nullopt);
-    EXPECT_EQ(a.max_locals(), 0);
+    EXPECT_EQ(a.locals(), 0);
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);
@@ -677,7 +677,7 @@ TEST(TypeTests, Function) {
         .info = yama::function_info{
             .callsig = a_callsig,
             .call_fn = a_call_fn,
-            .max_locals = 17,
+            .locals = 17,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
@@ -690,7 +690,7 @@ TEST(TypeTests, Function) {
     EXPECT_EQ(a.ptype(), std::nullopt);
     EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(a_callsig, a.links())));
     EXPECT_EQ(a.call_fn(), std::make_optional(a_call_fn));
-    EXPECT_EQ(a.max_locals(), 17);
+    EXPECT_EQ(a.locals(), 17);
     EXPECT_EQ(a.links().size(), 3);
     EXPECT_FALSE(a.links()[0]);
     EXPECT_FALSE(a.links()[1]);

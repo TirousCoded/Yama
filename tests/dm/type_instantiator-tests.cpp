@@ -664,7 +664,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToKindMismatch) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     yama::type_info c_info{
@@ -723,7 +723,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
         .info = yama::function_info{
             .callsig = clever_callsig_info_for_test,
             .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     static const std::vector<yama::linksym> b_linksyms{
@@ -735,7 +735,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
         .info = yama::function_info{
             .callsig = clever_callsig_info_for_test,
             .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
+            .locals = 10,
         },
     };
     yama::type_info c_info{

@@ -3,6 +3,7 @@
 #include "context.h"
 
 #include "general.h"
+#include "kind-features.h"
 
 
 using namespace yama::string_literals;
@@ -83,7 +84,7 @@ void yama::context::ll_copy_ref(const object_ref& src, object_ref& dest) {
 
 void yama::context::ll_move_ref(object_ref& src, object_ref& dest) {
     if (src == dest) return; // avoid potential issues w/ self-assignment
-    ll_remove_ref(dest);
+    ll_drop_ref(dest);
     dest = std::move(src);
 }
 
@@ -104,62 +105,55 @@ std::optional<yama::object_ref> yama::context::ll_clone_ref(std::optional<borrow
         : std::nullopt;
 }
 
-yama::object_ref yama::context::ll_new_none() {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_none() {
+    return canonical_ref{
         .t = load_none(),
         .v{ .i = 0 },
     };
 }
 
-yama::object_ref yama::context::ll_new_int(int_t v) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_int(int_t v) {
+    return canonical_ref{
         .t = load_int(),
         .v{ .i = v },
     };
 }
 
-yama::object_ref yama::context::ll_new_uint(uint_t v) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_uint(uint_t v) {
+    return canonical_ref{
         .t = load_uint(),
         .v{ .ui = v },
     };
 }
 
-yama::object_ref yama::context::ll_new_float(float_t v) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_float(float_t v) {
+    return canonical_ref{
         .t = load_float(),
         .v{ .f = v },
     };
 }
 
-yama::object_ref yama::context::ll_new_bool(bool_t v) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_bool(bool_t v) {
+    return canonical_ref{
         .t = load_bool(),
         .v{ .b = v },
     };
 }
 
-yama::object_ref yama::context::ll_new_char(char_t v) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    return object_ref{
+yama::canonical_ref yama::context::ll_new_char(char_t v) {
+    return canonical_ref{
         .t = load_char(),
         .v{ .c = v },
     };
 }
 
-std::optional<yama::object_ref> yama::context::ll_new_fn(type f) {
-    // NOTE: skip the ll_add_ref, as we know our object is canonicalized
-    object_ref result{
+std::optional<yama::canonical_ref> yama::context::ll_new_fn(type f) {
+    canonical_ref result{
         .t = f,
         .v{ .i = 0 },
     };
     return
-        f.kind() == kind::function
+        is_function(f.kind())
         ? std::make_optional(result)
         : std::nullopt;
 }
@@ -168,7 +162,7 @@ size_t yama::context::ll_crashes() noexcept {
     return _crashes;
 }
 
-bool yama::context::ll_is_crashing() noexcept {
+bool yama::context::ll_crashing() noexcept {
     return _crashing;
 }
 
@@ -184,129 +178,186 @@ size_t yama::context::ll_call_frames() noexcept {
     return _callstk.size();
 }
 
-size_t yama::context::ll_max_locals() noexcept {
+size_t yama::context::ll_args() noexcept {
     YAMA_ASSERT(!_callstk.empty());
-    return _callstk.back().max_locals();
+    return _top_cf().args_count;
 }
 
 size_t yama::context::ll_locals() noexcept {
     YAMA_ASSERT(!_callstk.empty());
-    return _callstk.back().locals();
+    return _top_cf().locals_count;
+}
+
+std::optional<yama::object_ref> yama::context::ll_arg(arg_t x) {
+    const auto view = _view_top_cf();
+    return
+        view.args_bounds_check(x)
+        ? std::make_optional(ll_clone_ref(view.args[x]))
+        : std::nullopt;
 }
 
 std::optional<yama::object_ref> yama::context::ll_local(local_t x) {
-    return ll_clone_ref(_callstk.back().borrow_local(x));
+    const auto view = _view_top_cf();
+    return
+        view.locals_bounds_check(x)
+        ? std::make_optional(ll_clone_ref(view.locals[x]))
+        : std::nullopt;
 }
 
 void yama::context::ll_crash() {
-    if (ll_is_crashing()) return; // don't count another crash if we're already crashing
+    if (ll_crashing()) return; // don't count another crash if we're already crashing
     _crashes++;
     _crashing = true;
     _try_handle_crash_for_user_cf(); // in case crashing outside of a ll_call call
 }
 
-yama::cmd_status yama::context::ll_call(local_t x, std::initializer_list<local_t> args, local_t ret) {
+yama::cmd_status yama::context::ll_load(local_t x, borrowed_ref v) {
+    return _load(x, v);
+}
+
+yama::cmd_status yama::context::ll_load_none(local_t x) {
+    return ll_load(x, ll_new_none());
+}
+
+yama::cmd_status yama::context::ll_load_int(local_t x, int_t v) {
+    return ll_load(x, ll_new_int(v));
+}
+
+yama::cmd_status yama::context::ll_load_uint(local_t x, uint_t v) {
+    return ll_load(x, ll_new_uint(v));
+}
+
+yama::cmd_status yama::context::ll_load_float(local_t x, float_t v) {
+    return ll_load(x, ll_new_float(v));
+}
+
+yama::cmd_status yama::context::ll_load_bool(local_t x, bool v) {
+    return ll_load(x, ll_new_bool(v));
+}
+
+yama::cmd_status yama::context::ll_load_char(local_t x, char_t v) {
+    return ll_load(x, ll_new_char(v));
+}
+
+yama::cmd_status yama::context::ll_load_fn(local_t x, type f) {
+    return _load_fn(x, f);
+}
+
+yama::cmd_status yama::context::ll_load_arg(local_t x, arg_t arg) {
+    return _load_arg(x, arg);
+}
+
+yama::cmd_status yama::context::ll_copy(local_t src, local_t dest) {
+    return _copy(src, dest);
+}
+
+yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, local_t ret) {
     if (!_call_ret_to_local_precheck(ret)) return yama::cmd_status::init(false);
-    return _call_ret_to_local(_call(_call_callobj_by_local(x), args), ret);
+    return _call_ret_to_local(_call(args_start, args_n), ret);
 }
 
-yama::cmd_status yama::context::ll_call(local_t x, std::initializer_list<local_t> args, newtop_t) {
-    if (!_call_ret_to_newtop_precheck()) return yama::cmd_status::init(false);
-    return _call_ret_to_newtop(_call(_call_callobj_by_local(x), args));
+yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, no_result_t) {
+    return _call_ret_to_no_result(_call(args_start, args_n));
 }
 
-yama::cmd_status yama::context::ll_call(local_t x, std::initializer_list<local_t> args, forget_t) {
-    return _call_ret_to_forget(_call(_call_callobj_by_local(x), args));
+yama::cmd_status yama::context::ll_ret(local_t x) {
+    return _ret(x);
 }
 
-yama::cmd_status yama::context::ll_call(borrowed_ref x, std::initializer_list<local_t> args, local_t ret) {
-    if (!_call_ret_to_local_precheck(ret)) return yama::cmd_status::init(false);
-    return _call_ret_to_local(_call(_call_callobj_by_lvalue(x), args), ret);
+bool yama::context::_cf_view_t::args_bounds_check(arg_t x) const noexcept {
+    return x < args.size();
 }
 
-yama::cmd_status yama::context::ll_call(borrowed_ref x, std::initializer_list<local_t> args, newtop_t) {
-    if (!_call_ret_to_newtop_precheck()) return yama::cmd_status::init(false);
-    return _call_ret_to_newtop(_call(_call_callobj_by_lvalue(x), args));
+bool yama::context::_cf_view_t::locals_bounds_check(local_t x) const noexcept {
+    return x < locals.size();
 }
 
-yama::cmd_status yama::context::ll_call(borrowed_ref x, std::initializer_list<local_t> args, forget_t) {
-    return _call_ret_to_forget(_call(_call_callobj_by_lvalue(x), args));
-}
-
-yama::cmd_status yama::context::ll_call(type f, std::initializer_list<local_t> args, local_t ret) {
-    if (!_call_ret_to_local_precheck(ret)) return yama::cmd_status::init(false);
-    return _call_ret_to_local(_call(_call_callobj_by_fntype(f), args), ret);
-}
-
-yama::cmd_status yama::context::ll_call(type f, std::initializer_list<local_t> args, newtop_t) {
-    if (!_call_ret_to_newtop_precheck()) return yama::cmd_status::init(false);
-    return _call_ret_to_newtop(_call(_call_callobj_by_fntype(f), args));
-}
-
-yama::cmd_status yama::context::ll_call(type f, std::initializer_list<local_t> args, forget_t) {
-    return _call_ret_to_forget(_call(_call_callobj_by_fntype(f), args));
-}
-
-yama::cmd_status yama::context::ll_put(local_t src, local_t dest) {
-    return _put_output_to_local(_put_input_by_local(src), dest);
-}
-
-yama::cmd_status yama::context::ll_put(local_t src, newtop_t) {
-    return _put_output_to_newtop(_put_input_by_local(src));
-}
-
-yama::cmd_status yama::context::ll_put(local_t src, forget_t) {
-    return _put_output_to_forget(_put_input_by_local(src));
-}
-
-yama::cmd_status yama::context::ll_put(borrowed_ref src, local_t dest) {
-    return _put_output_to_local(_put_input_by_lvalue(src), dest);
-}
-
-yama::cmd_status yama::context::ll_put(borrowed_ref src, newtop_t) {
-    return _put_output_to_newtop(_put_input_by_lvalue(src));
-}
-
-yama::cmd_status yama::context::ll_put(borrowed_ref src, forget_t) {
-    return _put_output_to_forget(_put_input_by_lvalue(src));
-}
-
-yama::cmd_status yama::context::ll_pop(size_t n) {
-    for (; n > 0; n--) {
-        if (!_top_cf().pop()) break; // stop popping if no more locals
-    }
-    return cmd_status::init(true);
-}
-
-yama::internal::call_frame<decltype(yama::context::_al)>& yama::context::_top_cf() {
+yama::context::_cf_t& yama::context::_top_cf() noexcept {
     YAMA_ASSERT(!_callstk.empty());
     return _callstk.back();
 }
 
-yama::internal::call_frame<decltype(yama::context::_al)>& yama::context::_below_top_cf() {
+yama::context::_cf_t& yama::context::_below_top_cf() noexcept {
     YAMA_ASSERT(_callstk.size() >= 2);
     return _callstk[_callstk.size() - 2];
 }
 
-bool yama::context::_push_cf(size_t max_locals) {
-    if (ll_call_frames() == ll_max_call_frames()) return false;
-    _callstk.push_back(internal::call_frame<decltype(_al)>(_al, *this, max_locals));
+yama::context::_cf_view_t yama::context::_view_top_cf() {
+    const auto& cf = _top_cf();
+    return _cf_view_t{
+        .args = std::span<object_ref>{
+            _registers.begin() + cf.args_offset,
+            cf.args_count,
+        },
+        .locals = std::span<object_ref>{
+            _registers.begin() + cf.locals_offset,
+            cf.locals_count,
+        },
+    };
+}
+
+yama::context::_cf_view_t yama::context::_view_below_top_cf() {
+    const auto& cf = _below_top_cf();
+    return _cf_view_t{
+        .args = std::span<object_ref>{
+            _registers.begin() + cf.args_offset,
+            cf.args_count,
+        },
+        .locals = std::span<object_ref>{
+            _registers.begin() + cf.locals_offset,
+            cf.locals_count,
+        },
+    };
+}
+
+bool yama::context::_push_cf(local_t args_start, size_t args_n, size_t locals) {
+    if (ll_call_frames() == ll_max_call_frames()) return false; // overflow
+    const bool has_top_cf = !_callstk.empty();
+    YAMA_ASSERT(has_top_cf || args_start == 0); // if pushing user call frame then args_start == 0
+    // prep new call frame
+    _cf_t new_cf{
+        // 0 below is fail-safe for user call frame
+        .args_offset    = has_top_cf ? _top_cf().locals_offset + args_start : 0,
+        .args_count     = args_n,
+        .locals_offset  = _registers.size(), // <- breaks if _add_registers is moved to above this
+        .locals_count   = locals,
+        .returned       = std::nullopt,
+    };
+    // push new call frame
+    _callstk.push_back(std::move(new_cf));
+    // add registers
+    _add_registers(locals);
     return true;
 }
 
-void yama::context::_pop_cf() noexcept {
+void yama::context::_pop_cf() {
     if (_callstk.empty()) return;
+    _remove_registers(_top_cf().locals_count);
     _callstk.pop_back();
 }
 
 void yama::context::_push_user_cf() {
     YAMA_ASSERT(_callstk.empty());
-    const bool success = _push_cf(_config.user_max_locals);
+    const bool success = _push_cf(0, 0, _config.user_locals);
     YAMA_ASSERT(success);
 }
 
+void yama::context::_add_registers(size_t n) {
+    // since ll_new_none returns a canonical_ref, we need-not incr ref counts
+    _registers.resize(_registers.size() + n, ll_new_none());
+}
+
+void yama::context::_remove_registers(size_t n) {
+    if (n > _registers.size()) n = _registers.size();
+    for (; n > 0; n--) {
+        // ll_drop_ref each one, in reverse order (ie. going top -> bottom)
+        ll_drop_ref(_registers.back());
+        _registers.pop_back();
+    }
+}
+
 void yama::context::_try_handle_crash_for_user_cf() {
-    if (!ll_is_crashing()) return;
+    if (!ll_crashing()) return;
     if (!ll_is_user()) return;
     _pop_cf();
     YAMA_LOG(dbg(), general_c, "reinitializing...");
@@ -314,135 +365,145 @@ void yama::context::_try_handle_crash_for_user_cf() {
     _push_user_cf();
 }
 
-std::optional<yama::object_ref> yama::context::_call(std::optional<stolen_ref> callobj, std::initializer_list<local_t> args) {
-    if (!callobj) return std::nullopt; // fail if _call_callobj_by_# method failed
-    YAMA_ASSERT(callobj->t.kind() == kind::function); // the _call_callobj_by_# method must ensure this
-    if (callobj->t.callsig()->params() != args.size()) { // arg count mismatch
-        YAMA_LOG(
-            dbg(), ctx_crash_c, 
-            "error: crash from call to {} with {} args, but expects {}!", 
-            *callobj, args.size(), callobj->t.callsig()->params());
-        ll_crash();
+yama::cmd_status yama::context::_load(local_t x, borrowed_ref v) {
+    if (_load_err_x_out_of_bounds(x, v)) {
+        return cmd_status::init(false);
+    }
+    auto& x_local = _view_top_cf().locals[x];
+    ll_copy_ref(v, x_local);
+    return cmd_status::init(true);
+}
+
+bool yama::context::_load_err_x_out_of_bounds(local_t x, borrowed_ref v) {
+    if (_view_top_cf().locals_bounds_check(x)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load object {} into local register at out-of-bounds index {}!",
+        v, x);
+    ll_crash();
+    return true;
+}
+
+yama::cmd_status yama::context::_load_fn(local_t x, type f) {
+    if (_load_fn_err_f_not_callable_type(f)) {
+        return cmd_status::init(false);
+    }
+    return ll_load(x, ll_new_fn(f).value());
+}
+
+bool yama::context::_load_fn_err_f_not_callable_type(type f) {
+    if (is_callable(f.kind())) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load function object of non-callable type {}!",
+        f);
+    ll_crash();
+    return true;
+}
+
+yama::cmd_status yama::context::_load_arg(local_t x, arg_t arg) {
+    if (_load_arg_err_arg_out_of_bounds(arg)) {
+        return cmd_status::init(false);
+    }
+    return ll_load(x, ll_arg(arg).value());
+}
+
+bool yama::context::_load_arg_err_arg_out_of_bounds(arg_t arg) {
+    if (_view_top_cf().args_bounds_check(arg)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load argument object from out-of-bounds argument index {}!",
+        arg);
+    ll_crash();
+    return true;
+}
+
+yama::cmd_status yama::context::_copy(local_t src, local_t dest) {
+    if (_copy_err_src_out_of_bounds(src)) {
+        return cmd_status::init(false);
+    }
+    auto& src_local = _view_top_cf().locals[src];
+    if (_copy_err_dest_out_of_bounds(dest, src_local)) {
+        // TODO: I'm *PRETTY SURE* we don't need to decr x ref count, right? as crash will clean up everything, right?
+        return cmd_status::init(false);
+    }
+    auto& dest_local = _view_top_cf().locals[dest];
+    ll_move_ref(src_local, dest_local); // perform move-assign
+    return cmd_status::init(true);
+}
+
+bool yama::context::_copy_err_src_out_of_bounds(local_t src) {
+    if (_view_top_cf().locals_bounds_check(src)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to copy object from out-of-bounds local register index {}!",
+        src);
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_copy_err_dest_out_of_bounds(local_t dest, borrowed_ref src_object) {
+    if (_view_top_cf().locals_bounds_check(dest)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to copy object {} to out-of-bounds local register index {}!",
+        src_object, dest);
+    ll_crash();
+    return true;
+}
+
+std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t args_n) {
+    if (_call_err_no_callobj(args_n)) {
+        return std::nullopt;
+    }
+    const auto& top_cf = _top_cf();
+    if (_call_err_args_out_of_bounds(args_start, args_n)) {
+        return std::nullopt;
+    }
+    const borrowed_ref callobj = _view_top_cf().locals[args_start];
+    if (_call_err_callobj_not_callable_type(callobj)) {
+        return std::nullopt;
+    }
+    const size_t param_args = args_n - 1;
+    if (_call_err_param_arg_count_mismatch(callobj, param_args)) {
         return std::nullopt;
     }
     // push our new call frame
-    if (!_push_cf(callobj->t.max_locals())) { // fail means call stack overflow
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to {} due to call stack overflow!",
-            *callobj);
-        ll_crash();
+    const bool push_cf_result = _push_cf(args_start, args_n, callobj.t.locals());
+    if (_call_err_push_cf_would_overflow(callobj, push_cf_result)) {
         return std::nullopt;
-    }
-    // push callobj to new call frame's stack
-    const bool okay0 = _top_cf().push_move(*callobj); // move ownership of callobj to the new call frame's stack
-    YAMA_ASSERT(okay0); // static verif guarantees this
-    // push arguments from our (now below the top) call frame's stack
-    // to the new call frame's stack
-    size_t arg_index = 0;
-    for (const auto& I : args) {
-        const auto arg = _below_top_cf().borrow_local(I);
-        if (!arg) { // I is out-of-bounds
-            YAMA_LOG(
-                dbg(), ctx_crash_c,
-                "error: crash from call to {} with arg {} using out-of-bounds local object stack index {}!",
-                *callobj, arg_index, I);
-            ll_crash();
-            _pop_cf(); // cleanup before abort
-            _try_handle_crash_for_user_cf(); // handle reset of user cf if needed
-            return std::nullopt;
-        }
-        const bool okay1 = _top_cf().push(*arg); // clone x to the new call frame's stack
-        YAMA_ASSERT(okay1); // static verif guarantees this
-        arg_index++;
     }
     // fire call behaviour
-    YAMA_ASSERT(callobj->t.call_fn());
-    (*callobj->t.call_fn())(*this, callobj->t.links());
+    YAMA_ASSERT(callobj.t.call_fn());
+    (*callobj.t.call_fn())(*this, callobj.t.links());
     // propagate crash if call behaviour crashed
-    if (ll_is_crashing()) {
+    if (ll_crashing()) {
         _pop_cf(); // cleanup before abort
         _try_handle_crash_for_user_cf(); // handle reset of user cf if needed
         return std::nullopt;
     }
-    // acquire top object of call's local object stack to be our return value
-    const auto ret = _top_cf().pop_move();
-    if (!ret) { // no return value object provided
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to {} due to no return value object!",
-            *callobj);
-        ll_crash();
+    if (_call_err_no_return_value_object(callobj)) {
         _pop_cf(); // cleanup before abort
         _try_handle_crash_for_user_cf(); // handle reset of user cf if needed
         return std::nullopt;
     }
+    // move-assign call frame's returned object (ie. don't need to incr/decr any ref counts)
+    auto returned = std::move(_top_cf().returned);
     // cleanup call frame of call and return
-    _pop_cf(); // pop call frame
-    return ret; // return ret to _call_ret_to_# method
-}
-
-std::optional<yama::object_ref> yama::context::_call_callobj_by_local(local_t x) {
-    const auto callobj = ll_local(x);
-    if (!callobj) { // x is out-of-bounds
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to call object at out-of-bounds local object stack index {}!",
-            x);
-        ll_crash();
-        return std::nullopt;
-    }
-    if (callobj->t.kind() != kind::function) { // callobj is not callable
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to non-callable call object {}!",
-            *callobj);
-        ll_crash();
-        return std::nullopt;
-    }
-    return callobj;
-}
-
-std::optional<yama::object_ref> yama::context::_call_callobj_by_lvalue(borrowed_ref x) {
-    if (x.t.kind() != kind::function) { // x is not callable
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to non-callable call object {}!",
-            x);
-        ll_crash();
-        return std::nullopt;
-    }
-    return ll_clone_ref(x);
-}
-
-std::optional<yama::object_ref> yama::context::_call_callobj_by_fntype(type f) {
-    const auto callobj = ll_new_fn(f);
-    if (!callobj) { // f is not callable
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from call to non-callable type {}!",
-            f);
-        ll_crash();
-        return std::nullopt;
-    }
-    return *callobj;
+    _pop_cf();
+    return returned;
 }
 
 yama::cmd_status yama::context::_call_ret_to_local(std::optional<stolen_ref> ret, local_t target) {
     if (!ret) return cmd_status::init(false); // fail quietly if upstream failed
-    const bool success = _top_cf().put_move(target, *ret); // move ownership of ret to the stack
-    YAMA_ASSERT(success); // we prechecked, so this shouldn't be able to fail
+    // NOTE: this method occurs in the caller's call frame, w/ the call's having already been unwound
+    YAMA_ASSERT(_view_top_cf().locals_bounds_check(target));
+    auto& target_objref = _view_top_cf().locals[target];
+    ll_move_ref(*ret, target_objref); // perform move-assign
     return cmd_status::init(true);
 }
 
-yama::cmd_status yama::context::_call_ret_to_newtop(std::optional<stolen_ref> ret) {
-    if (!ret) return cmd_status::init(false); // fail quietly if upstream failed
-    const bool success = _top_cf().push_move(*ret); // move ownership of ret to the stack
-    YAMA_ASSERT(success); // we prechecked, so this shouldn't be able to fail
-    return cmd_status::init(true);
-}
-
-yama::cmd_status yama::context::_call_ret_to_forget(std::optional<stolen_ref> ret) {
+yama::cmd_status yama::context::_call_ret_to_no_result(std::optional<stolen_ref> ret) {
     if (!ret) return cmd_status::init(false); // fail quietly if upstream failed
     ll_drop_ref(*ret); // just drop *ret and we're done
     // TODO: when we add dtors, what happens if ll_drop_ref causes dtor which crashes?
@@ -451,79 +512,125 @@ yama::cmd_status yama::context::_call_ret_to_forget(std::optional<stolen_ref> re
 }
 
 bool yama::context::_call_ret_to_local_precheck(local_t target) {
-    if (!_top_cf().in_bounds(target)) { // out-of-bounds
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from attempt to call with out-of-bounds return value object local object stack index {}!",
-            target);
-        ll_crash();
-        return false;
-    }
+    return !_call_err_ret_ouf_of_bounds(target);
+}
+
+bool yama::context::_call_err_no_callobj(size_t args_n) {
+    if (args_n >= 1) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call with no call object!");
+    ll_crash();
     return true;
 }
 
-bool yama::context::_call_ret_to_newtop_precheck() {
-    if (_top_cf().locals() == _top_cf().max_locals()) { // will overflow
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from attempt to call but local object stack would overflow from trying to push its return value object!");
-        ll_crash();
-        return false;
-    }
+bool yama::context::_call_err_args_out_of_bounds(local_t args_start, size_t args_n) {
+    const auto top_cf_view = _view_top_cf();
+    // remember that here [args_start, args_start+args_n) is referring to indices
+    // into the caller's local register table
+    const bool first_in_bounds = top_cf_view.locals_bounds_check(args_start);
+    const bool last_in_bounds = top_cf_view.locals_bounds_check(args_start + args_n - 1);
+    if (first_in_bounds && last_in_bounds) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call with out-of-bounds args range [{}, {})!",
+        args_start, args_start + args_n);
+    ll_crash();
     return true;
 }
 
-std::optional<yama::object_ref> yama::context::_put_input_by_local(local_t src) {
-    const auto x = ll_local(src);
-    if (!x) { // src is out-of-bounds
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from attempt to put object from out-of-bounds local object stack index {}!",
-            src);
-        ll_crash();
-        return std::nullopt;
-    }
-    return x;
+bool yama::context::_call_err_callobj_not_callable_type(borrowed_ref callobj) {
+    if (is_callable(callobj.t.kind())) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call to {} which is of non-callable type {}!",
+        callobj, callobj.t);
+    ll_crash();
+    return true;
 }
 
-std::optional<yama::object_ref> yama::context::_put_input_by_lvalue(borrowed_ref src) {
-    return ll_clone_ref(src);
+bool yama::context::_call_err_param_arg_count_mismatch(borrowed_ref callobj, size_t param_args) {
+    if (callobj.t.callsig()->params() == param_args) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call to {} with {} param args, but expects {}!",
+        callobj, param_args, callobj.t.callsig()->params());
+    ll_crash();
+    return true;
 }
 
-yama::cmd_status yama::context::_put_output_to_local(std::optional<stolen_ref> x, local_t dest) {
-    if (!x) return cmd_status::init(false); // fail quietly if upstream failed
-    const bool success = _top_cf().put_move(dest, *x); // move ownership of x to the stack
-    if (!success) { // out-of-bounds!
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash from attempt to put object {} to out-of-bounds local object stack index {}!",
-            *x, dest);
-        ll_crash();
-        ll_drop_ref(*x); // can't forget
+bool yama::context::_call_err_push_cf_would_overflow(borrowed_ref callobj, bool push_cf_result) {
+    if (push_cf_result) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call to {} due to call stack overflow!",
+        callobj);
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_call_err_no_return_value_object(borrowed_ref callobj) {
+    if (_top_cf().returned) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from call to {} due to call behaviour never returning anything!",
+        callobj);
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_call_err_ret_ouf_of_bounds(local_t ret) {
+    if (_view_top_cf().locals_bounds_check(ret)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to call with return value object at out-of-bounds local register index {}!",
+        ret);
+    ll_crash();
+    return true;
+}
+
+yama::cmd_status yama::context::_ret(local_t x) {
+    if (_ret_err_in_user_call_frame()) {
         return cmd_status::init(false);
     }
-    return cmd_status::init(true);
-}
-
-yama::cmd_status yama::context::_put_output_to_newtop(std::optional<stolen_ref> x) {
-    if (!x) return cmd_status::init(false); // fail quietly if upstream failed
-    const bool success = _top_cf().push_move(*x); // move ownership of x to the stack
-    if (!success) { // overflow!
-        YAMA_LOG(
-            dbg(), ctx_crash_c,
-            "error: crash due to local object stack overflow from attempting to push {}!",
-            *x);
-        ll_crash();
-        ll_drop_ref(*x); // can't forget
+    const auto top_cf_view = _view_top_cf();
+    if (_ret_err_x_out_of_bounds(x)) {
         return cmd_status::init(false);
     }
+    auto& top_cf = _top_cf();
+    if (_ret_err_already_returned_something()) {
+        return cmd_status::init(false);
+    }
+    // perform actual return value object cache
+    top_cf.returned = std::move(ll_local(x));
     return cmd_status::init(true);
 }
 
-yama::cmd_status yama::context::_put_output_to_forget(std::optional<stolen_ref> x) {
-    if (!x) return cmd_status::init(false); // fail quietly if upstream failed
-    ll_drop_ref(*x); // just drop *x and we're done
-    // TODO: when we add dtors, what happens if ll_drop_ref causes dtor which crashes?
-    //       should we return bad cmd_status?
-    return cmd_status::init(true);
+bool yama::context::_ret_err_in_user_call_frame() {
+    if (!ll_is_user()) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash due to attempting to return something from the user call frame!");
+    ll_crash();
+    return true;
 }
+
+bool yama::context::_ret_err_x_out_of_bounds(local_t x) {
+    if (_view_top_cf().locals_bounds_check(x)) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to return object from out-of-bounds local register index {}!",
+        x);
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_ret_err_already_returned_something() {
+    if (!_top_cf().returned) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash due to attempting to return object after already returning one!");
+    ll_crash();
+    return true;
+}
+

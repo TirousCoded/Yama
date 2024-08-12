@@ -29,7 +29,7 @@ namespace yama {
     struct function_info final {
         callsig_info                    callsig;        // the call signature
         call_fn                         call_fn;        // the call_fn encapsulating call behaviour
-        size_t                          max_locals;     // the call frame's max local object stack height
+        size_t                          locals;         // the call frame's local register table size
     };
 
     struct type_info final {
@@ -47,7 +47,7 @@ namespace yama {
         std::optional<ptype> ptype() const noexcept;
         const callsig_info* callsig() const noexcept;
         std::optional<call_fn> call_fn() const noexcept;
-        size_t max_locals() const noexcept; // returns 0 if the type is not callable
+        size_t locals() const noexcept; // returns 0 if the type is not callable
     };
 }
 

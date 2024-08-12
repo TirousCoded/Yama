@@ -10,15 +10,16 @@
 #include "domain.h"
 #include "object_ref.h"
 
-#include "../internals/call_frame.h"
-
 
 namespace yama {
 
 
     // TODO: in the future, we're gonna need to impl a way to allow for things
-    //       like destructors to be able to run when crashing, w/ them likewise 
+    //       like destructors to be able to run when crashing, w / them likewise
     //       having a notion of they themselves being able to crash
+
+    // TODO: we're also gonna have to have cleanup semantics for other forms of
+    //       object state, like* global* objects, when we add things like that
 
     // IMPORTANT:
     //      (call stack & call frames)
@@ -26,16 +27,16 @@ namespace yama {
     //      at the heart of the Yama context is the 'call stack', which is
     //      composed of 'call frames'
     // 
-    //      each call frame encapsulates a 'local object stack', or simply
-    //      its 'object stack', or just its 'stack'
+    //      each call frame encapsulates a 'local register table', or simply
+    //      its 'local registers', or simply its 'locals'
     // 
-    //      local object stacks encapsulate the local state of a call, 
+    //      local register tables encapsulate the local state of a call, 
     //      including things such as local variables, arguments, etc.
     // 
     //      (the 'user' call frame)
     // 
     //      at the base of the call stack is a special 'user' call frame,
-    //      which exists to provide a local object stack to use when operating
+    //      which exists to provide a local register table to use when operating
     //      outside of an actual call
     // 
     //      the user call frame is part of a pseudo-call which never *ends*,
@@ -50,116 +51,25 @@ namespace yama {
     //      for regular functions, these come in the form of stateless objects
     //      which are of the function's type
     // 
-    //      (call frame layout)
-    // 
-    //      w/ exception of user call frames, Yama call frames are mandated
-    //      to always start off respecting a particular object layout
-    // 
-    //      growing left-to-right, this layout is as follows:
-    // 
-    //          [ CALL OBJ. ][ ARGUMENTS ][ OTHERS ]
-    // 
-    //      where:
-    // 
-    //          CALL OBJ. is the call object of the call
-    // 
-    //          ARGUMENTS are argument objects of the call
-    // 
-    //          OTHERS is a catch-all for all other objects used in the call
-    // 
-    //      (return value objects)
-    // 
-    //      Yama requires all calls to return something, w/ unit typed objects
-    //      of type None being returned for when *nothing* is returned
-    // 
-    //      at the end of a call, after its call behaviour has ended, the top
-    //      object of the call frame's local object stack is taken as the return
-    //      value object returned by the call
-    // 
     //      (register-based vs. stack-based VMs)
     //
     //      Yama uses a 'register-based' VM, rather than a 'stack-based' one
+    // 
+    //      this means that Yama uses 'local register tables' to operate, which
+    //      are fixed-size arrays of Yama object references which the system
+    //      uses to store intermediate state
     //
-    //      this means that while Yama uses 'local object stacks' to operate,
-    //      how it transacts data to/from stacks differs from how it would be 
-    //      done in a stack machine
-    //
-    //      instead of operations popping from, and pushing to, the end of the
-    //      stack for each operation, operations specify stack indices which
+    //      instead of operations popping from, and pushing to, the end of a
+    //      stack for each operation, operations specify table indices which
     //      define the locations of objects which are used as the inputs/outputs
     //      of the operation, operating on these objects directly, avoiding
     //      having to copy as much as a stack machine would
-    //
-    //      (transactions)
-    //
-    //      each operation upon a Yama local object stack is defined, in part, 
-    //      by a 'transaction', which is a signature detailing the objects
-    //      involved in the operation
-    //
-    //      the following syntax is used to define a transaction:
-    //
-    //          transaction: <operation-name> <term-0> <term-1> ... <term-N>
-    //
-    //      where:
     // 
-    //          <operation-name> is the name of the operation
-    //
-    //          <term-0>, <term-1>, <term-N>, etc. are the 'terms' of the
-    //          operation's transaction
+    //      local register table registers start off initialized to object
+    //      references to the None object
     // 
-    //      the above 'terms' take either the form 'in(x)' or 'out(x)', where
-    //      x is some symbol specifying a Yama object, and detail either an
-    //      input/output object read-from/written-to by the operation
-    // 
-    //      the alternative form 'in(x)...' may be used for scenarios in which 
-    //      the input symbol x refers to an array of Yama objects
-    // 
-    //      in yama::context's low-level command interface, the aforementioned
-    //      'symbols' take the form of either local object stack indices, or
-    //      an lvalue to a particular yama::object_ref
-    // 
-    //      as stated in object_ref.h, Yama employs Python conventions in order
-    //      to keep ref counting straightforward, w/ these conventions also
-    //      applying to transactions
-    // 
-    //      this means that 'in(x)' and 'in(x)...' terms are equiv to function
-    //      params regarding these conventions, and likewise 'out(x)' is equiv
-    //      to function returning regarding these conventions
-    // 
-    //      transactions may express borrowed and stolen references
-    // 
-    //      for borrowed references, convert the 'in(x)', 'in(x)...', and 
-    //      'out(x)' to the forms '&in(x)', '&in(x)...', or '&out(x)', respectively
-    // 
-    //      for stolen references, convert the 'in(x)' and 'in(x)...' to the
-    //      forms '!in(x)' and '!in(x)...', respectively
-    // 
-    //      examples:
-    //
-    //          transaction: plus in(v0) in(v1) out(r)
-    // 
-    //          transaction: sum in(vs)... out(r)
-    //
-    //      (newtop & forget)
-    // 
-    //      in order to push new objects to a local object stack, transaction
-    //      terms expressing output objects may be used w/ a special 'newtop'
-    //      pseudo-index, which tells the Yama context to write the object
-    //      output to a new object pushed to the stack, rather than onto an 
-    //      existing object
-    // 
-    //      for output terms of an operation's transaction, the special 
-    //      pseudo-objects 'newtop' and 'forget' may be used
-    // 
-    //      newtop specifies that the output object should be pushed to the
-    //      end of the local object stack, instead of being written to an
-    //      existing object
-    // 
-    //      newtop is Yama's mechanism for *pushing* to the local object stack
-    // 
-    //      forget specifies that no output should occur, instead just *forgetting*
-    //      about the output object altogether, which can be useful for scenarios
-    //      where, for example, a return value object from a call is unimportant
+    //      local register table registers are weakly typed, and as such the
+    //      type of object they hold can change upon reassignment
     //
     //      (crashing)
     //
@@ -203,24 +113,19 @@ namespace yama {
     };
 
 
-    // local_t encapsulates an index into a local object stack
+    using arg_t     = size_t; // arg_t encapsulates an index into a call argument slice
+    using local_t   = size_t; // local_t encapsulates an index into a local register table
 
-    using local_t = size_t;
+    struct no_result_t final {};
 
-    // newtop and forget pseudo-objects
-
-    struct newtop_t final {};
-    struct forget_t final {};
-
-    constexpr auto newtop = newtop_t{};
-    constexpr auto forget = forget_t{};
+    constexpr auto no_result = no_result_t{};
 
 
     // ctx_config defines init config options for contexts
 
     struct ctx_config final {
-        size_t max_call_frames = 32; // max call frames before overflow
-        size_t user_max_locals = 32; // user call frame's max locals before overflow
+        size_t max_call_frames  = 32; // max call frames before overflow
+        size_t user_locals      = 32; // user call frame's local register table size
 
 
         bool operator==(const ctx_config&) const noexcept = default;
@@ -258,6 +163,9 @@ namespace yama {
 
         res<mas> get_mas() const noexcept;
 
+
+        // NOTE: try not to get the below load methods confused w/ the notion
+        //       of *loading* when it comes to object registers
 
         // load returns the type under fullname, if any
 
@@ -337,104 +245,121 @@ namespace yama {
 
         // these ll_new_# methods are used for the quick creation of objects
 
-        object_ref ll_new_none();
-        object_ref ll_new_int(int_t v);
-        object_ref ll_new_uint(uint_t v);
-        object_ref ll_new_float(float_t v);
-        object_ref ll_new_bool(bool_t v);
-        object_ref ll_new_char(char_t v);
+        canonical_ref ll_new_none();
+        canonical_ref ll_new_int(int_t v);
+        canonical_ref ll_new_uint(uint_t v);
+        canonical_ref ll_new_float(float_t v);
+        canonical_ref ll_new_bool(bool_t v);
+        canonical_ref ll_new_char(char_t v);
 
-        // ll_new_fn returns std::nullopt if f is not a function type
+        std::optional<canonical_ref> ll_new_fn(type f); // ll_new_fn returns std::nullopt if f is not a function type
 
-        std::optional<object_ref> ll_new_fn(type f);
-
-        // it's okay to use ll_is_crashing and ll_crashes while crashing,
+        // it's okay to use ll_crashing and ll_crashes while crashing,
         // as the whole point of it is to detect it
 
         size_t ll_crashes() noexcept;                   // ll_crashes returns the number of times the context has crashed
-        bool ll_is_crashing() noexcept;                 // ll_is_crashing queries if the context is crashing
+        bool ll_crashing() noexcept;                    // ll_crashing queries if the context is crashing
         bool ll_is_user() noexcept;                     // ll_is_user returns if the current call frame is the user call frame
         size_t ll_max_call_frames() noexcept;           // ll_max_call_frames returns the max call stack height allowed
         size_t ll_call_frames() noexcept;               // ll_call_frames returns the number of call frames on the call stack
-        size_t ll_max_locals() noexcept;                // ll_max_locals returns the max objects allowed on the local object stack
-        size_t ll_locals() noexcept;                    // ll_locals returns the number of objects on the local object stack
-        std::optional<object_ref> ll_local(local_t x);  // ll_local returns the object, if any, at x in the local object stack
+        
+        size_t ll_args() noexcept;                      // ll_args returns the number of args available
+        size_t ll_locals() noexcept;                    // ll_locals returns the number of objects on the local register table
+        std::optional<object_ref> ll_arg(arg_t x);      // ll_args returns the object, if any, at x in the arg slice
+        std::optional<object_ref> ll_local(local_t x);  // ll_local returns the object, if any, at x in the local register table
 
         void ll_crash();                                // ll_crash induces a crash, failing quietly if already crashing
 
-        // transaction: ll_call in(x) in(args)... out(ret)
+        // ll_load loads v into the local object register at x
 
-        // ll_call performs a Yama call of call object x over argument objects 
-        // args, writing the return value object to object ret
+        // ll_load does not care what type the x object is, as it overwrites it
 
-        // ll_call does not care what type ret is, as it overwrites ret's state
+        // ll_load crashes if x is out-of-bounds
 
-        // ll_call overloads w/ param 'f' specify a function type f, creating an 
-        // object of type f directly in the new call frame to use for x
+        cmd_status ll_load(local_t x, borrowed_ref v);
 
-        // ll_call does not check if args types are correct to use for a call to x
+        // these methods wrap ll_load calls composed w/ ll_new_# method calls
 
-        // ll_call does not check if the type of the return value object returned
-        // by the call is correct for a call to x
+        cmd_status ll_load_none(local_t x);
+        cmd_status ll_load_int(local_t x, int_t v);
+        cmd_status ll_load_uint(local_t x, uint_t v);
+        cmd_status ll_load_float(local_t x, float_t v);
+        cmd_status ll_load_bool(local_t x, bool v);
+        cmd_status ll_load_char(local_t x, char_t v);
 
-        // ll_call crashes if x is out-of-bounds
+        // ll_load_fn crashes if f is not a function type
 
-        // ll_call crashes if indices in args are out-of-bounds
+        cmd_status ll_load_fn(local_t x, type f);
+
+        // ll_load_arg loads the argument at index arg into the local object
+        // register at x
+
+        // ll_load_arg does not care what type the x object is, as it overwrites it
+
+        // ll_load_arg crashes if in the user call frame
+
+        // ll_load_arg crashes if x is out-of-bounds
+        
+        // ll_load_arg crashes if arg is out-of-bounds
+
+        cmd_status ll_load_arg(local_t x, arg_t arg);
+
+        // ll_copy copies object at src onto object at dest
+
+        // ll_copy does not care what type the dest object is, as it overwrites it
+
+        // ll_copy crashes if src is out-of-bounds
+
+        // ll_copy crashes if dest is out-of-bounds
+
+        cmd_status ll_copy(local_t src, local_t dest);
+
+        // below, let
+        //      - 'args' refer to the exclusive object range [args_start, args_start+args_n)
+        //      - 'callobj' refer to the first object in args
+        //      - 'param args' refer to args excluding callobj
+
+        // ll_call performs a Yama call of callobj using args, writing the
+        // return value object to object ret
+
+        // ll_call, for its no_result_t overload, does not output any return value object
+
+        // ll_call does not care what type the ret object is, as it overwrites it
+
+        // ll_call does not check if args types are correct to use in a callobj call
+
+        // ll_call crashes if args provides no callobj (ie. if args_n == 0)
+
+        // ll_call crashes if args index range is out-of-bounds
 
         // ll_call crashes if ret is out-of-bounds
 
-        // ll_call crashes if the type of x is not a callable type
+        // ll_call crashes if callobj is not of a callable type
 
-        // ll_call crashes if f is not a callable type
+        // ll_call crashes if args_n-1 is not equal to the argument count expected
+        // for a call to callobj (here, the -1 excludes callobj from argument count)
 
-        // ll_call crashes if args.size() is not equal to the expected argument count
+        // ll_call crashes if the call stack would overflow
 
-        // ll_call crashes for newtop_t overloads if pushing to the local object
-        // stack would cause it to overflow
+        // ll_call crashes if, after call behaviour has completed execution, no 
+        // return value object has been provided
 
-        // ll_call crashes if the call stack would overflow from pushing a new
-        // call frame to it
+        cmd_status ll_call(local_t args_start, size_t args_n, local_t ret);
+        cmd_status ll_call(local_t args_start, size_t args_n, no_result_t);
 
-        // ll_call crashes if no return value object is provided on the call's 
-        // local object stack after call behaviour has completed execution
+        // ll_ret is used within calls to perform the act of returning object x
+        // as the return value object of the call
 
-        // TODO: add overloads for specifying args via a pair of iterators
+        // ll_ret does not check if the type of the return value object returned
+        // is correct for a call to the call object in question
 
-        cmd_status ll_call(local_t x, std::initializer_list<local_t> args, local_t ret);
-        cmd_status ll_call(local_t x, std::initializer_list<local_t> args, newtop_t);
-        cmd_status ll_call(local_t x, std::initializer_list<local_t> args, forget_t);
-        cmd_status ll_call(borrowed_ref x, std::initializer_list<local_t> args, local_t ret);
-        cmd_status ll_call(borrowed_ref x, std::initializer_list<local_t> args, newtop_t);
-        cmd_status ll_call(borrowed_ref x, std::initializer_list<local_t> args, forget_t);
-        cmd_status ll_call(type f, std::initializer_list<local_t> args, local_t ret);
-        cmd_status ll_call(type f, std::initializer_list<local_t> args, newtop_t);
-        cmd_status ll_call(type f, std::initializer_list<local_t> args, forget_t);
+        // ll_ret crashes if in the user call frame
 
-        // transaction: ll_put in(src) out(dest)
+        // ll_ret crashes if x is out-of-bounds
 
-        // ll_put copies object src onto object dest
+        // ll_ret crashes if called multiple times
 
-        // ll_put does not care what type dest is, as it overwrites dest's state
-
-        // ll_put crashes if src is out-of-bounds
-        
-        // ll_put crashes if dest is out-of-bounds
-
-        // ll_put crashes for newtop_t overloads if pushing to the local object
-        // stack would cause it to overflow
-
-        cmd_status ll_put(local_t src, local_t dest);
-        cmd_status ll_put(local_t src, newtop_t);
-        cmd_status ll_put(local_t src, forget_t);
-        cmd_status ll_put(borrowed_ref src, local_t dest);
-        cmd_status ll_put(borrowed_ref src, newtop_t);
-        cmd_status ll_put(borrowed_ref src, forget_t);
-
-        // ll_pop pops the first n objects from the local object stack
-
-        // ll_pop will stop early if it runs out of objects to pop
-
-        cmd_status ll_pop(size_t n = 1);
+        cmd_status ll_ret(local_t x);
 
 
     private:
@@ -447,20 +372,56 @@ namespace yama {
 
         size_t _crashes = 0;
         bool _crashing = false;
+
+        // NOTE: _cf_t must used indices, as reallocs in _registers will invalidate pointers
+
+        struct _cf_t final {
+            size_t                      args_offset;    // offset into _registers where call args begin
+            size_t                      args_count;     // number of registers in call args
+            size_t                      locals_offset;  // offset into _registers where local register table begins
+            size_t                      locals_count;   // number of registers in local register table
+            std::optional<object_ref>   returned;       // cache for returned object, if any
+        };
         
-        std::vector<internal::call_frame<decltype(_al)>> _callstk;
+        std::vector<object_ref> _registers; // storage for local register tables for call frames
+        std::vector<_cf_t>      _callstk;   // the call stack
+
+        // _cf_view_t is used to easily view contents of a call frame
+
+        struct _cf_view_t final {
+            std::span<object_ref> args, locals;
 
 
-        internal::call_frame<decltype(_al)>& _top_cf();
-        internal::call_frame<decltype(_al)>& _below_top_cf(); // returns cf just below the top one
+            bool args_bounds_check(arg_t x) const noexcept;
+            bool locals_bounds_check(local_t x) const noexcept;
+        };
+
+        _cf_t& _top_cf() noexcept;
+        _cf_t& _below_top_cf() noexcept; // cf just below the top one
+
+        _cf_view_t _view_top_cf();
+        _cf_view_t _view_below_top_cf(); // cf just below the top one
 
         // _push_cf returns if successful, w/ it failing if pushing
         // would overflow the call stack
 
-        bool _push_cf(size_t max_locals);
-        void _pop_cf() noexcept;
+        // _push_cf will handle converting [args_start, args_start+args_n) into
+        // the equiv _registers index range
+
+        bool _push_cf(local_t args_start, size_t args_n, size_t locals);
+        void _pop_cf();
 
         void _push_user_cf();
+
+        // _add_registers is used to add new registers, initializing each one
+        // to an object reference to the None object
+
+        // _remove_registers is used to remove registers when popping call frames, 
+        // w/ us having to *unwind* each one to ensure their object references are
+        // deinitialized properly
+
+        void _add_registers(size_t n);
+        void _remove_registers(size_t n);
 
 
         // this needs to be called in ll_crash and ll_call (after call 
@@ -471,39 +432,51 @@ namespace yama {
         void _try_handle_crash_for_user_cf();
 
 
-        // _call defines the *core behaviour* of ll_call, which is common
-        // to all overloads
+        cmd_status _load(local_t x, borrowed_ref v);
 
-        std::optional<object_ref> _call(std::optional<stolen_ref> callobj, std::initializer_list<local_t> args);
+        bool _load_err_x_out_of_bounds(local_t x, borrowed_ref v);
 
-        // overload behaviour is defined by composition of _call w/ below
-        // for getting callobj, and handling what to do w/ return value
+        cmd_status _load_fn(local_t x, type f);
 
-        std::optional<object_ref> _call_callobj_by_local(local_t x);
-        std::optional<object_ref> _call_callobj_by_lvalue(borrowed_ref x);
-        std::optional<object_ref> _call_callobj_by_fntype(type f);
+        bool _load_fn_err_f_not_callable_type(type f);
+
+        cmd_status _load_arg(local_t x, arg_t arg);
+
+        bool _load_arg_err_arg_out_of_bounds(arg_t arg);
+
+
+        cmd_status _copy(local_t src, local_t dest);
+
+        bool _copy_err_src_out_of_bounds(local_t src);
+        bool _copy_err_dest_out_of_bounds(local_t dest, borrowed_ref src_object);
+
+
+        std::optional<object_ref> _call(local_t args_start, size_t args_n);
 
         cmd_status _call_ret_to_local(std::optional<stolen_ref> ret, local_t target);
-        cmd_status _call_ret_to_newtop(std::optional<stolen_ref> ret);
-        cmd_status _call_ret_to_forget(std::optional<stolen_ref> ret);
+        cmd_status _call_ret_to_no_result(std::optional<stolen_ref> ret);
 
         // turns out the out-of-bounds/overflow checks for ll_call outputting to
-        // local/newtop need to occur BEFORE anything else, so we'll use these
-        // methods to check these as a dirty little exception to our pattern
+        // local need to occur BEFORE anything else, so we'll use these methods 
+        // to check these as a dirty little exception to above pattern
 
         bool _call_ret_to_local_precheck(local_t target);
-        bool _call_ret_to_newtop_precheck();
+
+        bool _call_err_no_callobj(size_t args_n);
+        bool _call_err_args_out_of_bounds(local_t args_start, size_t args_n);
+        bool _call_err_callobj_not_callable_type(borrowed_ref callobj);
+        bool _call_err_param_arg_count_mismatch(borrowed_ref callobj, size_t param_args);
+        bool _call_err_push_cf_would_overflow(borrowed_ref callobj, bool push_cf_result);
+        bool _call_err_no_return_value_object(borrowed_ref callobj);
+
+        bool _call_err_ret_ouf_of_bounds(local_t ret);
 
 
-        // ll_put is defined in a manner akin to how we defined ll_call, except
-        // that we have no single *core behaviour* method
+        cmd_status _ret(local_t x);
 
-        std::optional<object_ref> _put_input_by_local(local_t src);
-        std::optional<object_ref> _put_input_by_lvalue(borrowed_ref src);
-
-        cmd_status _put_output_to_local(std::optional<stolen_ref> x, local_t dest);
-        cmd_status _put_output_to_newtop(std::optional<stolen_ref> x);
-        cmd_status _put_output_to_forget(std::optional<stolen_ref> x);
+        bool _ret_err_in_user_call_frame();
+        bool _ret_err_x_out_of_bounds(local_t x);
+        bool _ret_err_already_returned_something();
     };
 }
 

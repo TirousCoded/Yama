@@ -101,5 +101,37 @@ namespace yama {
 
     using borrowed_ref = object_ref;
     using stolen_ref = object_ref;
+
+    // TODO: maybe try and rewrite the below to be more *terse*
+
+    // alongside borrowed_ref and stolen_ref, Yama will employ one additional
+    // notion of a 'canonical' reference, for situations where we KNOW w/ 100%
+    // certainty that the object in question is of a canonicalized type
+
+    // canonical references are functionally identical to regular strong
+    // references, and can interact w/ regular references, and reference
+    // borrowing/stealing exactly like one
+
+    // what makes canonical references unique is that, so long as we KNOW
+    // the object is canonical (ie. if we're using canonical_ref, which
+    // communicates intent) then the decr of it can be forwent, as we KNOW
+    // that it's not necessary
+
+    // canonical references exist to help avoid the situation where we have
+    // a strong reference to a primitive, function, etc. and we forget to
+    // decr it *properly*, but the system reports no error, as of course,
+    // the decr is a noop, and failing to following our conventions in that
+    // scenario doesn't actually compromise the system
+
+    // canonical references thus help keep our conventions used properly,
+    // which helps code readability, maintainability, etc. in addition to
+    // streamlining usage by letting end-user have to do less work in 
+    // scenarios where we know it isn't needed
+
+    // finally, take note that if we have a object_ref, borrowed_ref, or
+    // stolen_ref, these should NOT be converted to a canonical_ref w/out
+    // being sure clear about why we know it's safe to do so
+
+    using canonical_ref = object_ref;
 }
 
