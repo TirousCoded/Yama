@@ -21,11 +21,16 @@ namespace yama {
     using bool_t = bool;
     using char_t = taul::unicode_t;
 
-
     static_assert(sizeof(int_t) == sizeof(int64_t)); // make sure range is correct
     static_assert(sizeof(uint_t) == sizeof(int64_t)); // make sure range is correct
     static_assert(sizeof(float_t) == sizeof(int64_t)); // make sure double precision IEEE 754
     static_assert(sizeof(bool_t) == sizeof(int8_t));
     static_assert(sizeof(char_t) == sizeof(int32_t)); // make sure range is correct
+
+    std::string fmt_int(int_t x);
+    std::string fmt_uint(uint_t x);
+    std::string fmt_float(float_t x);
+    std::string fmt_bool(bool_t x);
+    std::string fmt_char(char_t x);
 }
 

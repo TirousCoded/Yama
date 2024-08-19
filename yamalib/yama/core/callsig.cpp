@@ -5,9 +5,9 @@
 #include "type.h"
 
 
-yama::callsig::callsig(const callsig_info& info, links_view links) 
+yama::callsig::callsig(const callsig_info& info, const_table consts) 
     : _info(&info), 
-    _links(links) {}
+    _consts(consts) {}
 
 size_t yama::callsig::params() const noexcept {
     return _get_info().params.size();
@@ -15,13 +15,13 @@ size_t yama::callsig::params() const noexcept {
 
 std::optional<yama::type> yama::callsig::param_type(size_t index) const noexcept {
     return
-        index < params()
-        ? _links[_get_info().params[index]]
+        index < _consts.size()
+        ? _consts.type(_get_info().params[index])
         : std::nullopt;
 }
 
 std::optional<yama::type> yama::callsig::return_type() const noexcept {
-    return _links[_get_info().ret];
+    return _consts.type(_get_info().ret);
 }
 
 bool yama::callsig::operator==(const callsig& other) const noexcept {

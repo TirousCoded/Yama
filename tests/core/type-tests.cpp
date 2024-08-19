@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/general.h>
+#include <yama/core/callsig.h>
+#include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type.h>
 #include <yama/dm/type_instance.h>
@@ -13,28 +15,26 @@ using namespace yama::string_literals;
 
 // just some data that appears in our tests over-and-over
 
-static std::vector<yama::linksym> linksyms0{
-    yama::make_linksym("a"_str, yama::kind::primitive),
-    yama::make_linksym("b"_str, yama::kind::primitive),
-    yama::make_linksym("c"_str, yama::kind::primitive),
-};
-
-static std::vector<yama::linksym> linksyms1{
-    yama::make_linksym("aa"_str, yama::kind::primitive),
-    yama::make_linksym("bb"_str, yama::kind::primitive),
-    yama::make_linksym("cc"_str, yama::kind::primitive),
-    yama::make_linksym("dd"_str, yama::kind::primitive),
-};
+static const auto consts0 =
+    yama::const_table_info()
+    .add_primitive_type("a"_str)
+    .add_primitive_type("b"_str)
+    .add_primitive_type("c"_str);
+static const auto consts1 =
+    yama::const_table_info()
+    .add_primitive_type("aa"_str)
+    .add_primitive_type("bb"_str)
+    .add_primitive_type("cc"_str)
+    .add_primitive_type("dd"_str);
 
 static yama::callsig_info callsig_info0 = yama::make_callsig_info({ 0, 1, 2 }, 1);
-
 static yama::callsig_info callsig_info1 = yama::make_callsig_info({ 2, 0, 1 }, 0);
 
 
 TEST(TypeTests, TypeInstanceCtor) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -47,17 +47,17 @@ TEST(TypeTests, TypeInstanceCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), yama::ptype::float0);
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(a.consts().size(), 3);
+    EXPECT_TRUE(a.consts().is_stub(0));
+    EXPECT_TRUE(a.consts().is_stub(1));
+    EXPECT_TRUE(a.consts().is_stub(2));
 }
 
 TEST(TypeTests, CopyCtor) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -72,27 +72,19 @@ TEST(TypeTests, CopyCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.links().size(), 3);
-    EXPECT_FALSE(b.links()[0]);
-    EXPECT_FALSE(b.links()[1]);
-    EXPECT_FALSE(b.links()[2]);
-    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, MoveCtor) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -107,24 +99,20 @@ TEST(TypeTests, MoveCtor) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.links().size(), 3);
-    EXPECT_FALSE(b.links()[0]);
-    EXPECT_FALSE(b.links()[1]);
-    EXPECT_FALSE(b.links()[2]);
-    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, CopyAssign) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::type_info b_info{
         .fullname = "def"_str,
-        .linksyms = linksyms1,
+        .consts = consts1,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -141,34 +129,26 @@ TEST(TypeTests, CopyAssign) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.links().size(), 3);
-    EXPECT_FALSE(b.links()[0]);
-    EXPECT_FALSE(b.links()[1]);
-    EXPECT_FALSE(b.links()[2]);
-    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, MoveAssign) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::type_info b_info{
         .fullname = "def"_str,
-        .linksyms = linksyms1,
+        .consts = consts1,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -185,17 +165,13 @@ TEST(TypeTests, MoveAssign) {
     EXPECT_EQ(b.fullname(), "abc"_str);
     EXPECT_EQ(b.kind(), yama::kind::primitive);
     EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.links().size(), 3);
-    EXPECT_FALSE(b.links()[0]);
-    EXPECT_FALSE(b.links()[1]);
-    EXPECT_FALSE(b.links()[2]);
-    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, Complete_IncompleteType) {
     yama::type_info link_info{
         .fullname = "link"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -206,16 +182,16 @@ TEST(TypeTests, Complete_IncompleteType) {
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
-    a_inst.put_link(0, link);
-    //a_inst.put_link(1, link); <- incomplete
-    a_inst.put_link(2, link);
+    a_inst.put<yama::primitive_type_const>(0, link);
+    //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
+    a_inst.put<yama::primitive_type_const>(2, link);
 
     yama::type a(a_inst);
 
@@ -225,7 +201,7 @@ TEST(TypeTests, Complete_IncompleteType) {
 TEST(TypeTests, Complete_CompleteType) {
     yama::type_info link_info{
         .fullname = "link"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -236,16 +212,16 @@ TEST(TypeTests, Complete_CompleteType) {
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
-    a_inst.put_link(0, link);
-    a_inst.put_link(1, link);
-    a_inst.put_link(2, link);
+    a_inst.put<yama::primitive_type_const>(0, link);
+    a_inst.put<yama::primitive_type_const>(1, link);
+    a_inst.put<yama::primitive_type_const>(2, link);
 
     yama::type a(a_inst);
 
@@ -255,7 +231,7 @@ TEST(TypeTests, Complete_CompleteType) {
 TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {}, // <- zero linksyms
+        .consts = {}, // <- zero linksyms
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -270,7 +246,7 @@ TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
 TEST(TypeTests, Fullname) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -288,7 +264,7 @@ TEST(TypeTests, Fullname) {
 TEST(TypeTests, PType) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::uint,
         },
@@ -303,7 +279,7 @@ TEST(TypeTests, PType) {
 TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = yama::noop_call_fn,
@@ -318,11 +294,11 @@ TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
 }
 
 TEST(TypeTests, CallFn) {
-    auto cf = [](yama::context&, yama::links_view) {};
+    auto cf = [](yama::context&, yama::const_table) {};
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = cf,
@@ -339,7 +315,7 @@ TEST(TypeTests, CallFn) {
 TEST(TypeTests, CallFn_NoCallFnForNonCallableTypes) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::uint,
         },
@@ -351,10 +327,10 @@ TEST(TypeTests, CallFn_NoCallFnForNonCallableTypes) {
     EXPECT_EQ(a.call_fn(), std::nullopt);
 }
 
-TEST(TypeTests, MaxLocals) {
+TEST(TypeTests, Locals) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::function_info{
             .callsig = callsig_info0,
             .call_fn = yama::noop_call_fn,
@@ -368,10 +344,10 @@ TEST(TypeTests, MaxLocals) {
     EXPECT_EQ(a.locals(), 10);
 }
 
-TEST(TypeTests, MaxLocals_ZeroForNonCallableTypes) {
+TEST(TypeTests, Locals_ZeroForNonCallableTypes) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::uint,
         },
@@ -383,10 +359,10 @@ TEST(TypeTests, MaxLocals_ZeroForNonCallableTypes) {
     EXPECT_EQ(a.locals(), 0);
 }
 
-TEST(TypeTests, Links) {
+TEST(TypeTests, Consts) {
     yama::type_info link_info{
         .fullname = "link"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -397,62 +373,26 @@ TEST(TypeTests, Links) {
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
-    a_inst.put_link(0, link);
-    //a_inst.put_link(1, link); <- incomplete
-    a_inst.put_link(2, link);
+    a_inst.put<yama::primitive_type_const>(0, link);
+    //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
+    a_inst.put<yama::primitive_type_const>(2, link);
 
     yama::type a(a_inst);
 
-
-    EXPECT_EQ(a.links().size(), 3);
-
-    EXPECT_TRUE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_TRUE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-
-    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
-    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
-
-    EXPECT_TRUE(a.links().link(0));
-    EXPECT_FALSE(a.links().link(1));
-    EXPECT_TRUE(a.links().link(2));
-    EXPECT_FALSE(a.links().link(3)); // <- fail due to out-of-bounds
-
-    if (a.links().link(0)) EXPECT_EQ(a.links().link(0).value(), link);
-    if (a.links().link(2)) EXPECT_EQ(a.links().link(2).value(), link);
-}
-
-TEST(TypeTests, Links_ZeroLinkSyms) {
-    yama::type_info a_info{
-        .fullname = "abc"_str,
-        .linksyms = {}, // <- zero linksyms
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-
-    EXPECT_EQ(a.links().size(), 0);
-
-    EXPECT_FALSE(a.links()[0]); // <- fail due to out-of-bounds
-    EXPECT_FALSE(a.links().link(0)); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, Equality) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -493,13 +433,9 @@ TEST(TypeTests, Equality) {
 }
 
 TEST(TypeTests, TypeInstance_RegularCtor) {
-    // this is literally just a copy of TypeInstanceCtor, but I
-    // have this here to test specifically the yama::dm::type_instance
-    // side of things, for *completeness*
-
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -512,17 +448,17 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(a.consts().size(), 3);
+    EXPECT_TRUE(a.consts().is_stub(0));
+    EXPECT_TRUE(a.consts().is_stub(1));
+    EXPECT_TRUE(a.consts().is_stub(2));
 }
 
 TEST(TypeTests, TypeInstance_CloneCtor) {
     yama::type_info link_info{
         .fullname = "link"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -533,16 +469,16 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
-    a_inst.put_link(0, link);
-    //a_inst.put_link(1, link);
-    a_inst.put_link(2, link);
+    a_inst.put<yama::primitive_type_const>(0, link);
+    //a_inst.put<yama::primitive_type_const>(1, link);
+    a_inst.put<yama::primitive_type_const>(2, link);
 
     yama::dm::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
 
@@ -553,35 +489,33 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_TRUE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_TRUE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
-    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
-    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 
     EXPECT_FALSE(b.complete());
     EXPECT_EQ(b.fullname(), "def"_str); // <- clone uses new fullname
-    EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.links().size(), 3);
-    EXPECT_TRUE(b.links()[0]);
-    EXPECT_FALSE(b.links()[1]);
-    EXPECT_TRUE(b.links()[2]);
-    EXPECT_FALSE(b.links()[3]); // <- fail due to out-of-bounds
-    if (b.links()[0]) EXPECT_EQ(b.links()[0].value(), link);
-    if (b.links()[2]) EXPECT_EQ(b.links()[2].value(), link);
+    EXPECT_EQ(b.kind(), a.kind());
+    EXPECT_EQ(b.ptype(), a.ptype());
+    
+    EXPECT_EQ(b.consts().size(), a.consts().size());
+
+    EXPECT_EQ(b.consts().type(0), std::make_optional(link));
+    EXPECT_EQ(a.consts().type(0), std::make_optional(link));
+    
+    EXPECT_TRUE(b.consts().is_stub(1));
+    EXPECT_TRUE(a.consts().is_stub(1));
+    
+    EXPECT_EQ(b.consts().type(2), std::make_optional(link));
+    EXPECT_EQ(a.consts().type(2), std::make_optional(link));
 
     // equality tests already cover this, but just for completeness...
 
     EXPECT_NE(a, b);
 }
 
-TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
+TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToTypeAndConstTable) {
     yama::type_info link_info{
         .fullname = "link"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -592,50 +526,45 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToType) {
 
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
     };
     yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
-    yama::type a(a_inst);
+    yama::type t(a_inst);           // yama::type can see changes
+    yama::const_table ct(a_inst);   // yama::const_table can see changes
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
+    EXPECT_FALSE(t.complete());
+    EXPECT_FALSE(t.consts().complete());
+    EXPECT_FALSE(ct.complete());
+    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(ct, yama::const_table(a_inst));
 
-    a_inst.put_link(0, link);
+    a_inst.put<yama::primitive_type_const>(0, link);
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_TRUE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
+    EXPECT_FALSE(t.complete());
+    EXPECT_FALSE(t.consts().complete());
+    EXPECT_FALSE(ct.complete());
+    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(ct, yama::const_table(a_inst));
     
-    a_inst.put_link(2, link);
+    a_inst.put<yama::primitive_type_const>(2, link);
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_TRUE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_TRUE(a.links()[2]);
-    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
-    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
+    EXPECT_FALSE(t.complete());
+    EXPECT_FALSE(t.consts().complete());
+    EXPECT_FALSE(ct.complete());
+    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(ct, yama::const_table(a_inst));
     
-    a_inst.put_link(1, link);
+    a_inst.put<yama::primitive_type_const>(1, link);
 
-    EXPECT_TRUE(a.complete());
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_TRUE(a.links()[0]);
-    EXPECT_TRUE(a.links()[1]);
-    EXPECT_TRUE(a.links()[2]);
-    if (a.links()[0]) EXPECT_EQ(a.links()[0].value(), link);
-    if (a.links()[1]) EXPECT_EQ(a.links()[1].value(), link);
-    if (a.links()[2]) EXPECT_EQ(a.links()[2].value(), link);
+    EXPECT_TRUE(t.complete());
+    EXPECT_TRUE(t.consts().complete());
+    EXPECT_TRUE(ct.complete());
+    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(ct, yama::const_table(a_inst));
 }
 
 // per-kind tests
@@ -645,7 +574,7 @@ static_assert(yama::kinds == 2);
 TEST(TypeTests, Primitive) {
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::primitive_info{
             .ptype = yama::ptype::float0,
         },
@@ -661,19 +590,15 @@ TEST(TypeTests, Primitive) {
     EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_EQ(a.call_fn(), std::nullopt);
     EXPECT_EQ(a.locals(), 0);
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 }
 
 TEST(TypeTests, Function) {
-    auto a_call_fn = [](yama::context&, yama::links_view) {};
+    auto a_call_fn = [](yama::context&, yama::const_table) {};
     auto a_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
     yama::type_info a_info{
         .fullname = "abc"_str,
-        .linksyms = linksyms0,
+        .consts = consts0,
         .info = yama::function_info{
             .callsig = a_callsig,
             .call_fn = a_call_fn,
@@ -688,13 +613,9 @@ TEST(TypeTests, Function) {
     EXPECT_EQ(a.fullname(), "abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.ptype(), std::nullopt);
-    EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(a_callsig, a.links())));
+    EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(a_callsig, a.consts())));
     EXPECT_EQ(a.call_fn(), std::make_optional(a_call_fn));
     EXPECT_EQ(a.locals(), 17);
-    EXPECT_EQ(a.links().size(), 3);
-    EXPECT_FALSE(a.links()[0]);
-    EXPECT_FALSE(a.links()[1]);
-    EXPECT_FALSE(a.links()[2]);
-    EXPECT_FALSE(a.links()[3]); // <- fail due to out-of-bounds
+    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
 }
 

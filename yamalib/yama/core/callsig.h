@@ -4,13 +4,13 @@
 
 
 #include "callsig_info.h"
-#include "links_view.h"
+#include "const_table.h"
 
 
 namespace yama {
 
 
-    // TODO: I've chosen to not make link index info available to yama::callsig
+    // TODO: I've chosen to not make constant index info available to yama::callsig
     //       in case I in the future want to decouple yama::callsig from yama::type,
     //       and allow for the definition of yama::callsig w/out underlying 
     //       yama::callsig_info associations
@@ -23,10 +23,10 @@ namespace yama {
     class callsig final {
     public:
 
-        // behaviour is undefined if links is not appropriate to be
+        // behaviour is undefined if consts is not appropriate to be
         // used w/ info provided
 
-        callsig(const callsig_info& info, links_view links);
+        callsig(const callsig_info& info, const_table consts);
 
         callsig() = delete;
         callsig(const callsig&) = default;
@@ -46,17 +46,19 @@ namespace yama {
 
         // param_type returns std::nullopt if index is out-of-bounds
 
-        // param_type returns std::nullopt if the link table index associated
-        // w/ the param index has no associated link table data (due to
-        // index out-of-bounds or due to entry being a stub)
+        // param_type returns std::nullopt if the constant index associated
+        // w/ the param index has no associated constant data (due to
+        // index out-of-bounds, or due to entry being a stub, or due to
+        // the constant not being a type constant)
 
         std::optional<type> param_type(size_t index) const noexcept;
 
         // return_type returns the return type of the callsig, if any
 
-        // return_type returns std::nullopt if the link table index associated
-        // for the return type has no associated link table data (due to
-        // index out-of-bounds or due to entry being a stub)
+        // return_type returns std::nullopt if the constant index associated
+        // for the return type has no associated constant data (due to
+        // index out-of-bounds, or due to entry being a stub, or due to
+        // the constant not being a type constant)
 
         std::optional<type> return_type() const noexcept;
 
@@ -81,7 +83,7 @@ namespace yama {
     private:
 
         const callsig_info* _info;
-        links_view _links;
+        const_table _consts;
 
 
         inline const callsig_info& _get_info() const noexcept {

@@ -124,6 +124,11 @@ namespace yama {
     // ctx_config defines init config options for contexts
 
     struct ctx_config final {
+        // TODO: maybe in the future replace below undefined behaviour w/ something *safer*
+
+        // IMPORTANT:
+        //      undefined behaviour if max_call_frames == 0 (ie. can't have user call frame)
+
         size_t max_call_frames  = 32; // max call frames before overflow
         size_t user_locals      = 32; // user call frame's local register table size
 
@@ -257,18 +262,18 @@ namespace yama {
         // it's okay to use ll_crashing and ll_crashes while crashing,
         // as the whole point of it is to detect it
 
-        size_t ll_crashes() noexcept;                   // ll_crashes returns the number of times the context has crashed
-        bool ll_crashing() noexcept;                    // ll_crashing queries if the context is crashing
-        bool ll_is_user() noexcept;                     // ll_is_user returns if the current call frame is the user call frame
-        size_t ll_max_call_frames() noexcept;           // ll_max_call_frames returns the max call stack height allowed
-        size_t ll_call_frames() noexcept;               // ll_call_frames returns the number of call frames on the call stack
-        
-        size_t ll_args() noexcept;                      // ll_args returns the number of args available
-        size_t ll_locals() noexcept;                    // ll_locals returns the number of objects on the local register table
-        std::optional<object_ref> ll_arg(arg_t x);      // ll_args returns the object, if any, at x in the arg slice
-        std::optional<object_ref> ll_local(local_t x);  // ll_local returns the object, if any, at x in the local register table
+        size_t ll_crashes() noexcept;                       // ll_crashes returns the number of times the context has crashed
+        bool ll_crashing() noexcept;                        // ll_crashing queries if the context is crashing
+        bool ll_is_user() noexcept;                         // ll_is_user returns if the current call frame is the user call frame
+        size_t ll_max_call_frames() noexcept;               // ll_max_call_frames returns the max call stack height allowed
+        size_t ll_call_frames() noexcept;                   // ll_call_frames returns the number of call frames on the call stack
 
-        void ll_crash();                                // ll_crash induces a crash, failing quietly if already crashing
+        size_t ll_args() noexcept;                          // ll_args returns the number of args available
+        size_t ll_locals() noexcept;                        // ll_locals returns the number of objects on the local register table
+        std::optional<object_ref> ll_arg(arg_t x);          // ll_args returns the object, if any, at x in the arg slice
+        std::optional<object_ref> ll_local(local_t x);      // ll_local returns the object, if any, at x in the local register table
+
+        void ll_crash();                                    // ll_crash induces a crash, failing quietly if already crashing
 
         // ll_load loads v into the local object register at x
 
@@ -290,6 +295,21 @@ namespace yama {
         // ll_load_fn crashes if f is not a function type
 
         cmd_status ll_load_fn(local_t x, type f);
+
+        // ll_load_const loads the object constant at c, in the constant table
+        // of the current call, into the local object register at x
+
+        // ll_load_const does not care what type the x object is, as it overwrites it
+
+        // ll_load_const crashes if in the user call frame
+
+        // ll_load_const crashes if x is out-of-bounds
+
+        // ll_load_const crashes if c is out-of-bounds
+
+        // ll_load_const crashes if the constant at c is not an object constant
+
+        cmd_status ll_load_const(local_t x, const_t c);
 
         // ll_load_arg loads the argument at index arg into the local object
         // register at x
@@ -386,6 +406,8 @@ namespace yama {
         std::vector<object_ref> _registers; // storage for local register tables for call frames
         std::vector<_cf_t>      _callstk;   // the call stack
 
+        const_table*            _consts;    // the constant table available to ll_load_const
+
         // _cf_view_t is used to easily view contents of a call frame
 
         struct _cf_view_t final {
@@ -440,8 +462,15 @@ namespace yama {
 
         bool _load_fn_err_f_not_callable_type(type f);
 
+        cmd_status _load_const(local_t x, const_t c);
+
+        bool _load_const_err_in_user_call_frame();
+        bool _load_const_err_c_out_of_bounds(const_t c);
+        bool _load_const_err_c_is_not_object_constant(const_t c);
+
         cmd_status _load_arg(local_t x, arg_t arg);
 
+        bool _load_arg_err_in_user_call_frame();
         bool _load_arg_err_arg_out_of_bounds(arg_t arg);
 
 

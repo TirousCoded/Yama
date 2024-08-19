@@ -12,42 +12,42 @@ yama::domain::domain(std::shared_ptr<debug> dbg)
 bool yama::domain::setup_domain() {
     type_info _None_info{
         .fullname = "None"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::none,
         },
     };
     type_info _Int_info{
         .fullname = "Int"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::int0,
         },
     };
     type_info _UInt_info{
         .fullname = "UInt"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::uint,
         },
     };
     type_info _Float_info{
         .fullname = "Float"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::float0,
         },
     };
     type_info _Bool_info{
         .fullname = "Bool"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::bool0,
         },
     };
     type_info _Char_info{
         .fullname = "Char"_str,
-        .linksyms = {},
+        .consts = {},
         .info = primitive_info{
             .ptype = ptype::char0,
         },

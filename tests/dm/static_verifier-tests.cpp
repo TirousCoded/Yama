@@ -32,14 +32,14 @@ protected:
 TEST_F(StaticVerifierTests, Verify) {
     // this is just a general test of successful usage of static_verifier
 
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-        yama::make_linksym("c"_str, yama::kind::function, yama::make_callsig_info({ 0 }, 1)), // <- callsig 'fn(b) -> c'
-        yama::make_linksym("d"_str, yama::kind::primitive),
-    };
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str)
+        .add_function_type("c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
+        .add_primitive_type("d"_str);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 0),
             .call_fn = yama::noop_call_fn,
@@ -50,15 +50,15 @@ TEST_F(StaticVerifierTests, Verify) {
     EXPECT_TRUE(verif->verify(a));
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ParamType_ForTypeItself) {
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstIndexOutOfBounds_ParamType_ForTypeItself) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
         .info = yama::function_info{
-            // illegal out-of-bounds link index (for param type of a)
+            // illegal out-of-bounds constant index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
             .locals = 4,
@@ -68,15 +68,15 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ParamTyp
     EXPECT_FALSE(verif->verify(a));
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ParamType_ForLinkSymbol) {
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal out-of-bounds link index (for param type of b)
-        yama::make_linksym("b"_str, yama::kind::function, yama::make_callsig_info({ 2 }, 1)),
-        yama::make_linksym("c"_str, yama::kind::primitive),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstIndexOutOfBounds_ParamType_ForLinkSymbol) {
+    const auto a_consts =
+        yama::const_table_info()
+        // illegal out-of-bounds constant index (for param type of b)
+        .add_function_type("b"_str, yama::make_callsig_info({ 2 }, 1))
+        .add_primitive_type("c"_str);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -85,15 +85,15 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ParamTyp
     EXPECT_FALSE(verif->verify(a));
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnType_ForTypeItself) {
-    const std::vector<yama::linksym> a_linksyms{
-        yama::make_linksym("b"_str, yama::kind::primitive),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstIndexOutOfBounds_ReturnType_ForTypeItself) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
         .info = yama::function_info{
-            // illegal out-of-bounds link index (for return type of a)
+            // illegal out-of-bounds constant index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
             .locals = 4,
@@ -103,15 +103,15 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnTy
     EXPECT_FALSE(verif->verify(a));
 }
 
-TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnType_ForLinkSymbol) {
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal out-of-bounds link index (for return type of b)
-        yama::make_linksym("b"_str, yama::kind::function, yama::make_callsig_info({}, 2)),
-        yama::make_linksym("c"_str, yama::kind::primitive),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstIndexOutOfBounds_ReturnType_ForLinkSymbol) {
+    const auto a_consts =
+        yama::const_table_info()
+        // illegal out-of-bounds constant index (for return type of b)
+        .add_function_type("b"_str, yama::make_callsig_info({}, 2))
+        .add_primitive_type("c"_str);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -120,22 +120,35 @@ TEST_F(StaticVerifierTests, Verify_FailDueToCallSigLinkIndexOutOfBounds_ReturnTy
     EXPECT_FALSE(verif->verify(a));
 }
 
-static_assert(yama::kinds == 2);
-
-// primitives
-
-TEST_F(StaticVerifierTests, Verify_Primitive_FailDueToMustHaveNoCallSig_ForLinkSymbol) {
-    // NOTE: the type verif->verify is called w/ DOES NOT MATTER, as this test is about
-    //       the type OF THE LINK SYMBOL
-
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal primitive type w/ callsig
-        yama::make_linksym("b"_str, yama::kind::primitive, yama::make_callsig_info({ 1 }, 1)), // <- callsig 'fn(c) -> c'
-        yama::make_linksym("c"_str, yama::kind::primitive),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstNotATypeConst_ParamType_ForTypeItself) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str)
+        .add_int(10);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
+        .info = yama::function_info{
+            // illegal use of non-type constant index (for param type of a)
+            .callsig = yama::make_callsig_info({ 1 }, 0),
+            .call_fn = yama::noop_call_fn,
+            .locals = 4,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(a));
+}
+
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstNotATypeConst_ParamType_ForLinkSymbol) {
+    const auto a_consts =
+        yama::const_table_info()
+        // illegal use of non-type constant index (for param type of b)
+        .add_function_type("b"_str, yama::make_callsig_info({ 2 }, 1))
+        .add_primitive_type("c"_str)
+        .add_int(10);
+    yama::type_info a{
+        .fullname = "a"_str,
+        .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -144,19 +157,35 @@ TEST_F(StaticVerifierTests, Verify_Primitive_FailDueToMustHaveNoCallSig_ForLinkS
     EXPECT_FALSE(verif->verify(a));
 }
 
-// functions
-
-TEST_F(StaticVerifierTests, Verify_Function_FailDueToMustHaveCallSig_ForLinkSymbol) {
-    // NOTE: the type verif->verify is called w/ DOES NOT MATTER, as this test is about
-    //       the type OF THE LINK SYMBOL
-
-    const std::vector<yama::linksym> a_linksyms{
-        // illegal function type w/out callsig
-        yama::make_linksym("b"_str, yama::kind::function),
-    };
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstNotATypeConst_ReturnType_ForTypeItself) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str)
+        .add_int(10);
     yama::type_info a{
         .fullname = "a"_str,
-        .linksyms = a_linksyms,
+        .consts = a_consts,
+        .info = yama::function_info{
+            // illegal use of non-type constant index (for return type of a)
+            .callsig = yama::make_callsig_info({}, 1),
+            .call_fn = yama::noop_call_fn,
+            .locals = 4,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(a));
+}
+
+TEST_F(StaticVerifierTests, Verify_FailDueToCallSigConstNotATypeConst_ReturnType_ForLinkSymbol) {
+    const auto a_consts =
+        yama::const_table_info()
+        // illegal use of non-type constant index (for return type of b)
+        .add_function_type("b"_str, yama::make_callsig_info({}, 2))
+        .add_primitive_type("c"_str)
+        .add_int(10);
+    yama::type_info a{
+        .fullname = "a"_str,
+        .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },

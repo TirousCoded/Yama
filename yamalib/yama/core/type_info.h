@@ -10,8 +10,8 @@
 #include "kind.h"
 #include "ptype.h"
 #include "call_fn.h"
-#include "linksym.h"
 #include "callsig_info.h"
+#include "const_table_info.h"
 
 
 namespace yama {
@@ -37,8 +37,11 @@ namespace yama {
             primitive_info, 
             function_info>;
 
+        static_assert(std::variant_size_v<info_t> == kinds);
+
+
         str                             fullname;       // the fullname of the type
-        std::vector<linksym>            linksyms;       // the link symbol vector
+        const_table_info                consts;         // the constant table symbols
         info_t                          info;           // the kind-specific details of the type
 
 

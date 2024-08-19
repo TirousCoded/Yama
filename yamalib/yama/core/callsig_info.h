@@ -5,7 +5,7 @@
 
 #include <format>
 
-#include "link_index.h"
+#include "const_type.h"
 
 
 namespace yama {
@@ -20,7 +20,7 @@ namespace yama {
     //      yama::type, yama::callsig, etc.
 
 
-    struct linksym;
+    struct const_table_info;
 
 
     // yama::callsig_info encapsulates a 'call signature' of a function-like type
@@ -29,8 +29,8 @@ namespace yama {
     // type, w/ Yama functions being expected to use unit types to specify
     // situations where a function should return *nothing*
 
-    // yama::callsig_info encapsulates type info in the form of link indices, which
-    // specify types relative to some link (symbol) table
+    // yama::callsig_info encapsulates type info in the form of constant table
+    // indices, which specify types relative to some constant table
 
     // in Yama, methods are called as just regular functions but w/ their first
     // parameter being the object they're being called in relation to, w/ this
@@ -40,33 +40,22 @@ namespace yama {
 
 
     struct callsig_info final {
-        std::vector<link_index> params; // the parameter types
-        link_index              ret;    // the return type
+        std::vector<const_t>    params; // the parameter types
+        const_t                 ret;    // the return type
 
 
-        // verify_indices returns if the callsig_info contains no 
-        // indices out-of-bounds of linksyms
-
-        bool verify_indices(std::span<const linksym> linksyms) const noexcept;
-
-
-        // callsig_info is compared by value, comparing raw link index values
+        // callsig_info is compared by value, comparing raw constant index values
 
         bool operator==(const callsig_info& other) const noexcept;
 
 
-        std::string fmt(std::span<const linksym> linksyms) const;
-
-
-    private:
-
-        std::string _fmt_index(std::span<const linksym> linksyms, link_index index) const;
+        std::string fmt(const const_table_info& consts) const;
     };
 
 
     // TODO: make_callsig_info has not been unit tested
 
-    inline callsig_info make_callsig_info(std::vector<link_index>&& params, link_index ret) {
+    inline callsig_info make_callsig_info(std::vector<const_t>&& params, const_t ret) {
         return callsig_info{ std::forward<decltype(params)&&>(params), ret };
     }
 }

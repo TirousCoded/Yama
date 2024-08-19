@@ -3,10 +3,10 @@
 #include "call_fn.h"
 
 #include "context.h"
-#include "links_view.h"
+#include "const_table.h"
 
 
-void yama::noop_call_fn(context&, links_view) {
+void yama::noop_call_fn(context&, const_table) {
     // do nothing
 }
 

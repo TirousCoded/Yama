@@ -4,6 +4,7 @@
 
 #include "general.h"
 #include "kind-features.h"
+#include "callsig.h"
 
 
 using namespace yama::string_literals;
@@ -16,6 +17,7 @@ yama::context::context(res<domain> dm, ctx_config config, std::shared_ptr<debug>
     _mas(dm->get_mas()),
     _al(std::allocator<void>{}),
     _callstk(_al) {
+    YAMA_ASSERT(get_config().max_call_frames >= 1);
     _push_user_cf();
 }
 
@@ -243,6 +245,10 @@ yama::cmd_status yama::context::ll_load_fn(local_t x, type f) {
     return _load_fn(x, f);
 }
 
+yama::cmd_status yama::context::ll_load_const(local_t x, const_t c) {
+    return _load_const(x, c);
+}
+
 yama::cmd_status yama::context::ll_load_arg(local_t x, arg_t arg) {
     return _load_arg(x, arg);
 }
@@ -401,11 +407,81 @@ bool yama::context::_load_fn_err_f_not_callable_type(type f) {
     return true;
 }
 
+yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
+    if (_load_const_err_in_user_call_frame()) {
+        return cmd_status::init(false);
+    }
+    if (_load_const_err_c_out_of_bounds(c)) {
+        return cmd_status::init(false);
+    }
+    if (_load_const_err_c_is_not_object_constant(c)) {
+        return cmd_status::init(false);
+    }
+    return ll_load(x,
+        [&]() -> canonical_ref {
+            YAMA_DEREF_SAFE(_consts) {
+                static_assert(const_types == 7);
+                if (const auto r = _consts->get<int_const>(c))          return ll_new_int(*r);
+                else if (const auto r = _consts->get<uint_const>(c))    return ll_new_uint(*r);
+                else if (const auto r = _consts->get<float_const>(c))   return ll_new_float(*r);
+                else if (const auto r = _consts->get<bool_const>(c))    return ll_new_bool(*r);
+                else if (const auto r = _consts->get<char_const>(c))    return ll_new_char(*r);
+                else                                                    YAMA_DEADEND;
+            }
+            return ll_new_none(); // dummy
+        }());
+}
+
+bool yama::context::_load_const_err_in_user_call_frame() {
+    if (!ll_is_user()) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load object constant from the user call frame!");
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_load_const_err_c_out_of_bounds(const_t c) {
+    YAMA_DEREF_SAFE(_consts) {
+        if (c < _consts->size()) return false;
+    }
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load object constant from out-of-bounds constant index {}!",
+        c);
+    ll_crash();
+    return true;
+}
+
+bool yama::context::_load_const_err_c_is_not_object_constant(const_t c) {
+    YAMA_DEREF_SAFE(_consts) {
+        if (is_object_const(_consts->const_type(c).value())) return false;
+    }
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load object constant from constant index {}, but the constant is not an object constant!",
+        c);
+    ll_crash();
+    return true;
+}
+
 yama::cmd_status yama::context::_load_arg(local_t x, arg_t arg) {
+    if (_load_arg_err_in_user_call_frame()) {
+        return cmd_status::init(false);
+    }
     if (_load_arg_err_arg_out_of_bounds(arg)) {
         return cmd_status::init(false);
     }
     return ll_load(x, ll_arg(arg).value());
+}
+
+bool yama::context::_load_arg_err_in_user_call_frame() {
+    if (!ll_is_user()) return false;
+    YAMA_LOG(
+        dbg(), ctx_crash_c,
+        "error: crash from attempt to load argument object from the user call frame!");
+    ll_crash();
+    return true;
 }
 
 bool yama::context::_load_arg_err_arg_out_of_bounds(arg_t arg) {
@@ -475,7 +551,11 @@ std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t 
     }
     // fire call behaviour
     YAMA_ASSERT(callobj.t.call_fn());
-    (*callobj.t.call_fn())(*this, callobj.t.links());
+    const_table ct = callobj.t.consts(); // store constant table so we can get a pointer to it
+    _consts = &ct;
+    YAMA_DEREF_SAFE(_consts) {
+        (*callobj.t.call_fn())(*this, *_consts); // call behaviour
+    }
     // propagate crash if call behaviour crashed
     if (ll_crashing()) {
         _pop_cf(); // cleanup before abort

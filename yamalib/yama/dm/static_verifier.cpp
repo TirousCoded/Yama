@@ -16,14 +16,10 @@ bool yama::dm::static_verifier::verify(const type_info& subject) {
 }
 
 bool yama::dm::static_verifier::_verify(const type_info& subject) {
-    // if type has a callsig, check whether its param and return type indices
-    // are in-bounds
-    if (!_verify_type_callsig_indices(subject)) {
+    if (!_verify_type(subject)) {
         return false;
     }
-    // check each link symbol to see if it has a callsig, and whether or not
-    // what is found is correct for the kind of type it is
-    if (!_verify_linksym_callsigs(subject)) {
+    if (!_verify_constant_symbols(subject)) {
         return false;
     }
     return true;
@@ -42,32 +38,43 @@ void yama::dm::static_verifier::_end_verify(bool success) {
     }
 }
 
-inline bool yama::dm::static_verifier::_verify_type_callsig_indices(const type_info& subject) {
-    const bool type_has_callsig = (bool)subject.callsig();
-    if (!type_has_callsig) {
-        // if no callsig to check, default to returning successful
-        return true;
-    }
-    if (!subject.callsig()->verify_indices(subject.linksyms)) {
-        YAMA_LOG(
-            dbg(), static_verif_c, 
-            "error: {} callsig (expressed using link symbols) {} contains out-of-bounds link indices!", 
-            subject.fullname, subject.callsig()->fmt(subject.linksyms));
+bool yama::dm::static_verifier::_verify_type(const type_info& subject) {
+    if (!_verify_type_callsig(subject)) {
         return false;
     }
     return true;
 }
 
-inline bool yama::dm::static_verifier::_verify_linksym_callsigs(const type_info& subject) {
+bool yama::dm::static_verifier::_verify_type_callsig(const type_info& subject) {
+    const bool type_has_callsig = (bool)subject.callsig();
+    if (!type_has_callsig) {
+        // if no callsig to check, default to returning successful
+        return true;
+    }
+    const auto report = gen_callsig_report(subject, subject.callsig());
+    if (!report.indices_are_in_bounds) {
+        YAMA_LOG(
+            dbg(), static_verif_c,
+            "error: {} callsig (expressed using constant symbols) {} contains out-of-bounds constant indices!",
+            subject.fullname, subject.callsig()->fmt(subject.consts));
+    }
+    if (!report.indices_specify_type_consts) {
+        YAMA_LOG(
+            dbg(), static_verif_c,
+            "error: {} callsig (expressed using constant symbols) {} contains constant indices specifying non-type constant symbols!",
+            subject.fullname, subject.callsig()->fmt(subject.consts));
+    }
+    return
+        report.indices_are_in_bounds &&
+        report.indices_specify_type_consts;
+}
+
+bool yama::dm::static_verifier::_verify_constant_symbols(const type_info& subject) {
     bool success = true;
-    for (link_index i = 0; i < subject.linksyms.size(); i++) {
+    for (const_t i = 0; i < subject.consts.size(); i++) {
         // keep iterating if we find a failure so as to get a chance
         // to log all issues found
-        if (!_verify_linksym_callsig(subject, i)) {
-            success = false;
-            continue;
-        }
-        if (!_verify_linksym_callsig_indices(subject, i)) {
+        if (!_verify_constant_symbol(subject, i)) {
             success = false;
             continue;
         }
@@ -75,39 +82,57 @@ inline bool yama::dm::static_verifier::_verify_linksym_callsigs(const type_info&
     return success;
 }
 
-inline bool yama::dm::static_verifier::_verify_linksym_callsig(const type_info& subject, link_index index) {
-    const auto& linksym = subject.linksyms[index];
-    const bool type_has_callsig = (bool)linksym.callsig;
-    const bool kind_uses_callsig = is_callable(linksym.kind);
-    if (type_has_callsig && !kind_uses_callsig) {
-        YAMA_LOG(
-            dbg(), static_verif_c,
-            "error: {} link symbol {} (at link index {}) has a callsig, but for {} types this is illegal!",
-            subject.fullname, linksym.fullname, index, subject.kind());
-    }
-    if (!type_has_callsig && kind_uses_callsig) {
-        YAMA_LOG(
-            dbg(), static_verif_c,
-            "error: {} link symbol {} (at link index {}) has no callsig, but for {} types this is illegal!",
-            subject.fullname, linksym.fullname, index, subject.kind());
-    }
-    return type_has_callsig == kind_uses_callsig;
-}
-
-inline bool yama::dm::static_verifier::_verify_linksym_callsig_indices(const type_info& subject, link_index index) {
-    const auto& linksym = subject.linksyms[index];
-    const bool linksym_has_callsig = (bool)linksym.callsig;
-    if (!linksym_has_callsig) {
-        // if no callsig to check, default to returning successful
-        return true;
-    }
-    if (!linksym.callsig->verify_indices(subject.linksyms)) {
-        YAMA_LOG(
-            dbg(), static_verif_c,
-            "error: {} link symbol {} (at link index {}) callsig (expressed using link symbols) {} contains out-of-bounds link indices!",
-            subject.fullname, linksym.fullname, index, linksym.callsig->fmt(subject.linksyms));
+bool yama::dm::static_verifier::_verify_constant_symbol(const type_info& subject, const_t index) {
+    if (!_verify_constant_symbol_callsig(subject, index)) {
         return false;
     }
     return true;
+}
+
+bool yama::dm::static_verifier::_verify_constant_symbol_callsig(const type_info& subject, const_t index) {
+    const bool constant_symbol_has_callsig = (bool)subject.consts.callsig(index);
+    if (!constant_symbol_has_callsig) {
+        // if no callsig to check, default to returning successful
+        return true;
+    }
+    const auto report = gen_callsig_report(subject, subject.consts.callsig(index));
+    if (!report.indices_are_in_bounds) {
+        YAMA_LOG(
+            dbg(), static_verif_c,
+            "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains out-of-bounds constant indices!",
+            subject.fullname, subject.consts.fmt_type_const(index), index, subject.consts.callsig(index)->fmt(subject.consts));
+    }
+    if (!report.indices_specify_type_consts) {
+        YAMA_LOG(
+            dbg(), static_verif_c,
+            "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains constant indices specifying non-type constant symbols!",
+            subject.fullname, subject.consts.fmt_type_const(index), index, subject.consts.callsig(index)->fmt(subject.consts));
+    }
+    return
+        report.indices_are_in_bounds &&
+        report.indices_specify_type_consts;
+}
+
+yama::dm::static_verifier::callsig_report yama::dm::static_verifier::gen_callsig_report(const type_info& subject, const callsig_info* callsig) {
+    callsig_report result{};
+    YAMA_DEREF_SAFE(callsig) {
+        for (const auto& I : callsig->params) {
+            if (I >= subject.consts.size()) {
+                result.indices_are_in_bounds = false;
+                break;
+            }
+            else if (!is_type_const(subject.consts.const_type(I).value())) {
+                result.indices_specify_type_consts = false;
+                break;
+            }
+        }
+        if (callsig->ret >= subject.consts.size()) {
+            result.indices_are_in_bounds = false;
+        }
+        else if (!is_type_const(subject.consts.const_type(callsig->ret).value())) {
+            result.indices_specify_type_consts = false;
+        }
+    }
+    return result;
 }
 

@@ -3,54 +3,85 @@
 #pragma once
 
 
-#include "../core/general.h"
+#include <variant>
+
 #include "../core/res.h"
+#include "../core/const_type.h"
 #include "../core/type_info.h"
 
 #include "ha_struct.h"
 
 
-namespace yama {
+namespace yama::internal {
 
 
-    class type;
+    struct type_mem_header final {
+        str             fullname;
+        size_t          len;        // size of constant table
+        size_t          stubs;      // constant table stubs
+        res<type_info>  info;
 
-    namespace dm {
-        template<typename Allocator>
-        class type_instance;
-    }
+        // storing these for fast RTTI access if we need it
 
-
-    namespace internal {
-
-
-        struct type_mem_header final {
-            str fullname; // the fullname of this type
-            res<type_info> info; // the underlying type_info this type is based on
-            size_t links; // the number of links in the link table
-
-            // storing the kind here for fast RTTI access if we need it
-
-            kind kind; // the kind of type this is
-
-            // using this stubs counter we can test for completeness w/out having to
-            // iterate over the link table at any point, as we'll incrementally
-            // reduce stubs for each link put onto a stub
-
-            size_t stubs; // the number of stubs outstanding
+        kind            kind;       // the kind of type this is
 
 
-            inline size_t length() const noexcept { return links; }
-        };
+        inline size_t length() const noexcept { return len; }
+    };
+
+    // NOTE: ran into NASTY cyclical include problems by trying to use std::variant
+    //       for type_mem_elem, so instead we're gonna just use a type-erased thing
+    //       to get around the issue
+
+    // type_mem_elem will use 'index' to encode the const_type value, w/ const_types
+    // being a special value encapsulating a 'stub' entry
+
+    // type_mem_elem will use 'data' to encode the constant value, which will be 
+    // reinterpreted as whatever data is encoded by the constant
+
+    struct type_mem_elem final {
+        size_t      index   = stub_index;
+        uint64_t    data    = 0;
 
 
-        // the ha_struct_anon_ref element type is for the link table
+        inline bool holds_stub() const noexcept {
+            return index == stub_index;
+        }
 
-        // ha_struct_anon_ref has a nullptr value, so I decided not to wrap in std::optional
+        inline bool holds(const_type x) const noexcept {
+            return index == size_t(x);
+        }
 
-        // originally I tried using yama::type, but that caused too many problems...
+        template<const_type C>
+            requires std::is_trivially_copyable_v<const_data_of_t<C>>
+        inline const_data_of_t<C>& as() noexcept {
+            using T = const_data_of_t<C>;
+            static_assert(sizeof(T) <= sizeof(data));
+            return *(T*)&data;
+        }
+        
+        template<const_type C>
+            requires std::is_trivially_copyable_v<const_data_of_t<C>>
+        inline const const_data_of_t<C>& as() const noexcept {
+            using T = const_data_of_t<C>;
+            static_assert(sizeof(T) <= sizeof(data));
+            return *(const T*)&data;
+        }
 
-        using type_mem = internal::ha_struct<type_mem_header, internal::ha_struct_anon_ref>;
-    }
+
+        static constexpr size_t stub_index = const_types;
+
+
+        template<const_type C>
+            requires std::is_trivially_copyable_v<const_data_of_t<C>>
+        static inline type_mem_elem init(const const_data_of_t<C>& v) noexcept {
+            type_mem_elem result{};
+            result.index = size_t(C);
+            result.as<C>() = v;
+            return result;
+        }
+    };
+
+    using type_mem = ha_struct<type_mem_header, type_mem_elem>;
 }
 

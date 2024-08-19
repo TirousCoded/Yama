@@ -9,9 +9,9 @@
 yama::kind yama::type_info::kind() const noexcept {
     static_assert(kinds == 2);
     yama::kind result{};
-    if (std::holds_alternative<primitive_info>(info)) result = kind::primitive;
-    else if (std::holds_alternative<function_info>(info)) result = kind::function;
-    else YAMA_DEADEND;
+    if (std::holds_alternative<primitive_info>(info))       result = kind::primitive;
+    else if (std::holds_alternative<function_info>(info))   result = kind::function;
+    else                                                    YAMA_DEADEND;
     return result;
 }
 

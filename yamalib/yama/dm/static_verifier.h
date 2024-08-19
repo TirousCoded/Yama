@@ -32,14 +32,24 @@ namespace yama::dm {
 
     private:
 
+        struct callsig_report final {
+            bool indices_are_in_bounds          = true;
+            bool indices_specify_type_consts    = true;
+        };
+
+
         bool _verify(const type_info& subject);
         void _begin_verify(const type_info& subject);
         void _end_verify(bool success);
 
-        inline bool _verify_type_callsig_indices(const type_info& subject);
-        inline bool _verify_linksym_callsigs(const type_info& subject);
-        inline bool _verify_linksym_callsig(const type_info& subject, link_index index);
-        inline bool _verify_linksym_callsig_indices(const type_info& subject, link_index index);
+        bool _verify_type(const type_info& subject);
+        bool _verify_type_callsig(const type_info& subject);
+
+        bool _verify_constant_symbols(const type_info& subject);
+        bool _verify_constant_symbol(const type_info& subject, const_t index);
+        bool _verify_constant_symbol_callsig(const type_info& subject, const_t index);
+
+        callsig_report gen_callsig_report(const type_info& subject, const callsig_info* callsig);
     };
 }
 

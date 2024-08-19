@@ -20,14 +20,14 @@
 #include "kind-features.h"
 
 #include "ptype.h"
-#include "link_index.h"
 #include "call_fn.h"
-
-#include "linksym.h"
-#include "links_view.h"
 
 #include "callsig_info.h"
 #include "callsig.h"
+
+#include "const_type.h"
+#include "const_table_info.h"
+#include "const_table.h"
 
 #include "type_info.h"
 #include "type.h"

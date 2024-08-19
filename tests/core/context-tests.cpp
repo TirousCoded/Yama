@@ -15,7 +15,7 @@ using namespace yama::string_literals;
 // globals will help us launder data out of call behaviour functions
 
 struct CallStateSnapshot final {
-    yama::links_view links;
+    yama::const_table consts;
     size_t crashes;
     bool is_crashing;
     bool is_user;
@@ -43,11 +43,14 @@ struct CallStateSnapshot final {
     std::optional<yama::object_ref> local10;
     std::optional<yama::object_ref> local11;
     std::optional<yama::object_ref> local12;
+    std::optional<yama::object_ref> local13;
+    std::optional<yama::object_ref> local14;
+    std::optional<yama::object_ref> local15;
 
 
-    static CallStateSnapshot make(yama::context& ctx, yama::links_view links) {
+    static CallStateSnapshot make(yama::context& ctx, yama::const_table consts) {
         return CallStateSnapshot{
-            links,
+            consts,
             ctx.ll_crashes(),
             ctx.ll_crashing(),
             ctx.ll_is_user(),
@@ -73,6 +76,9 @@ struct CallStateSnapshot final {
             ctx.ll_local(10),
             ctx.ll_local(11),
             ctx.ll_local(12),
+            ctx.ll_local(13),
+            ctx.ll_local(14),
+            ctx.ll_local(15),
         };
     }
 };
@@ -434,18 +440,18 @@ TEST_F(ContextTests, LLArg_OutsideOfCall) {
 }
 
 TEST_F(ContextTests, LLArg_InsideOfCall) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-        yama::make_linksym("Float"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_primitive_type("Float"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        [](yama::context& ctx, yama::const_table consts) {
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         if (ctx.ll_ret(0).bad()) return; // return None object
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 0),
             .call_fn = f_call_fn,
@@ -491,17 +497,17 @@ TEST_F(ContextTests, LLLocal_OutsideOfCall) {
 }
 
 TEST_F(ContextTests, LLLocal_InsideOfCall) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        [](yama::context& ctx, yama::const_table consts) {
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         if (ctx.ll_ret(0).bad()) return; // return None object
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = f_call_fn,
@@ -527,20 +533,20 @@ TEST_F(ContextTests, LLLocal_InsideOfCall) {
 }
 
 TEST_F(ContextTests, LLCrash) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        [](yama::context& ctx, yama::const_table consts) {
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         ctx.ll_crash();
-        globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         ctx.ll_crash(); // should fail quietly
-        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -605,13 +611,13 @@ TEST_F(ContextTests, LLCrash_OutsideOfCall) {
 
 TEST_F(ContextTests, LLCrash_MultiLevelCallStack) {
     // outer call
-    std::vector<yama::linksym> fa_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-        yama::make_linksym("fb"_str, yama::kind::function, yama::make_callsig_info({}, 0)),
-    };
+    const yama::const_table_info fa_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("fb"_str, yama::make_callsig_info({}, 0));
     auto fa_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        if (ctx.ll_load_fn(0, links[1].value()).bad()) return;
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_fn(0, consts.type(1).value()).bad()) return;
         if (ctx.ll_call(0, 1, yama::no_result).bad()) return;
         // prepare return obj (which won't be reached due to crash)
         if (ctx.ll_load_none(0).bad()) return;
@@ -620,7 +626,7 @@ TEST_F(ContextTests, LLCrash_MultiLevelCallStack) {
         };
     yama::type_info fa_info{
         .fullname = "fa"_str,
-        .linksyms = fa_linksyms,
+        .consts = fa_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = fa_call_fn,
@@ -628,20 +634,20 @@ TEST_F(ContextTests, LLCrash_MultiLevelCallStack) {
         },
     };
     // inner call
-    std::vector<yama::linksym> fb_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info fb_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto fb_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        [](yama::context& ctx, yama::const_table consts) {
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         ctx.ll_crash();
-        globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_1 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         ctx.ll_crash(); // should fail quietly
-        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_2 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         };
     yama::type_info fb_info{
         .fullname = "fb"_str,
-        .linksyms = fb_linksyms,
+        .consts = fb_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = fb_call_fn,
@@ -707,18 +713,18 @@ TEST_F(ContextTests, LLLoad_OutsideOfCall) {
 }
 
 TEST_F(ContextTests, LLLoad_InsideOfCall) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         if (ctx.ll_load(0, ctx.ll_new_int(-14)).bad()) return;
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -849,20 +855,191 @@ TEST_F(ContextTests, LLLoadFn_CrashIfFIsNotCallable) {
     EXPECT_EQ(ctx->ll_crashes(), 1);
 }
 
-TEST_F(ContextTests, LLLoadArg) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+TEST_F(ContextTests, LLLoadConst) {
+    static_assert(
+        []() constexpr -> bool {
+            // NOTE: expand this test each time we add a new loadable object constant
+            static_assert(yama::const_types == 7);
+            return
+                yama::is_object_const(yama::int_const) &&
+                yama::is_object_const(yama::uint_const) &&
+                yama::is_object_const(yama::float_const) &&
+                yama::is_object_const(yama::bool_const) &&
+                yama::is_object_const(yama::char_const) &&
+                !yama::is_object_const(yama::primitive_type_const) &&
+                !yama::is_object_const(yama::function_type_const);
+        }());
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_int(-4)
+        .add_uint(301)
+        .add_float(3.14159)
+        .add_bool(true)
+        .add_char(U'y');
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        if (ctx.ll_load_arg(0, 0).bad()) return;
-        if (ctx.ll_load_arg(1, 1).bad()) return;
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        [](yama::context& ctx, yama::const_table consts) {
+        // I wanna have the x and c args differ so the impl can't so easily get away w/
+        // confusing the two (as actually happened to be on initial impl of ll_load_const)
+        if (ctx.ll_load_const(0, 1).bad()) return;
+        if (ctx.ll_load_const(1, 2).bad()) return;
+        if (ctx.ll_load_const(2, 3).bad()) return;
+        if (ctx.ll_load_const(3, 4).bad()) return;
+        if (ctx.ll_load_const(4, 5).bad()) return;
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
+        if (ctx.ll_load_none(0).bad()) return;
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = f_call_fn,
+            .locals = yama::const_types + 10, // just have a bunch of objects for us to use
+        },
+    };
+    ASSERT_TRUE(dm->push(f_info) && dm->load("f"_str));
+    const yama::type f = dm->load("f"_str).value();
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good()); // call object
+    ASSERT_TRUE(ctx->ll_call(0, 1, yama::no_result).good());
+
+    EXPECT_TRUE(globals.snapshot_0);
+    if (globals.snapshot_0) {
+        const auto& ss = *globals.snapshot_0;
+        EXPECT_EQ(ss.local0, std::make_optional(ctx->ll_new_int(-4)));
+        EXPECT_EQ(ss.local1, std::make_optional(ctx->ll_new_uint(301)));
+        EXPECT_EQ(ss.local2, std::make_optional(ctx->ll_new_float(3.14159)));
+        EXPECT_EQ(ss.local3, std::make_optional(ctx->ll_new_bool(true)));
+        EXPECT_EQ(ss.local4, std::make_optional(ctx->ll_new_char(U'y')));
+    }
+}
+
+TEST_F(ContextTests, LLLoadConst_CrashIfInUserCallFrame) {
+    EXPECT_EQ(ctx->ll_crashes(), 0);
+
+    // the user call frame has no constants, so it's not really possible to test
+    // this w/out having the constant be out-of-bounds
+
+    ASSERT_TRUE(ctx->ll_load_const(0, 0).bad());
+
+    EXPECT_EQ(ctx->ll_crashes(), 1);
+}
+
+TEST_F(ContextTests, LLLoadConst_CrashIfXIsOutOfBounds) {
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    auto f_call_fn =
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_const(70, 0).bad()) return; // local register index out-of-bounds
+        globals.even_reached_0 = true; // shouldn't reach due to crash
+        if (ctx.ll_load_none(0).bad()) return;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = f_call_fn,
+            .locals = 1,
+        },
+    };
+    ASSERT_TRUE(dm->push(f_info) && dm->load("f"_str));
+    const yama::type f = dm->load("f"_str).value();
+
+    EXPECT_EQ(ctx->ll_crashes(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good()); // call object
+    ASSERT_TRUE(ctx->ll_call(0, 1, yama::no_result).bad());
+
+    EXPECT_EQ(ctx->ll_crashes(), 1);
+
+    EXPECT_FALSE(globals.even_reached_0);
+}
+
+TEST_F(ContextTests, LLLoadConst_CrashIfCIsOutOfBounds) {
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    auto f_call_fn =
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_const(0, 70).bad()) return; // constant index out-of-bounds
+        globals.even_reached_0 = true; // shouldn't reach due to crash
+        if (ctx.ll_load_none(0).bad()) return;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = f_call_fn,
+            .locals = 1,
+        },
+    };
+    ASSERT_TRUE(dm->push(f_info) && dm->load("f"_str));
+    const yama::type f = dm->load("f"_str).value();
+
+    EXPECT_EQ(ctx->ll_crashes(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good()); // call object
+    ASSERT_TRUE(ctx->ll_call(0, 1, yama::no_result).bad());
+
+    EXPECT_EQ(ctx->ll_crashes(), 1);
+
+    EXPECT_FALSE(globals.even_reached_0);
+}
+
+TEST_F(ContextTests, LLLoadConst_CrashIfCIsNotIndexOfAnObjectConstant) {
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    auto f_call_fn =
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_const(0, 0).bad()) return; // constant at index 0 is NOT an object constant
+        globals.even_reached_0 = true; // shouldn't reach due to crash
+        if (ctx.ll_load_none(0).bad()) return;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = f_call_fn,
+            .locals = 1,
+        },
+    };
+    ASSERT_TRUE(dm->push(f_info) && dm->load("f"_str));
+    const yama::type f = dm->load("f"_str).value();
+
+    EXPECT_EQ(ctx->ll_crashes(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good()); // call object
+    ASSERT_TRUE(ctx->ll_call(0, 1, yama::no_result).bad());
+
+    EXPECT_EQ(ctx->ll_crashes(), 1);
+
+    EXPECT_FALSE(globals.even_reached_0);
+}
+
+TEST_F(ContextTests, LLLoadArg) {
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
+    auto f_call_fn =
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_arg(0, 0).bad()) return;
+        if (ctx.ll_load_arg(1, 1).bad()) return;
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = f_call_fn,
@@ -896,17 +1073,17 @@ TEST_F(ContextTests, LLLoadArg_CrashIfInUserCallFrame) {
 }
 
 TEST_F(ContextTests, LLLoadArg_CrashIfXIsOutOfBounds) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         if (ctx.ll_load_arg(70, 0).bad()) return; // 70 is out-of-bounds
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = f_call_fn,
@@ -926,17 +1103,17 @@ TEST_F(ContextTests, LLLoadArg_CrashIfXIsOutOfBounds) {
 }
 
 TEST_F(ContextTests, LLLoadArg_CrashIfArgIsOutOfBounds) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         if (ctx.ll_load_arg(0, 70).bad()) return; // 70 is out-of-bounds
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = f_call_fn,
@@ -970,19 +1147,19 @@ TEST_F(ContextTests, LLCopy_OutsideOfCall) {
 }
 
 TEST_F(ContextTests, LLCopy_InsideOfCall) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         if (ctx.ll_load_int(0, -14).bad()) return;
         if (ctx.ll_copy(0, 1).bad()) return;
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         if (ctx.ll_ret(1).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1030,20 +1207,20 @@ TEST_F(ContextTests, LLCopy_CrashIfDestIsOutOfBounds) {
 }
 
 bool ContextTests::build_push_and_load_f_type_for_call_tests() {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
-        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, links));
+        globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
 
         if (ctx.ll_load_arg(0, 1).bad()) return;
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = f_call_fn,
@@ -1056,13 +1233,13 @@ bool ContextTests::build_push_and_load_f_type_for_call_tests() {
 }
 
 bool ContextTests::build_push_and_load_g_type_for_call_tests() {
-    std::vector<yama::linksym> g_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-        yama::make_linksym("f"_str, yama::kind::function, yama::make_callsig_info({ 0 }, 0)),
-    };
+    const yama::const_table_info g_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0 }, 0));
     auto g_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
-        if (ctx.ll_load_fn(0, links[1].value()).bad()) return; // callobj (ie. of type f)
+        [](yama::context& ctx, yama::const_table consts) {
+        if (ctx.ll_load_fn(0, consts.type(1).value()).bad()) return; // callobj (ie. of type f)
         if (ctx.ll_load_arg(1, 1).bad()) return; // argument
         if (ctx.ll_load_int(2, 0).bad()) return; // result
         if (ctx.ll_call(0, 2, 3).bad()) return; // just call f and return
@@ -1070,7 +1247,7 @@ bool ContextTests::build_push_and_load_g_type_for_call_tests() {
         };
     yama::type_info g_info{
         .fullname = "g"_str,
-        .linksyms = g_linksyms,
+        .consts = g_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = g_call_fn,
@@ -1109,10 +1286,10 @@ TEST_F(ContextTests, LLCall) {
     EXPECT_TRUE(globals.snapshot_0);
     if (globals.snapshot_0) {
         const auto& ss = *globals.snapshot_0;
-        EXPECT_EQ(ss.links.size(), 1);
-        EXPECT_TRUE(ss.links[0]);
-        if (ss.links[0]) {
-            EXPECT_EQ(ss.links[0].value(), dm->load_int());
+        EXPECT_EQ(ss.consts.size(), 1);
+        EXPECT_TRUE(ss.consts.type(0));
+        if (ss.consts.type(0)) {
+            EXPECT_EQ(ss.consts.type(0).value(), dm->load_int());
         }
         EXPECT_FALSE(ss.is_user);
         EXPECT_EQ(ss.max_call_frames, config.max_call_frames);
@@ -1160,10 +1337,10 @@ TEST_F(ContextTests, LLCall_MultiLevelCallStack) {
     EXPECT_TRUE(globals.snapshot_0);
     if (globals.snapshot_0) {
         const auto& ss = *globals.snapshot_0;
-        EXPECT_EQ(ss.links.size(), 1);
-        EXPECT_TRUE(ss.links[0]);
-        if (ss.links[0]) {
-            EXPECT_EQ(ss.links[0].value(), dm->load_int());
+        EXPECT_EQ(ss.consts.size(), 1);
+        EXPECT_TRUE(ss.consts.type(0));
+        if (ss.consts.type(0)) {
+            EXPECT_EQ(ss.consts.type(0).value(), dm->load_int());
         }
         EXPECT_FALSE(ss.is_user);
         EXPECT_EQ(ss.max_call_frames, config.max_call_frames);
@@ -1218,10 +1395,10 @@ TEST_F(ContextTests, LLCall_NoResultOverload) {
     EXPECT_TRUE(globals.snapshot_0);
     if (globals.snapshot_0) {
         const auto& ss = *globals.snapshot_0;
-        EXPECT_EQ(ss.links.size(), 1);
-        EXPECT_TRUE(ss.links[0]);
-        if (ss.links[0]) {
-            EXPECT_EQ(ss.links[0].value(), dm->load_int());
+        EXPECT_EQ(ss.consts.size(), 1);
+        EXPECT_TRUE(ss.consts.type(0));
+        if (ss.consts.type(0)) {
+            EXPECT_EQ(ss.consts.type(0).value(), dm->load_int());
         }
         EXPECT_FALSE(ss.is_user);
         EXPECT_EQ(ss.max_call_frames, config.max_call_frames);
@@ -1241,18 +1418,18 @@ TEST_F(ContextTests, LLCall_NoResultOverload) {
 }
 
 TEST_F(ContextTests, LLCall_CrashIfArgsProvidesNoCallObj) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true;
 
         if (ctx.ll_ret(0).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1373,22 +1550,22 @@ TEST_F(ContextTests, LLCall_CrashIfUnexpectedArgCount_TooFewArgs) {
 }
 
 TEST_F(ContextTests, LLCall_CrashIfCallStackOverflow) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-        yama::make_linksym("f"_str, yama::kind::function, yama::make_callsig_info({}, 0)),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({}, 0));
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.call_depth++; // count number of calls until call stack overflow
         // infinitely recurse until we overflow the call stack and crash
-        if (ctx.ll_load_fn(0, links[1].value()).bad()) return; // call object
+        if (ctx.ll_load_fn(0, consts.type(1).value()).bad()) return; // call object
         if (ctx.ll_load_none(1).bad()) return; // result
         if (ctx.ll_call(0, 1, 2).bad()) return;
         if (ctx.ll_ret(2).bad()) return;
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1410,17 +1587,17 @@ TEST_F(ContextTests, LLCall_CrashIfCallStackOverflow) {
 }
 
 TEST_F(ContextTests, LLCall_CrashIfNoReturnValueObjectProvided) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true;
         // return w/out ever calling ll_ret
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1445,11 +1622,11 @@ TEST_F(ContextTests, LLCall_CrashIfNoReturnValueObjectProvided) {
 // NOTE: most usage of ll_ret will be tested as part of testing ll_call
 
 TEST_F(ContextTests, LLRet_AllowsReturningWrongTypedObject) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("Int"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
 
         // tell ll_ret to return a UInt, even though f should return a Int,
@@ -1464,7 +1641,7 @@ TEST_F(ContextTests, LLRet_AllowsReturningWrongTypedObject) {
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1503,17 +1680,17 @@ TEST_F(ContextTests, LLRet_CrashIfInUserCallFrame) {
 }
 
 TEST_F(ContextTests, LLRet_CrashIfXIsOutOfBounds) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true;
         if (ctx.ll_ret(70).bad()) return; // 70 is out-of-bounds
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,
@@ -1536,18 +1713,18 @@ TEST_F(ContextTests, LLRet_CrashIfXIsOutOfBounds) {
 }
 
 TEST_F(ContextTests, LLRet_CrashIfCalledMultipleTimesInOneCall) {
-    std::vector<yama::linksym> f_linksyms{
-        yama::make_linksym("None"_str, yama::kind::primitive),
-    };
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
     auto f_call_fn =
-        [](yama::context& ctx, yama::links_view links) {
+        [](yama::context& ctx, yama::const_table consts) {
         globals.even_reached_0 = true;
         if (ctx.ll_ret(0).bad()) return; // okay
         if (ctx.ll_ret(0).bad()) return; // illegal
         };
     yama::type_info f_info{
         .fullname = "f"_str,
-        .linksyms = f_linksyms,
+        .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = f_call_fn,

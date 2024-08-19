@@ -3,6 +3,9 @@
 #include "domain-impl-tests.h"
 
 #include <yama/core/general.h>
+#include <yama/core/callsig.h>
+#include <yama/core/const_table_info.h>
+#include <yama/core/const_table.h>
 
 
 using namespace yama::string_literals;
@@ -13,35 +16,35 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplTests);
 
 yama::type_info a_info{
     .fullname = "a"_str,
-    .linksyms = {},
+    .consts = {},
     .info = yama::primitive_info{
         .ptype = yama::ptype::bool0,
     },
 };
 yama::type_info b_info{
     .fullname = "b"_str,
-    .linksyms = {},
+    .consts = {},
     .info = yama::primitive_info{
         .ptype = yama::ptype::bool0,
     },
 };
 yama::type_info c_info{
     .fullname = "c"_str,
-    .linksyms = {},
+    .consts = {},
     .info = yama::primitive_info{
         .ptype = yama::ptype::bool0,
     },
 };
 
-static const std::vector<yama::linksym> f_linksyms{
-    yama::make_linksym("a"_str, yama::kind::primitive),
-    yama::make_linksym("b"_str, yama::kind::primitive),
-    yama::make_linksym("c"_str, yama::kind::primitive),
-};
+static const auto f_consts =
+yama::const_table_info()
+.add_primitive_type("a"_str)
+.add_primitive_type("b"_str)
+.add_primitive_type("c"_str);
 static const auto f_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
 yama::type_info f_info{
     .fullname = "f"_str,
-    .linksyms = f_linksyms,
+    .consts = f_consts,
     .info = yama::function_info{
         .callsig = f_callsig,
         .call_fn = yama::noop_call_fn,
@@ -51,15 +54,15 @@ yama::type_info f_info{
 
 // the type 'bad' will fail static verification during push
 
-static const std::vector<yama::linksym> bad_linksyms{
-    yama::make_linksym("a"_str, yama::kind::primitive),
-    yama::make_linksym("b"_str, yama::kind::primitive),
-    yama::make_linksym("c"_str, yama::kind::primitive),
-};
+static const auto bad_consts =
+yama::const_table_info()
+.add_primitive_type("a"_str)
+.add_primitive_type("b"_str)
+.add_primitive_type("c"_str);
 static const auto bad_callsig = yama::make_callsig_info({ 0, 7, 2 }, 1); // <- link index 7 is out-of-bounds!
 yama::type_info bad_info{
     .fullname = "bad"_str,
-    .linksyms = bad_linksyms,
+    .consts = bad_consts,
     .info = yama::function_info{
         .callsig = bad_callsig,
         .call_fn = yama::noop_call_fn,
@@ -150,13 +153,13 @@ TEST_P(DomainImplTests, Load) {
         EXPECT_EQ(result_f->kind(), yama::kind::function);
         
         EXPECT_TRUE(result_f->callsig());
-        if (result_f->callsig()) EXPECT_EQ(result_f->callsig().value(), yama::callsig(f_callsig, result_f->links()));
+        if (result_f->callsig()) EXPECT_EQ(result_f->callsig().value(), yama::callsig(f_callsig, result_f->consts()));
 
-        EXPECT_EQ(result_f->links().size(), 3);
-        if (result_f->links().size() == 3) {
-            if (result_f->links()[0]) EXPECT_EQ(result_f->links()[0].value(), *result_a);
-            if (result_f->links()[1]) EXPECT_EQ(result_f->links()[1].value(), *result_b);
-            if (result_f->links()[2]) EXPECT_EQ(result_f->links()[2].value(), *result_c);
+        EXPECT_EQ(result_f->consts().size(), 3);
+        if (result_f->consts().size() == 3) {
+            EXPECT_EQ(result_f->consts().type(0), result_a);
+            EXPECT_EQ(result_f->consts().type(1), result_b);
+            EXPECT_EQ(result_f->consts().type(2), result_c);
         }
     }
 
@@ -165,7 +168,7 @@ TEST_P(DomainImplTests, Load) {
         EXPECT_EQ(result_a->fullname(), "a"_str);
         EXPECT_EQ(result_a->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_a->callsig());
-        EXPECT_EQ(result_a->links().size(), 0);
+        EXPECT_EQ(result_a->consts().size(), 0);
     }
     
     if (result_b) {
@@ -173,7 +176,7 @@ TEST_P(DomainImplTests, Load) {
         EXPECT_EQ(result_b->fullname(), "b"_str);
         EXPECT_EQ(result_b->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_b->callsig());
-        EXPECT_EQ(result_b->links().size(), 0);
+        EXPECT_EQ(result_b->consts().size(), 0);
     }
     
     if (result_c) {
@@ -181,7 +184,7 @@ TEST_P(DomainImplTests, Load) {
         EXPECT_EQ(result_c->fullname(), "c"_str);
         EXPECT_EQ(result_c->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_c->callsig());
-        EXPECT_EQ(result_c->links().size(), 0);
+        EXPECT_EQ(result_c->consts().size(), 0);
     }
 }
 
@@ -284,18 +287,18 @@ TEST_P(DomainImplTests, Push) {
     EXPECT_EQ(ff->kind(), yama::kind::function);
 
     ASSERT_TRUE(ff->callsig());
-    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->links()));
+    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->consts()));
     
-    ASSERT_EQ(ff->links().size(), 3);
-    if (ff->links()[0]) EXPECT_EQ(ff->links()[0].value(), *aa);
-    if (ff->links()[1]) EXPECT_EQ(ff->links()[1].value(), *bb);
-    if (ff->links()[2]) EXPECT_EQ(ff->links()[2].value(), *cc);
+    ASSERT_EQ(ff->consts().size(), 3);
+    EXPECT_EQ(ff->consts().type(0), aa);
+    EXPECT_EQ(ff->consts().type(1), bb);
+    EXPECT_EQ(ff->consts().type(2), cc);
 
     EXPECT_TRUE(aa->complete());
     EXPECT_EQ(aa->fullname(), "a"_str);
     EXPECT_EQ(aa->kind(), yama::kind::primitive);
     EXPECT_FALSE(aa->callsig());
-    EXPECT_EQ(aa->links().size(), 0);
+    EXPECT_EQ(aa->consts().size(), 0);
 }
 
 TEST_P(DomainImplTests, Push_FailDueToStaticVerificationError) {

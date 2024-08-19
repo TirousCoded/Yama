@@ -2,8 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <yama/core/const_table_info.h>
+#include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
-#include <yama/core/links_view.h>
 
 
 using namespace yama::string_literals;
@@ -14,7 +15,7 @@ static_assert(yama::kinds == 2);
 TEST(TypeInfoTests, PrimitiveType) {
     yama::type_info abc{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
@@ -29,11 +30,11 @@ TEST(TypeInfoTests, PrimitiveType) {
 }
 
 TEST(TypeInfoTests, FunctionType) {
-    auto cf = [](yama::context&, yama::links_view) {};
+    auto cf = [](yama::context&, yama::const_table) {};
 
     yama::type_info abc{
         .fullname = "abc"_str,
-        .linksyms = {},
+        .consts = {},
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 1),
             .call_fn = cf,
