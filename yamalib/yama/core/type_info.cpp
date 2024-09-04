@@ -43,3 +43,10 @@ size_t yama::type_info::locals() const noexcept {
         : 0;
 }
 
+const yama::bc::code* yama::type_info::bcode() const noexcept {
+    return
+        std::holds_alternative<function_info>(info)
+        ? &(std::get<function_info>(info).bcode)
+        : nullptr;
+}
+

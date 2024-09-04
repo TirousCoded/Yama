@@ -21,6 +21,7 @@
 
 #include "ptype.h"
 #include "call_fn.h"
+#include "bcode.h"
 
 #include "callsig_info.h"
 #include "callsig.h"

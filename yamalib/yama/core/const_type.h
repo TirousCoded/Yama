@@ -96,6 +96,11 @@ namespace yama {
     // is_object_const returns if constants of type x are able to be loaded
     // as objects into object registers
 
+    // TODO: maybe in the future generalize the below to other type consts
+
+    // NOTE: we're gonna have it be that function type consts can be used as
+    //       object consts in order to load stateless objects of said types
+
     constexpr bool is_object_const(const_type x) noexcept {
         static_assert(const_types == 7);
         switch (x) {
@@ -105,7 +110,7 @@ namespace yama {
         case bool_const:            return true;    break;
         case char_const:            return true;    break;
         case primitive_type_const:  return false;   break;
-        case function_type_const:   return false;   break;
+        case function_type_const:   return true;    break;
         default:                    return bool{};  break;
         }
     }

@@ -408,6 +408,19 @@ bool yama::context::_load_fn_err_f_not_callable_type(type f) {
 }
 
 yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
+    static_assert(
+        []() constexpr -> bool {
+            // NOTE: extend this each time we add a new loadable object constant
+            static_assert(yama::const_types == 7);
+            return
+                yama::is_object_const(yama::int_const) &&
+                yama::is_object_const(yama::uint_const) &&
+                yama::is_object_const(yama::float_const) &&
+                yama::is_object_const(yama::bool_const) &&
+                yama::is_object_const(yama::char_const) &&
+                !yama::is_object_const(yama::primitive_type_const) &&
+                yama::is_object_const(yama::function_type_const);
+        }());
     if (_load_const_err_in_user_call_frame()) {
         return cmd_status::init(false);
     }
@@ -421,12 +434,13 @@ yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
         [&]() -> canonical_ref {
             YAMA_DEREF_SAFE(_consts) {
                 static_assert(const_types == 7);
-                if (const auto r = _consts->get<int_const>(c))          return ll_new_int(*r);
-                else if (const auto r = _consts->get<uint_const>(c))    return ll_new_uint(*r);
-                else if (const auto r = _consts->get<float_const>(c))   return ll_new_float(*r);
-                else if (const auto r = _consts->get<bool_const>(c))    return ll_new_bool(*r);
-                else if (const auto r = _consts->get<char_const>(c))    return ll_new_char(*r);
-                else                                                    YAMA_DEADEND;
+                if (const auto r = _consts->get<int_const>(c))                  return ll_new_int(*r);
+                else if (const auto r = _consts->get<uint_const>(c))            return ll_new_uint(*r);
+                else if (const auto r = _consts->get<float_const>(c))           return ll_new_float(*r);
+                else if (const auto r = _consts->get<bool_const>(c))            return ll_new_bool(*r);
+                else if (const auto r = _consts->get<char_const>(c))            return ll_new_char(*r);
+                else if (const auto r = _consts->get<function_type_const>(c))   return ll_new_fn(*r).value();
+                else                                                            YAMA_DEADEND;
             }
             return ll_new_none(); // dummy
         }());

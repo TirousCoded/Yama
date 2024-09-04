@@ -858,7 +858,7 @@ TEST_F(ContextTests, LLLoadFn_CrashIfFIsNotCallable) {
 TEST_F(ContextTests, LLLoadConst) {
     static_assert(
         []() constexpr -> bool {
-            // NOTE: expand this test each time we add a new loadable object constant
+            // NOTE: extend this each time we add a new loadable object constant
             static_assert(yama::const_types == 7);
             return
                 yama::is_object_const(yama::int_const) &&
@@ -867,7 +867,7 @@ TEST_F(ContextTests, LLLoadConst) {
                 yama::is_object_const(yama::bool_const) &&
                 yama::is_object_const(yama::char_const) &&
                 !yama::is_object_const(yama::primitive_type_const) &&
-                !yama::is_object_const(yama::function_type_const);
+                yama::is_object_const(yama::function_type_const);
         }());
     const yama::const_table_info f_consts =
         yama::const_table_info()
@@ -876,7 +876,8 @@ TEST_F(ContextTests, LLLoadConst) {
         .add_uint(301)
         .add_float(3.14159)
         .add_bool(true)
-        .add_char(U'y');
+        .add_char(U'y')
+        .add_function_type("f"_str, yama::make_callsig_info({}, 0));
     auto f_call_fn =
         [](yama::context& ctx, yama::const_table consts) {
         // I wanna have the x and c args differ so the impl can't so easily get away w/
@@ -886,6 +887,7 @@ TEST_F(ContextTests, LLLoadConst) {
         if (ctx.ll_load_const(2, 3).bad()) return;
         if (ctx.ll_load_const(3, 4).bad()) return;
         if (ctx.ll_load_const(4, 5).bad()) return;
+        if (ctx.ll_load_const(5, 6).bad()) return;
         globals.snapshot_0 = std::make_optional(CallStateSnapshot::make(ctx, consts));
         if (ctx.ll_load_none(0).bad()) return;
         if (ctx.ll_ret(0).bad()) return;
@@ -913,6 +915,7 @@ TEST_F(ContextTests, LLLoadConst) {
         EXPECT_EQ(ss.local2, std::make_optional(ctx->ll_new_float(3.14159)));
         EXPECT_EQ(ss.local3, std::make_optional(ctx->ll_new_bool(true)));
         EXPECT_EQ(ss.local4, std::make_optional(ctx->ll_new_char(U'y')));
+        EXPECT_EQ(ss.local5, std::make_optional(ctx->ll_new_fn(f)));
     }
 }
 
