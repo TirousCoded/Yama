@@ -7,6 +7,10 @@
 #include "const_table.h"
 
 
+yama::internal::type_mem yama::internal::get_type_mem(type x) noexcept {
+    return x._mem;
+}
+
 bool yama::type::complete() const noexcept {
     return _mem->stubs == 0;
 }

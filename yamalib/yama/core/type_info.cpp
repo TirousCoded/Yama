@@ -50,3 +50,10 @@ const yama::bc::code* yama::type_info::bcode() const noexcept {
         : nullptr;
 }
 
+const yama::bc::syms* yama::type_info::bcodesyms() const noexcept {
+    return
+        std::holds_alternative<function_info>(info)
+        ? &(std::get<function_info>(info).bcodesyms)
+        : nullptr;
+}
+

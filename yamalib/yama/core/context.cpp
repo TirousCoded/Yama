@@ -207,6 +207,7 @@ std::optional<yama::object_ref> yama::context::ll_local(local_t x) {
 }
 
 void yama::context::ll_crash() {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">> crash");
     if (ll_crashing()) return; // don't count another crash if we're already crashing
     _crashes++;
     _crashing = true;
@@ -214,6 +215,7 @@ void yama::context::ll_crash() {
 }
 
 yama::cmd_status yama::context::ll_load(local_t x, borrowed_ref v) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">>       {: <13}<- {}", _fmt_R_no_preview(x), v);
     return _load(x, v);
 }
 
@@ -246,27 +248,79 @@ yama::cmd_status yama::context::ll_load_fn(local_t x, type f) {
 }
 
 yama::cmd_status yama::context::ll_load_const(local_t x, const_t c) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">>       {: <13}<- {}", _fmt_R_no_preview(x), _fmt_Ko(c));
     return _load_const(x, c);
 }
 
 yama::cmd_status yama::context::ll_load_arg(local_t x, arg_t arg) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">>       {: <13}<- {}", _fmt_R_no_preview(x), _fmt_Arg(arg));
     return _load_arg(x, arg);
 }
 
 yama::cmd_status yama::context::ll_copy(local_t src, local_t dest) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">>       {: <13}<- {}", _fmt_R_no_preview(dest), _fmt_R(src));
     return _copy(src, dest);
 }
 
 yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, local_t ret) {
+    if (args_n == 0) {
+        YAMA_LOG(dbg(), ctx_llcmd_c, 
+            ">>       {: <13}<- call n/a",
+            _fmt_R_no_preview(ret));
+    }
+    else if (args_n == 1) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       {: <13}<- call {}",
+            _fmt_R_no_preview(ret),
+            _fmt_R(args_start));
+    }
+    else if (args_n == 2) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       {: <13}<- call {} ({})",
+            _fmt_R_no_preview(ret),
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1));
+    }
+    else {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       {: <13}<- call {} ({}..{})",
+            _fmt_R_no_preview(ret),
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1),
+            _fmt_R(args_start + args_n - 1));
+    }
     if (!_call_ret_to_local_precheck(ret)) return yama::cmd_status::init(false);
     return _call_ret_to_local(_call(args_start, args_n), ret);
 }
 
 yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, no_result_t) {
+    if (args_n == 0) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       n/a <- call n/a");
+    }
+    else if (args_n == 1) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       n/a <- call {}",
+            _fmt_R(args_start));
+    }
+    else if (args_n == 2) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       n/a <- call {} ({})",
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1));
+    }
+    else {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            ">>       n/a <- call {} ({}..{})",
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1),
+            _fmt_R(args_start + args_n - 1));
+    }
     return _call_ret_to_no_result(_call(args_start, args_n));
 }
 
 yama::cmd_status yama::context::ll_ret(local_t x) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">>       return       <- {}", _fmt_R(x));
     return _ret(x);
 }
 
@@ -371,6 +425,36 @@ void yama::context::_try_handle_crash_for_user_cf() {
     _push_user_cf();
 }
 
+std::string yama::context::_fmt_R_no_preview(local_t x) {
+    return
+        x < ll_locals()
+        ? std::format("R({})", x)
+        : std::format("R({}) (error)", x);
+}
+
+std::string yama::context::_fmt_R(local_t x) {
+    const auto a = ll_local(x);
+    return
+        a
+        ? std::format("R({}) [{}]", x, *a)
+        : std::format("R({}) (error)", x);
+}
+
+std::string yama::context::_fmt_Ko(const_t x) {
+    return
+        _consts
+        ? std::format("Ko({}) [{}]", x, _consts->fmt_const(x))
+        : std::format("Ko({}) (error)", x);
+}
+
+std::string yama::context::_fmt_Arg(arg_t x) {
+    const auto a = ll_arg(x);
+    return
+        a
+        ? std::format("Arg({}) [{}]", x, *a)
+        : std::format("Arg({}) (error)", x);
+}
+
 yama::cmd_status yama::context::_load(local_t x, borrowed_ref v) {
     if (_load_err_x_out_of_bounds(x, v)) {
         return cmd_status::init(false);
@@ -430,18 +514,17 @@ yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
     if (_load_const_err_c_is_not_object_constant(c)) {
         return cmd_status::init(false);
     }
-    return ll_load(x,
+    return _load(x,
         [&]() -> canonical_ref {
-            YAMA_DEREF_SAFE(_consts) {
-                static_assert(const_types == 7);
-                if (const auto r = _consts->get<int_const>(c))                  return ll_new_int(*r);
-                else if (const auto r = _consts->get<uint_const>(c))            return ll_new_uint(*r);
-                else if (const auto r = _consts->get<float_const>(c))           return ll_new_float(*r);
-                else if (const auto r = _consts->get<bool_const>(c))            return ll_new_bool(*r);
-                else if (const auto r = _consts->get<char_const>(c))            return ll_new_char(*r);
-                else if (const auto r = _consts->get<function_type_const>(c))   return ll_new_fn(*r).value();
-                else                                                            YAMA_DEADEND;
-            }
+            const auto& cc = deref_assert(_consts);
+            static_assert(const_types == 7);
+            if (const auto r = cc.get<int_const>(c))                return ll_new_int(*r);
+            else if (const auto r = cc.get<uint_const>(c))          return ll_new_uint(*r);
+            else if (const auto r = cc.get<float_const>(c))         return ll_new_float(*r);
+            else if (const auto r = cc.get<bool_const>(c))          return ll_new_bool(*r);
+            else if (const auto r = cc.get<char_const>(c))          return ll_new_char(*r);
+            else if (const auto r = cc.get<function_type_const>(c)) return ll_new_fn(*r).value();
+            else                                                    YAMA_DEADEND;
             return ll_new_none(); // dummy
         }());
 }
@@ -456,8 +539,8 @@ bool yama::context::_load_const_err_in_user_call_frame() {
 }
 
 bool yama::context::_load_const_err_c_out_of_bounds(const_t c) {
-    YAMA_DEREF_SAFE(_consts) {
-        if (c < _consts->size()) return false;
+    if (c < deref_assert(_consts).size()) {
+        return false;
     }
     YAMA_LOG(
         dbg(), ctx_crash_c,
@@ -468,8 +551,8 @@ bool yama::context::_load_const_err_c_out_of_bounds(const_t c) {
 }
 
 bool yama::context::_load_const_err_c_is_not_object_constant(const_t c) {
-    YAMA_DEREF_SAFE(_consts) {
-        if (is_object_const(_consts->const_type(c).value())) return false;
+    if (is_object_const(deref_assert(_consts).const_type(c).value())) {
+        return false;
     }
     YAMA_LOG(
         dbg(), ctx_crash_c,
@@ -486,7 +569,7 @@ yama::cmd_status yama::context::_load_arg(local_t x, arg_t arg) {
     if (_load_arg_err_arg_out_of_bounds(arg)) {
         return cmd_status::init(false);
     }
-    return ll_load(x, ll_arg(arg).value());
+    return _load(x, ll_arg(arg).value());
 }
 
 bool yama::context::_load_arg_err_in_user_call_frame() {
@@ -564,12 +647,16 @@ std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t 
         return std::nullopt;
     }
     // fire call behaviour
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">> *enter* call frame {}", ll_call_frames() - 1);
     YAMA_ASSERT(callobj.t.call_fn());
-    const_table ct = callobj.t.consts(); // store constant table so we can get a pointer to it
-    _consts = &ct;
-    YAMA_DEREF_SAFE(_consts) {
-        (*callobj.t.call_fn())(*this, *_consts); // call behaviour
-    }
+    // IMPORTANT: remember that we MUST see to it that the old state of _consts is saved
+    //            before dispatching to the new method call, and that this data is used
+    //            to restore _consts original value after the call returns
+    const auto _old_consts = _consts;
+    _consts = std::make_optional(callobj.t.consts()); // store constant table so we can get a pointer to it
+    (*callobj.t.call_fn())(*this, deref_assert(_consts)); // call behaviour
+    _consts = _old_consts;
+    YAMA_LOG(dbg(), ctx_llcmd_c, ">> *exit* call frame {}", ll_call_frames() - 1);
     // propagate crash if call behaviour crashed
     if (ll_crashing()) {
         _pop_cf(); // cleanup before abort

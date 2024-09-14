@@ -15,7 +15,7 @@ size_t yama::callsig::params() const noexcept {
 
 std::optional<yama::type> yama::callsig::param_type(size_t index) const noexcept {
     return
-        index < _consts.size()
+        index < _get_info().params.size()
         ? _consts.type(_get_info().params[index])
         : std::nullopt;
 }

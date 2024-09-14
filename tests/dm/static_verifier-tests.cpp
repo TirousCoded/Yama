@@ -367,7 +367,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_MultipleExitpoints) {
         yama::bc::code()
         // block #1
         .add_load_const(0, 3, true) // reinit R(0) (to Bool true)
-        .add_jump_if(0, 2)
+        .add_jump_true(0, 2)
         // block #2 (exitpoint)
         .add_load_const(1, 1, true) // reinit R(1) (to Float 3.14159)
         .add_ret(1)
@@ -400,7 +400,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_ControlPathsMerge) {
         yama::bc::code()
         // block #1
         .add_load_const(0, 3, true) // reinit R(0) (to Bool true)
-        .add_jump_if(0, 2)
+        .add_jump_true(0, 2)
         // block #2
         .add_load_const(1, 1, true) // reinit R(1) (to Float 3.14159)
         .add_jump(1) // merges into block #4
@@ -439,7 +439,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_CyclicalControlPath) {
         .add_load_const(0, 2) // no reinit R(0), so R(0) MUST be an Int already
         .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
         .add_load_const(1, 4, true) // reinit R(1) (to Bool true)
-        .add_jump_if(1, 3) // jump to block #4, or fallthrough to block #3
+        .add_jump_true(1, 3) // jump to block #4, or fallthrough to block #3
         // block #3
         .add_load_const(0, 5, true) // reinit R(0) (to Int 100)
         // notice: block #2 is entered w/ R(1) being None, NOT Bool, so we gotta reinit R(1)
@@ -538,7 +538,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBounds
         .add_noop() // jump destination (so R(A) is always Bool)
         .add_noop()
         // we're using jump_if to test more nuanced scenario than just a simple fallthrough due to no branch or exitpoint
-        .add_jump_if(0, -3); // illegal fallthrough to out-of-bounds instruction
+        .add_jump_true(0, -3); // illegal fallthrough to out-of-bounds instruction
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -558,7 +558,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBounds
     EXPECT_FALSE(verif->verify(f));
 }
 
-static_assert(yama::bc::opcodes == 10);
+static_assert(yama::bc::opcodes == 11);
 
 TEST_F(StaticVerifierTests, Verify_BCode_Noop) {
     const auto f_bcode =
@@ -847,16 +847,19 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 2, true) // reinit R(0) (to Bool true)
-        .add_load_arg(0, 0) // load Bool arg into R(0), w/out reinit
-        .add_load_const(1, 3, true) // reinit R(1) (to Float 0.05)
-        .add_load_arg(1, 1) // load Float arg into R(1), w/out reinit
-        .add_ret(1);
+        .add_load_const(0, 2, true) // reinit R(0) (to f object)
+        .add_load_const(1, 3, true) // reinit R(1) (to Bool true)
+        .add_load_const(2, 4, true) // reinit R(2) (to Float 0.05)
+        .add_load_arg(0, 0) // load callobj f arg into R(0), w/out reinit
+        .add_load_arg(1, 1) // load Bool arg into R(1), w/out reinit
+        .add_load_arg(2, 2) // load Float arg into R(2), w/out reinit
+        .add_ret(2);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("Bool"_str)
         .add_primitive_type("Float"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
@@ -865,7 +868,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -877,16 +880,19 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_arg(0, 0, true) // load Bool arg into R(0), w/ reinit
-        .add_load_const(0, 2) // no reinit, so R(0) MUST be Bool already
-        .add_load_arg(1, 1, true) // load Float arg into R(1), w/ reinit
-        .add_load_const(1, 3) // no reinit, so R(1) MUST be Float already
-        .add_ret(1);
+        .add_load_arg(0, 0, true) // load callobj f arg into R(0), w/ reinit
+        .add_load_arg(1, 1, true) // load Bool arg into R(1), w/ reinit
+        .add_load_arg(2, 2, true) // load Float arg into R(2), w/ reinit
+        .add_load_const(0, 2) // no reinit, so R(0) MUST be f already
+        .add_load_const(1, 3) // no reinit, so R(1) MUST be Bool already
+        .add_load_const(2, 4) // no reinit, so R(2) MUST be Float already
+        .add_ret(2);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("Bool"_str)
         .add_primitive_type("Float"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
@@ -895,7 +901,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -935,7 +941,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
         yama::bc::code()
         // block #1
         .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
-        .add_load_arg(0, 2) // Arg(2) out-of-bounds
+        .add_load_arg(0, 3) // Arg(3) out-of-bounds
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -962,7 +968,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
         yama::bc::code()
         // block #1
         .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
-        .add_load_arg(0, 0) // Arg(0) not type Float
+        .add_load_arg(0, 1) // Arg(1) not type Float
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1851,7 +1857,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
         yama::bc::code()
         // block #1
         .add_load_const(0, 1, true) // reinits R(0) (to Bool true)
-        .add_jump_if(0, 2)
+        .add_jump_true(0, 2)
         // block #2
         .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
         .add_jump(2) // merge R(0) into block #4 as Float
@@ -1882,12 +1888,12 @@ TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
     EXPECT_FALSE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpIf) {
+TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_if(0, 2) // jump to block #3, or fallthrough to block #2
+        .add_jump_true(0, 2) // jump to block #3, or fallthrough to block #2
         // block #2
         .add_load_const(0, 2, true) // reinit R(0) (to Float 10.5)
         .add_ret(0)
@@ -1915,12 +1921,12 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpIf) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_RA_OutOfBounds) {
+TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_if(1, 2) // R(1) out-of-bounds
+        .add_jump_true(1, 2) // R(1) out-of-bounds
         // block #2
         .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
         .add_ret(0)
@@ -1948,12 +1954,12 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_RA_OutOfBounds) {
     EXPECT_FALSE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_RA_WrongType) {
+TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_load_const(0, 1, true) // reinit R(0) (to Int -4)
-        .add_jump_if(0, 2) // R(0) not type Bool
+        .add_jump_true(0, 2) // R(0) not type Bool
         // block #2
         .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
         .add_ret(0)
@@ -1981,12 +1987,12 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_RA_WrongType) {
     EXPECT_FALSE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_PutsPCOutOfBounds) {
+TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_if(0, 10'000) // branches to out-of-bounds instruction
+        .add_jump_true(0, 10'000) // branches to out-of-bounds instruction
         // block #2
         .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
         .add_ret(0)
@@ -2014,22 +2020,198 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_PutsPCOutOfBounds) {
     EXPECT_FALSE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpIf_Fail_ViolatesRegisterCoherence) {
+TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
-        .add_jump_if(1, 4)
+        .add_jump_true(1, 4)
         // block #2
         .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
-        .add_jump_if(1, 6) // merge R(0) into block #6 as Float
+        .add_jump_true(1, 6) // merge R(0) into block #6 as Float
         // block #3
         // this block is here just to provide a place to fallthrough to
         .add_load_none(0, true)
         .add_ret(0)
         // block #4
         .add_load_const(0, 3, true) // reinits R(0) (to Int 100)
-        .add_jump_if(1, 2) // merge R(0) into block #6 as Int (violating register coherence w/ above R(0) being Float)
+        .add_jump_true(1, 2) // merge R(0) into block #6 as Int (violating register coherence w/ above R(0) being Float)
+        // block #5
+        // this block is here just to provide a place to fallthrough to
+        .add_load_none(0, true)
+        .add_ret(0)
+        // block #6
+        .add_load_none(0, true) // reinits R(0) (to None)
+        .add_ret(0); // return None object
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_bool(true)
+        .add_float(3.14159)
+        .add_int(100);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 2,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+}
+
+TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
+        .add_jump_false(0, 2) // jump to block #3, or fallthrough to block #2
+        // block #2
+        .add_load_const(0, 2, true) // reinit R(0) (to Float 10.5)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_bool(true)
+        .add_float(10.5)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
+        .add_jump_false(1, 2) // R(1) out-of-bounds
+        // block #2
+        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_bool(true)
+        .add_int(10)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+}
+
+TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // reinit R(0) (to Int -4)
+        .add_jump_false(0, 2) // R(0) not type Bool
+        // block #2
+        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_int(-4)
+        .add_int(10)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+}
+
+TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
+        .add_jump_false(0, 10'000) // branches to out-of-bounds instruction
+        // block #2
+        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_bool(true)
+        .add_int(10)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+}
+
+TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherence) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
+        .add_jump_false(1, 4)
+        // block #2
+        .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
+        .add_jump_false(1, 6) // merge R(0) into block #6 as Float
+        // block #3
+        // this block is here just to provide a place to fallthrough to
+        .add_load_none(0, true)
+        .add_ret(0)
+        // block #4
+        .add_load_const(0, 3, true) // reinits R(0) (to Int 100)
+        .add_jump_false(1, 2) // merge R(0) into block #6 as Int (violating register coherence w/ above R(0) being Float)
         // block #5
         // this block is here just to provide a place to fallthrough to
         .add_load_none(0, true)

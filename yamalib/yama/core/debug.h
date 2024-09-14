@@ -41,6 +41,8 @@ namespace yama {
         static_verif    = 1 << 1,           // static verification debug logs
         type_instant    = 1 << 2,           // type instantiation debug logs
         ctx_crash       = 1 << 3,           // context crash debug logs
+        ctx_llcmd      = 1 << 4,           // low-level command behaviour debug logs
+        bcode_exec      = 1 << 5,           // bcode execution trace debug logs
     };
 
 
@@ -54,10 +56,41 @@ namespace yama {
     constexpr auto static_verif_c = debug_cat::static_verif;
     constexpr auto type_instant_c = debug_cat::type_instant;
     constexpr auto ctx_crash_c = debug_cat::ctx_crash;
+    constexpr auto ctx_llcmd_c = debug_cat::ctx_llcmd;
+    constexpr auto bcode_exec_c = debug_cat::bcode_exec;
+}
+
+// TODO: the below have not been unit tested
+
+constexpr yama::debug_cat operator&(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
+    return yama::debug_cat(uint32_t(lhs) & uint32_t(rhs));
 }
 
 constexpr yama::debug_cat operator|(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
     return yama::debug_cat(uint32_t(lhs) | uint32_t(rhs));
+}
+
+constexpr yama::debug_cat operator^(yama::debug_cat lhs, yama::debug_cat rhs) noexcept {
+    return yama::debug_cat(uint32_t(lhs) ^ uint32_t(rhs));
+}
+
+constexpr yama::debug_cat operator~(yama::debug_cat rhs) noexcept {
+    return yama::debug_cat(~uint32_t(rhs));
+}
+
+constexpr yama::debug_cat& operator&=(yama::debug_cat& lhs, yama::debug_cat rhs) noexcept {
+    lhs = lhs & rhs;
+    return lhs;
+}
+
+constexpr yama::debug_cat& operator|=(yama::debug_cat& lhs, yama::debug_cat rhs) noexcept {
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr yama::debug_cat& operator^=(yama::debug_cat& lhs, yama::debug_cat rhs) noexcept {
+    lhs = lhs ^ rhs;
+    return lhs;
 }
 
 namespace yama {
@@ -66,7 +99,7 @@ namespace yama {
     // check returns if cat contains the flags of expect
 
     constexpr bool check(debug_cat cat, debug_cat expect) noexcept {
-        return debug_cat(uint32_t(cat) & uint32_t(expect)) == expect;
+        return (cat & expect) == expect;
     }
 
     // TODO: maybe update the below later to be properly comprehensive

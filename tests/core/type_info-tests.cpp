@@ -50,5 +50,6 @@ TEST(TypeInfoTests, FunctionType) {
     EXPECT_EQ(abc.call_fn(), cf);
     EXPECT_EQ(abc.locals(), 17);
     EXPECT_EQ(abc.bcode(), &(std::get<yama::function_info>(abc.info).bcode));
+    EXPECT_EQ(abc.bcodesyms(), &(std::get<yama::function_info>(abc.info).bcodesyms));
 }
 

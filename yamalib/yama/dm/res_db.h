@@ -113,8 +113,9 @@ namespace yama::dm {
     
     template<fullnamed_type T>
     inline bool res_db<T>::push(T new_res) {
-        if (exists(fullname_of(new_res))) return false;
-        _db.try_emplace(fullname_of(new_res), std::move(new_res));
+        const auto fullname = fullname_of(new_res);
+        if (exists(fullname)) return false;
+        _db.try_emplace(fullname, std::move(new_res));
         return true;
     }
 

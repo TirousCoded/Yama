@@ -26,22 +26,24 @@ std::string yama::dm::static_verifier::_cfg_block::fmt() const {
 }
 
 bool yama::dm::static_verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 10);
+    static_assert(bc::opcodes == 11);
     switch (bcode[final_instr_index()].opc) {
-    case bc::opcode::ret:       return false;
-    case bc::opcode::jump:      return true;
-    case bc::opcode::jump_if:   return true;
-    default:                    return false;
+    case bc::opcode::ret:           return false;
+    case bc::opcode::jump:          return true;
+    case bc::opcode::jump_true:     return true;
+    case bc::opcode::jump_false:    return true;
+    default:                        return false;
     }
 }
 
 bool yama::dm::static_verifier::_cfg_block::final_instr_has_fallthrough(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 10);
+    static_assert(bc::opcodes == 11);
     switch (bcode[final_instr_index()].opc) {
-    case bc::opcode::ret:       return false;
-    case bc::opcode::jump:      return false;
-    case bc::opcode::jump_if:   return true;
-    default:                    return true;
+    case bc::opcode::ret:           return false;
+    case bc::opcode::jump:          return false;
+    case bc::opcode::jump_true:     return true;
+    case bc::opcode::jump_false:    return true;
+    default:                        return true;
     }
 }
 
@@ -113,16 +115,11 @@ bool yama::dm::static_verifier::_verify(const type_info& subject) {
 }
 
 void yama::dm::static_verifier::_begin_verify(const type_info& subject) {
-    YAMA_LOG(dbg(), static_verif_c, "static verif. {} type {}...", subject.kind(), subject.fullname);
+    YAMA_LOG(dbg(), static_verif_c, "verifying {}...", subject.fullname);
 }
 
 void yama::dm::static_verifier::_end_verify(bool success) {
-    if (success) {
-        YAMA_LOG(dbg(), static_verif_c, "static verif. success!");
-    }
-    else {
-        YAMA_LOG(dbg(), static_verif_c, "static verif. failure!");
-    }
+    // TODO: should we even log anything here?
 }
 
 void yama::dm::static_verifier::_post_verify_cleanup() {
@@ -275,7 +272,7 @@ void yama::dm::static_verifier::_build_cfg_division_points(const bc::code& bcode
     _add_start_and_end_division_points(bcode);
     for (size_t i = 0; i < bcode.count(); i++) {
         const auto instr = bcode[i];
-        static_assert(bc::opcodes == 10);
+        static_assert(bc::opcodes == 11);
         if (instr.opc == bc::opcode::ret) {
             _add_end_of_instr_division_point(bcode, i);
         }
@@ -283,7 +280,11 @@ void yama::dm::static_verifier::_build_cfg_division_points(const bc::code& bcode
             _add_end_of_instr_division_point(bcode, i);
             _add_jump_dest_division_point(bcode, i, instr.sBx);
         }
-        else if (instr.opc == bc::opcode::jump_if) {
+        else if (instr.opc == bc::opcode::jump_true) {
+            _add_end_of_instr_division_point(bcode, i);
+            _add_jump_dest_division_point(bcode, i, instr.sBx);
+        }
+        else if (instr.opc == bc::opcode::jump_false) {
             _add_end_of_instr_division_point(bcode, i);
             _add_jump_dest_division_point(bcode, i, instr.sBx);
         }
@@ -458,7 +459,7 @@ bool yama::dm::static_verifier::_symbolic_exec(const type_info& subject, const b
 
 bool yama::dm::static_verifier::_symbolic_exec_step(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from, size_t i) {
     const auto instr = bcode[i];
-    static_assert(bc::opcodes == 10);
+    static_assert(bc::opcodes == 11);
     switch (instr.opc) {
     case bc::opcode::noop:
     {
@@ -563,7 +564,19 @@ bool yama::dm::static_verifier::_symbolic_exec_step(const type_info& subject, co
         }
     }
     break;
-    case bc::opcode::jump_if:
+    case bc::opcode::jump_true:
+    {
+        // NOTE: see _symbolic_exec for general branch-related verif checks (which get done at *block-level*)
+        // NOTE: see _visit_unprocessed_block for branch-related code which calls _visit_block (again, *block-level*)
+        const bool valid =
+            _verify_RA_in_bounds(subject, bcode, i) &&
+            _verify_RA_is_type_bool(subject, bcode, block, i);
+        if (!valid) {
+            return false;
+        }
+    }
+    break;
+    case bc::opcode::jump_false:
     {
         // NOTE: see _symbolic_exec for general branch-related verif checks (which get done at *block-level*)
         // NOTE: see _visit_unprocessed_block for branch-related code which calls _visit_block (again, *block-level*)
@@ -685,7 +698,7 @@ bool yama::dm::static_verifier::_verify_RC_is_return_type_of_call_object(const t
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} bcode instr {}: R(A) (A == {}) call object return type is {}, but return target R(C) (C == {}) is type {}!",
-            subject.fullname, i, bcode[i].A, RA, bcode[i].C, RC);
+            subject.fullname, i, bcode[i].A, RA_return_type, bcode[i].C, RC);
         return false;
     }
     return true;
@@ -722,7 +735,9 @@ bool yama::dm::static_verifier::_verify_KoB_is_object_const(const type_info& sub
 }
 
 bool yama::dm::static_verifier::_verify_ArgB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].B >= deref_assert(subject.callsig()).params.size()) {
+    // NOTE: remember, 'args' passed into a call includes the call object, not just callable type's params
+    const auto args = deref_assert(subject.callsig()).params.size() + 1;
+    if (bcode[i].B >= args) {
         YAMA_LOG(
             dbg(), static_verif_c,
             "error: {} bcode instr {}: Arg(B) (B == {}) out-of-bounds!",
@@ -915,7 +930,12 @@ yama::str yama::dm::static_verifier::_Ko_type(const type_info& subject, size_t i
 }
 
 yama::str yama::dm::static_verifier::_Arg_type(const type_info& subject, size_t index) {
-    return subject.consts.fullname(deref_assert(subject.callsig()).params[index]).value();
+    if (index == 0) { // callobj arg
+        return subject.fullname;
+    }
+    else { // param arg
+        return subject.consts.fullname(deref_assert(subject.callsig()).params[index - 1]).value();
+    }
 }
 
 size_t yama::dm::static_verifier::_calc_jump_dest(size_t i, int16_t sBx) {

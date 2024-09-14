@@ -50,7 +50,7 @@ std::string yama::object_ref::fmt() const {
         YAMA_ASSERT(t.ptype());
         const ptype x = t.ptype().value();
         if (x == ptype::none) {
-            result = std::format("{} (stateless)", t.fullname());
+            result = std::format("{} (n/a)", t.fullname());
         }
         else if (x == ptype::int0) {
             result = std::format("{} ({})", t.fullname(), as_int());
@@ -70,7 +70,7 @@ std::string yama::object_ref::fmt() const {
         else YAMA_DEADEND;
     }
     else if (t.kind() == kind::function) {
-        result = std::format("{} (stateless)", t.fullname());
+        result = std::format("{} (n/a)", t.fullname());
     }
     else YAMA_DEADEND;
     return result;

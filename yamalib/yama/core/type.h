@@ -24,6 +24,10 @@ namespace yama {
         class type_instance;
     }
 
+    namespace internal {
+        type_mem get_type_mem(type x) noexcept;
+    }
+
 
     // yama::type is a lightweight non-owning reference to a instantiated
     // Yama language type, and w/ no 'null' state
@@ -97,6 +101,8 @@ namespace yama {
 
         template<typename Allocator>
         friend class yama::dm::type_instance;
+
+        friend internal::type_mem yama::internal::get_type_mem(type x) noexcept;
 
 
         internal::type_mem _mem;

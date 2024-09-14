@@ -8,6 +8,14 @@
 #include "../core/type_info.h"
 
 
+#define _DUMP_LOG 0
+
+
+namespace yama::internal {
+    template<typename Allocator>
+    inline type_mem get_type_mem(const dm::type_instance<Allocator>& x) noexcept;
+}
+
 namespace yama::dm {
 
 
@@ -103,6 +111,9 @@ namespace yama::dm {
 
     private:
 
+        friend yama::internal::type_mem yama::internal::get_type_mem<Allocator>(const dm::type_instance<Allocator>& x) noexcept;
+
+
         Allocator           _al;    // the allocator associated w/ the type_instance
 
         // the type_instance will manage _mem via RAII
@@ -114,6 +125,13 @@ namespace yama::dm {
         static inline internal::type_mem _create_mem(Allocator al, str new_fullname, const type_instance& other);
         static inline void _destroy_mem(Allocator al, internal::type_mem mem) noexcept;
     };
+}
+
+namespace yama::internal {
+    template<typename Allocator>
+    inline type_mem get_type_mem(const dm::type_instance<Allocator>& x) noexcept {
+        return x._mem;
+    }
 }
 
 
@@ -129,6 +147,9 @@ yama::dm::type_instance<Allocator>::type_instance(Allocator al, str new_fullname
 
 template<typename Allocator>
 inline yama::dm::type_instance<Allocator>::~type_instance() noexcept {
+#if _DUMP_LOG
+    std::cerr << std::format("~type_instance @ {}\n", (void*)this);
+#endif
     _destroy_mem(get_allocator(), _mem); // RAII cleanup of _mem
 }
 

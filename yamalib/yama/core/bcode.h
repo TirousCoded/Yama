@@ -83,6 +83,9 @@ namespace yama::bc {
 
         // noop is the no-op instruction
 
+        // crash conditions:
+        //      n/a
+
         // static verif requires:
         //      n/a
 
@@ -91,6 +94,9 @@ namespace yama::bc {
         // load_none R(A)
 
         // load_none performs ll_load_none(R(A))
+
+        // crash conditions:
+        //      n/a
 
         // static verif requires:
         //      - R(A) must be in-bounds
@@ -101,6 +107,9 @@ namespace yama::bc {
         // load_const R(A) Ko(B)
 
         // load_const performs ll_load_const(R(A), Ko(B))
+
+        // crash conditions:
+        //      n/a
 
         // static verif requires:
         //      - R(A) must be in-bounds
@@ -114,6 +123,9 @@ namespace yama::bc {
 
         // load_arg performs ll_load_arg(R(A), Arg(B))
 
+        // crash conditions:
+        //      n/a
+
         // static verif requires:
         //      - R(A) must be in-bounds
         //      - Arg(B) must be in-bounds
@@ -124,6 +136,9 @@ namespace yama::bc {
         // copy R(A) R(B)
 
         // copy performs ll_copy(R(A), R(B))
+
+        // crash conditions:
+        //      n/a
 
         // static verif requires:
         //      - R(A) must be in-bounds
@@ -139,6 +154,9 @@ namespace yama::bc {
         // R(A) defines the 'call object'
         // [R(A), R(A+B-1)] defines the 'arg registers' of the call
         // [R(A+1), R(A+B-1)] defines the 'param arg registers' of the call
+
+        // crash conditions:
+        //      - if call behaviour crashes
 
         // static verif requires:
         //      - arg registers must be in-bounds
@@ -158,6 +176,9 @@ namespace yama::bc {
         // [R(A), R(A+B-1)] defines the 'args' of the call
         // [R(A+1), R(A+B-1)] defines the 'param args' of the call
 
+        // crash conditions:
+        //      - if call behaviour crashes
+
         // static verif requires:
         //      - arg registers must be in-bounds
         //      - arg registers must include at least one object (ie. B must be >=1)
@@ -169,6 +190,9 @@ namespace yama::bc {
         // ret R(A)
 
         // ret performs ll_ret(R(A)), then instructs the interpreter to halt
+
+        // crash conditions:
+        //      n/a
 
         // static verif requires:
         //      - R(A) must be in-bounds
@@ -188,18 +212,21 @@ namespace yama::bc {
         // branched-from instr reported is expected to be the branching 
         // instr itself (ie. NOT the instr *after* it)
 
+        // crash conditions:
+        //      n/a
+
         // static verif requires:
         //      - program counter must remain in-bounds after sBx offset
         //      - the branch must not violate register coherence
 
         jump,
 
-        // jump_if R(A) sBx
+        // jump_true R(A) sBx
 
-        // jump_if conditionally jumps, adding sBx to program counter if 
-        // Bool in R(A) is true, acting as a no-op otherwise
+        // jump_true conditionally jumps, adding sBx to program counter if 
+        // Bool in R(A) is true, falling-through otherwise
 
-        // jump_if operates on the program counter AFTER it's been incremented
+        // jump_true operates on the program counter AFTER it's been incremented
         // from reading the instruction itself
         //
         // take note that this ONLY applies when considering sBx offsets,
@@ -207,13 +234,40 @@ namespace yama::bc {
         // branched-from instr reported is expected to be the branching 
         // instr itself (ie. NOT the instr *after* it)
 
+        // crash conditions:
+        //      n/a
+
         // static verif requires:
         //      - R(A) must be in-bounds
         //      - R(A) must be of type Bool
         //      - program counter must remain in-bounds after sBx offset
         //      - the branch must not violate register coherence
 
-        jump_if,
+        jump_true,
+
+        // jump_false R(A) sBx
+
+        // jump_false conditionally jumps, adding sBx to program counter if 
+        // Bool in R(A) is false, falling-through otherwise
+
+        // jump_false operates on the program counter AFTER it's been incremented
+        // from reading the instruction itself
+        //
+        // take note that this ONLY applies when considering sBx offsets,
+        // so for describing branches *from* an instr, *to* another, the 
+        // branched-from instr reported is expected to be the branching 
+        // instr itself (ie. NOT the instr *after* it)
+
+        // crash conditions:
+        //      n/a
+
+        // static verif requires:
+        //      - R(A) must be in-bounds
+        //      - R(A) must be of type Bool
+        //      - program counter must remain in-bounds after sBx offset
+        //      - the branch must not violate register coherence
+
+        jump_false,
 
 
         num, // this is not a valid opcode
@@ -265,7 +319,7 @@ namespace yama::bc {
         // count returns instruction count
 
         size_t count() const noexcept;
-        
+
         // instr returns the instruction at x
 
         // behaviour is undefined if x is out-of-bounds
@@ -280,10 +334,11 @@ namespace yama::bc {
         bool reinit_flag(size_t x) const noexcept;
 
 
+        std::string fmt_instr(size_t x, const char* tab = "    ") const;
         std::string fmt_disassembly(const char* tab = "    ") const;
 
 
-        static_assert(opcodes == 10);
+        static_assert(opcodes == 11);
 
         code& add_noop();
         code& add_load_none(uint8_t A, bool reinit = false);
@@ -294,13 +349,70 @@ namespace yama::bc {
         code& add_call_nr(uint8_t A, uint8_t B);
         code& add_ret(uint8_t A);
         code& add_jump(int16_t sBx);
-        code& add_jump_if(uint8_t A, int16_t sBx);
+        code& add_jump_true(uint8_t A, int16_t sBx);
+        code& add_jump_false(uint8_t A, int16_t sBx);
 
 
     private:
 
         std::vector<instr> _instrs;
         std::vector<bool> _reinit_flags;
+    };
+
+
+    struct sym final {
+        size_t  index;  // the index of the instr this symbol
+        str     origin; // the string (eg. a file path) describing where the contents referenced by the symbol resides
+        size_t  ch;     // the character number (indexes from 1)
+        size_t  ln;     // the line number (indexes from 1)
+
+
+        bool operator==(const sym&) const noexcept = default;
+
+
+        std::string fmt() const;
+    };
+}
+
+
+YAMA_SETUP_FORMAT(yama::bc::sym, x.fmt());
+
+
+namespace yama::bc {
+
+
+    class syms final {
+    public:
+
+        syms() = default;
+        syms(const syms&) = default;
+        syms(syms&&) noexcept = default;
+        ~syms() noexcept = default;
+        syms& operator=(const syms&) = default;
+        syms& operator=(syms&&) noexcept = default;
+
+
+        // fetch fetches the symbol for the instr at index, if any
+
+        std::optional<sym> fetch(size_t index) const noexcept;
+        std::optional<sym> operator[](size_t index) const noexcept;
+
+
+        // add adds a new symbol for the instr at index, overwriting
+        // any existing association
+
+        // ch and ln index from 1, not 0, however this being respected
+        // by the API users is not enforced
+
+        // index does not need to be in-bounds of the code object these
+        // symbols are being used w/, as that association is a convention
+
+        syms& add(size_t index, str origin, size_t ch, size_t ln);
+
+
+    private:
+
+        std::unordered_map<size_t, sym> _syms;
     };
 }
 

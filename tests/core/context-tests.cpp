@@ -108,6 +108,7 @@ public:
 
     bool build_push_and_load_f_type_for_call_tests();
     bool build_push_and_load_g_type_for_call_tests();
+    bool build_push_and_load_h_type_for_call_tests();
 
 
 protected:
@@ -1262,6 +1263,34 @@ bool ContextTests::build_push_and_load_g_type_for_call_tests() {
         dm->load("g"_str); // <- skip tests if we can't even load g properly
 }
 
+bool ContextTests::build_push_and_load_h_type_for_call_tests() {
+    const auto h_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true)
+        .add_load_arg(1, 1, true)
+        .add_call(0, 2, 2, true)
+        .add_ret(2);
+    std::cerr << h_bcode.fmt_disassembly() << "\n";
+    const yama::const_table_info h_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0 }, 0));
+    yama::type_info h_info{
+        .fullname = "h"_str,
+        .consts = h_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 3,
+            .bcode = h_bcode,
+        },
+    };
+    return
+        dm->push(h_info) &&
+        dm->load("h"_str); // <- skip tests if we can't even load h properly
+}
+
 // NOTE: the below tests sorta conflate the two ll_call overloads,
 //       w/ them presuming that the impl of them share the same
 //       underlying core behaviour
@@ -1375,6 +1404,53 @@ TEST_F(ContextTests, LLCall_OverwritesStateOfRet) {
     ASSERT_TRUE(ctx->ll_call(0, 2, 2).good());
 
     EXPECT_EQ(ctx->ll_local(2), std::make_optional(ctx->ll_new_int(-4)));
+}
+
+TEST_F(ContextTests, LLCall_BCodeExec) {
+    ASSERT_TRUE(build_push_and_load_f_type_for_call_tests());
+    ASSERT_TRUE(build_push_and_load_h_type_for_call_tests());
+    const yama::type f = dm->load("f"_str).value();
+    const yama::type h = dm->load("h"_str).value();
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, h).good()); // call object
+    ASSERT_TRUE(ctx->ll_load_int(1, -4).good()); // argument
+    ASSERT_TRUE(ctx->ll_load_int(2, 0).good()); // result
+    globals.int_arg_value_called_with = -4;
+    ASSERT_TRUE(ctx->ll_call(0, 2, 2).good());
+
+    EXPECT_EQ(ctx->ll_crashes(), 0);
+    EXPECT_FALSE(ctx->ll_crashing());
+    EXPECT_TRUE(ctx->ll_is_user());
+    EXPECT_EQ(ctx->ll_max_call_frames(), config.max_call_frames);
+    EXPECT_EQ(ctx->ll_call_frames(), 1);
+    EXPECT_EQ(ctx->ll_locals(), config.user_locals);
+
+    EXPECT_EQ(ctx->ll_local(2), std::make_optional(ctx->ll_new_int(-4)));
+
+    EXPECT_TRUE(globals.even_reached_0); // acknowledge f call behaviour occurred
+    EXPECT_TRUE(globals.snapshot_0);
+    if (globals.snapshot_0) {
+        const auto& ss = *globals.snapshot_0;
+        EXPECT_EQ(ss.consts.size(), 1);
+        EXPECT_TRUE(ss.consts.type(0));
+        if (ss.consts.type(0)) {
+            EXPECT_EQ(ss.consts.type(0).value(), dm->load_int());
+        }
+        EXPECT_FALSE(ss.is_user);
+        EXPECT_EQ(ss.max_call_frames, config.max_call_frames);
+        EXPECT_EQ(ss.call_frames, 3);
+        EXPECT_EQ(ss.args, 2);
+        EXPECT_EQ(ss.locals, 3);
+
+        EXPECT_EQ(ss.arg0, std::make_optional(ctx->ll_new_fn(f).value()));
+        EXPECT_EQ(ss.arg1, std::make_optional(ctx->ll_new_int(-4)));
+        EXPECT_EQ(ss.arg2, std::nullopt);
+
+        EXPECT_EQ(ss.local0, std::make_optional(ctx->ll_new_none()));
+        EXPECT_EQ(ss.local1, std::make_optional(ctx->ll_new_none()));
+        EXPECT_EQ(ss.local2, std::make_optional(ctx->ll_new_none()));
+        EXPECT_EQ(ss.local3, std::nullopt);
+    }
 }
 
 TEST_F(ContextTests, LLCall_NoResultOverload) {
@@ -1637,7 +1713,7 @@ TEST_F(ContextTests, LLRet_AllowsReturningWrongTypedObject) {
         
         // checking return type of return value object is beyond the scope 
         // of this level of abstraction, and so for safety this is allowed
-        // as a almost a kind of *feature* of the low-level command interface
+        // as almost a kind of *feature* of the low-level command interface
 
         if (ctx.ll_load_uint(0, 301).bad()) return;
         if (ctx.ll_ret(0).bad()) return;

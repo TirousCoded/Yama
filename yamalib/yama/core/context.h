@@ -10,16 +10,18 @@
 #include "domain.h"
 #include "object_ref.h"
 
+#include "const_table.h"
+
 
 namespace yama {
 
 
     // TODO: in the future, we're gonna need to impl a way to allow for things
-    //       like destructors to be able to run when crashing, w / them likewise
+    //       like destructors to be able to run when crashing, w/ them likewise
     //       having a notion of they themselves being able to crash
 
     // TODO: we're also gonna have to have cleanup semantics for other forms of
-    //       object state, like* global* objects, when we add things like that
+    //       object state, like *global* objects, when we add things like that
 
     // IMPORTANT:
     //      (call stack & call frames)
@@ -126,8 +128,7 @@ namespace yama {
     struct ctx_config final {
         // TODO: maybe in the future replace below undefined behaviour w/ something *safer*
 
-        // IMPORTANT:
-        //      undefined behaviour if max_call_frames == 0 (ie. can't have user call frame)
+        // IMPORTANT: undefined behaviour if max_call_frames == 0 (ie. if can't have user call frame)
 
         size_t max_call_frames  = 32; // max call frames before overflow
         size_t user_locals      = 32; // user call frame's local register table size
@@ -393,7 +394,7 @@ namespace yama {
         size_t _crashes = 0;
         bool _crashing = false;
 
-        // NOTE: _cf_t must used indices, as reallocs in _registers will invalidate pointers
+        // NOTE: _cf_t must use indices, as reallocs in _registers will invalidate pointers
 
         struct _cf_t final {
             size_t                      args_offset;    // offset into _registers where call args begin
@@ -403,10 +404,10 @@ namespace yama {
             std::optional<object_ref>   returned;       // cache for returned object, if any
         };
         
-        std::vector<object_ref> _registers; // storage for local register tables for call frames
-        std::vector<_cf_t>      _callstk;   // the call stack
+        std::vector<object_ref>     _registers; // storage for local register tables for call frames
+        std::vector<_cf_t>          _callstk;   // the call stack
 
-        const_table*            _consts;    // the constant table available to ll_load_const
+        std::optional<const_table>  _consts;    // the constant table available to ll_load_const
 
         // _cf_view_t is used to easily view contents of a call frame
 
@@ -452,6 +453,17 @@ namespace yama {
         // and a new one pushed
 
         void _try_handle_crash_for_user_cf();
+
+
+        // TODO: gonna need a '_fmt_Kt', or others, later when we use constants 
+        //       for things other than just object constants
+
+        // special formatter methods used to help w/ low-level command diagnostics
+
+        std::string _fmt_R_no_preview(local_t x);
+        std::string _fmt_R(local_t x);
+        std::string _fmt_Ko(const_t x);
+        std::string _fmt_Arg(arg_t x);
 
 
         cmd_status _load(local_t x, borrowed_ref v);

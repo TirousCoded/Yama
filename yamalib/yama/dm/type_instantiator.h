@@ -12,6 +12,9 @@
 #include "../core/type.h"
 
 
+#define _DUMP_LOG 0
+
+
 namespace yama::dm {
 
 
@@ -67,13 +70,16 @@ namespace yama::dm {
         Allocator _al;
 
 
-        inline void _instantiate_begin();
-        inline void _instantiate_end(size_t n);
+        inline auto& get_type_info_db() const noexcept { return deref_assert(_type_info_db); }
+        inline auto& get_type_db() const noexcept { return deref_assert(_type_db); }
+        inline auto& get_type_batch_db() const noexcept { return deref_assert(_type_batch_db); }
 
         inline std::optional<res<type_instance<Allocator>>> _fetch(const str& type_fullname) const noexcept;
         inline std::optional<res<type_instance<Allocator>>> _fetch_with_batch(const str& type_fullname) const noexcept;
+
         inline void _instantiate(const str& type_fullname);
         inline bool _check_already_instantiated(const str& type_fullname) const;
+
         inline bool _add_type(const str& type_fullname);
         inline void _transfer_batch_into_instances();
         inline void _dump_batch() noexcept;
@@ -82,25 +88,35 @@ namespace yama::dm {
         inline res<type_instance<Allocator>> _create_instance(const str& type_fullname, res<type_info> info);
         inline void _add_to_batch(res<type_instance<Allocator>> instance);
 
+        // herein, 'resolving' refers to the act of linking new types in the batch, w/
+        // new types being added recursively as needed
+
+        // resolving does not check the validity of links (ie. whether the type linked
+        // against a given type constant symbol is reasonable to do so w/)
+
         inline bool _resolve_consts(type_instance<Allocator>& instance, res<type_info> info);
         inline bool _resolve_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-
-        static_assert(const_types == 7);
-        inline bool _resolve_int_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_uint_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_float_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_bool_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_char_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_primitive_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-        inline bool _resolve_function_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
-
         template<const_type C>
         inline bool _resolve_scalar_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
         template<const_type C>
         inline bool _resolve_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
 
-        inline bool _check_for_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved);
-        inline bool _check_for_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved);
+        // herein, 'checking' refers to the act of checking to see whether or not the
+        // type constant links established during resolving are reasonable
+
+        // resolving is performed first, and fully, to ensure that there's no ambiguity
+        // as to whether checking will have access to any given piece of linkage info
+        // (ie. it will never encounter partially linked type instances)
+
+        inline bool _check_batch();
+        inline bool _check_consts(type_instance<Allocator>& instance, res<type_info> info);
+        inline bool _check_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
+        template<const_type C>
+        inline bool _check_scalar_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
+        template<const_type C>
+        inline bool _check_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index);
+        inline bool _check_no_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved);
+        inline bool _check_no_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved);
     };
 
 
@@ -119,41 +135,15 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline size_t type_instantiator<Allocator>::instantiate(const str& fullname) {
-        _instantiate_begin();
-        size_t old_size{}, new_size{};
-        YAMA_DEREF_SAFE(_type_db) {
-            old_size = _type_db->size();
-            _instantiate(fullname);
-            new_size = _type_db->size();
-        }
-        YAMA_ASSERT(new_size >= old_size);
-        const size_t result = new_size - old_size;
-        _instantiate_end(result);
-        return result;
-    }
-
-    template<typename Allocator>
-    inline void type_instantiator<Allocator>::_instantiate_begin() {
-        YAMA_LOG(dbg(), type_instant_c, "type instant. batch...");
-    }
-
-    template<typename Allocator>
-    inline void type_instantiator<Allocator>::_instantiate_end(size_t n) {
-        if (n > 0) {
-            YAMA_LOG(dbg(), type_instant_c, "type instant. success! ({} types)", n);
-        }
-        else {
-            YAMA_LOG(dbg(), type_instant_c, "type instant. failure! ({} types)", n);
-        }
+        const size_t old_size = get_type_db().size();
+        _instantiate(fullname);
+        const size_t new_size = get_type_db().size();
+        return new_size - old_size;
     }
 
     template<typename Allocator>
     inline std::optional<res<type_instance<Allocator>>> type_instantiator<Allocator>::_fetch(const str& type_fullname) const noexcept {
-        std::optional<res<type_instance<Allocator>>> result{};
-        YAMA_DEREF_SAFE(_type_db) {
-            result = _type_db->pull(type_fullname);
-        }
-        return result;
+        return get_type_db().pull(type_fullname);
     }
 
     template<typename Allocator>
@@ -163,10 +153,7 @@ namespace yama::dm {
             return first_attempt;
         }
         // if that didn't work, attempt to fetch from _type_batch_db
-        std::optional<res<type_instance<Allocator>>> second_attempt{};
-        YAMA_DEREF_SAFE(_type_batch_db) {
-            second_attempt = _type_batch_db->pull(type_fullname);
-        }
+        const auto second_attempt = get_type_batch_db().pull(type_fullname);
         return second_attempt;
     }
 
@@ -175,18 +162,20 @@ namespace yama::dm {
         if (_check_already_instantiated(type_fullname)) {
             return;
         }
-        if (_add_type(type_fullname)) {
-            _transfer_batch_into_instances();
+        if (!_add_type(type_fullname)) {
+            _dump_batch();
+            return;
         }
-        _dump_batch();
+        if (!_check_batch()) {
+            _dump_batch();
+            return;
+        }
+        _transfer_batch_into_instances();
     }
 
     template<typename Allocator>
     inline bool type_instantiator<Allocator>::_check_already_instantiated(const str& type_fullname) const {
-        bool result = false;
-        YAMA_DEREF_SAFE(_type_db) {
-            result = _type_db->exists(type_fullname);
-        }
+        const bool result = get_type_db().exists(type_fullname);
         if (result) {
             YAMA_LOG(dbg(), type_instant_c, "error: type {} already instantiated!", type_fullname);
         }
@@ -224,25 +213,25 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline void type_instantiator<Allocator>::_transfer_batch_into_instances() {
-        YAMA_DEREF_SAFE(_type_db && _type_batch_db) {
-            _type_batch_db->transfer(*_type_db);
-        }
+        get_type_batch_db().transfer(get_type_db());
+        _dump_batch();
     }
 
     template<typename Allocator>
     inline void type_instantiator<Allocator>::_dump_batch() noexcept {
-        YAMA_DEREF_SAFE(_type_batch_db) {
-            _type_batch_db->reset();
-        }
+        get_type_batch_db().reset();
     }
 
     template<typename Allocator>
     inline std::optional<res<type_info>> type_instantiator<Allocator>::_pull_type_info(const str& type_fullname) {
-        std::optional<res<type_info>> info{};
-        YAMA_DEREF_SAFE(_type_info_db) {
-            info = _type_info_db->pull(type_fullname);
+        const auto result = get_type_info_db().pull(type_fullname);
+        if (!result) {
+            YAMA_LOG(
+                dbg(), type_instant_c,
+                "error: no type info exists for type {}!",
+                type_fullname);
         }
-        return info;
+        return result;
     }
 
     template<typename Allocator>
@@ -252,9 +241,7 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline void type_instantiator<Allocator>::_add_to_batch(res<type_instance<Allocator>> instance) {
-        YAMA_DEREF_SAFE(_type_batch_db) {
-            _type_batch_db->push(instance);
-        }
+        get_type_batch_db().push(instance);
     }
 
     template<typename Allocator>
@@ -270,54 +257,19 @@ namespace yama::dm {
 
     template<typename Allocator>
     inline bool type_instantiator<Allocator>::_resolve_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        bool result{};
         static_assert(const_types == 7);
         switch (info->consts.const_type(index).value()) {
-        case int_const:             result = _resolve_int_const(instance, info, index);             break;
-        case uint_const:            result = _resolve_uint_const(instance, info, index);            break;
-        case float_const:           result = _resolve_float_const(instance, info, index);           break;
-        case bool_const:            result = _resolve_bool_const(instance, info, index);            break;
-        case char_const:            result = _resolve_char_const(instance, info, index);            break;
-        case primitive_type_const:  result = _resolve_primitive_type_const(instance, info, index);  break;
-        case function_type_const:   result = _resolve_function_type_const(instance, info, index);   break;
-        default:                    YAMA_DEADEND;                                                   break;
+        case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);             break;
+        case uint_const:            return _resolve_scalar_const<uint_const>(instance, info, index);            break;
+        case float_const:           return _resolve_scalar_const<float_const>(instance, info, index);           break;
+        case bool_const:            return _resolve_scalar_const<bool_const>(instance, info, index);            break;
+        case char_const:            return _resolve_scalar_const<char_const>(instance, info, index);            break;
+        case primitive_type_const:  return _resolve_type_const<primitive_type_const>(instance, info, index);    break;
+        case function_type_const:   return _resolve_type_const<function_type_const>(instance, info, index);     break;
+        default:                    YAMA_DEADEND;                                                               break;
         }
-        return result;
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_int_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_scalar_const<int_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_uint_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_scalar_const<uint_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_float_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_scalar_const<float_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_bool_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_scalar_const<bool_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_char_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_scalar_const<char_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_primitive_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_type_const<primitive_type_const>(instance, info, index);
-    }
-
-    template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_resolve_function_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
-        return _resolve_type_const<function_type_const>(instance, info, index);
+        YAMA_DEADEND;
+        return bool();
     }
 
     template<typename Allocator>
@@ -340,20 +292,73 @@ namespace yama::dm {
         if (!_add_type(fullname)) {
             return false;
         }
-        YAMA_ASSERT(_fetch_with_batch(fullname));
-        const auto& resolved = type(**_fetch_with_batch(fullname));
-        if (!_check_for_kind_mismatch(instance, info, index, resolved)) {
-            return false;
-        }
-        if (!_check_for_callsig_mismatch(instance, info, index, resolved)) {
-            return false;
-        }
+        const auto& resolved = type(*_fetch_with_batch(fullname).value());
+#if _DUMP_LOG
+        std::cerr << std::format(">> {} type const. {} => {}\n", instance.fullname(), index, resolved);
+#endif
         instance.put<C>(index, resolved);
         return true;
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_for_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved) {
+    inline bool type_instantiator<Allocator>::_check_batch() {
+        for (const auto& I : get_type_batch_db()) {
+            auto& instance = *I.second;
+            const auto& info = internal::get_type_mem(instance)->info;
+            if (!_check_consts(instance, info)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template<typename Allocator>
+    inline bool type_instantiator<Allocator>::_check_consts(type_instance<Allocator>& instance, res<type_info> info) {
+        const auto t = type(instance);
+        for (const_t i = 0; i < t.consts().size(); i++) {
+            if (!_check_const(instance, info, i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template<typename Allocator>
+    inline bool type_instantiator<Allocator>::_check_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
+        static_assert(const_types == 7);
+        switch (info->consts.const_type(index).value()) {
+        case int_const:             return _check_scalar_const<int_const>(instance, info, index);           break;
+        case uint_const:            return _check_scalar_const<uint_const>(instance, info, index);          break;
+        case float_const:           return _check_scalar_const<float_const>(instance, info, index);         break;
+        case bool_const:            return _check_scalar_const<bool_const>(instance, info, index);          break;
+        case char_const:            return _check_scalar_const<char_const>(instance, info, index);          break;
+        case primitive_type_const:  return _check_type_const<primitive_type_const>(instance, info, index);  break;
+        case function_type_const:   return _check_type_const<function_type_const>(instance, info, index);   break;
+        default:                    YAMA_DEADEND;                                                           break;
+        }
+        YAMA_DEADEND;
+        return bool();
+    }
+
+    template<typename Allocator>
+    template<const_type C>
+    inline bool type_instantiator<Allocator>::_check_scalar_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
+        return true; // nothing to check
+    }
+
+    template<typename Allocator>
+    template<const_type C>
+    inline bool type_instantiator<Allocator>::_check_type_const(type_instance<Allocator>& instance, res<type_info> info, const_t index) {
+        YAMA_ASSERT(!type(instance).consts().is_stub(index));
+        const str fullname = info->consts.fullname(index).value();
+        const auto& resolved = type(*_fetch_with_batch(fullname).value());
+        return
+            _check_no_kind_mismatch(instance, info, index, resolved) &&
+            _check_no_callsig_mismatch(instance, info, index, resolved);
+    }
+
+    template<typename Allocator>
+    inline bool type_instantiator<Allocator>::_check_no_kind_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved) {
         const auto  t               = type(instance);
         const str   symbol_fullname = info->consts.fullname(index).value();
         const auto  symbol_kind     = info->consts.kind(index).value();
@@ -370,7 +375,7 @@ namespace yama::dm {
     }
 
     template<typename Allocator>
-    inline bool type_instantiator<Allocator>::_check_for_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved) {
+    inline bool type_instantiator<Allocator>::_check_no_callsig_mismatch(type_instance<Allocator>& instance, res<type_info> info, const_t index, const type& resolved) {
         // TODO: right now type constant callsig strings are identical to the fmt of the callsig of
         //       the instantiated type's they specify (due to Yama's current lack of namespaces 
         //       or generics)
@@ -381,15 +386,6 @@ namespace yama::dm {
         // TODO: in particular, we're gonna need a way to translate the callsig fmt string of
         //       resolved into the *language* of the constant symbol table of the constant symbol
         //       at index
-        // TODO: if when trying to impl above we encounter issues involving us needing complete
-        //       linkage info before being able to resolve this, maybe seperate 'linking' and 
-        //       'verifying' (which would be where these checks are done), making the ladder such
-        //       that it occurs AFTER all actual linking has occurred
-        //
-        //       to do this, in _instantiate, wrap the '_transfer_batch_into_instances()' call in
-        //       a nested if-statement which calls a '_verify_batch' method, and then make _verify_batch
-        //       scan the batch, then scan the type consts of the types therein, and perform these
-        //       kind and callsig mismatch checks there instead
         const auto t                = type(instance);
         const auto symbol_callsig   = info->consts.callsig(index);
         const auto resolved_callsig = resolved.callsig();
@@ -400,19 +396,16 @@ namespace yama::dm {
         }
         // otherwise, expect outside code to guarantee no kind mismatch
         YAMA_ASSERT(symbol_callsig && resolved_callsig);
-        bool result{};
-        YAMA_DEREF_SAFE(symbol_callsig) {
-            // get fmt string of resolved_callsig and compare it against symbol_callsig's string
-            const auto& symbol_callsig_s    = symbol_callsig->fmt(info->consts);
-            const auto  resolved_callsig_s  = resolved_callsig->fmt();
-            result = symbol_callsig_s == resolved_callsig_s;
-            if (!result) {
-                YAMA_LOG(
-                    dbg(), type_instant_c,
-                    "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol's callsig {} doesn't match the resolved type's callsig {}!",
-                    t.fullname(), info->consts.fullname(index).value(), index, resolved.fullname(),
-                    symbol_callsig_s, resolved_callsig_s);
-            }
+        // get fmt string of resolved_callsig and compare it against symbol_callsig's string
+        const auto& symbol_callsig_s = deref_assert(symbol_callsig).fmt(info->consts);
+        const auto  resolved_callsig_s = deref_assert(resolved_callsig).fmt();
+        const bool  result = symbol_callsig_s == resolved_callsig_s;
+        if (!result) {
+            YAMA_LOG(
+                dbg(), type_instant_c,
+                "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol's callsig {} doesn't match the resolved type's callsig {}!",
+                t.fullname(), info->consts.fullname(index).value(), index, resolved.fullname(),
+                symbol_callsig_s, resolved_callsig_s);
         }
         return result;
     }

@@ -5,6 +5,9 @@
 #include <yama/core/bcode.h>
 
 
+using namespace yama::string_literals;
+
+
 // TODO: copy/move ctor/assign have not been unit tested yet
 
 
@@ -92,7 +95,7 @@ TEST(BCodeTests, ReinitFlag) {
 TEST(BCodeTests, Construction) {
     yama::bc::code a{};
 
-    static_assert(yama::bc::opcodes == 10);
+    static_assert(yama::bc::opcodes == 11);
 
     a
         .add_noop()
@@ -109,9 +112,10 @@ TEST(BCodeTests, Construction) {
         .add_call_nr(10, 11)
         .add_ret(10)
         .add_jump(-6)
-        .add_jump_if(10, -6);
+        .add_jump_true(10, -6)
+        .add_jump_false(10, -6);
 
-    ASSERT_EQ(a.count(), 15);
+    ASSERT_EQ(a.count(), 16);
 
     std::cerr << a.fmt_disassembly() << "\n";
 
@@ -211,9 +215,69 @@ TEST(BCodeTests, Construction) {
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::jump_if);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::jump_true);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].sBx, -6);
     EXPECT_FALSE(a.reinit_flag(i));
+
+    i++;
+
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::jump_false);
+    EXPECT_EQ(a[i].A, 10);
+    EXPECT_EQ(a[i].sBx, -6);
+    EXPECT_FALSE(a.reinit_flag(i));
+}
+
+TEST(BCodeTests, Syms_Empty) {
+    yama::bc::syms a{};
+
+    EXPECT_FALSE(a.fetch(0));
+    EXPECT_FALSE(a.fetch(1));
+    EXPECT_FALSE(a.fetch(2));
+    EXPECT_FALSE(a.fetch(3));
+
+    EXPECT_FALSE(a[0]);
+    EXPECT_FALSE(a[1]);
+    EXPECT_FALSE(a[2]);
+    EXPECT_FALSE(a[3]);
+}
+
+TEST(BCodeTests, Syms_NonEmpty) {
+    const auto a =
+        yama::bc::syms()
+        .add(1, "abc"_str, 10, 14)
+        .add(3, "def"_str, 1, 1);
+
+    EXPECT_FALSE(a.fetch(0));
+    EXPECT_TRUE(a.fetch(1));
+    EXPECT_FALSE(a.fetch(2));
+    EXPECT_TRUE(a.fetch(3));
+
+    EXPECT_FALSE(a[0]);
+    EXPECT_TRUE(a[1]);
+    EXPECT_FALSE(a[2]);
+    EXPECT_TRUE(a[3]);
+
+    const yama::bc::sym other_a{ .index = 1, .origin = "abc"_str, .ch = 10, .ln = 14 };
+    const yama::bc::sym other_b{ .index = 3, .origin = "def"_str, .ch = 1, .ln = 1 };
+
+    if (const auto v = a.fetch(1)) EXPECT_EQ(*v, other_a);
+    if (const auto v = a.fetch(3)) EXPECT_EQ(*v, other_b);
+
+    if (const auto v = a[1]) EXPECT_EQ(*v, other_a);
+    if (const auto v = a[3]) EXPECT_EQ(*v, other_b);
+}
+
+TEST(BCodeTests, Syms_AddOverwritesExisting) {
+    const auto a =
+        yama::bc::syms()
+        .add(0, "abc"_str, 10, 14)
+        .add(0, "def"_str, 1, 1);
+
+    ASSERT_TRUE(a[0]);
+
+    const yama::bc::sym other{ .index = 0, .origin = "def"_str, .ch = 1, .ln = 1 };
+
+    EXPECT_EQ(a[0].value(), other);
 }
 

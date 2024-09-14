@@ -32,6 +32,7 @@ namespace yama {
         call_fn                         call_fn;        // the call_fn encapsulating call behaviour
         size_t                          locals;         // the call frame's local register table size
         bc::code                        bcode;          // the bytecode (no static verif check if call_fn != bcode_call_fn)
+        bc::syms                        bcodesyms;      // the bytecode symbol info
     };
 
     struct type_info final {
@@ -54,6 +55,7 @@ namespace yama {
         std::optional<call_fn> call_fn() const noexcept;
         size_t locals() const noexcept; // returns 0 if the type is not callable
         const bc::code* bcode() const noexcept;
+        const bc::syms* bcodesyms() const noexcept;
     };
 }
 
