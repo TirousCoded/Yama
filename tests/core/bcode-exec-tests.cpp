@@ -12,14 +12,6 @@
 using namespace yama::string_literals;
 
 
-// TODO: add tests for crashing (due to deliberate ll_crash, or call stack overflow)
-// TODO: have it print crash error message w/ bcode symbol info when available
-// TODO: also, have it print a stack trace
-// TODO: also, gonna have to update ll_crash to support error messages + symbol info
-
-// TODO: maybe replace 'll_call(~, ~, no_result_t)' w/ 'll_call_nr(~, ~)'
-
-
 class BCodeExecTests : public testing::Test {
 public:
 
@@ -217,12 +209,13 @@ TEST_F(BCodeExecTests, Instr_Copy) {
     EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
 }
 
-static bool was_called = false;
+static bool was_called_0 = false;
+static bool was_called_1 = false;
 
 TEST_F(BCodeExecTests, Instr_Call) {
     auto plus_fn = 
-        [](yama::context& ctx, yama::const_table consts) {
-        was_called = true;
+        [](yama::context& ctx) {
+        was_called_0 = true;
         yama::int_t result =
             ctx.ll_arg(1).value().as_int() +
             ctx.ll_arg(2).value().as_int() +
@@ -276,20 +269,309 @@ TEST_F(BCodeExecTests, Instr_Call) {
 
     const auto f = ctx->load("f"_str).value();
 
-    was_called = false;
+    was_called_0 = false;
 
     ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
     ASSERT_TRUE(ctx->ll_call(0, 1, 1).good());
 
-    EXPECT_TRUE(was_called);
+    EXPECT_TRUE(was_called_0);
 
     EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(149));
 }
 
+TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
+    auto panic_fn = 
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        ctx.ll_panic();
+        };
+    const auto panic_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info panic_info{
+        .fullname = "panic"_str,
+        .consts = panic_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = panic_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn = 
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // panic
+        .add_call(0, 1, 0, true)
+        .add_load_const(0, 2, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("panic"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(panic_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_0 = false;
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_TRUE(was_called_0);
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
+}
+
+TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
+    auto panic_fn = 
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        // should induce panic by failing to call ll_ret
+        };
+    const auto panic_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info panic_info{
+        .fullname = "panic"_str,
+        .consts = panic_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = panic_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn = 
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // panic
+        .add_call(0, 1, 0, true)
+        .add_load_const(0, 2, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("panic"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(panic_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_0 = false;
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_TRUE(was_called_0);
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
+}
+
+TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
+    ctx->dbg()->cats &= ~yama::bcode_exec_c; // make output easier to read
+
+    // this 'dummy' function is here as it will be the thing that will actually trigger
+    // the call stack overflow, which otherwise would be fail_safe, but I don't want it
+    // to be the thing triggering it, as that's not its role (also the fact that it returns
+    // something means it wouldn't work for testing call_nr)
+
+    auto dummy_fn =
+        [](yama::context& ctx) {
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto dummy_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info dummy_info{
+        .fullname = "dummy"_str,
+        .consts = dummy_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = dummy_fn,
+            .locals = 1,
+        },
+    };
+
+    auto fail_safe_fn = 
+        [](yama::context& ctx) {
+        // in the event of the impl actually allowing for infinite (or at least until
+        // the VM breaks) number of calls, this *fail safe* function will cause it to 
+        // stop after proving its point, so we can get useful testing data
+        const bool triggered = ctx.ll_call_frames() > ctx.ll_max_call_frames();
+        if (triggered) {
+            YAMA_LOG(ctx.dbg(), yama::general_c, "** fail safe triggered! **");
+        }
+        if (ctx.ll_load_bool(0, triggered).bad()) return;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto fail_safe_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str);
+    yama::type_info fail_safe_info{
+        .fullname = "fail_safe"_str,
+        .consts = fail_safe_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = fail_safe_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn = 
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 5, true) // dummy
+        .add_call(0, 1, 0, true) // <- the call instr under test
+        .add_load_const(0, 2, true) // fail_safe
+        .add_call(0, 1, 0, true)
+        .add_jump_false(0, 2)
+        // block #2
+        .add_load_none(0, true)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 4, true) // f (recurse)
+        .add_call(0, 1, 0, true)
+        // infinite recursion should induce panic by this point
+        .add_load_const(0, 3, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_primitive_type("Bool"_str)
+        .add_function_type("fail_safe"_str, yama::make_callsig_info({}, 1))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("f"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("dummy"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(dummy_info));
+    ASSERT_TRUE(ctx->dm().push(fail_safe_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
+}
+
 TEST_F(BCodeExecTests, Instr_CallNR) {
     auto plus_fn =
-        [](yama::context& ctx, yama::const_table consts) {
-        was_called = true;
+        [](yama::context& ctx) {
+        was_called_0 = true;
         yama::int_t result =
             ctx.ll_arg(1).value().as_int() +
             ctx.ll_arg(2).value().as_int() +
@@ -344,14 +626,303 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
 
     const auto f = ctx->load("f"_str).value();
 
-    was_called = false;
+    was_called_0 = false;
 
     ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
     ASSERT_TRUE(ctx->ll_call(0, 1, 1).good());
 
-    EXPECT_TRUE(was_called);
+    EXPECT_TRUE(was_called_0);
 
     EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_none());
+}
+
+TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
+    auto panic_fn =
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        ctx.ll_panic();
+        };
+    const auto panic_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info panic_info{
+        .fullname = "panic"_str,
+        .consts = panic_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = panic_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn =
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // panic
+        .add_call_nr(0, 1)
+        .add_load_const(0, 2, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("panic"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(panic_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_0 = false;
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_TRUE(was_called_0);
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
+}
+
+TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
+    auto panic_fn =
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        // should induce panic by failing to call ll_ret
+        };
+    const auto panic_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info panic_info{
+        .fullname = "panic"_str,
+        .consts = panic_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = panic_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn =
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 1, true) // panic
+        .add_call_nr(0, 1)
+        .add_load_const(0, 2, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_function_type("panic"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(panic_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_0 = false;
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_TRUE(was_called_0);
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
+}
+
+TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
+    ctx->dbg()->cats &= ~yama::bcode_exec_c; // make output easier to read
+
+    // this 'dummy' function is here as it will be the thing that will actually trigger
+    // the call stack overflow, which otherwise would be fail_safe, but I don't want it
+    // to be the thing triggering it, as that's not its role (also the fact that it returns
+    // something means it wouldn't work for testing call_nr)
+
+    auto dummy_fn =
+        [](yama::context& ctx) {
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto dummy_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info dummy_info{
+        .fullname = "dummy"_str,
+        .consts = dummy_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = dummy_fn,
+            .locals = 1,
+        },
+    };
+
+    auto fail_safe_fn =
+        [](yama::context& ctx) {
+        // in the event of the impl actually allowing for infinite (or at least until
+        // the VM breaks) number of calls, this *fail safe* function will cause it to 
+        // stop after proving its point, so we can get useful testing data
+        const bool triggered = ctx.ll_call_frames() > ctx.ll_max_call_frames();
+        if (triggered) {
+            YAMA_LOG(ctx.dbg(), yama::general_c, "** fail safe triggered! **");
+        }
+        if (ctx.ll_load_bool(0, triggered).bad()) return;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto fail_safe_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str);
+    yama::type_info fail_safe_info{
+        .fullname = "fail_safe"_str,
+        .consts = fail_safe_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = fail_safe_fn,
+            .locals = 1,
+        },
+    };
+
+    auto never_reached_fn =
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.ll_ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info never_reached_info{
+        .fullname = "never_reached"_str,
+        .consts = never_reached_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = never_reached_fn,
+            .locals = 1,
+        },
+    };
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_load_const(0, 5, true) // dummy
+        .add_call_nr(0, 1) // <- the call_nr instr under test
+        .add_load_const(0, 2, true) // fail_safe
+        .add_call(0, 1, 0, true)
+        .add_jump_false(0, 2)
+        // block #2
+        .add_load_none(0, true)
+        .add_ret(0)
+        // block #3
+        .add_load_const(0, 4, true) // f (recurse)
+        .add_call(0, 1, 0, true)
+        // infinite recursion should induce panic by this point
+        .add_load_const(0, 3, true) // never_reached
+        .add_call(0, 1, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_primitive_type("Bool"_str)
+        .add_function_type("fail_safe"_str, yama::make_callsig_info({}, 1))
+        .add_function_type("never_reached"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("f"_str, yama::make_callsig_info({}, 0))
+        .add_function_type("dummy"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f_info{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    ASSERT_TRUE(ctx->dm().push(dummy_info));
+    ASSERT_TRUE(ctx->dm().push(fail_safe_info));
+    ASSERT_TRUE(ctx->dm().push(never_reached_info));
+    ASSERT_TRUE(ctx->dm().push(f_info));
+
+    const auto f = ctx->load("f"_str).value();
+
+    was_called_1 = false;
+
+    ASSERT_EQ(ctx->ll_panics(), 0);
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 1).bad()); // expect panic
+
+    EXPECT_EQ(ctx->ll_panics(), 1);
+
+    EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
 TEST_F(BCodeExecTests, Instr_Ret) {
@@ -529,7 +1100,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
     // test impl of a basic factorial function for testing recursion
 
     const auto subtract_fn =
-        [](yama::context& ctx, yama::const_table consts) {
+        [](yama::context& ctx) {
         const auto a = ctx.ll_arg(1).value().as_uint();
         const auto b = ctx.ll_arg(2).value().as_uint();
         const auto result = a - b;
@@ -550,7 +1121,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
     };
 
     const auto multiply_fn =
-        [](yama::context& ctx, yama::const_table consts) {
+        [](yama::context& ctx) {
         const auto a = ctx.ll_arg(1).value().as_uint();
         const auto b = ctx.ll_arg(2).value().as_uint();
         const auto result = a * b;
@@ -571,7 +1142,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
     };
     
     const auto greaterThanZero_fn =
-        [](yama::context& ctx, yama::const_table consts) {
+        [](yama::context& ctx) {
         const auto success = ctx.ll_arg(1).value().as_uint() > 0;
         if (ctx.ll_load_bool(0, success).bad()) return;
         if (ctx.ll_ret(0).bad()) return;
@@ -666,7 +1237,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
     // value as result, in order to test looping
 
     const auto addOne_fn =
-        [](yama::context& ctx, yama::const_table consts) {
+        [](yama::context& ctx) {
         const auto a = ctx.ll_arg(1).value().as_uint();
         const auto result = a + 1;
         if (ctx.ll_load_uint(0, result).bad()) return;
@@ -686,7 +1257,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
     };
 
     const auto lessThan_fn =
-        [](yama::context& ctx, yama::const_table consts) {
+        [](yama::context& ctx) {
         const auto a = ctx.ll_arg(1).value().as_uint();
         const auto b = ctx.ll_arg(2).value().as_uint();
         const auto result = a < b;

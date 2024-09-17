@@ -83,7 +83,7 @@ namespace yama::bc {
 
         // noop is the no-op instruction
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -95,7 +95,7 @@ namespace yama::bc {
 
         // load_none performs ll_load_none(R(A))
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -108,7 +108,7 @@ namespace yama::bc {
 
         // load_const performs ll_load_const(R(A), Ko(B))
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -123,7 +123,7 @@ namespace yama::bc {
 
         // load_arg performs ll_load_arg(R(A), Arg(B))
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -137,7 +137,7 @@ namespace yama::bc {
 
         // copy performs ll_copy(R(A), R(B))
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -155,8 +155,10 @@ namespace yama::bc {
         // [R(A), R(A+B-1)] defines the 'arg registers' of the call
         // [R(A+1), R(A+B-1)] defines the 'param arg registers' of the call
 
-        // crash conditions:
-        //      - if call behaviour crashes
+        // panic conditions:
+        //      - if call behaviour panics
+        //      - if call behaviour does not return anything
+        //      - if call call stack would overflow
 
         // static verif requires:
         //      - arg registers must be in-bounds
@@ -170,14 +172,16 @@ namespace yama::bc {
 
         // call_nr R(A) B
 
-        // call_nr performs ll_call(R(A), B, no_result)
+        // call_nr performs ll_call_nr(R(A), B)
 
         // R(A) defines the 'call object'
         // [R(A), R(A+B-1)] defines the 'args' of the call
         // [R(A+1), R(A+B-1)] defines the 'param args' of the call
 
-        // crash conditions:
-        //      - if call behaviour crashes
+        // panic conditions:
+        //      - if call behaviour panics
+        //      - if call behaviour does not return anything
+        //      - if call call stack would overflow
 
         // static verif requires:
         //      - arg registers must be in-bounds
@@ -191,7 +195,7 @@ namespace yama::bc {
 
         // ret performs ll_ret(R(A)), then instructs the interpreter to halt
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -212,7 +216,7 @@ namespace yama::bc {
         // branched-from instr reported is expected to be the branching 
         // instr itself (ie. NOT the instr *after* it)
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -234,7 +238,7 @@ namespace yama::bc {
         // branched-from instr reported is expected to be the branching 
         // instr itself (ie. NOT the instr *after* it)
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:
@@ -258,7 +262,7 @@ namespace yama::bc {
         // branched-from instr reported is expected to be the branching 
         // instr itself (ie. NOT the instr *after* it)
 
-        // crash conditions:
+        // panic conditions:
         //      n/a
 
         // static verif requires:

@@ -294,7 +294,7 @@ TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
 }
 
 TEST(TypeTests, CallFn) {
-    auto cf = [](yama::context&, yama::const_table) {};
+    auto cf = [](yama::context&) {};
 
     yama::type_info a_info{
         .fullname = "abc"_str,
@@ -594,7 +594,7 @@ TEST(TypeTests, Primitive) {
 }
 
 TEST(TypeTests, Function) {
-    auto a_call_fn = [](yama::context&, yama::const_table) {};
+    auto a_call_fn = [](yama::context&) {};
     auto a_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
     yama::type_info a_info{
         .fullname = "abc"_str,

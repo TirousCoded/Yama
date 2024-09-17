@@ -31,7 +31,7 @@ TEST(TypeInfoTests, PrimitiveType) {
 }
 
 TEST(TypeInfoTests, FunctionType) {
-    auto cf = [](yama::context&, yama::const_table) {};
+    auto cf = [](yama::context&) {};
 
     yama::type_info abc{
         .fullname = "abc"_str,

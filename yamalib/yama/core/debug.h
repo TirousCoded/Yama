@@ -40,8 +40,8 @@ namespace yama {
         general         = 1 << 0,           // general is for all non-specific debug logs
         static_verif    = 1 << 1,           // static verification debug logs
         type_instant    = 1 << 2,           // type instantiation debug logs
-        ctx_crash       = 1 << 3,           // context crash debug logs
-        ctx_llcmd      = 1 << 4,           // low-level command behaviour debug logs
+        ctx_panic       = 1 << 3,           // context panic debug logs
+        ctx_llcmd       = 1 << 4,           // low-level command behaviour debug logs
         bcode_exec      = 1 << 5,           // bcode execution trace debug logs
     };
 
@@ -55,7 +55,7 @@ namespace yama {
     constexpr auto general_c = debug_cat::general;
     constexpr auto static_verif_c = debug_cat::static_verif;
     constexpr auto type_instant_c = debug_cat::type_instant;
-    constexpr auto ctx_crash_c = debug_cat::ctx_crash;
+    constexpr auto ctx_panic_c = debug_cat::ctx_panic;
     constexpr auto ctx_llcmd_c = debug_cat::ctx_llcmd;
     constexpr auto bcode_exec_c = debug_cat::bcode_exec;
 }

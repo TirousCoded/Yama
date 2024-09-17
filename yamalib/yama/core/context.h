@@ -17,8 +17,8 @@ namespace yama {
 
 
     // TODO: in the future, we're gonna need to impl a way to allow for things
-    //       like destructors to be able to run when crashing, w/ them likewise
-    //       having a notion of they themselves being able to crash
+    //       like destructors to be able to run when panicking, w/ them likewise
+    //       having a notion of they themselves being able to panic
 
     // TODO: we're also gonna have to have cleanup semantics for other forms of
     //       object state, like *global* objects, when we add things like that
@@ -73,22 +73,22 @@ namespace yama {
     //      local register table registers are weakly typed, and as such the
     //      type of object they hold can change upon reassignment
     //
-    //      (crashing)
+    //      (panicking)
     //
-    //      Yama contexts 'crash' when they are irrecoverably in error
+    //      Yama contexts 'panic' when they are irrecoverably in error
     //
-    //      crashing results in Yama-related behaviour being aborted, and the
+    //      panicking results in Yama-related behaviour being aborted, and the
     //      entire object state, call stack, etc. of the context being reset
     // 
-    //      the user call frame is also reset when crashing
+    //      the user call frame is also reset when panicking
     // 
     //      methods of the context's low-level command interface which return
     //      cmd_status will, if they return a *bad* status object, be indicating
-    //      that command failure has resulted in a crash, either due to improper
+    //      that command failure has resulted in a panic, either due to improper
     //      command method usage, or for other reasons
     // 
     //      C++ functions defining call behaviour are expected to do the following
-    //      if by cmd_status or other means they detect a crash:
+    //      if by cmd_status or other means they detect a panic:
     //
     //          1) cease low-level command interface usage <- TODO: not 100% sure on this one
     //
@@ -117,10 +117,6 @@ namespace yama {
 
     using arg_t     = size_t; // arg_t encapsulates an index into a call argument slice
     using local_t   = size_t; // local_t encapsulates an index into a local register table
-
-    struct no_result_t final {};
-
-    constexpr auto no_result = no_result_t{};
 
 
     // ctx_config defines init config options for contexts
@@ -188,6 +184,17 @@ namespace yama {
         type load_char();
 
 
+        // TODO: fmt_stacktrace has not been unit tested
+
+        // fmt_stacktrace returns a formatted string of a trace of the current
+        // state of the call stack of the context
+
+        // skip tells fmt_stacktrace how many of the top call frames of the
+        // call stack should be ignored
+
+        std::string fmt_stacktrace(size_t skip = 0, const char* tab = "    ") const;
+
+
         // LOW-LEVEL COMMAND INTERFACE
         
         // IMPORTANT:
@@ -201,7 +208,7 @@ namespace yama {
         //       be able to do so yet
 
         // TODO: if later on ll_remove_ref will fire destructors, what happens
-        //       if doing so causes ll_remove_ref to *crash* the context?
+        //       if doing so causes ll_remove_ref to *panic*
         //
         //       should ll_remove_ref return cmd_status?
 
@@ -260,27 +267,31 @@ namespace yama {
 
         std::optional<canonical_ref> ll_new_fn(type f); // ll_new_fn returns std::nullopt if f is not a function type
 
-        // it's okay to use ll_crashing and ll_crashes while crashing,
+        // it's okay to use ll_panicking and ll_panics while panicking,
         // as the whole point of it is to detect it
 
-        size_t ll_crashes() noexcept;                       // ll_crashes returns the number of times the context has crashed
-        bool ll_crashing() noexcept;                        // ll_crashing queries if the context is crashing
+        size_t ll_panics() noexcept;                       // ll_panics returns the number of times the context has panicked
+        bool ll_panicking() noexcept;                        // ll_panicking queries if the context is panicking
         bool ll_is_user() noexcept;                         // ll_is_user returns if the current call frame is the user call frame
         size_t ll_max_call_frames() noexcept;               // ll_max_call_frames returns the max call stack height allowed
         size_t ll_call_frames() noexcept;                   // ll_call_frames returns the number of call frames on the call stack
+
+        // ll_consts behaviour is undefined if in the user call frame
+
+        const_table ll_consts() noexcept;                   // ll_consts returns the constant table of the current call
 
         size_t ll_args() noexcept;                          // ll_args returns the number of args available
         size_t ll_locals() noexcept;                        // ll_locals returns the number of objects on the local register table
         std::optional<object_ref> ll_arg(arg_t x);          // ll_args returns the object, if any, at x in the arg slice
         std::optional<object_ref> ll_local(local_t x);      // ll_local returns the object, if any, at x in the local register table
 
-        void ll_crash();                                    // ll_crash induces a crash, failing quietly if already crashing
+        void ll_panic();                                    // ll_panic induces a panic, failing quietly if already panicking
 
         // ll_load loads v into the local object register at x
 
         // ll_load does not care what type the x object is, as it overwrites it
 
-        // ll_load crashes if x is out-of-bounds
+        // ll_load panics if x is out-of-bounds
 
         cmd_status ll_load(local_t x, borrowed_ref v);
 
@@ -293,7 +304,7 @@ namespace yama {
         cmd_status ll_load_bool(local_t x, bool v);
         cmd_status ll_load_char(local_t x, char_t v);
 
-        // ll_load_fn crashes if f is not a function type
+        // ll_load_fn panics if f is not a function type
 
         cmd_status ll_load_fn(local_t x, type f);
 
@@ -302,13 +313,13 @@ namespace yama {
 
         // ll_load_const does not care what type the x object is, as it overwrites it
 
-        // ll_load_const crashes if in the user call frame
+        // ll_load_const panics if in the user call frame
 
-        // ll_load_const crashes if x is out-of-bounds
+        // ll_load_const panics if x is out-of-bounds
 
-        // ll_load_const crashes if c is out-of-bounds
+        // ll_load_const panics if c is out-of-bounds
 
-        // ll_load_const crashes if the constant at c is not an object constant
+        // ll_load_const panics if the constant at c is not an object constant
 
         cmd_status ll_load_const(local_t x, const_t c);
 
@@ -317,11 +328,11 @@ namespace yama {
 
         // ll_load_arg does not care what type the x object is, as it overwrites it
 
-        // ll_load_arg crashes if in the user call frame
+        // ll_load_arg panics if in the user call frame
 
-        // ll_load_arg crashes if x is out-of-bounds
+        // ll_load_arg panics if x is out-of-bounds
         
-        // ll_load_arg crashes if arg is out-of-bounds
+        // ll_load_arg panics if arg is out-of-bounds
 
         cmd_status ll_load_arg(local_t x, arg_t arg);
 
@@ -329,9 +340,9 @@ namespace yama {
 
         // ll_copy does not care what type the dest object is, as it overwrites it
 
-        // ll_copy crashes if src is out-of-bounds
+        // ll_copy panics if src is out-of-bounds
 
-        // ll_copy crashes if dest is out-of-bounds
+        // ll_copy panics if dest is out-of-bounds
 
         cmd_status ll_copy(local_t src, local_t dest);
 
@@ -343,30 +354,50 @@ namespace yama {
         // ll_call performs a Yama call of callobj using args, writing the
         // return value object to object ret
 
-        // ll_call, for its no_result_t overload, does not output any return value object
-
         // ll_call does not care what type the ret object is, as it overwrites it
 
         // ll_call does not check if args types are correct to use in a callobj call
 
-        // ll_call crashes if args provides no callobj (ie. if args_n == 0)
+        // ll_call panics if args provides no callobj (ie. if args_n == 0)
 
-        // ll_call crashes if args index range is out-of-bounds
+        // ll_call panics if args index range is out-of-bounds
 
-        // ll_call crashes if ret is out-of-bounds
+        // ll_call panics if ret is out-of-bounds
 
-        // ll_call crashes if callobj is not of a callable type
+        // ll_call panics if callobj is not of a callable type
 
-        // ll_call crashes if args_n-1 is not equal to the argument count expected
+        // ll_call panics if args_n-1 is not equal to the argument count expected
         // for a call to callobj (here, the -1 excludes callobj from argument count)
 
-        // ll_call crashes if the call stack would overflow
+        // ll_call panics if the call stack would overflow
 
-        // ll_call crashes if, after call behaviour has completed execution, no 
+        // ll_call panics if, after call behaviour has completed execution, no 
         // return value object has been provided
 
         cmd_status ll_call(local_t args_start, size_t args_n, local_t ret);
-        cmd_status ll_call(local_t args_start, size_t args_n, no_result_t);
+
+        // ll_call_nr performs a Yama call of callobj using args, discarding the
+        // return value object
+
+        // the '_nr' in ll_call_nr stands for 'no result'
+
+        // ll_call_nr does not check if args types are correct to use in a callobj call
+
+        // ll_call_nr panics if args provides no callobj (ie. if args_n == 0)
+
+        // ll_call_nr panics if args index range is out-of-bounds
+
+        // ll_call_nr panics if callobj is not of a callable type
+
+        // ll_call_nr panics if args_n-1 is not equal to the argument count expected
+        // for a call to callobj (here, the -1 excludes callobj from argument count)
+
+        // ll_call_nr panics if the call stack would overflow
+
+        // ll_call_nr panics if, after call behaviour has completed execution, no 
+        // return value object has been provided
+
+        cmd_status ll_call_nr(local_t args_start, size_t args_n);
 
         // ll_ret is used within calls to perform the act of returning object x
         // as the return value object of the call
@@ -374,11 +405,11 @@ namespace yama {
         // ll_ret does not check if the type of the return value object returned
         // is correct for a call to the call object in question
 
-        // ll_ret crashes if in the user call frame
+        // ll_ret panics if in the user call frame
 
-        // ll_ret crashes if x is out-of-bounds
+        // ll_ret panics if x is out-of-bounds
 
-        // ll_ret crashes if called multiple times
+        // ll_ret panics if called multiple times
 
         cmd_status ll_ret(local_t x);
 
@@ -391,23 +422,30 @@ namespace yama {
 
         std::allocator<void> _al;
 
-        size_t _crashes = 0;
-        bool _crashing = false;
+        size_t _panics = 0;
+        bool _panicking = false;
 
         // NOTE: _cf_t must use indices, as reallocs in _registers will invalidate pointers
 
         struct _cf_t final {
+            std::optional<type>         t;              // the type associated w/ this call (or std::nullopt if user call frame)
             size_t                      args_offset;    // offset into _registers where call args begin
             size_t                      args_count;     // number of registers in call args
             size_t                      locals_offset;  // offset into _registers where local register table begins
             size_t                      locals_count;   // number of registers in local register table
             std::optional<object_ref>   returned;       // cache for returned object, if any
+
+            // bcode exec fields
+
+            // TODO: the memory locality improvements of bcode_ptr have not actually been proven yet
+
+            const bc::code*             bcode_ptr;      // pointer to bcode (to improve memory locality)
+            size_t                      pc;             // program counter
+            bool                        should_halt;    // if instructed to halt
         };
         
         std::vector<object_ref>     _registers; // storage for local register tables for call frames
         std::vector<_cf_t>          _callstk;   // the call stack
-
-        std::optional<const_table>  _consts;    // the constant table available to ll_load_const
 
         // _cf_view_t is used to easily view contents of a call frame
 
@@ -425,13 +463,21 @@ namespace yama {
         _cf_view_t _view_top_cf();
         _cf_view_t _view_below_top_cf(); // cf just below the top one
 
+        type _curr_type() noexcept;
+        bool _has_curr_type() noexcept;
+
+
+        template<typename... Args>
+        inline void _panic(std::format_string<Args...> msg, Args&&... args);
+
+
         // _push_cf returns if successful, w/ it failing if pushing
         // would overflow the call stack
 
         // _push_cf will handle converting [args_start, args_start+args_n) into
         // the equiv _registers index range
 
-        bool _push_cf(local_t args_start, size_t args_n, size_t locals);
+        bool _push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t locals);
         void _pop_cf();
 
         void _push_user_cf();
@@ -447,12 +493,12 @@ namespace yama {
         void _remove_registers(size_t n);
 
 
-        // this needs to be called in ll_crash and ll_call (after call 
-        // behaviour) in order to handle crash behaviour once call stack 
+        // this needs to be called in ll_panic and ll_call (after call 
+        // behaviour) in order to handle panic behaviour once call stack 
         // unwinding reaches the user call frame, which needs to be popped, 
         // and a new one pushed
 
-        void _try_handle_crash_for_user_cf();
+        void _try_handle_panic_for_user_cf();
 
 
         // TODO: gonna need a '_fmt_Kt', or others, later when we use constants 
@@ -466,7 +512,7 @@ namespace yama {
         std::string _fmt_Arg(arg_t x);
 
 
-        cmd_status _load(local_t x, borrowed_ref v);
+        cmd_status _load(local_t x, stolen_ref v);
 
         bool _load_err_x_out_of_bounds(local_t x, borrowed_ref v);
 
@@ -518,6 +564,28 @@ namespace yama {
         bool _ret_err_in_user_call_frame();
         bool _ret_err_x_out_of_bounds(local_t x);
         bool _ret_err_already_returned_something();
+
+
+        // bcode exec helpers
+
+        void _bcode_exec();
+        void _bcode_setup();
+        const bc::code* _bcode_acquire_bcode();
+        bc::instr _bcode_fetch_instr();
+        void _bcode_exec_instr(bc::instr x);
+        void _bcode_halt_if_panicking();
+        void _bcode_halt();
+        void _bcode_jump(int16_t offset);
     };
+
+    template<typename ...Args>
+    inline void context::_panic(std::format_string<Args...> msg, Args&&... args) {
+        YAMA_LOG(
+            dbg(), ctx_panic_c,
+            msg, 
+            std::forward<Args>(args)...);
+        YAMA_LOG(dbg(), ctx_panic_c, "{}", fmt_stacktrace());
+        ll_panic();
+    }
 }
 
