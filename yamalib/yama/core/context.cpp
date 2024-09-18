@@ -75,13 +75,9 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
     for (auto it = begin; it != end; std::advance(it, 1)) {
         const auto& callframe = *it;
         result +=
-            it == begin
-            ? std::format("\n{}[{}] ", tab, number)
-            : std::format("\n{}[{}] (called by) ", tab, number);
-        result +=
             callframe.t
-            ? std::format("{}", deref_assert(callframe.t))
-            : "<user>";
+            ? std::format("\n{}[{}] {}", tab, number, deref_assert(callframe.t))
+            : std::format("\n{}[{}] <user>", tab, number);
         // check for symbol info, and if so, add it to result
         if (callframe.t) {
             const auto info = internal::get_type_mem(deref_assert(callframe.t))->info;
@@ -91,13 +87,12 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
                 // remember that program counter will be incr when fetching instr, meaning
                 // we need to decr it to get current instr index
                 const size_t x_index = callframe.pc - 1;
-                const bc::instr x_instr = code[x_index];
                 if (const auto x_sym = syms[x_index]) {
                     result += std::format(" {}", *x_sym);
                 }
                 else {
                     // write info about instr index if actual sym isn't available
-                    result += std::format(" [{}; instr {}]", x_instr.opc, x_index);
+                    result += std::format(" [instr {}]", x_index);
                 }
             }
         }
@@ -326,6 +321,14 @@ yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, local
             _fmt_R(args_start),
             _fmt_R(args_start + 1));
     }
+    else if (args_n == 3) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            " >       {: <13} = *call* ({}, {}, {})",
+            _fmt_R_no_preview(ret),
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1),
+            _fmt_R(args_start + 2));
+    }
     else {
         YAMA_LOG(dbg(), ctx_llcmd_c,
             " >       {: <13} = *call* ({}, {}, ..., {})",
@@ -353,6 +356,13 @@ yama::cmd_status yama::context::ll_call_nr(local_t args_start, size_t args_n) {
             " >       n/a           = *call* ({}, {})",
             _fmt_R(args_start),
             _fmt_R(args_start + 1));
+    }
+    else if (args_n == 3) {
+        YAMA_LOG(dbg(), ctx_llcmd_c,
+            " >       n/a           = *call* ({}, {}, {})",
+            _fmt_R(args_start),
+            _fmt_R(args_start + 1),
+            _fmt_R(args_start + 2));
     }
     else {
         YAMA_LOG(dbg(), ctx_llcmd_c,
@@ -486,30 +496,30 @@ std::string yama::context::_fmt_R_no_preview(local_t x) {
     return
         x < ll_locals()
         ? std::format("R({})", x)
-        : std::format("R({}) (error)", x);
+        : std::format("R({}) (out-of-bounds)", x);
 }
 
 std::string yama::context::_fmt_R(local_t x) {
     const auto a = ll_local(x);
     return
         a
-        ? std::format("R({}) [{}]", x, *a)
-        : std::format("R({}) (error)", x);
+        ? std::format("R({})={}", x, *a)
+        : std::format("R({})=*error*", x);
 }
 
 std::string yama::context::_fmt_Ko(const_t x) {
     return
         _has_curr_type()
-        ? std::format("Ko({}) [{}]", x, ll_consts().fmt_const(x))
-        : std::format("Ko({}) (error)", x);
+        ? std::format("Ko({})={}", x, ll_consts().fmt_const(x))
+        : std::format("Ko({})=*error*", x);
 }
 
 std::string yama::context::_fmt_Arg(arg_t x) {
     const auto a = ll_arg(x);
     return
         a
-        ? std::format("Arg({}) [{}]", x, *a)
-        : std::format("Arg({}) (error)", x);
+        ? std::format("Arg({})={}", x, *a)
+        : std::format("Arg({})=*error*", x);
 }
 
 yama::cmd_status yama::context::_load(local_t x, stolen_ref v) {
