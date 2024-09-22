@@ -1,0 +1,171 @@
+
+
+# Yama Grammar
+
+
+# Yama Escape Sequences
+# 
+#   \0              <- Null
+#   \a				<- Bell (Alert)
+#   \b				<- Backspace
+#   \f				<- Form Feed
+#   \n				<- New Line
+#   \r				<- Carriage Return
+#   \t				<- Horizontal Tab
+#   \v				<- Vertical Tab
+#   \'				<- Single Quotation
+#   \"				<- Double Quotation
+#   \\				<- Backslash
+#   \xhh			<- Hex Literal (8-bit)
+#   \uhhhh          <- Hex Literal (16-bit)
+#   \Uhhhhhhhh      <- Hex Literal (32-bit)
+
+# escaped characters which do not form any of the above are *literalized*,
+# meaning the opening '\' is simply removed
+
+# Yama doesn't support octal literal escape sequences
+
+# Yama hex literal escape sequences are *case-insensitive*
+
+# Yama hex literals which are malformed are interpreted as literalized 'x'
+
+
+lexer section:
+
+
+    # TODO: not 100% sure on what this should be called
+
+    support END_OF_WORD             : -[0-9a-zA-Z_] | end ;
+
+
+    # Keywords
+
+    TRUE                            : 'true' END_OF_WORD ;
+    FALSE                           : 'false' END_OF_WORD ;
+    VAR                             : 'var' END_OF_WORD ;
+    FN                              : 'fn' END_OF_WORD ;
+    IF                              : 'if' END_OF_WORD ;
+    ELSE                            : 'else' END_OF_WORD ;
+    LOOP                            : 'loop' END_OF_WORD ;
+    BREAK                           : 'break' END_OF_WORD ;
+    CONTINUE                        : 'continue' END_OF_WORD ;
+    RETURN                          : 'return' END_OF_WORD ;
+
+    # Operators & Punctuation
+
+    R_ARROW                         : '->' ;
+
+    ASSIGN                          : '=' ;
+
+    MINUS                           : '-' ;
+    
+    L_ROUND                         : '(' ;
+    R_ROUND                         : ')' ;
+    L_CURLY                         : '{' ;
+    R_CURLY                         : '}' ;
+
+    COMMA                           : ',' ;
+    COLON                           : ':' ;
+    SEMI                            : ';' ;
+
+
+    # General
+
+    IDENTIFIER                      : [a-zA-Z_] [0-9a-zA-Z_]* ;
+
+    # NOTE: negation of int/float values will be done via prefixing w/ a MINUS
+    
+    # NOTE: putting FLOAT before [U]INT_[DEC|HEX|BIN] as the ladder will mess up the former otherwise
+    
+    # TODO: maybe add a warning for if string/char literal contains invisible chars
+
+    support DIGITS_DEC              : [0-9] ( '_'? [0-9] )* ;
+    support DIGITS_HEX              : [0-9a-fA-F] ( '_'? [0-9a-fA-F] )* ;
+    support DIGITS_BIN              : [01] ( '_'? [01] )* ;
+
+    FLOAT                           : DIGITS_DEC '.' DIGITS_DEC END_OF_WORD ;
+    INT_DEC                         : DIGITS_DEC END_OF_WORD ;
+    INT_HEX                         : '0x' DIGITS_HEX END_OF_WORD ;
+    INT_BIN                         : '0b' DIGITS_BIN END_OF_WORD ;
+    UINT_DEC                        : DIGITS_DEC 'u' END_OF_WORD ;
+    UINT_HEX                        : '0x' DIGITS_HEX 'u' END_OF_WORD ;
+    UINT_BIN                        : '0b' DIGITS_BIN 'u' END_OF_WORD ;
+    CHAR                            : '\'' ( '\\' any | ~[\'\\] )* '\'' ;
+
+    skip WHITESPACE                 : [ \t]+ ;
+    skip NEWLINE                    : '\n' | '\r' '\n'? ;
+
+    skip SL_COMMENT                 : '//' ~[\r\n]* ;
+
+
+parser section:
+
+
+    Chunk                           : Decl* end ;
+
+    Decl                            : VarDecl
+                                    | FnDecl ;
+
+    # NOTE: VarDecl is for specifying local and non-local variables
+    
+    VarDecl                         : VAR IDENTIFIER (COLON TypeSpec)? (ASSIGN Expr)? SEMI ;
+    FnDecl                          : FN IDENTIFIER CallSig Block ;
+
+    CallSig                         : CallSig_Params CallSig_Result? ;
+    CallSig_Params                  : L_ROUND ( CallSig_Param ( COMMA CallSig_Param )* )? R_ROUND ;
+    CallSig_Param                   : IDENTIFIER ( COLON TypeSpec )? ;
+    CallSig_Result                  : R_ARROW TypeSpec ;
+
+    Block                           : L_CURLY Stmt* R_CURLY ;
+
+    # NOTE: certain statements (ie. assignment) are parsed as exprs, due to
+    #       how their syntax would otherwise be ambiguous w/ them
+
+    Stmt                            : Decl
+                                    | ExprStmt
+                                    | IfStmt
+                                    | LoopStmt
+                                    | BreakStmt
+                                    | ContinueStmt
+                                    | ReturnStmt
+                                    ;
+
+    ExprStmt                        : Expr SEMI ;
+    IfStmt                          : IF L_ROUND Expr R_ROUND Block ( ELSE ( Block | IfStmt ) )? ;
+    LoopStmt                        : LOOP Block ;
+    BreakStmt                       : BREAK SEMI ;
+    ContinueStmt                    : CONTINUE SEMI ;
+    ReturnStmt                      : RETURN SEMI ;
+
+    Expr                            : MINUS Expr            # negation expr
+                                    | PrimaryExpr           # primary expr (if no suffix)
+                                        ( Assign            # assignment stmt (not an expr)
+                                        | Args              # call expr
+                                        )?
+                                    ;
+                                    
+    PrimaryExpr                     : IDENTIFIER            # identifier expr
+                                    | Lit                   # literal expr
+                                    ;
+
+    Assign                          : ASSIGN Expr ;
+
+    Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
+
+    Lit                             : IntLit
+                                    | UIntLit
+                                    | FloatLit
+                                    | BoolLit
+                                    | CharLit
+                                    ;
+    
+    IntLit                          : INT_DEC | INT_HEX | INT_BIN ;
+    UIntLit                         : UINT_DEC | UINT_HEX | UINT_BIN ;
+    FloatLit                        : FLOAT ;
+    BoolLit                         : TRUE | FALSE ;
+    CharLit                         : CHAR ;
+
+    # TODO: maybe replace TypeSpec w/ TypeLit (in Lit) when TAUL supports left-recursion
+
+    TypeSpec                        : IDENTIFIER ;
+

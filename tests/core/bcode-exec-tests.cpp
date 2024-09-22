@@ -12,6 +12,11 @@
 using namespace yama::string_literals;
 
 
+// NOTE: when we're not focused on these tests, it's useful to turn off them logging
+
+#define _DISABLE_LOGGING 1
+
+
 class BCodeExecTests : public testing::Test {
 public:
 
@@ -28,6 +33,10 @@ protected:
         mas = std::make_shared<yama::heap_mas>(dbg);
         dm = std::make_shared<yama::domain_st>(yama::res(mas), dbg);
         ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
+
+#if _DISABLE_LOGGING
+        dbg->cats &= ~yama::bcode_exec_c & ~yama::ctx_llcmd_c;
+#endif
     }
 
     void TearDown() override final {
