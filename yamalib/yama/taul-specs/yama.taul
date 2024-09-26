@@ -3,7 +3,7 @@
 # Yama Grammar
 
 
-# Yama Escape Sequences
+# (Yama Escape Sequences)
 # 
 #   \0              <- Null
 #   \a				<- Bell (Alert)
@@ -30,10 +30,47 @@
 # Yama hex literals which are malformed are interpreted as literalized 'x'
 
 
+# (Yama Floating Point Format)
+
+# Yama floats are designed to take (almost) all forms C++/std::format 
+# float take
+
+# Yama floats expressing regular and subnormal values take the forms:
+
+#       <integer> . <fraction>                  (eg. 3.14159)
+#       <integer> . <fraction> e <exponent>     (eg. 12.3e-4 or 1.2e13)
+#       . <fraction>                            (eg. .312)
+#       . <fraction> e <exponent>               (eg. .314159e1)
+#       <integer> e <exponent>                  (eg. 314159e-5)
+
+# Yama floats may take the following additional form, however, this
+# form is not allowed in Yama language lexing due to how it would
+# interfere w/ Yama integer lexing:
+
+#       <integer>                               (eg. 3)
+
+# the above form is allowed as the output of functions like yama::fmt_float,
+# and can be parsed by functions like yama::parse_float
+
+# Yama float infinity and NaN take the forms:
+
+#       inf
+#       nan
+
+# the below two forms are, however, not allowed due to how they interfere 
+# w/ member access syntax
+
+#       <integer> .                             (eg. 3.)
+#       <integer> . e <exponent>                (eg. 3.e-2)
+
+
 lexer section:
 
 
     # TODO: not 100% sure on what this should be called
+
+    # END_OF_WORD is used to specify that no further letters/digits/underscores
+    # may appear following a given token
 
     support END_OF_WORD             : -[0-9a-zA-Z_] | end ;
 
@@ -42,6 +79,8 @@ lexer section:
 
     TRUE                            : 'true' END_OF_WORD ;
     FALSE                           : 'false' END_OF_WORD ;
+    INF                             : 'inf' END_OF_WORD ;
+    NAN                             : 'nan' END_OF_WORD ;
     VAR                             : 'var' END_OF_WORD ;
     FN                              : 'fn' END_OF_WORD ;
     IF                              : 'if' END_OF_WORD ;
@@ -74,16 +113,18 @@ lexer section:
     IDENTIFIER                      : [a-zA-Z_] [0-9a-zA-Z_]* ;
 
     # NOTE: negation of int/float values will be done via prefixing w/ a MINUS
-    
     # NOTE: putting FLOAT before [U]INT_[DEC|HEX|BIN] as the ladder will mess up the former otherwise
-    
+    # NOTE: 'inf' and 'nan' float values are handled via INF and NAN keywords, not FLOAT tokens
+
     # TODO: maybe add a warning for if string/char literal contains invisible chars
 
     support DIGITS_DEC              : [0-9] ( '_'? [0-9] )* ;
     support DIGITS_HEX              : [0-9a-fA-F] ( '_'? [0-9a-fA-F] )* ;
     support DIGITS_BIN              : [01] ( '_'? [01] )* ;
 
-    FLOAT                           : DIGITS_DEC '.' DIGITS_DEC END_OF_WORD ;
+    support EXPONENT                : 'e' [+\-]? DIGITS_DEC ;
+
+    FLOAT                           : ( DIGITS_DEC ( '.' DIGITS_DEC EXPONENT? | EXPONENT ) | '.' DIGITS_DEC EXPONENT? ) END_OF_WORD ;
     INT_DEC                         : DIGITS_DEC END_OF_WORD ;
     INT_HEX                         : '0x' DIGITS_HEX END_OF_WORD ;
     INT_BIN                         : '0b' DIGITS_BIN END_OF_WORD ;
@@ -161,7 +202,7 @@ parser section:
     
     IntLit                          : INT_DEC | INT_HEX | INT_BIN ;
     UIntLit                         : UINT_DEC | UINT_HEX | UINT_BIN ;
-    FloatLit                        : FLOAT ;
+    FloatLit                        : FLOAT | INF | NAN ;
     BoolLit                         : TRUE | FALSE ;
     CharLit                         : CHAR ;
 

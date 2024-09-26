@@ -55,10 +55,12 @@ TEST_F(YamaSpecTests, GrammarLoads) {
 TEST_F(YamaSpecTests, LPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->nonsupport_lprs(), 32);
+    EXPECT_EQ(gram->nonsupport_lprs(), 34);
 
     ASSERT_TRUE(gram->has_lpr("TRUE"_str));
     ASSERT_TRUE(gram->has_lpr("FALSE"_str));
+    ASSERT_TRUE(gram->has_lpr("INF"_str));
+    ASSERT_TRUE(gram->has_lpr("NAN"_str));
     ASSERT_TRUE(gram->has_lpr("VAR"_str));
     ASSERT_TRUE(gram->has_lpr("FN"_str));
     ASSERT_TRUE(gram->has_lpr("IF"_str));
@@ -70,6 +72,8 @@ TEST_F(YamaSpecTests, LPRs) {
 
     EXPECT_EQ(gram->lpr("TRUE"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("FALSE"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("INF"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("NAN"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("VAR"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("FN"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("IF"_str)->qualifier(), taul::qualifier::none);
@@ -183,8 +187,34 @@ TEST_F(YamaSpecTests, _KW_) {\
     _fail("?*&"_str);\
 }
 
+// need this quick-n'-dirty *alt* version to account for NAN being taken by a preprocessor def
+
+#define _KW_TEST_ALT(_KW_, _LITERAL_, _LEN_) \
+TEST_F(YamaSpecTests, _KW_ ## 0) {\
+    _SETUP_FOR_LPR(taul::str::lit(#_KW_));\
+\
+    constexpr taul::source_len len = _LEN_;\
+\
+    _succeed(_LITERAL_ ""_str, len);\
+    _succeed(_LITERAL_ " "_str, len);\
+    _succeed(_LITERAL_ "\r\n"_str, len);\
+    _succeed(_LITERAL_ "//abc"_str, len);\
+    _succeed(_LITERAL_ "?"_str, len);\
+\
+    _fail(_LITERAL_ "a"_str);\
+    _fail(_LITERAL_ "0"_str);\
+    _fail(_LITERAL_ "_"_str);\
+    _fail(""_str);\
+    _fail(" "_str);\
+    _fail("abc"_str);\
+    _fail("123"_str);\
+    _fail("?*&"_str);\
+}
+
 _KW_TEST(TRUE, "true", 4);
 _KW_TEST(FALSE, "false", 5);
+_KW_TEST(INF, "inf", 3);
+_KW_TEST_ALT(NAN, "nan", 3);
 _KW_TEST(VAR, "var", 3);
 _KW_TEST(FN, "fn", 2);
 _KW_TEST(IF, "if", 2);
@@ -283,19 +313,50 @@ TEST_F(YamaSpecTests, FLOAT) {
     _succeed("0000.0001"_str, 9);
     _succeed("0_0_0_0.0_0_0_1"_str, 15);
 
+    _succeed(".0"_str, 2);
+    _succeed(".1"_str, 2);
+    _succeed(".2"_str, 2);
+    _succeed(".3"_str, 2);
+    _succeed(".4"_str, 2);
+    _succeed(".5"_str, 2);
+    _succeed(".6"_str, 2);
+    _succeed(".7"_str, 2);
+    _succeed(".8"_str, 2);
+    _succeed(".9"_str, 2);
+    _succeed(".01"_str, 3);
+    _succeed(".0001"_str, 5);
+    _succeed(".0_0_0_1"_str, 8);
+
     _succeed("987654321.123456789"_str, 19);
     _succeed("123456789.987654321"_str, 19);
+
+    _succeed("1.03e101"_str, 8);
+    _succeed("2.0e-30"_str, 7);
+    _succeed("2.0e-3_0"_str, 8);
+    _succeed("2.0e+30"_str, 7);
+    _succeed("2.0e+3_0"_str, 8);
+    
+    _succeed("1e101"_str, 5);
+    _succeed("2e-30"_str, 5);
+    _succeed("2e-3_0"_str, 6);
+    _succeed("2e+30"_str, 5);
+    _succeed("2e+3_0"_str, 6);
+    
+    _succeed(".1e101"_str, 6);
+    _succeed(".2e-30"_str, 6);
+    _succeed(".2e-3_0"_str, 7);
+    _succeed(".2e+30"_str, 6);
+    _succeed(".2e+3_0"_str, 7);
 
     _fail(""_str);
     _fail(" "_str);
     _fail("?*&"_str);
     _fail("true"_str);
-    _fail("1002"_str);
+    _fail("1002"_str); // allow for fmt_float/parse_float, but not in Yama lexing, due to ambiguity w/ integers
     _fail("0x1e2f"_str);
     _fail("0b1011"_str);
 
     _fail("0."_str);
-    _fail(".0"_str);
     _fail("."_str);
     _fail("0.0__0"_str);
     _fail("0.0_"_str);
@@ -303,6 +364,27 @@ TEST_F(YamaSpecTests, FLOAT) {
     _fail("0_.0"_str);
     _fail("_0.0"_str);
     _fail("0.0a"_str);
+
+    _fail("0.e"_str);
+    _fail("0.0e"_str);
+    _fail("e0"_str);
+    _fail("0.0e0_"_str);
+    _fail("0.0e_0"_str);
+    _fail("0.0_e0"_str);
+    _fail("0.0e0a"_str);
+
+    // negative mantissa isn't allowed in lexing FLOAT
+
+    _fail("-1.2"_str);
+    _fail("-.2"_str);
+    _fail("-1.2e1"_str);
+    _fail("-.2e1"_str);
+    _fail("-1e1"_str);
+
+    // inf and nan aren't covered by this LPR
+
+    _fail("inf"_str);
+    _fail("nan"_str);
 }
 
 TEST_F(YamaSpecTests, INT_DEC) {
@@ -2695,7 +2777,7 @@ TEST_F(YamaSpecTests, UIntLit_Bin) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, FloatLit) {
+TEST_F(YamaSpecTests, FloatLit_FLOAT) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2708,6 +2790,54 @@ TEST_F(YamaSpecTests, FloatLit) {
     {
         auto node0 = b.syntactic("FloatLit"_str);
         b.lexical("FLOAT"_str, 6);
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("FloatLit"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, FloatLit_INF) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "inf"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("FloatLit"_str);
+        b.lexical("INF"_str, 3);
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("FloatLit"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, FloatLit_NAN) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "nan"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("FloatLit"_str);
+        b.lexical("NAN"_str, 3);
     }
 
     auto expected = b.done();
