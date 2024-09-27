@@ -35,8 +35,10 @@ namespace yama::dm {
     private:
 
         struct _callsig_report final {
-            bool indices_are_in_bounds          = true;
-            bool indices_specify_type_consts    = true;
+            bool param_type_indices_are_in_bounds        = true;
+            bool param_type_indices_specify_type_consts  = true;
+            bool return_type_indices_are_in_bounds        = true;
+            bool return_type_indices_specify_type_consts  = true;
         };
 
         // we'll use a vector of type ref names to encapsulate the initial/final

@@ -94,8 +94,7 @@ namespace yama {
 
     // below parse_# methods return std::nullopt if x could not be parsed
 
-    // below parse_# methods allow for extra text following a valid int/uint/float/bool/char,
-    // w/ this extra text not being acknowledged by the return value
+    // below parse_# methods allow for extra text following a valid int/uint/float/bool/char
 
     // parse_int returns an unspecified int value if overflow/underflow, w/ overflow/underflow
     // field being set to true

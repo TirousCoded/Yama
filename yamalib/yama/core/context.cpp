@@ -857,7 +857,7 @@ void yama::context::_bcode_setup() {
     YAMA_ASSERT(_top_cf().pc == 0);
     YAMA_ASSERT(!_top_cf().should_halt);
     _top_cf().bcode_ptr = _bcode_acquire_bcode();
-    YAMA_LOG(dbg(), bcode_exec_c, " > bcode exec");
+    YAMA_LOG(dbg(), ctx_bcode_exec_c, " > bcode exec");
 }
 
 const yama::bc::code* yama::context::_bcode_acquire_bcode() {
@@ -874,7 +874,7 @@ yama::bc::instr yama::context::_bcode_fetch_instr() {
 }
 
 void yama::context::_bcode_exec_instr(bc::instr x) {
-    YAMA_LOG(dbg(), bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
+    YAMA_LOG(dbg(), ctx_bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
     static_assert(bc::opcodes == 11);
     switch (x.opc) {
     case bc::opcode::noop:
@@ -953,11 +953,11 @@ void yama::context::_bcode_halt_if_panicking() {
 
 void yama::context::_bcode_halt() {
     _top_cf().should_halt = true;
-    YAMA_LOG(dbg(), bcode_exec_c, " > halt");
+    YAMA_LOG(dbg(), ctx_bcode_exec_c, " > halt");
 }
 
 void yama::context::_bcode_jump(int16_t offset) {
     _top_cf().pc += std::make_signed_t<size_t>(offset);
-    YAMA_LOG(dbg(), bcode_exec_c, " > jump (to {})", _top_cf().pc);
+    YAMA_LOG(dbg(), ctx_bcode_exec_c, " > jump (to {})", _top_cf().pc);
 }
 

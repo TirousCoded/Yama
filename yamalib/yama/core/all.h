@@ -7,9 +7,9 @@
 #include "asserts.h"
 
 #include "general.h"
-#include "scalars.h"
-
 #include "res.h"
+
+#include "scalars.h"
 
 #include "debug.h"
 #include "api_component.h"

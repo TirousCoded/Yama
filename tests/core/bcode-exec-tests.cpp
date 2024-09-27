@@ -35,7 +35,7 @@ protected:
         ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
 
 #if _DISABLE_LOGGING
-        dbg->cats &= ~yama::bcode_exec_c & ~yama::ctx_llcmd_c;
+        dbg->cats &= ~yama::ctx_bcode_exec_c & ~yama::ctx_llcmd_c;
 #endif
     }
 
@@ -453,7 +453,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
 }
 
 TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
-    ctx->dbg()->cats &= ~yama::bcode_exec_c; // make output easier to read
+    ctx->dbg()->cats &= ~yama::ctx_bcode_exec_c; // make output easier to read
 
     // this 'dummy' function is here as it will be the thing that will actually trigger
     // the call stack overflow, which otherwise would be fail_safe, but I don't want it
@@ -810,7 +810,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
 }
 
 TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
-    ctx->dbg()->cats &= ~yama::bcode_exec_c; // make output easier to read
+    ctx->dbg()->cats &= ~yama::ctx_bcode_exec_c; // make output easier to read
 
     // this 'dummy' function is here as it will be the thing that will actually trigger
     // the call stack overflow, which otherwise would be fail_safe, but I don't want it
@@ -1355,7 +1355,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
     _EXAMPLE_TEST(1);
     _EXAMPLE_TEST(10);
 
-    dbg->cats &= ~yama::bcode_exec_c & ~yama::ctx_llcmd_c;
+    dbg->cats &= ~yama::ctx_bcode_exec_c & ~yama::ctx_llcmd_c;
 
     _EXAMPLE_TEST(100);
     _EXAMPLE_TEST(1000);

@@ -22,5 +22,14 @@ namespace yama::internal {
         //return !(a_first >= b_last || a_last <= b_first); <- helps me understand what below does
         return a_first < b_last && b_first < a_last;
     }
+
+    // range_contains returns if [a_first, a_last) *contains fully* [b_first, b_last)
+
+    template<typename T>
+    inline bool range_contains(T a_first, T a_last, T b_first, T b_last) noexcept {
+        YAMA_ASSERT(a_first <= a_last);
+        YAMA_ASSERT(b_first <= b_last);
+        return b_first >= a_first && b_last <= a_last;
+    }
 }
 

@@ -8,14 +8,27 @@
 #include <yama/dm/res_db.h>
 #include <yama/dm/type_instantiator.h>
 #include <yama/debug-impls/stderr_debug.h>
+#include <yama/debug-impls/dsignal_debug.h>
 
 
 using namespace yama::string_literals;
 
 
+// IMPORTANT:
+//      our policy is gonna be to only testing a single error per unit test, not testing
+//      multiple different errors arising in one unit test
+//
+//      the reason is so that the impl is free to forgo work checking for other errors
+//      after one is found, nor any complexity about certain errors having to be grouped
+//      together w/ others
+//
+//      one error may correspond to multiple dsignal raises
+
+
 class TypeInstantiatorTests : public testing::Test {
 public:
 
+    std::shared_ptr<yama::dsignal_debug> dbg;
     yama::dm::res_db<yama::res<yama::type_info>> type_info_db;
     yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_db;
     yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_batch_db;
@@ -26,10 +39,11 @@ public:
 protected:
 
     void SetUp() override final {
+        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
         instant = std::make_unique<yama::dm::type_instantiator<std::allocator<void>>>(
             type_info_db, type_db, type_batch_db, 
             std::allocator<void>{},
-            std::make_shared<yama::stderr_debug>());
+            dbg);
     }
 
     void TearDown() override final {
@@ -574,7 +588,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_DepGraphCycle) {
     EXPECT_EQ(bb.consts().type(0), std::make_optional(aa));
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeAlreadyInstantiated) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeAlreadyInstantiated) {
     // dep graph:
     //      a
 
@@ -601,9 +615,11 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeAlreadyInstantiat
 
     EXPECT_EQ(type_db.size(), 1);
     EXPECT_TRUE(type_db.exists("a"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_already_instantiated), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeNotFound) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeNotFound) {
     // dep graph:
     //      a           <- error is that no type_data 'a' provided
 
@@ -614,9 +630,11 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToOriginalTypeNotFound) {
     EXPECT_EQ(result, 0);
 
     EXPECT_EQ(type_db.size(), 0);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToReferencedTypeNotFound) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_ReferencedTypeNotFound) {
     // dep graph:
     //      a -> b      <- error is that no type_data 'b' provided
     //        -> c
@@ -655,9 +673,11 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToReferencedTypeNotFound) {
     EXPECT_EQ(result, 0);
 
     EXPECT_EQ(type_db.size(), 0);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToIndirectlyReferencedTypeNotFound) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound) {
     // dep graph:
     //      a -> b -> d     <- error is that no type_data 'd' provided
     //             -> e
@@ -728,9 +748,11 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToIndirectlyReferencedTypeNotFo
     EXPECT_EQ(result, 0);
 
     EXPECT_EQ(type_db.size(), 0);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToKindMismatch) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
     // dep graph:
     //      a -> b -> c
 
@@ -776,6 +798,8 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToKindMismatch) {
     EXPECT_EQ(result, 0);
 
     EXPECT_EQ(type_db.size(), 0);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_kind_mismatch), 1);
 }
 
 // TODO: maybe decompose below test into a few tests for each of the following cases:
@@ -784,7 +808,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToKindMismatch) {
 //          2) differ by return type indices (same const table)
 //          3) differ by const table (but have otherwise identical callsigs)
 
-TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
+TEST_F(TypeInstantiatorTests, Instantiate_Fail_CallSigMismatch) {
     // dep graph:
     //      a -> b -> c
 
@@ -854,5 +878,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_FailDueToCallSigMismatch) {
     EXPECT_EQ(result, 0);
 
     EXPECT_EQ(type_db.size(), 0);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_callsig_mismatch), 1);
 }
 

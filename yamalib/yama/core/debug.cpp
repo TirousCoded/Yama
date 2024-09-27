@@ -3,11 +3,11 @@
 #include "debug.h"
 
 
-yama::debug::debug(debug_cat cats) 
+yama::debug::debug(dcat cats) 
     : enable_shared_from_this(),
     cats(cats) {}
 
-bool yama::debug::has_cat(debug_cat cat) const noexcept {
+bool yama::debug::has_cat(dcat cat) const noexcept {
     return check(cats, cat);
 }
 

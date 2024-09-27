@@ -177,7 +177,8 @@ namespace yama::dm {
     inline bool type_instantiator<Allocator>::_check_already_instantiated(const str& type_fullname) const {
         const bool result = get_type_db().exists(type_fullname);
         if (result) {
-            YAMA_LOG(dbg(), type_instant_c, "error: type {} already instantiated!", type_fullname);
+            YAMA_RAISE(dbg(), dsignal::dm_instant_type_already_instantiated);
+            YAMA_LOG(dbg(), dm_instant_c, "error: type {} already instantiated!", type_fullname);
         }
         return result;
     }
@@ -190,7 +191,7 @@ namespace yama::dm {
             return true;
         }
         // only log if we're actually instantiating a type not already
-        YAMA_LOG(dbg(), type_instant_c, "instantiating {}...", type_fullname);
+        YAMA_LOG(dbg(), dm_instant_c, "instantiating {}...", type_fullname);
         // query res<type_info> to link
         const auto info = _pull_type_info(type_fullname);
         if (!info) {
@@ -226,8 +227,9 @@ namespace yama::dm {
     inline std::optional<res<type_info>> type_instantiator<Allocator>::_pull_type_info(const str& type_fullname) {
         const auto result = get_type_info_db().pull(type_fullname);
         if (!result) {
+            YAMA_RAISE(dbg(), dsignal::dm_instant_type_not_found);
             YAMA_LOG(
-                dbg(), type_instant_c,
+                dbg(), dm_instant_c,
                 "error: no type info exists for type {}!",
                 type_fullname);
         }
@@ -365,8 +367,9 @@ namespace yama::dm {
         const auto  resolved_kind   = resolved.kind();
         const bool  success         = symbol_kind == resolved_kind;
         if (!success) {
+            YAMA_RAISE(dbg(), dsignal::dm_instant_kind_mismatch);
             YAMA_LOG(
-                dbg(), type_instant_c,
+                dbg(), dm_instant_c,
                 "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol describes a {}, and the resolved type is a {}!",
                 t.fullname(), symbol_fullname, index, resolved.fullname(),
                 symbol_kind, resolved_kind);
@@ -401,8 +404,9 @@ namespace yama::dm {
         const auto  resolved_callsig_s = deref_assert(resolved_callsig).fmt();
         const bool  result = symbol_callsig_s == resolved_callsig_s;
         if (!result) {
+            YAMA_RAISE(dbg(), dsignal::dm_instant_callsig_mismatch);
             YAMA_LOG(
-                dbg(), type_instant_c,
+                dbg(), dm_instant_c,
                 "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol's callsig {} doesn't match the resolved type's callsig {}!",
                 t.fullname(), info->consts.fullname(index).value(), index, resolved.fullname(),
                 symbol_callsig_s, resolved_callsig_s);
