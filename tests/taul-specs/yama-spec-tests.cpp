@@ -10,7 +10,12 @@
 #include <yama/core/general.h>
 #include <yama/core/scalars.h>
 #include <yama/core/debug.h>
+#include <yama/core/yama_gram.h>
 #include <yama/debug-impls/stderr_debug.h>
+
+
+// IMPORTANT: see yama_gram.cpp for config about whether or not the below unit tests
+//            are to use dynamic loading or source generation to acquire the grammar
 
 
 using namespace yama::string_literals;
@@ -28,15 +33,9 @@ protected:
     void SetUp() {
         dbg = std::make_shared<yama::stderr_debug>();
         lgr = std::make_shared<taul::stderr_logger>();
-
-        const auto p = std::filesystem::current_path() / "..\\yamalib\\yama\\taul-specs\\yama.taul";
-
-        YAMA_LOG(dbg, yama::general_c, "{}", p.string());
-
         if (!gram) {
-            gram = taul::load(p, lgr, false);
+            gram = std::make_optional(yama::yama_gram());
         }
-
         YAMA_ASSERT(gram);
     }
 
@@ -55,7 +54,7 @@ TEST_F(YamaSpecTests, GrammarLoads) {
 TEST_F(YamaSpecTests, LPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->nonsupport_lprs(), 34);
+    EXPECT_EQ(gram->nonsupport_lprs(), 33);
 
     ASSERT_TRUE(gram->has_lpr("TRUE"_str));
     ASSERT_TRUE(gram->has_lpr("FALSE"_str));
@@ -85,7 +84,7 @@ TEST_F(YamaSpecTests, LPRs) {
 
     ASSERT_TRUE(gram->has_lpr("R_ARROW"_str));
     ASSERT_TRUE(gram->has_lpr("ASSIGN"_str));
-    ASSERT_TRUE(gram->has_lpr("MINUS"_str));
+    //ASSERT_TRUE(gram->has_lpr("MINUS"_str));
     ASSERT_TRUE(gram->has_lpr("L_ROUND"_str));
     ASSERT_TRUE(gram->has_lpr("R_ROUND"_str));
     ASSERT_TRUE(gram->has_lpr("L_CURLY"_str));
@@ -96,7 +95,7 @@ TEST_F(YamaSpecTests, LPRs) {
 
     EXPECT_EQ(gram->lpr("R_ARROW"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("ASSIGN"_str)->qualifier(), taul::qualifier::none);
-    EXPECT_EQ(gram->lpr("MINUS"_str)->qualifier(), taul::qualifier::none);
+    //EXPECT_EQ(gram->lpr("MINUS"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("L_ROUND"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("R_ROUND"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("L_CURLY"_str)->qualifier(), taul::qualifier::none);
@@ -238,7 +237,8 @@ TEST_F(YamaSpecTests, _OP_) {\
     _succeed(_LITERAL_ "//abc"_str, len);\
     _succeed(_LITERAL_ "?"_str, len);\
     _succeed(_LITERAL_ "a"_str, len);\
-    _succeed(_LITERAL_ "1"_str, len);\
+    /*if (_LITERAL_ != "-"_str) _succeed(_LITERAL_ "1"_str, len);*/\
+    _succeed(_LITERAL_ "1u"_str, len);\
     _succeed(_LITERAL_ "_"_str, len);\
 \
     _fail(""_str);\
@@ -249,7 +249,7 @@ TEST_F(YamaSpecTests, _OP_) {\
 
 _OP_TEST(R_ARROW, "->"_str, 2);
 _OP_TEST(ASSIGN, "="_str, 1);
-_OP_TEST(MINUS, "-"_str, 1);
+//_OP_TEST(MINUS, "-"_str, 1);
 _OP_TEST(L_ROUND, "("_str, 1);
 _OP_TEST(R_ROUND, ")"_str, 1);
 _OP_TEST(L_CURLY, "{"_str, 1);
@@ -282,6 +282,7 @@ TEST_F(YamaSpecTests, FLOAT) {
     _SETUP_FOR_LPR("FLOAT"_str);
 
     _succeed("0.0"_str, 3);
+    _succeed("-0.0"_str, 4);
 
     _succeed("1.0"_str, 3);
     _succeed("2.0"_str, 3);
@@ -297,6 +298,21 @@ TEST_F(YamaSpecTests, FLOAT) {
     _succeed("1_0_0_0.0"_str, 9);
     _succeed("0001000.0"_str, 9);
     _succeed("0_0_0_1_0_0_0.0"_str, 15);
+    
+    _succeed("-1.0"_str, 4);
+    _succeed("-2.0"_str, 4);
+    _succeed("-3.0"_str, 4);
+    _succeed("-4.0"_str, 4);
+    _succeed("-5.0"_str, 4);
+    _succeed("-6.0"_str, 4);
+    _succeed("-7.0"_str, 4);
+    _succeed("-8.0"_str, 4);
+    _succeed("-9.0"_str, 4);
+    _succeed("-10.0"_str, 5);
+    _succeed("-1000.0"_str, 7);
+    _succeed("-1_0_0_0.0"_str, 10);
+    _succeed("-0001000.0"_str, 10);
+    _succeed("-0_0_0_1_0_0_0.0"_str, 16);
 
     _succeed("0.1"_str, 3);
     _succeed("0.2"_str, 3);
@@ -312,7 +328,22 @@ TEST_F(YamaSpecTests, FLOAT) {
     _succeed("0.0_0_0_1"_str, 9);
     _succeed("0000.0001"_str, 9);
     _succeed("0_0_0_0.0_0_0_1"_str, 15);
-
+    
+    _succeed("-0.1"_str, 4);
+    _succeed("-0.2"_str, 4);
+    _succeed("-0.3"_str, 4);
+    _succeed("-0.4"_str, 4);
+    _succeed("-0.5"_str, 4);
+    _succeed("-0.6"_str, 4);
+    _succeed("-0.7"_str, 4);
+    _succeed("-0.8"_str, 4);
+    _succeed("-0.9"_str, 4);
+    _succeed("-0.01"_str, 5);
+    _succeed("-0.0001"_str, 7);
+    _succeed("-0.0_0_0_1"_str, 10);
+    _succeed("-0000.0001"_str, 10);
+    _succeed("-0_0_0_0.0_0_0_1"_str, 16);
+    
     _succeed(".0"_str, 2);
     _succeed(".1"_str, 2);
     _succeed(".2"_str, 2);
@@ -326,9 +357,26 @@ TEST_F(YamaSpecTests, FLOAT) {
     _succeed(".01"_str, 3);
     _succeed(".0001"_str, 5);
     _succeed(".0_0_0_1"_str, 8);
-
+    
+    _succeed("-.0"_str, 3);
+    _succeed("-.1"_str, 3);
+    _succeed("-.2"_str, 3);
+    _succeed("-.3"_str, 3);
+    _succeed("-.4"_str, 3);
+    _succeed("-.5"_str, 3);
+    _succeed("-.6"_str, 3);
+    _succeed("-.7"_str, 3);
+    _succeed("-.8"_str, 3);
+    _succeed("-.9"_str, 3);
+    _succeed("-.01"_str, 4);
+    _succeed("-.0001"_str, 6);
+    _succeed("-.0_0_0_1"_str, 9);
+    
     _succeed("987654321.123456789"_str, 19);
     _succeed("123456789.987654321"_str, 19);
+    
+    _succeed("-987654321.123456789"_str, 20);
+    _succeed("-123456789.987654321"_str, 20);
 
     _succeed("1.03e101"_str, 8);
     _succeed("2.0e-30"_str, 7);
@@ -336,20 +384,39 @@ TEST_F(YamaSpecTests, FLOAT) {
     _succeed("2.0e+30"_str, 7);
     _succeed("2.0e+3_0"_str, 8);
     
+    _succeed("-1.03e101"_str, 9);
+    _succeed("-2.0e-30"_str, 8);
+    _succeed("-2.0e-3_0"_str, 9);
+    _succeed("-2.0e+30"_str, 8);
+    _succeed("-2.0e+3_0"_str, 9);
+    
     _succeed("1e101"_str, 5);
     _succeed("2e-30"_str, 5);
     _succeed("2e-3_0"_str, 6);
     _succeed("2e+30"_str, 5);
     _succeed("2e+3_0"_str, 6);
     
+    _succeed("-1e101"_str, 6);
+    _succeed("-2e-30"_str, 6);
+    _succeed("-2e-3_0"_str, 7);
+    _succeed("-2e+30"_str, 6);
+    _succeed("-2e+3_0"_str, 7);
+    
     _succeed(".1e101"_str, 6);
     _succeed(".2e-30"_str, 6);
     _succeed(".2e-3_0"_str, 7);
     _succeed(".2e+30"_str, 6);
     _succeed(".2e+3_0"_str, 7);
-
+    
+    _succeed("-.1e101"_str, 7);
+    _succeed("-.2e-30"_str, 7);
+    _succeed("-.2e-3_0"_str, 8);
+    _succeed("-.2e+30"_str, 7);
+    _succeed("-.2e+3_0"_str, 8);
+    
     _fail(""_str);
     _fail(" "_str);
+    _fail("-"_str);
     _fail("?*&"_str);
     _fail("true"_str);
     _fail("1002"_str); // allow for fmt_float/parse_float, but not in Yama lexing, due to ambiguity w/ integers
@@ -364,7 +431,7 @@ TEST_F(YamaSpecTests, FLOAT) {
     _fail("0_.0"_str);
     _fail("_0.0"_str);
     _fail("0.0a"_str);
-
+    
     _fail("0.e"_str);
     _fail("0.0e"_str);
     _fail("e0"_str);
@@ -373,14 +440,10 @@ TEST_F(YamaSpecTests, FLOAT) {
     _fail("0.0_e0"_str);
     _fail("0.0e0a"_str);
 
-    // negative mantissa isn't allowed in lexing FLOAT
-
-    _fail("-1.2"_str);
-    _fail("-.2"_str);
-    _fail("-1.2e1"_str);
-    _fail("-.2e1"_str);
-    _fail("-1e1"_str);
-
+    _fail("_-0.0"_str);
+    _fail("-_0.0"_str);
+    _fail("-e0"_str);
+    
     // inf and nan aren't covered by this LPR
 
     _fail("inf"_str);
@@ -407,9 +470,28 @@ TEST_F(YamaSpecTests, INT_DEC) {
     _succeed("000000789"_str, 9);
     _succeed("1_2_3_4_5_6_7_8_9"_str, 17);
     _succeed("0_0_0_0_0_0_7_8_9"_str, 17);
+    
+    _succeed("-0"_str, 2);
+    _succeed("-1"_str, 2);
+    _succeed("-2"_str, 2);
+    _succeed("-3"_str, 2);
+    _succeed("-4"_str, 2);
+    _succeed("-5"_str, 2);
+    _succeed("-6"_str, 2);
+    _succeed("-7"_str, 2);
+    _succeed("-8"_str, 2);
+    _succeed("-9"_str, 2);
+    _succeed("-10"_str, 3);
+    _succeed("-1000"_str, 5);
+    _succeed("-1928"_str, 5);
+    _succeed("-123456789"_str, 10);
+    _succeed("-000000789"_str, 10);
+    _succeed("-1_2_3_4_5_6_7_8_9"_str, 18);
+    _succeed("-0_0_0_0_0_0_7_8_9"_str, 18);
 
     _fail(""_str);
     _fail(" "_str);
+    _fail("-"_str);
     _fail("?*&"_str);
     _fail("true"_str);
     _fail("100u"_str); // legal uint, but not int
@@ -419,6 +501,9 @@ TEST_F(YamaSpecTests, INT_DEC) {
     _fail("1__0"_str);
     _fail("10__"_str);
     _fail("__10"_str);
+    _fail("_-10"_str);
+    _fail("-_10"_str);
+    _fail("-10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
 TEST_F(YamaSpecTests, INT_HEX) {
@@ -454,8 +539,39 @@ TEST_F(YamaSpecTests, INT_HEX) {
     _succeed("0x1_2_3_4_5_6_7_8_9_a_b_c_d_e_f_A_B_C_D_E_F"_str, 43);
     _succeed("0x0_0_0_0_0_0_7_8_9_a_b_c_d_e_f_A_B_C_D_E_F"_str, 43);
     
+    _succeed("-0x0"_str, 4);
+    _succeed("-0x1"_str, 4);
+    _succeed("-0x2"_str, 4);
+    _succeed("-0x3"_str, 4);
+    _succeed("-0x4"_str, 4);
+    _succeed("-0x5"_str, 4);
+    _succeed("-0x6"_str, 4);
+    _succeed("-0x7"_str, 4);
+    _succeed("-0x8"_str, 4);
+    _succeed("-0x9"_str, 4);
+    _succeed("-0xa"_str, 4);
+    _succeed("-0xb"_str, 4);
+    _succeed("-0xc"_str, 4);
+    _succeed("-0xd"_str, 4);
+    _succeed("-0xe"_str, 4);
+    _succeed("-0xf"_str, 4);
+    _succeed("-0xA"_str, 4);
+    _succeed("-0xB"_str, 4);
+    _succeed("-0xC"_str, 4);
+    _succeed("-0xD"_str, 4);
+    _succeed("-0xE"_str, 4);
+    _succeed("-0xF"_str, 4);
+    _succeed("-0x10"_str, 5);
+    _succeed("-0x1000"_str, 7);
+    _succeed("-0xf1E9"_str, 7);
+    _succeed("-0x000000789abcdefABCDEF"_str, 24);
+    _succeed("-0x123456789abcdefABCDEF"_str, 24);
+    _succeed("-0x1_2_3_4_5_6_7_8_9_a_b_c_d_e_f_A_B_C_D_E_F"_str, 44);
+    _succeed("-0x0_0_0_0_0_0_7_8_9_a_b_c_d_e_f_A_B_C_D_E_F"_str, 44);
+    
     _fail(""_str);
     _fail(" "_str);
+    _fail("-"_str);
     _fail("?*&"_str);
     _fail("true"_str);
     _fail("0x10u"_str); // legal uint, but not int
@@ -468,6 +584,9 @@ TEST_F(YamaSpecTests, INT_HEX) {
     _fail("0_x10"_str);
     _fail("0x_10"_str);
     _fail("0x"_str);
+    _fail("_-0x10"_str);
+    _fail("-_0x10"_str);
+    _fail("-0x10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
 TEST_F(YamaSpecTests, INT_BIN) {
@@ -482,9 +601,20 @@ TEST_F(YamaSpecTests, INT_BIN) {
     _succeed("0b000000101"_str, 11);
     _succeed("0b1_0_1_0_1_0_1_0_1"_str, 19);
     _succeed("0b0_0_0_0_0_0_1_0_1"_str, 19);
+    
+    _succeed("-0b0"_str, 4);
+    _succeed("-0b1"_str, 4);
+    _succeed("-0b10"_str, 5);
+    _succeed("-0b1000"_str, 7);
+    _succeed("-0b1011"_str, 7);
+    _succeed("-0b101010101"_str, 12);
+    _succeed("-0b000000101"_str, 12);
+    _succeed("-0b1_0_1_0_1_0_1_0_1"_str, 20);
+    _succeed("-0b0_0_0_0_0_0_1_0_1"_str, 20);
 
     _fail(""_str);
     _fail(" "_str);
+    _fail("-"_str);
     _fail("?*&"_str);
     _fail("true"_str);
     _fail("0b10u"_str); // legal uint, but not int
@@ -497,6 +627,9 @@ TEST_F(YamaSpecTests, INT_BIN) {
     _fail("0_b10"_str);
     _fail("0b_10"_str);
     _fail("0b"_str);
+    _fail("_-0b10"_str);
+    _fail("-_0b10"_str);
+    _fail("-0b10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
 TEST_F(YamaSpecTests, UINT_DEC) {
@@ -893,9 +1026,8 @@ TEST_F(YamaSpecTests, PPRs) {
     EXPECT_TRUE(gram->has_ppr("FnDecl"_str));
 
     ASSERT_TRUE(gram->has_ppr("CallSig"_str));
-    ASSERT_TRUE(gram->has_ppr("CallSig_Params"_str));
-    ASSERT_TRUE(gram->has_ppr("CallSig_Param"_str));
-    ASSERT_TRUE(gram->has_ppr("CallSig_Result"_str));
+    ASSERT_TRUE(gram->has_ppr("ParamDecl"_str));
+    ASSERT_TRUE(gram->has_ppr("Result"_str));
 
     ASSERT_TRUE(gram->has_ppr("Block"_str));
 
@@ -912,10 +1044,6 @@ TEST_F(YamaSpecTests, PPRs) {
 
     ASSERT_TRUE(gram->has_ppr("PrimaryExpr"_str));
     
-    ASSERT_TRUE(gram->has_ppr("Assign"_str));
-
-    ASSERT_TRUE(gram->has_ppr("Args"_str));
-
     ASSERT_TRUE(gram->has_ppr("Lit"_str));
 
     ASSERT_TRUE(gram->has_ppr("IntLit"_str));
@@ -924,13 +1052,14 @@ TEST_F(YamaSpecTests, PPRs) {
     ASSERT_TRUE(gram->has_ppr("BoolLit"_str));
     ASSERT_TRUE(gram->has_ppr("CharLit"_str));
     
+    ASSERT_TRUE(gram->has_ppr("Assign"_str));
+    ASSERT_TRUE(gram->has_ppr("Args"_str));
+
+    ASSERT_TRUE(gram->has_ppr("TypeAnnot"_str));
     ASSERT_TRUE(gram->has_ppr("TypeSpec"_str));
 
     pprs_ready = true;
 }
-
-
-// IMPORTANT: PPRs w/ a common prefix (eg. like CallSig and CallSig_Params) will be tested as a unit
 
 
 TEST_F(YamaSpecTests, Chunk_Empty) {
@@ -1000,11 +1129,8 @@ TEST_F(YamaSpecTests, Chunk_NonEmpty) {
                 b.lexical("IDENTIFIER"_str, 3);
                 {
                     auto node3 = b.syntactic("CallSig"_str);
-                    {
-                        auto node4 = b.syntactic("CallSig_Params"_str);
-                        b.lexical("L_ROUND"_str, 1);
-                        b.lexical("R_ROUND"_str, 1);
-                    }
+                    b.lexical("L_ROUND"_str, 1);
+                    b.lexical("R_ROUND"_str, 1);
                 }
                 b.skip_text(" "_str);
                 {
@@ -1076,11 +1202,8 @@ TEST_F(YamaSpecTests, Decl_FnDecl) {
             b.lexical("IDENTIFIER"_str, 3);
             {
                 auto node3 = b.syntactic("CallSig"_str);
-                {
-                    auto node4 = b.syntactic("CallSig_Params"_str);
-                    b.lexical("L_ROUND"_str, 1);
-                    b.lexical("R_ROUND"_str, 1);
-                }
+                b.lexical("L_ROUND"_str, 1);
+                b.lexical("R_ROUND"_str, 1);
             }
             b.skip_text(" "_str);
             {
@@ -1100,7 +1223,7 @@ TEST_F(YamaSpecTests, Decl_FnDecl) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_NoTypeSpec_NoExpr) {
+TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_NoAssign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1127,7 +1250,7 @@ TEST_F(YamaSpecTests, VarDecl_NoTypeSpec_NoExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_TypeSpec_NoExpr) {
+TEST_F(YamaSpecTests, VarDecl_TypeAnnot_NoAssign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1142,11 +1265,14 @@ TEST_F(YamaSpecTests, VarDecl_TypeSpec_NoExpr) {
         b.lexical("VAR"_str, 3);
         b.skip_text(" "_str);
         b.lexical("IDENTIFIER"_str, 1);
-        b.lexical("COLON"_str, 1);
-        b.skip_text(" "_str);
         {
-            auto node2 = b.syntactic("TypeSpec"_str);
-            b.lexical("IDENTIFIER"_str, 3);
+            auto node2 = b.syntactic("TypeAnnot"_str);
+            b.lexical("COLON"_str, 1);
+            b.skip_text(" "_str);
+            {
+                auto node3 = b.syntactic("TypeSpec"_str);
+                b.lexical("IDENTIFIER"_str, 3);
+            }
         }
         b.lexical("SEMI"_str, 1);
     }
@@ -1160,7 +1286,7 @@ TEST_F(YamaSpecTests, VarDecl_TypeSpec_NoExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_NoTypeSpec_Expr) {
+TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_Assign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1176,17 +1302,20 @@ TEST_F(YamaSpecTests, VarDecl_NoTypeSpec_Expr) {
         b.skip_text(" "_str);
         b.lexical("IDENTIFIER"_str, 1);
         b.skip_text(" "_str);
-        b.lexical("ASSIGN"_str, 1);
-        b.skip_text(" "_str);
         {
-            auto node2 = b.syntactic("Expr"_str);
+            auto node2 = b.syntactic("Assign"_str);
+            b.lexical("ASSIGN"_str, 1);
+            b.skip_text(" "_str);
             {
-                auto node3 = b.syntactic("PrimaryExpr"_str);
+                auto node3 = b.syntactic("Expr"_str);
                 {
-                    auto node4 = b.syntactic("Lit"_str);
+                    auto node4 = b.syntactic("PrimaryExpr"_str);
                     {
-                        auto node5 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
+                        auto node5 = b.syntactic("Lit"_str);
+                        {
+                            auto node6 = b.syntactic("IntLit"_str);
+                            b.lexical("INT_DEC"_str, 3);
+                        }
                     }
                 }
             }
@@ -1203,7 +1332,7 @@ TEST_F(YamaSpecTests, VarDecl_NoTypeSpec_Expr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_TypeSpec_Expr) {
+TEST_F(YamaSpecTests, VarDecl_TypeAnnot_Assign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1218,24 +1347,30 @@ TEST_F(YamaSpecTests, VarDecl_TypeSpec_Expr) {
         b.lexical("VAR"_str, 3);
         b.skip_text(" "_str);
         b.lexical("IDENTIFIER"_str, 1);
-        b.lexical("COLON"_str, 1);
-        b.skip_text(" "_str);
         {
-            auto node2 = b.syntactic("TypeSpec"_str);
-            b.lexical("IDENTIFIER"_str, 3);
+            auto node2 = b.syntactic("TypeAnnot"_str);
+            b.lexical("COLON"_str, 1);
+            b.skip_text(" "_str);
+            {
+                auto node3 = b.syntactic("TypeSpec"_str);
+                b.lexical("IDENTIFIER"_str, 3);
+            }
         }
         b.skip_text(" "_str);
-        b.lexical("ASSIGN"_str, 1);
-        b.skip_text(" "_str);
         {
-            auto node2 = b.syntactic("Expr"_str);
+            auto node2 = b.syntactic("Assign"_str);
+            b.lexical("ASSIGN"_str, 1);
+            b.skip_text(" "_str);
             {
-                auto node3 = b.syntactic("PrimaryExpr"_str);
+                auto node3 = b.syntactic("Expr"_str);
                 {
-                    auto node4 = b.syntactic("Lit"_str);
+                    auto node4 = b.syntactic("PrimaryExpr"_str);
                     {
-                        auto node5 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
+                        auto node5 = b.syntactic("Lit"_str);
+                        {
+                            auto node6 = b.syntactic("IntLit"_str);
+                            b.lexical("INT_DEC"_str, 3);
+                        }
                     }
                 }
             }
@@ -1269,11 +1404,8 @@ TEST_F(YamaSpecTests, FnDecl) {
         b.lexical("IDENTIFIER"_str, 3);
         {
             auto node2 = b.syntactic("CallSig"_str);
-            {
-                auto node3 = b.syntactic("CallSig_Params"_str);
-                b.lexical("L_ROUND"_str, 1);
-                b.lexical("R_ROUND"_str, 1);
-            }
+            b.lexical("L_ROUND"_str, 1);
+            b.lexical("R_ROUND"_str, 1);
         }
         b.skip_text(" "_str);
         {
@@ -1292,6 +1424,8 @@ TEST_F(YamaSpecTests, FnDecl) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
+// IMPORTANT: 'CallSig', 'ParamDecl', and 'Result' will be tested as a unit
+
 TEST_F(YamaSpecTests, CallSig_NoParams_NoResult) {
     ASSERT_TRUE(pprs_ready);
 
@@ -1304,11 +1438,8 @@ TEST_F(YamaSpecTests, CallSig_NoParams_NoResult) {
     parse_tree_builder b(*gram);
     {
         auto node0 = b.syntactic("CallSig"_str);
-        {
-            auto node1 = b.syntactic("CallSig_Params"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
+        b.lexical("L_ROUND"_str, 1);
+        b.lexical("R_ROUND"_str, 1);
     }
 
     auto expected = b.done();
@@ -1332,58 +1463,17 @@ TEST_F(YamaSpecTests, CallSig_NoParams_Result) {
     parse_tree_builder b(*gram);
     {
         auto node0 = b.syntactic("CallSig"_str);
-        {
-            auto node1 = b.syntactic("CallSig_Params"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
+        b.lexical("L_ROUND"_str, 1);
+        b.lexical("R_ROUND"_str, 1);
         b.skip_text(" "_str);
         {
-            auto node1 = b.syntactic("CallSig_Result"_str);
+            auto node1 = b.syntactic("Result"_str);
             b.lexical("R_ARROW"_str, 2);
             b.skip_text(" "_str);
             {
                 auto node2 = b.syntactic("TypeSpec"_str);
                 b.lexical("IDENTIFIER"_str, 3);
             }
-        }
-    }
-
-    auto expected = b.done();
-    auto actual = parser->parse("CallSig"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
-
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
-}
-
-TEST_F(YamaSpecTests, CallSig_OneParam_NoResult) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "(a: Int)"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    parse_tree_builder b(*gram);
-    {
-        auto node0 = b.syntactic("CallSig"_str);
-        {
-            auto node1 = b.syntactic("CallSig_Params"_str);
-            b.lexical("L_ROUND"_str, 1);
-            {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
-                b.lexical("COLON"_str, 1);
-                b.skip_text(" "_str);
-                {
-                    auto node3 = b.syntactic("TypeSpec"_str);
-                    b.lexical("IDENTIFIER"_str, 3);
-                }
-            }
-            b.lexical("R_ROUND"_str, 1);
         }
     }
 
@@ -1408,45 +1498,48 @@ TEST_F(YamaSpecTests, CallSig_Params_NoResult) {
     parse_tree_builder b(*gram);
     {
         auto node0 = b.syntactic("CallSig"_str);
+        b.lexical("L_ROUND"_str, 1);
         {
-            auto node1 = b.syntactic("CallSig_Params"_str);
-            b.lexical("L_ROUND"_str, 1);
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
             {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
-            }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
+                auto node3 = b.syntactic("TypeAnnot"_str);
                 b.lexical("COLON"_str, 1);
                 b.skip_text(" "_str);
                 {
-                    auto node3 = b.syntactic("TypeSpec"_str);
+                    auto node4 = b.syntactic("TypeSpec"_str);
                     b.lexical("IDENTIFIER"_str, 3);
                 }
             }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
             {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
+                auto node3 = b.syntactic("TypeAnnot"_str);
                 b.lexical("COLON"_str, 1);
                 b.skip_text(" "_str);
                 {
-                    auto node3 = b.syntactic("TypeSpec"_str);
+                    auto node4 = b.syntactic("TypeSpec"_str);
                     b.lexical("IDENTIFIER"_str, 5);
                 }
             }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
-            }
-            b.lexical("R_ROUND"_str, 1);
         }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
+        }
+        b.lexical("R_ROUND"_str, 1);
     }
 
     auto expected = b.done();
@@ -1470,48 +1563,51 @@ TEST_F(YamaSpecTests, CallSig_Params_Result) {
     parse_tree_builder b(*gram);
     {
         auto node0 = b.syntactic("CallSig"_str);
+        b.lexical("L_ROUND"_str, 1);
         {
-            auto node1 = b.syntactic("CallSig_Params"_str);
-            b.lexical("L_ROUND"_str, 1);
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
             {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
-            }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
+                auto node3 = b.syntactic("TypeAnnot"_str);
                 b.lexical("COLON"_str, 1);
                 b.skip_text(" "_str);
                 {
-                    auto node3 = b.syntactic("TypeSpec"_str);
+                    auto node4 = b.syntactic("TypeSpec"_str);
                     b.lexical("IDENTIFIER"_str, 3);
                 }
             }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
             {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
+                auto node3 = b.syntactic("TypeAnnot"_str);
                 b.lexical("COLON"_str, 1);
                 b.skip_text(" "_str);
                 {
-                    auto node3 = b.syntactic("TypeSpec"_str);
+                    auto node4 = b.syntactic("TypeSpec"_str);
                     b.lexical("IDENTIFIER"_str, 5);
                 }
             }
-            b.lexical("COMMA"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("CallSig_Param"_str);
-                b.lexical("IDENTIFIER"_str, 1);
-            }
-            b.lexical("R_ROUND"_str, 1);
         }
+        b.lexical("COMMA"_str, 1);
         b.skip_text(" "_str);
         {
-            auto node1 = b.syntactic("CallSig_Result"_str);
+            auto node2 = b.syntactic("ParamDecl"_str);
+            b.lexical("IDENTIFIER"_str, 1);
+        }
+        b.lexical("R_ROUND"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("Result"_str);
             b.lexical("R_ARROW"_str, 2);
             b.skip_text(" "_str);
             {
@@ -1885,6 +1981,56 @@ TEST_F(YamaSpecTests, ExprStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
+TEST_F(YamaSpecTests, ExprStmt_AssignStmt) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "300 = abc;"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("ExprStmt"_str);
+        {
+            auto node1 = b.syntactic("Expr"_str);
+            {
+                auto node2 = b.syntactic("PrimaryExpr"_str);
+                {
+                    auto node3 = b.syntactic("Lit"_str);
+                    {
+                        auto node4 = b.syntactic("IntLit"_str);
+                        b.lexical("INT_DEC"_str, 3);
+                    }
+                }
+            }
+        }
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("Assign"_str);
+            b.lexical("ASSIGN"_str, 1);
+            b.skip_text(" "_str);
+            {
+                auto node2 = b.syntactic("Expr"_str);
+                {
+                    auto node3 = b.syntactic("PrimaryExpr"_str);
+                    b.lexical("IDENTIFIER"_str, 3);
+                }
+            }
+        }
+        b.lexical("SEMI"_str, 1);
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("ExprStmt"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
 TEST_F(YamaSpecTests, IfStmt_NoElse) {
     ASSERT_TRUE(pprs_ready);
 
@@ -2140,7 +2286,7 @@ TEST_F(YamaSpecTests, ContinueStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ReturnStmt) {
+TEST_F(YamaSpecTests, ReturnStmt_NoExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2165,19 +2311,20 @@ TEST_F(YamaSpecTests, ReturnStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Expr_NegationExpr) {
+TEST_F(YamaSpecTests, ReturnStmt_Expr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
-    input.add_str(""_str, "-300"_str);
+    input.add_str(""_str, "return 3.14159;"_str);
 
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
     parse_tree_builder b(*gram);
     {
-        auto node0 = b.syntactic("Expr"_str);
-        b.lexical("MINUS"_str, 1);
+        auto node0 = b.syntactic("ReturnStmt"_str);
+        b.lexical("RETURN"_str, 6);
+        b.skip_text(" "_str);
         {
             auto node1 = b.syntactic("Expr"_str);
             {
@@ -2185,16 +2332,17 @@ TEST_F(YamaSpecTests, Expr_NegationExpr) {
                 {
                     auto node3 = b.syntactic("Lit"_str);
                     {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
+                        auto node4 = b.syntactic("FloatLit"_str);
+                        b.lexical("FLOAT"_str, 7);
                     }
                 }
             }
         }
+        b.lexical("SEMI"_str, 1);
     }
 
     auto expected = b.done();
-    auto actual = parser->parse("Expr"_str);
+    auto actual = parser->parse("ReturnStmt"_str);
 
     YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
     YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
@@ -2235,52 +2383,6 @@ TEST_F(YamaSpecTests, Expr_PrimaryExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Expr_AssignStmt) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "a = 300"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    parse_tree_builder b(*gram);
-    {
-        auto node0 = b.syntactic("Expr"_str);
-        {
-            auto node1 = b.syntactic("PrimaryExpr"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Assign"_str);
-            b.lexical("ASSIGN"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("Expr"_str);
-                {
-                    auto node3 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node4 = b.syntactic("Lit"_str);
-                        {
-                            auto node5 = b.syntactic("IntLit"_str);
-                            b.lexical("INT_DEC"_str, 3);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    auto expected = b.done();
-    auto actual = parser->parse("Expr"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
-
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
-}
-
 TEST_F(YamaSpecTests, Expr_CallExpr) {
     ASSERT_TRUE(pprs_ready);
 
@@ -2296,6 +2398,48 @@ TEST_F(YamaSpecTests, Expr_CallExpr) {
         {
             auto node1 = b.syntactic("PrimaryExpr"_str);
             b.lexical("IDENTIFIER"_str, 1);
+        }
+        {
+            auto node1 = b.syntactic("Args"_str);
+            b.lexical("L_ROUND"_str, 1);
+            b.lexical("R_ROUND"_str, 1);
+        }
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("Expr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, Expr_SuffixNesting) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "a()()()"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("Expr"_str);
+        {
+            auto node1 = b.syntactic("PrimaryExpr"_str);
+            b.lexical("IDENTIFIER"_str, 1);
+        }
+        {
+            auto node1 = b.syntactic("Args"_str);
+            b.lexical("L_ROUND"_str, 1);
+            b.lexical("R_ROUND"_str, 1);
+        }
+        {
+            auto node1 = b.syntactic("Args"_str);
+            b.lexical("L_ROUND"_str, 1);
+            b.lexical("R_ROUND"_str, 1);
         }
         {
             auto node1 = b.syntactic("Args"_str);
@@ -2360,137 +2504,6 @@ TEST_F(YamaSpecTests, PrimaryExpr_LitExpr) {
 
     auto expected = b.done();
     auto actual = parser->parse("PrimaryExpr"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
-
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
-}
-
-TEST_F(YamaSpecTests, Assign) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "= 10"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    parse_tree_builder b(*gram);
-    {
-        auto node0 = b.syntactic("Assign"_str);
-        b.lexical("ASSIGN"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 2);
-                    }
-                }
-            }
-        }
-    }
-
-    auto expected = b.done();
-    auto actual = parser->parse("Assign"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
-
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
-}
-
-TEST_F(YamaSpecTests, Args_Empty) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "()"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    parse_tree_builder b(*gram);
-    {
-        auto node0 = b.syntactic("Args"_str);
-        b.lexical("L_ROUND"_str, 1);
-        b.lexical("R_ROUND"_str, 1);
-    }
-
-    auto expected = b.done();
-    auto actual = parser->parse("Args"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
-
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
-}
-
-TEST_F(YamaSpecTests, Args_NonEmpty) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "(10, 3, 100)"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    parse_tree_builder b(*gram);
-    {
-        auto node0 = b.syntactic("Args"_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 2);
-                    }
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 1);
-                    }
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
-                    }
-                }
-            }
-        }
-        b.lexical("R_ROUND"_str, 1);
-    }
-
-    auto expected = b.done();
-    auto actual = parser->parse("Args"_str);
 
     YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
     YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
@@ -2914,6 +2927,166 @@ TEST_F(YamaSpecTests, CharLit) {
 
     auto expected = b.done();
     auto actual = parser->parse("CharLit"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, Assign) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "= 10"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("Assign"_str);
+        b.lexical("ASSIGN"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("Expr"_str);
+            {
+                auto node2 = b.syntactic("PrimaryExpr"_str);
+                {
+                    auto node3 = b.syntactic("Lit"_str);
+                    {
+                        auto node4 = b.syntactic("IntLit"_str);
+                        b.lexical("INT_DEC"_str, 2);
+                    }
+                }
+            }
+        }
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("Assign"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, Args_Empty) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "()"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("Args"_str);
+        b.lexical("L_ROUND"_str, 1);
+        b.lexical("R_ROUND"_str, 1);
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("Args"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, Args_NonEmpty) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "(10, 3, 100)"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("Args"_str);
+        b.lexical("L_ROUND"_str, 1);
+        {
+            auto node1 = b.syntactic("Expr"_str);
+            {
+                auto node2 = b.syntactic("PrimaryExpr"_str);
+                {
+                    auto node3 = b.syntactic("Lit"_str);
+                    {
+                        auto node4 = b.syntactic("IntLit"_str);
+                        b.lexical("INT_DEC"_str, 2);
+                    }
+                }
+            }
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("Expr"_str);
+            {
+                auto node2 = b.syntactic("PrimaryExpr"_str);
+                {
+                    auto node3 = b.syntactic("Lit"_str);
+                    {
+                        auto node4 = b.syntactic("IntLit"_str);
+                        b.lexical("INT_DEC"_str, 1);
+                    }
+                }
+            }
+        }
+        b.lexical("COMMA"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("Expr"_str);
+            {
+                auto node2 = b.syntactic("PrimaryExpr"_str);
+                {
+                    auto node3 = b.syntactic("Lit"_str);
+                    {
+                        auto node4 = b.syntactic("IntLit"_str);
+                        b.lexical("INT_DEC"_str, 3);
+                    }
+                }
+            }
+        }
+        b.lexical("R_ROUND"_str, 1);
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("Args"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
+    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+
+    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+}
+
+TEST_F(YamaSpecTests, TypeAnnot) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, ": Float"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    parse_tree_builder b(*gram);
+    {
+        auto node0 = b.syntactic("TypeAnnot"_str);
+        b.lexical("COLON"_str, 1);
+        b.skip_text(" "_str);
+        {
+            auto node1 = b.syntactic("TypeSpec"_str);
+            b.lexical("IDENTIFIER"_str, 5);
+        }
+    }
+
+    auto expected = b.done();
+    auto actual = parser->parse("TypeAnnot"_str);
 
     YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
     YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);

@@ -57,3 +57,38 @@ const yama::bc::syms* yama::type_info::bcodesyms() const noexcept {
         : nullptr;
 }
 
+std::string yama::primitive_info::fmt(const char* tab) const {
+    YAMA_ASSERT(tab);
+    std::string result{};
+    result += "primitive_info";
+    result += std::format("\n{}ptype: {}", tab, ptype);
+    return result;
+}
+
+std::string yama::function_info::fmt(const const_table_info& consts, const char* tab) const {
+    YAMA_ASSERT(tab);
+    std::string result{};
+    result += "function_info";
+    result += std::format("\n{}callsig: {}", tab, callsig.fmt(consts));
+    result += std::format("\n{}call_fn: {}", tab, call_fn == bcode_call_fn ? "bcode" : "C++");
+    result += std::format("\n{}locals : {}", tab, locals);
+    result += std::format("\n{}", bcode.fmt_disassembly(tab));
+    return result;
+}
+
+std::string yama::type_info::fmt(const char* tab) const {
+    YAMA_ASSERT(tab);
+    std::string result{};
+    result += "type_info";
+    result += std::format("\n{}fullname: {}", tab, fullname);
+    if (kind() == kind::primitive) {
+        result += std::format("\n{}", std::get<primitive_info>(info).fmt(tab));
+    }
+    else if (kind() == kind::function) {
+        result += std::format("\n{}", std::get<function_info>(info).fmt(consts, tab));
+    }
+    else YAMA_DEADEND;
+    result += std::format("\n{}", consts.fmt(tab));
+    return result;
+}
+

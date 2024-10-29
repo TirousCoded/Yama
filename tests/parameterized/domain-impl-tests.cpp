@@ -3,6 +3,7 @@
 #include "domain-impl-tests.h"
 
 #include <yama/core/general.h>
+#include <yama/core/context.h>
 #include <yama/core/callsig.h>
 #include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
@@ -52,7 +53,7 @@ yama::type_info f_info{
     },
 };
 
-// the type 'bad' will fail static verification during push
+// the type 'bad' will fail static verification during upload
 
 static const auto bad_consts =
 yama::const_table_info()
@@ -131,10 +132,10 @@ TEST_P(DomainImplTests, Builtins) {
 TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
 
-    ASSERT_TRUE(dm->push(f_info));
-    ASSERT_TRUE(dm->push(a_info));
-    ASSERT_TRUE(dm->push(b_info));
-    ASSERT_TRUE(dm->push(c_info));
+    ASSERT_TRUE(dm->upload(f_info));
+    ASSERT_TRUE(dm->upload(a_info));
+    ASSERT_TRUE(dm->upload(b_info));
+    ASSERT_TRUE(dm->upload(c_info));
 
 
     const auto result_f = dm->load("f"_str);
@@ -193,10 +194,10 @@ TEST_P(DomainImplTests, Load_FailDueToInstantiationError) {
 
     // f will fail instantiation due to type b not being available
 
-    ASSERT_TRUE(dm->push(f_info));
-    ASSERT_TRUE(dm->push(a_info));
-    //ASSERT_TRUE(dm->push(b_info));
-    ASSERT_TRUE(dm->push(c_info));
+    ASSERT_TRUE(dm->upload(f_info));
+    ASSERT_TRUE(dm->upload(a_info));
+    //ASSERT_TRUE(dm->upload(b_info));
+    ASSERT_TRUE(dm->upload(c_info));
 
 
     const auto result_f = dm->load("f"_str);
@@ -249,27 +250,27 @@ TEST_P(DomainImplTests, LoadChar) {
 
 
 // IMPORTANT:
-//      push tests presume that since static_verifier is so well tested, that so
+//      upload tests presume that since static_verifier is so well tested, that so
 //      long as *basic* behaviour can be *broadly* ensured, that it can be presumed
 //      that static_verifier is the mechanism by which this behaviour is implemented,
 //      such that its guarantees can be presumed to likewise apply here
 
 // IMPORTANT:
 //      take note also that these tests also presume that the templated overload
-//      of push working can be taken to imply that its type_data overload also works,
+//      of upload working can be taken to imply that its type_data overload also works,
 //      as it's presumed to be the mechanism by which the former is implemented
 
-TEST_P(DomainImplTests, Push) {
+TEST_P(DomainImplTests, Upload_One) {
     const auto dm = GetParam().factory(dbg);
 
-    // push types f, a, b, and c, to test that push works broadly
+    // upload types f, a, b, and c, to test that upload works broadly
 
-    ASSERT_TRUE(dm->push(f_info));
-    ASSERT_TRUE(dm->push(a_info));
-    ASSERT_TRUE(dm->push(b_info));
-    ASSERT_TRUE(dm->push(c_info));
+    ASSERT_TRUE(dm->upload(f_info));
+    ASSERT_TRUE(dm->upload(a_info));
+    ASSERT_TRUE(dm->upload(b_info));
+    ASSERT_TRUE(dm->upload(c_info));
 
-    // test that pushed types are acknowledged by the domain impl correctly
+    // test that uploaded types are acknowledged by the domain impl correctly
 
     const auto ff = dm->load("f"_str);
     const auto aa = dm->load("a"_str);
@@ -280,7 +281,7 @@ TEST_P(DomainImplTests, Push) {
     ASSERT_TRUE(bb);
     ASSERT_TRUE(cc);
 
-    // quickly sample state of types f and a to see that they pushed correctly
+    // quickly sample state of types f, a, b, and c, to see that they uploaded correctly
 
     EXPECT_TRUE(ff->complete());
     EXPECT_EQ(ff->fullname(), "f"_str);
@@ -299,15 +300,354 @@ TEST_P(DomainImplTests, Push) {
     EXPECT_EQ(aa->kind(), yama::kind::primitive);
     EXPECT_FALSE(aa->callsig());
     EXPECT_EQ(aa->consts().size(), 0);
+
+    EXPECT_TRUE(bb->complete());
+    EXPECT_EQ(bb->fullname(), "b"_str);
+    EXPECT_EQ(bb->kind(), yama::kind::primitive);
+    EXPECT_FALSE(bb->callsig());
+    EXPECT_EQ(bb->consts().size(), 0);
+
+    EXPECT_TRUE(cc->complete());
+    EXPECT_EQ(cc->fullname(), "c"_str);
+    EXPECT_EQ(cc->kind(), yama::kind::primitive);
+    EXPECT_FALSE(cc->callsig());
+    EXPECT_EQ(cc->consts().size(), 0);
 }
 
-TEST_P(DomainImplTests, Push_FailDueToStaticVerificationError) {
+TEST_P(DomainImplTests, Upload_One_FailDueToStaticVerificationError) {
     const auto dm = GetParam().factory(dbg);
 
-    EXPECT_FALSE(dm->push(bad_info));
+    EXPECT_FALSE(dm->upload(bad_info));
 
     // test that no new type was made available
 
     EXPECT_FALSE(dm->load("bad"_str));
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaIterPair) {
+    const auto dm = GetParam().factory(dbg);
+
+    // upload types f, a, b, and c, to test that upload works broadly
+
+    std::vector<yama::type_info> group{
+        f_info,
+        a_info,
+        b_info,
+        c_info,
+    };
+
+    ASSERT_TRUE(dm->upload(group.begin(), group.end()));
+
+    // test that uploaded types are acknowledged by the domain impl correctly
+
+    const auto ff = dm->load("f"_str);
+    const auto aa = dm->load("a"_str);
+    const auto bb = dm->load("b"_str);
+    const auto cc = dm->load("c"_str);
+    ASSERT_TRUE(ff);
+    ASSERT_TRUE(aa);
+    ASSERT_TRUE(bb);
+    ASSERT_TRUE(cc);
+
+    // quickly sample state of types f, a, b, and c, to see that they uploaded correctly
+
+    EXPECT_TRUE(ff->complete());
+    EXPECT_EQ(ff->fullname(), "f"_str);
+    EXPECT_EQ(ff->kind(), yama::kind::function);
+
+    ASSERT_TRUE(ff->callsig());
+    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->consts()));
+    
+    ASSERT_EQ(ff->consts().size(), 3);
+    EXPECT_EQ(ff->consts().type(0), aa);
+    EXPECT_EQ(ff->consts().type(1), bb);
+    EXPECT_EQ(ff->consts().type(2), cc);
+
+    EXPECT_TRUE(aa->complete());
+    EXPECT_EQ(aa->fullname(), "a"_str);
+    EXPECT_EQ(aa->kind(), yama::kind::primitive);
+    EXPECT_FALSE(aa->callsig());
+    EXPECT_EQ(aa->consts().size(), 0);
+
+    EXPECT_TRUE(bb->complete());
+    EXPECT_EQ(bb->fullname(), "b"_str);
+    EXPECT_EQ(bb->kind(), yama::kind::primitive);
+    EXPECT_FALSE(bb->callsig());
+    EXPECT_EQ(bb->consts().size(), 0);
+
+    EXPECT_TRUE(cc->complete());
+    EXPECT_EQ(cc->fullname(), "c"_str);
+    EXPECT_EQ(cc->kind(), yama::kind::primitive);
+    EXPECT_FALSE(cc->callsig());
+    EXPECT_EQ(cc->consts().size(), 0);
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaIterPair_FailDueToStaticVerificationError) {
+    const auto dm = GetParam().factory(dbg);
+
+    std::vector<yama::type_info> group{
+        f_info,
+        a_info,
+        bad_info, // <- should cause whole group to fail upload
+        c_info,
+    };
+
+    EXPECT_FALSE(dm->upload(group.begin(), group.end()));
+
+    // test that no new types were made available
+
+    EXPECT_FALSE(dm->load("f"_str));
+    EXPECT_FALSE(dm->load("a"_str));
+    EXPECT_FALSE(dm->load("bad"_str));
+    EXPECT_FALSE(dm->load("c"_str));
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaIterable) {
+    const auto dm = GetParam().factory(dbg);
+
+    // upload types f, a, b, and c, to test that upload works broadly
+
+    std::vector<yama::type_info> group{
+        f_info,
+        a_info,
+        b_info,
+        c_info,
+    };
+
+    ASSERT_TRUE(dm->upload(group));
+
+    // test that uploaded types are acknowledged by the domain impl correctly
+
+    const auto ff = dm->load("f"_str);
+    const auto aa = dm->load("a"_str);
+    const auto bb = dm->load("b"_str);
+    const auto cc = dm->load("c"_str);
+    ASSERT_TRUE(ff);
+    ASSERT_TRUE(aa);
+    ASSERT_TRUE(bb);
+    ASSERT_TRUE(cc);
+
+    // quickly sample state of types f, a, b, and c, to see that they uploaded correctly
+
+    EXPECT_TRUE(ff->complete());
+    EXPECT_EQ(ff->fullname(), "f"_str);
+    EXPECT_EQ(ff->kind(), yama::kind::function);
+
+    ASSERT_TRUE(ff->callsig());
+    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->consts()));
+    
+    ASSERT_EQ(ff->consts().size(), 3);
+    EXPECT_EQ(ff->consts().type(0), aa);
+    EXPECT_EQ(ff->consts().type(1), bb);
+    EXPECT_EQ(ff->consts().type(2), cc);
+
+    EXPECT_TRUE(aa->complete());
+    EXPECT_EQ(aa->fullname(), "a"_str);
+    EXPECT_EQ(aa->kind(), yama::kind::primitive);
+    EXPECT_FALSE(aa->callsig());
+    EXPECT_EQ(aa->consts().size(), 0);
+
+    EXPECT_TRUE(bb->complete());
+    EXPECT_EQ(bb->fullname(), "b"_str);
+    EXPECT_EQ(bb->kind(), yama::kind::primitive);
+    EXPECT_FALSE(bb->callsig());
+    EXPECT_EQ(bb->consts().size(), 0);
+
+    EXPECT_TRUE(cc->complete());
+    EXPECT_EQ(cc->fullname(), "c"_str);
+    EXPECT_EQ(cc->kind(), yama::kind::primitive);
+    EXPECT_FALSE(cc->callsig());
+    EXPECT_EQ(cc->consts().size(), 0);
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaIterable_FailDueToStaticVerificationError) {
+    const auto dm = GetParam().factory(dbg);
+
+    std::vector<yama::type_info> group{
+        f_info,
+        a_info,
+        bad_info, // <- should cause whole group to fail upload
+        c_info,
+    };
+
+    EXPECT_FALSE(dm->upload(group));
+
+    // test that no new types were made available
+
+    EXPECT_FALSE(dm->load("f"_str));
+    EXPECT_FALSE(dm->load("a"_str));
+    EXPECT_FALSE(dm->load("bad"_str));
+    EXPECT_FALSE(dm->load("c"_str));
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaInitList) {
+    const auto dm = GetParam().factory(dbg);
+
+    // upload types f, a, b, and c, to test that upload works broadly
+
+    std::initializer_list<yama::type_info> group{
+        f_info,
+        a_info,
+        b_info,
+        c_info,
+    };
+
+    ASSERT_TRUE(dm->upload(group));
+
+    // test that uploaded types are acknowledged by the domain impl correctly
+
+    const auto ff = dm->load("f"_str);
+    const auto aa = dm->load("a"_str);
+    const auto bb = dm->load("b"_str);
+    const auto cc = dm->load("c"_str);
+    ASSERT_TRUE(ff);
+    ASSERT_TRUE(aa);
+    ASSERT_TRUE(bb);
+    ASSERT_TRUE(cc);
+
+    // quickly sample state of types f, a, b, and c, to see that they uploaded correctly
+
+    EXPECT_TRUE(ff->complete());
+    EXPECT_EQ(ff->fullname(), "f"_str);
+    EXPECT_EQ(ff->kind(), yama::kind::function);
+
+    ASSERT_TRUE(ff->callsig());
+    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->consts()));
+    
+    ASSERT_EQ(ff->consts().size(), 3);
+    EXPECT_EQ(ff->consts().type(0), aa);
+    EXPECT_EQ(ff->consts().type(1), bb);
+    EXPECT_EQ(ff->consts().type(2), cc);
+
+    EXPECT_TRUE(aa->complete());
+    EXPECT_EQ(aa->fullname(), "a"_str);
+    EXPECT_EQ(aa->kind(), yama::kind::primitive);
+    EXPECT_FALSE(aa->callsig());
+    EXPECT_EQ(aa->consts().size(), 0);
+
+    EXPECT_TRUE(bb->complete());
+    EXPECT_EQ(bb->fullname(), "b"_str);
+    EXPECT_EQ(bb->kind(), yama::kind::primitive);
+    EXPECT_FALSE(bb->callsig());
+    EXPECT_EQ(bb->consts().size(), 0);
+
+    EXPECT_TRUE(cc->complete());
+    EXPECT_EQ(cc->fullname(), "c"_str);
+    EXPECT_EQ(cc->kind(), yama::kind::primitive);
+    EXPECT_FALSE(cc->callsig());
+    EXPECT_EQ(cc->consts().size(), 0);
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaInitList_FailDueToStaticVerificationError) {
+    const auto dm = GetParam().factory(dbg);
+
+    std::initializer_list<yama::type_info> group{
+        f_info,
+        a_info,
+        bad_info, // <- should cause whole group to fail upload
+        c_info,
+    };
+
+    EXPECT_FALSE(dm->upload(group));
+
+    // test that no new types were made available
+
+    EXPECT_FALSE(dm->load("f"_str));
+    EXPECT_FALSE(dm->load("a"_str));
+    EXPECT_FALSE(dm->load("bad"_str));
+    EXPECT_FALSE(dm->load("c"_str));
+}
+
+TEST_P(DomainImplTests, Upload_SrcCode) {
+    const auto dm = GetParam().factory(dbg);
+
+    std::string txt = R"(
+
+fn pi() -> Float {
+    return 3.14159;
+}
+
+)";
+
+    taul::source_code src{};
+    src.add_str("src"_str, yama::str(txt));
+
+    ASSERT_TRUE(dm->upload(src));
+
+    // test that no new types were made available
+
+    EXPECT_TRUE(dm->load("pi"_str));
+
+    yama::context ctx(dm, yama::default_ctx_config, dbg);
+
+    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+
+    EXPECT_TRUE(ctx.ll_local(0));
+    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+        EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
+    }
+}
+
+TEST_P(DomainImplTests, Upload_Str) {
+    const auto dm = GetParam().factory(dbg);
+
+    std::string txt = R"(
+
+fn pi() -> Float {
+    return 3.14159;
+}
+
+)";
+
+    taul::source_code src{};
+    src.add_str("src"_str, yama::str(txt));
+
+    ASSERT_TRUE(dm->upload(src.str())); // <- compile w/ the string part only
+
+    // test that no new types were made available
+
+    EXPECT_TRUE(dm->load("pi"_str));
+
+    yama::context ctx(dm, yama::default_ctx_config, dbg);
+
+    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+
+    EXPECT_TRUE(ctx.ll_local(0));
+    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+        EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
+    }
+}
+
+TEST_P(DomainImplTests, Upload_FilePath) {
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_TRUE(dm->upload(std::filesystem::current_path() / "support-files/domain-impl-tests-helper.yama"));
+
+    // test that no new types were made available
+
+    EXPECT_TRUE(dm->load("pi"_str));
+
+    yama::context ctx(dm, yama::default_ctx_config, dbg);
+
+    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+
+    EXPECT_TRUE(ctx.ll_local(0));
+    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+        EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
+    }
+}
+
+TEST_P(DomainImplTests, Upload_FilePath_FileNotFound) {
+    const auto path = std::filesystem::current_path() / "support-files/some-file-that-does-not-exist.yama";
+    ASSERT_FALSE(std::filesystem::exists(path));
+
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_FALSE(dm->upload(path));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_file_not_found), 1);
 }
 

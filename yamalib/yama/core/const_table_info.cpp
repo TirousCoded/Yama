@@ -166,3 +166,10 @@ yama::const_table_info& yama::const_table_info::add_function_type(str fullname, 
     return *this;
 }
 
+yama::const_table_info& yama::const_table_info::_patch_function_type(const_t x, callsig_info new_callsig) {
+    YAMA_ASSERT(x < consts.size());
+    YAMA_ASSERT(std::holds_alternative<function_type_const_info>(consts[x]));
+    std::get<function_type_const_info>(consts[x]).callsig = std::move(new_callsig);
+    return *this;
+}
+

@@ -9,6 +9,7 @@ yama::domain_st::domain_st(res<mas> mas, std::shared_ptr<debug> dbg)
     _type_info_db(),
     _type_db(),
     _type_batch_db(),
+    _compiler(*this, dbg),
     _verif(dbg),
     _instant(_type_info_db, _type_db, _type_batch_db, std::allocator<void>{}, dbg) {
     if (!setup_domain()) {
@@ -36,9 +37,15 @@ std::optional<yama::type> yama::domain_st::load(const str& fullname) {
     return std::nullopt;
 }
 
-bool yama::domain_st::push(type_info x) {
-    if (!_verif.verify(x)) return false;
-    _type_info_db.push(make_res<type_info>(std::move(x)));
-    return true;
+std::optional<std::vector<yama::type_info>> yama::domain_st::do_compile(const taul::source_code& src) {
+    return _compiler.compile(src);
+}
+
+bool yama::domain_st::do_verify(const type_info& x) {
+    return _verif.verify(x);
+}
+
+void yama::domain_st::do_upload(type_info&& x) {
+    _type_info_db.push(make_res<type_info>(std::forward<type_info>(x)));
 }
 

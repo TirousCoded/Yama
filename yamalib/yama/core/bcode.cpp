@@ -162,6 +162,32 @@ yama::bc::code& yama::bc::code::add_jump_false(uint8_t A, int16_t sBx) {
     return *this;
 }
 
+yama::bc::code& yama::bc::code::append(const code& x) {
+    if (_instrs.capacity() < count() + x.count()) {
+        _instrs.reserve(count() + x.count());
+        _reinit_flags.reserve(count() + x.count());
+    }
+    _instrs.insert(_instrs.end(), x._instrs.begin(), x._instrs.end());
+    _reinit_flags.insert(_reinit_flags.end(), x._reinit_flags.begin(), x._reinit_flags.end());
+    return *this;
+}
+
+yama::bc::code yama::bc::code::concat(const code& a, const code& b) {
+    code result{};
+    result._instrs.reserve(a.count() + b.count());
+    result._instrs.insert(result._instrs.end(), a._instrs.begin(), a._instrs.end());
+    result._instrs.insert(result._instrs.end(), b._instrs.begin(), b._instrs.end());
+    result._reinit_flags.reserve(a.count() + b.count());
+    result._reinit_flags.insert(result._reinit_flags.end(), a._reinit_flags.begin(), a._reinit_flags.end());
+    result._reinit_flags.insert(result._reinit_flags.end(), b._reinit_flags.begin(), b._reinit_flags.end());
+    return result;
+}
+
+void yama::bc::code::_reset() {
+    _instrs.clear();
+    _reinit_flags.clear();
+}
+
 std::string yama::bc::sym::fmt() const {
     return std::format("[ln {}, ch {}; \"{}\"]", ln, ch, origin);
 }
@@ -181,5 +207,153 @@ std::optional<yama::bc::sym> yama::bc::syms::operator[](size_t index) const noex
 yama::bc::syms& yama::bc::syms::add(size_t index, str origin, size_t ch, size_t ln) {
     _syms[index] = sym{ .index = index, .origin = origin, .ch = ch, .ln = ln };
     return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_noop() {
+    _result.add_noop();
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_load_none(uint8_t A, bool reinit) {
+    _result.add_load_none(A, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_load_const(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_load_const(A, B, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_load_arg(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_load_arg(A, B, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_copy(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_copy(A, B, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit) {
+    _result.add_call(A, B, C, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_call_nr(uint8_t A, uint8_t B) {
+    _result.add_call_nr(A, B);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_ret(uint8_t A) {
+    _result.add_ret(A);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_jump(label_id_t label_id) {
+    _bind_label_id_user(label_id);
+    _result.add_jump(0); // stub
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_jump_true(uint8_t A, label_id_t label_id) {
+    _bind_label_id_user(label_id);
+    _result.add_jump_true(A, 0); // stub
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_jump_false(uint8_t A, label_id_t label_id) {
+    _bind_label_id_user(label_id);
+    _result.add_jump_false(A, 0); // stub
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_label(label_id_t label_id) {
+    _bind_label_id(label_id);
+    return *this;
+}
+
+std::optional<yama::bc::code> yama::bc::code_writer::done(bool* label_not_found) {
+    std::optional<code> result{};
+    if (_resolve(label_not_found)) {
+        result = std::move(_result);
+        _reset();
+    }
+    return result;
+}
+
+size_t yama::bc::code_writer::_write_pos() const noexcept {
+    return _result.count();
+}
+
+std::optional<size_t> yama::bc::code_writer::_get_instr_index(label_id_t label_id) {
+    const auto it = _label_id_map.find(label_id);
+    return
+        it != _label_id_map.end()
+        ? std::make_optional(it->second)
+        : std::nullopt;
+}
+
+void yama::bc::code_writer::_bind_label_id(label_id_t label_id) {
+    _label_id_map[label_id] = _write_pos(); // overwrites existing
+}
+
+void yama::bc::code_writer::_bind_label_id_user(label_id_t label_id) {
+    _label_id_user_map[_write_pos()] = label_id;
+}
+
+void yama::bc::code_writer::_reset() {
+    _result._reset();
+    _label_id_map.clear();
+    _label_id_user_map.clear();
+}
+
+bool yama::bc::code_writer::_resolve(bool* label_not_found) {
+    // iterate over label ID user map, resolving each one, and failing and
+    // propagating correct error if issue is found
+    for (const auto& I : _label_id_user_map) {
+        const size_t instr_index = I.first; // the instr who's stub needs patching
+        const label_id_t label_id = I.second; // label ID to use to patch stub
+        if (const auto label_instr_index = _get_instr_index(label_id)) {
+            // IMPORTANT: remember that branch instrs sBx offsets are relative to
+            //            the instr index immediately after the instr, so we do the
+            //            '+ 1' bit below
+            size_t low = instr_index + 1; // initial value is jumped-from instr index
+            size_t high = *label_instr_index; // initial value is jumped-to instr index
+            const bool jump_backwards = low > high; // are we jumping forwards, or backwards?
+            if (jump_backwards) {
+                std::swap(low, high); // ensure diff below is non-negative
+            }
+            size_t diff = high - low; // jump offset (w/out accounting for forward/backwards)
+            if (!jump_backwards) { // forward jump
+                if (diff > size_t(std::numeric_limits<int16_t>::max())) { // sBx overflow error
+                    if (label_not_found) {
+                        *label_not_found = false;
+                    }
+                    return false;
+                }
+                // if branch is reasonable, then apply patch and move on
+                _result._instrs[instr_index].sBx = int16_t(diff);
+            }
+            else { // backward jump
+                // NOTE: below, size_t(std::numeric_limits<int16_t>::max()) + 1 gets us the minimum
+                //       16-bit value, but expressed as a positive size_t value
+                if (diff > size_t(std::numeric_limits<int16_t>::max()) + 1) { // sBx underflow error
+                    if (label_not_found) {
+                        *label_not_found = false;
+                    }
+                    return false;
+                }
+                // if branch is reasonable, then apply patch and move on
+                _result._instrs[instr_index].sBx = int16_t(-ssize_t(diff)); // careful to avoid overflow/underflow
+            }
+        }
+        else { // label not found error
+            if (label_not_found) {
+                *label_not_found = true;
+            }
+            return false;
+        }
+    }
+    return true;
 }
 

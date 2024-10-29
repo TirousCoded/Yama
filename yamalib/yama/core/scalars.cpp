@@ -282,7 +282,7 @@ std::optional<yama::parsed_int> yama::parse_int(std::string_view x) {
     return std::make_optional(result);
 }
 
-std::optional<yama::parsed_uint> yama::parse_uint(std::string_view x) {
+std::optional<yama::parsed_uint> yama::parse_uint(std::string_view x, bool expect_u) {
     parsed_uint result{ .v = 0, .bytes = 0 }; // our eventual result
 
     auto ctx = internal::parse_ctx::make(x);
@@ -392,7 +392,7 @@ std::optional<yama::parsed_uint> yama::parse_uint(std::string_view x) {
             else break; // if no digit, but also didn't fail due to it, then we're done
         }
     }
-    if (!ctx.expect(U'u')) { // if no final 'u', fail parse
+    if (expect_u && !ctx.expect(U'u')) { // if expect_u, and no final 'u', fail parse
         return std::nullopt;
     }
     if (!reasonable) {

@@ -616,7 +616,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeAlreadyInstantiated) 
     EXPECT_EQ(type_db.size(), 1);
     EXPECT_TRUE(type_db.exists("a"_str));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_already_instantiated), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_already_instantiated), 1);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeNotFound) {
@@ -631,7 +631,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeNotFound) {
 
     EXPECT_EQ(type_db.size(), 0);
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Fail_ReferencedTypeNotFound) {
@@ -674,7 +674,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_ReferencedTypeNotFound) {
 
     EXPECT_EQ(type_db.size(), 0);
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound) {
@@ -749,7 +749,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound)
 
     EXPECT_EQ(type_db.size(), 0);
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
 }
 
 TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
@@ -799,7 +799,7 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
 
     EXPECT_EQ(type_db.size(), 0);
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_kind_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_kind_mismatch), 1);
 }
 
 // TODO: maybe decompose below test into a few tests for each of the following cases:
@@ -879,6 +879,6 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_CallSigMismatch) {
 
     EXPECT_EQ(type_db.size(), 0);
 
-    EXPECT_EQ(dbg->count(yama::dsignal::dm_instant_callsig_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_callsig_mismatch), 1);
 }
 

@@ -8,6 +8,7 @@
 #include <yama/core/res.h>
 #include <yama/core/domain.h>
 #include <yama/debug-impls/stderr_debug.h>
+#include <yama/debug-impls/dsignal_debug.h>
 
 
 struct DomainImplTestsParam final {
@@ -17,11 +18,11 @@ struct DomainImplTestsParam final {
 class DomainImplTests : public testing::TestWithParam<DomainImplTestsParam> {
 public:
 
-    std::shared_ptr<yama::debug> dbg;
+    std::shared_ptr<yama::dsignal_debug> dbg;
 
 
     inline void SetUp() override final {
-        dbg = std::make_shared<yama::stderr_debug>();
+        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
     }
 
     inline void TearDown() override final {

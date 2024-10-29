@@ -31,5 +31,16 @@ namespace yama::internal {
         YAMA_ASSERT(b_first <= b_last);
         return b_first >= a_first && b_last <= a_last;
     }
+
+
+    inline std::string fmt_tabs(size_t tabs, const char* tab) {
+        YAMA_ASSERT(tab);
+        std::string result{};
+        result.reserve(tabs * strlen(tab));
+        for (size_t i = 0; i < tabs; i++) {
+            result += tab;
+        }
+        return result;
+    }
 }
 

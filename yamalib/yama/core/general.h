@@ -4,11 +4,17 @@
 
 
 #include <utility>
+#include <iterator>
 
 #include <taul/str.h>
 
 
 namespace yama {
+
+
+    // useful signed size_t
+
+    using ssize_t = std::make_signed_t<size_t>;
 
 
     // yama will make use of TAUL's immutable string type str as its

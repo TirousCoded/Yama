@@ -228,6 +228,210 @@ TEST(BCodeTests, Construction) {
     EXPECT_FALSE(a.reinit_flag(i));
 }
 
+TEST(BCodeTests, Append) {
+    auto a =
+        yama::bc::code()
+        .add_load_const(0, 10, true)
+        .add_load_const(1, 55)
+        .add_load_const(2, 4, true)
+        .add_call(0, 3, 139, true)
+        .add_jump_false(0, -31);
+
+    const auto b =
+        yama::bc::code()
+        .add_call(0, 0, 10)
+        .add_load_const(1, 55)
+        .add_call(0, 0, 10, true)
+        .add_jump(4)
+        .add_load_const(2, 4, true);
+
+    a.append(b);
+
+    const auto expected =
+        yama::bc::code()
+        .add_load_const(0, 10, true)
+        .add_load_const(1, 55)
+        .add_load_const(2, 4, true)
+        .add_call(0, 3, 139, true)
+        .add_jump_false(0, -31)
+        .add_call(0, 0, 10)
+        .add_load_const(1, 55)
+        .add_call(0, 0, 10, true)
+        .add_jump(4)
+        .add_load_const(2, 4, true);
+
+    EXPECT_EQ(expected.fmt_disassembly(), a.fmt_disassembly());
+
+    std::cerr << expected.fmt_disassembly() << "\n";
+    std::cerr << a.fmt_disassembly() << "\n";
+}
+
+TEST(BCodeTests, Concat) {
+    const auto a =
+        yama::bc::code()
+        .add_load_const(0, 10, true)
+        .add_load_const(1, 55)
+        .add_load_const(2, 4, true)
+        .add_call(0, 3, 139, true)
+        .add_jump_false(0, -31);
+
+    const auto b =
+        yama::bc::code()
+        .add_call(0, 0, 10)
+        .add_load_const(1, 55)
+        .add_call(0, 0, 10, true)
+        .add_jump(4)
+        .add_load_const(2, 4, true);
+
+    const auto expected =
+        yama::bc::code()
+        .add_load_const(0, 10, true)
+        .add_load_const(1, 55)
+        .add_load_const(2, 4, true)
+        .add_call(0, 3, 139, true)
+        .add_jump_false(0, -31)
+        .add_call(0, 0, 10)
+        .add_load_const(1, 55)
+        .add_call(0, 0, 10, true)
+        .add_jump(4)
+        .add_load_const(2, 4, true);
+
+    const auto actual = yama::bc::code::concat(a, b);
+
+    EXPECT_EQ(expected.fmt_disassembly(), actual.fmt_disassembly());
+
+    std::cerr << expected.fmt_disassembly() << "\n";
+    std::cerr << actual.fmt_disassembly() << "\n";
+}
+
+TEST(BCodeTests, CodeWriter_DefaultInit) {
+    yama::bc::code_writer cw{};
+
+    const auto result = cw.done();
+    ASSERT_TRUE(result);
+    ASSERT_EQ(result.value().fmt_disassembly(), yama::bc::code{}.fmt_disassembly());
+}
+
+TEST(BCodeTests, CodeWriter_Usage) {
+
+    static_assert(yama::bc::opcodes == 11);
+
+    const auto expected =
+        yama::bc::code()
+        .add_noop()
+        .add_load_none(10)
+        .add_load_none(10, true)
+        .add_load_const(10, 11)
+        .add_load_const(10, 11, true)
+        .add_load_arg(10, 11)
+        .add_load_arg(10, 11, true)
+        .add_copy(10, 11)
+        .add_copy(10, 11, true)
+        .add_call(10, 11, 12)
+        .add_call(10, 11, 12, true)
+        .add_call_nr(10, 11)
+        .add_ret(10)
+        .add_jump(-1)
+        .add_jump(4)
+        .add_jump_true(10, -3)
+        .add_jump_true(10, 2)
+        .add_jump_false(10, -5)
+        .add_jump_false(10, 0);
+
+    yama::bc::code_writer cw{};
+
+    const auto actual = cw
+        .add_noop()
+        .add_load_none(10)
+        .add_load_none(10, true)
+        .add_load_const(10, 11)
+        .add_load_const(10, 11, true)
+        .add_load_arg(10, 11)
+        .add_load_arg(10, 11, true)
+        .add_copy(10, 11)
+        .add_copy(10, 11, true)
+        .add_call(10, 11, 12)
+        .add_call(10, 11, 12, true)
+        .add_call_nr(10, 11)
+        .add_ret(10)
+        .add_label(0) // label for backwards branching
+        .add_jump(0)
+        .add_jump(1)
+        .add_jump_true(10, 0)
+        .add_jump_true(10, 1)
+        .add_jump_false(10, 0)
+        .add_jump_false(10, 1)
+        .add_label(1) // label for forwards branching
+        .done();
+
+    ASSERT_TRUE(actual);
+
+    EXPECT_EQ(expected.fmt_disassembly(), actual->fmt_disassembly());
+
+    std::cerr << expected.fmt_disassembly() << "\n";
+    std::cerr << actual->fmt_disassembly() << "\n";
+}
+
+TEST(BCodeTests, CodeWriter_AddLabelOverwriting) {
+    yama::bc::code_writer cw{};
+    
+    const auto actual = cw
+        .add_jump_true(10, 0) // <- jumps to label w/ ID 0
+        .add_load_const(0, 14)
+        .add_label(0) // <- will be overwritten
+        .add_load_const(1, 114)
+        .add_load_const(2, 41)
+        .add_label(0) // <- overwrites above
+        .done();
+
+    const auto expected = cw
+        .add_jump_true(10, 0) // <- jumps to label w/ ID 0
+        .add_load_const(0, 14)
+        //.add_label(0) // <- will be overwritten
+        .add_load_const(1, 114)
+        .add_load_const(2, 41)
+        .add_label(0) // <- overwrites above
+        .done();
+
+    ASSERT_TRUE(expected);
+    ASSERT_TRUE(actual);
+
+    EXPECT_EQ(expected->fmt_disassembly(), actual->fmt_disassembly());
+
+    std::cerr << expected->fmt_disassembly() << "\n";
+    std::cerr << actual->fmt_disassembly() << "\n";
+}
+
+TEST(BCodeTests, CodeWriter_ResetDueToDone) {
+    yama::bc::code_writer cw{};
+
+    // populate w/ old state, then reset it
+    const auto old = cw
+        .add_jump_true(10, 0) // <- jumps to label w/ ID 0
+        .add_load_const(0, 14)
+        .add_load_const(1, 114)
+        .add_load_const(2, 41)
+        .add_label(0) // <- old state has a valid label w/ ID 0
+        .done();
+
+    {
+        // successful usage after reset
+        const auto result = cw.done();
+        ASSERT_TRUE(result);
+        ASSERT_EQ(result.value().fmt_disassembly(), yama::bc::code{}.fmt_disassembly());
+    }
+
+    {
+        // fail usage due to reset state lacking a label w/ ID 0
+        bool label_not_found = false;
+        const auto result = cw
+            .add_jump(0) // <- need label w/ ID 0
+            .done(&label_not_found);
+        ASSERT_FALSE(result);
+        EXPECT_TRUE(label_not_found);
+    }
+}
+
 TEST(BCodeTests, Syms_Empty) {
     yama::bc::syms a{};
 

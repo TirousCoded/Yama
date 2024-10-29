@@ -25,6 +25,9 @@ namespace yama {
 
     struct primitive_info final {
         ptype                           ptype;          // the type of primitive this is
+
+
+        std::string fmt(const char* tab = "    ") const;
     };
 
     struct function_info final {
@@ -33,6 +36,9 @@ namespace yama {
         size_t                          locals;         // the call frame's local register table size
         bc::code                        bcode;          // the bytecode (no static verif check if call_fn != bcode_call_fn)
         bc::syms                        bcodesyms;      // the bytecode symbol info
+
+
+        std::string fmt(const const_table_info& consts, const char* tab = "    ") const;
     };
 
     struct type_info final {
@@ -56,6 +62,11 @@ namespace yama {
         size_t locals() const noexcept; // returns 0 if the type is not callable
         const bc::code* bcode() const noexcept;
         const bc::syms* bcodesyms() const noexcept;
+
+        std::string fmt(const char* tab = "    ") const;
     };
 }
+
+YAMA_SETUP_FORMAT(yama::primitive_info, x.fmt());
+YAMA_SETUP_FORMAT(yama::type_info, x.fmt());
 

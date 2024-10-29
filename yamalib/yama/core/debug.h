@@ -39,12 +39,12 @@ namespace yama {
         defaults        = all,
 
         general         = 1 << 0,           // general is for all otherwise uncategorized debug logs
-        dm_comp         = 1 << 1,           // compiler debug logs
-        dm_verif        = 1 << 2,           // static verification debug logs
-        dm_instant      = 1 << 3,           // type instantiation debug logs
+        compile         = 1 << 1,           // compiler debug logs
+        verify          = 1 << 2,           // static verification debug logs
+        instantiate     = 1 << 3,           // type instantiation debug logs
         ctx_panic       = 1 << 4,           // context panic debug logs
         ctx_llcmd       = 1 << 5,           // low-level command behaviour debug logs
-        ctx_bcode_exec  = 1 << 6,           // bcode execution trace debug logs
+        bcode_exec      = 1 << 6,           // bcode execution trace debug logs
     };
 
 
@@ -55,12 +55,12 @@ namespace yama {
     constexpr auto defaults_c       = dcat::defaults;
 
     constexpr auto general_c        = dcat::general;
-    constexpr auto dm_comp_c        = dcat::dm_comp;
-    constexpr auto dm_verif_c       = dcat::dm_verif;
-    constexpr auto dm_instant_c     = dcat::dm_instant;
+    constexpr auto compile_c        = dcat::compile;
+    constexpr auto verify_c         = dcat::verify;
+    constexpr auto instantiate_c    = dcat::instantiate;
     constexpr auto ctx_panic_c      = dcat::ctx_panic;
     constexpr auto ctx_llcmd_c      = dcat::ctx_llcmd;
-    constexpr auto ctx_bcode_exec_c = dcat::ctx_bcode_exec;
+    constexpr auto bcode_exec_c     = dcat::bcode_exec;
 }
 
 // TODO: the below have not been unit tested
@@ -132,38 +132,60 @@ namespace yama {
 
     enum class dsignal : uint32_t {
         // all dsignal values should be prefixed by the name of the dcat they belong to
+        
+        compile_file_not_found,
+        compile_impl_internal, // internal error
+        compile_impl_limits, // impl-defined limits exceeded
+        compile_syntax_error,
+        compile_name_conflict,
+        compile_undeclared_name,
+        compile_type_mismatch,
+        compile_not_a_type,
+        compile_not_an_expr,
+        compile_nonlocal_var,
+        compile_local_fn,
+        compile_invalid_local_var,
+        compile_invalid_param_list,
+        compile_nonassignable_expr,
+        compile_not_in_loop,
+        compile_no_return_stmt,
+        compile_numeric_overflow,
+        compile_numeric_underflow,
+        compile_illegal_unicode,
+        compile_invalid_operation,
+        compile_wrong_arg_count,
 
-        dm_verif_type_callsig_invalid,
-        dm_verif_constsym_callsig_invalid,
-        dm_verif_callsig_param_type_out_of_bounds,
-        dm_verif_callsig_return_type_out_of_bounds,
-        dm_verif_callsig_param_type_not_type_const,
-        dm_verif_callsig_return_type_not_type_const,
-        dm_verif_binary_is_empty,
-        dm_verif_RA_out_of_bounds,
-        dm_verif_RA_wrong_type,
-        dm_verif_RA_illegal_callobj,
-        dm_verif_RB_out_of_bounds,
-        dm_verif_RC_out_of_bounds,
-        dm_verif_RC_wrong_type,
-        dm_verif_KoB_out_of_bounds,
-        dm_verif_KoB_not_object_const,
-        dm_verif_ArgB_out_of_bounds,
-        dm_verif_RA_and_RB_types_differ,
-        dm_verif_RA_and_KoB_types_differ,
-        dm_verif_RA_and_ArgB_types_differ,
-        dm_verif_ArgRs_out_of_bounds,
-        dm_verif_ArgRs_zero_objects,
-        dm_verif_ParamArgRs_wrong_number,
-        dm_verif_ParamArgRs_wrong_types,
-        dm_verif_puts_PC_out_of_bounds,
-        dm_verif_fallthrough_puts_PC_out_of_bounds,
-        dm_verif_violates_register_coherence,
+        verify_type_callsig_invalid,
+        verify_constsym_callsig_invalid,
+        verify_callsig_param_type_out_of_bounds,
+        verify_callsig_return_type_out_of_bounds,
+        verify_callsig_param_type_not_type_const,
+        verify_callsig_return_type_not_type_const,
+        verify_binary_is_empty,
+        verify_RA_out_of_bounds,
+        verify_RA_wrong_type,
+        verify_RA_illegal_callobj,
+        verify_RB_out_of_bounds,
+        verify_RC_out_of_bounds,
+        verify_RC_wrong_type,
+        verify_KoB_out_of_bounds,
+        verify_KoB_not_object_const,
+        verify_ArgB_out_of_bounds,
+        verify_RA_and_RB_types_differ,
+        verify_RA_and_KoB_types_differ,
+        verify_RA_and_ArgB_types_differ,
+        verify_ArgRs_out_of_bounds,
+        verify_ArgRs_zero_objects,
+        verify_ParamArgRs_wrong_number,
+        verify_ParamArgRs_wrong_types,
+        verify_puts_PC_out_of_bounds,
+        verify_fallthrough_puts_PC_out_of_bounds,
+        verify_violates_register_coherence,
 
-        dm_instant_type_already_instantiated,
-        dm_instant_type_not_found,
-        dm_instant_kind_mismatch,
-        dm_instant_callsig_mismatch,
+        instantiate_type_already_instantiated,
+        instantiate_type_not_found,
+        instantiate_kind_mismatch,
+        instantiate_callsig_mismatch,
 
         num, // not a valid dsignal
     };
@@ -172,42 +194,64 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 30);
+        static_assert(dsignals == 51);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
 
-            _YAMA_ENTRY_(dm_verif_type_callsig_invalid);
-            _YAMA_ENTRY_(dm_verif_constsym_callsig_invalid);
-            _YAMA_ENTRY_(dm_verif_callsig_param_type_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_callsig_return_type_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_callsig_param_type_not_type_const);
-            _YAMA_ENTRY_(dm_verif_callsig_return_type_not_type_const);
-            _YAMA_ENTRY_(dm_verif_binary_is_empty);
-            _YAMA_ENTRY_(dm_verif_RA_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_RA_wrong_type);
-            _YAMA_ENTRY_(dm_verif_RA_illegal_callobj);
-            _YAMA_ENTRY_(dm_verif_RB_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_RC_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_RC_wrong_type);
-            _YAMA_ENTRY_(dm_verif_KoB_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_KoB_not_object_const);
-            _YAMA_ENTRY_(dm_verif_ArgB_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_RA_and_RB_types_differ);
-            _YAMA_ENTRY_(dm_verif_RA_and_KoB_types_differ);
-            _YAMA_ENTRY_(dm_verif_RA_and_ArgB_types_differ);
-            _YAMA_ENTRY_(dm_verif_ArgRs_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_ArgRs_zero_objects);
-            _YAMA_ENTRY_(dm_verif_ParamArgRs_wrong_number);
-            _YAMA_ENTRY_(dm_verif_ParamArgRs_wrong_types);
-            _YAMA_ENTRY_(dm_verif_puts_PC_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_fallthrough_puts_PC_out_of_bounds);
-            _YAMA_ENTRY_(dm_verif_violates_register_coherence);
+            _YAMA_ENTRY_(compile_file_not_found);
+            _YAMA_ENTRY_(compile_impl_internal);
+            _YAMA_ENTRY_(compile_impl_limits);
+            _YAMA_ENTRY_(compile_syntax_error);
+            _YAMA_ENTRY_(compile_name_conflict);
+            _YAMA_ENTRY_(compile_undeclared_name);
+            _YAMA_ENTRY_(compile_type_mismatch);
+            _YAMA_ENTRY_(compile_not_a_type);
+            _YAMA_ENTRY_(compile_not_an_expr);
+            _YAMA_ENTRY_(compile_nonlocal_var);
+            _YAMA_ENTRY_(compile_local_fn);
+            _YAMA_ENTRY_(compile_invalid_local_var);
+            _YAMA_ENTRY_(compile_invalid_param_list);
+            _YAMA_ENTRY_(compile_nonassignable_expr);
+            _YAMA_ENTRY_(compile_not_in_loop);
+            _YAMA_ENTRY_(compile_no_return_stmt);
+            _YAMA_ENTRY_(compile_numeric_overflow);
+            _YAMA_ENTRY_(compile_numeric_underflow);
+            _YAMA_ENTRY_(compile_illegal_unicode);
+            _YAMA_ENTRY_(compile_invalid_operation);
+            _YAMA_ENTRY_(compile_wrong_arg_count);
 
-            _YAMA_ENTRY_(dm_instant_type_already_instantiated);
-            _YAMA_ENTRY_(dm_instant_type_not_found);
-            _YAMA_ENTRY_(dm_instant_kind_mismatch);
-            _YAMA_ENTRY_(dm_instant_callsig_mismatch);
+            _YAMA_ENTRY_(verify_type_callsig_invalid);
+            _YAMA_ENTRY_(verify_constsym_callsig_invalid);
+            _YAMA_ENTRY_(verify_callsig_param_type_out_of_bounds);
+            _YAMA_ENTRY_(verify_callsig_return_type_out_of_bounds);
+            _YAMA_ENTRY_(verify_callsig_param_type_not_type_const);
+            _YAMA_ENTRY_(verify_callsig_return_type_not_type_const);
+            _YAMA_ENTRY_(verify_binary_is_empty);
+            _YAMA_ENTRY_(verify_RA_out_of_bounds);
+            _YAMA_ENTRY_(verify_RA_wrong_type);
+            _YAMA_ENTRY_(verify_RA_illegal_callobj);
+            _YAMA_ENTRY_(verify_RB_out_of_bounds);
+            _YAMA_ENTRY_(verify_RC_out_of_bounds);
+            _YAMA_ENTRY_(verify_RC_wrong_type);
+            _YAMA_ENTRY_(verify_KoB_out_of_bounds);
+            _YAMA_ENTRY_(verify_KoB_not_object_const);
+            _YAMA_ENTRY_(verify_ArgB_out_of_bounds);
+            _YAMA_ENTRY_(verify_RA_and_RB_types_differ);
+            _YAMA_ENTRY_(verify_RA_and_KoB_types_differ);
+            _YAMA_ENTRY_(verify_RA_and_ArgB_types_differ);
+            _YAMA_ENTRY_(verify_ArgRs_out_of_bounds);
+            _YAMA_ENTRY_(verify_ArgRs_zero_objects);
+            _YAMA_ENTRY_(verify_ParamArgRs_wrong_number);
+            _YAMA_ENTRY_(verify_ParamArgRs_wrong_types);
+            _YAMA_ENTRY_(verify_puts_PC_out_of_bounds);
+            _YAMA_ENTRY_(verify_fallthrough_puts_PC_out_of_bounds);
+            _YAMA_ENTRY_(verify_violates_register_coherence);
+
+            _YAMA_ENTRY_(instantiate_type_already_instantiated);
+            _YAMA_ENTRY_(instantiate_type_not_found);
+            _YAMA_ENTRY_(instantiate_kind_mismatch);
+            _YAMA_ENTRY_(instantiate_callsig_mismatch);
 
         default: YAMA_DEADEND; break;
         }
@@ -229,32 +273,24 @@ namespace yama {
         virtual ~debug() noexcept = default;
 
 
-        // has_cat returns if debug output will occur w/ cat
+        bool has_cat(dcat cat) const noexcept;  // has_cat returns if output will occur w/ under categor(ies) cat
 
-        bool has_cat(dcat cat) const noexcept;
+        void add_cat(dcat cat) noexcept;        // add_cat adds debug categor(ies) cat
+        void remove_cat(dcat cat) noexcept;     // remove_cat removes debug categor(ies) cat
 
 
         // log performs a debug log w/ category cat
 
         // no log is performed if has_cat(cat) == false
 
-        inline void log(dcat cat, const std::string& msg) {
-            if (has_cat(cat)) {
-                do_log(cat, msg);
-            }
-        }
+        void log(dcat cat, const std::string& msg);
 
         template<typename... Args>
         inline void log(dcat cat, std::format_string<Args...> fmt, Args&&... args) {
             log(cat, std::format(fmt, std::forward<Args&&>(args)...));
         }
 
-
-        // raises debug signal sig
-
-        inline void raise(dsignal sig) {
-            do_raise(sig);
-        }
+        void raise(dsignal sig); // raises debug signal sig
 
 
     protected:

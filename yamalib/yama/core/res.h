@@ -170,7 +170,7 @@ namespace yama {
     template<typename T>
     template<typename U>
     inline res<T>::res(const res<U>& other)
-        : _base(other._base) {
+        : _base(std::static_pointer_cast<T>(other._base)) {
         YAMA_ASSERT(_base);
     }
     
@@ -178,7 +178,7 @@ namespace yama {
     template<typename U>
     inline res<T>::res(res<U>&& other) noexcept
         // note how this puts other in an invalid state!
-        : _base(std::move(other._base)) {
+        : _base(std::static_pointer_cast<T>(std::move(other._base))) {
         YAMA_ASSERT(_base);
     }
     
@@ -191,7 +191,7 @@ namespace yama {
     template<typename T>
     template<typename U>
     inline res<T>::res(std::shared_ptr<U> other)
-        : _base(other) {
+        : _base(std::static_pointer_cast<T>(other)) {
         if (!other) _throw();
     }
 
@@ -217,7 +217,7 @@ namespace yama {
     template<typename T>
     template<typename U>
     inline res<T>& res<T>::operator=(const res<U>& other) {
-        _base = other._base;
+        _base = std::static_pointer_cast<T>(other._base);
         return *this;
     }
     
@@ -226,7 +226,7 @@ namespace yama {
     inline res<T>& res<T>::operator=(res<U>&& other) noexcept {
         //if (this == &other) return *this;
         // note how this puts other in an invalid state!
-        _base = std::move(other._base);
+        _base = std::static_pointer_cast<T>(std::move(other._base));
         return *this;
     }
 

@@ -777,6 +777,236 @@ TEST(ScalarsTests, ParseUInt) {
     //_TEST_FAIL(yama::parse_uint("0b0u_"));
 }
 
+TEST(ScalarsTests, ParseUInt_NoU) {
+    // decimal
+
+    _TEST_SUCC(yama::parse_uint("0u", false), mk<yama::uint_t>(0, 1));
+    _TEST_SUCC(yama::parse_uint("1u", false), mk<yama::uint_t>(1, 1));
+    _TEST_SUCC(yama::parse_uint("2u", false), mk<yama::uint_t>(2, 1));
+    _TEST_SUCC(yama::parse_uint("3u", false), mk<yama::uint_t>(3, 1));
+    _TEST_SUCC(yama::parse_uint("4u", false), mk<yama::uint_t>(4, 1));
+    _TEST_SUCC(yama::parse_uint("5u", false), mk<yama::uint_t>(5, 1));
+    _TEST_SUCC(yama::parse_uint("6u", false), mk<yama::uint_t>(6, 1));
+    _TEST_SUCC(yama::parse_uint("7u", false), mk<yama::uint_t>(7, 1));
+    _TEST_SUCC(yama::parse_uint("8u", false), mk<yama::uint_t>(8, 1));
+    _TEST_SUCC(yama::parse_uint("9u", false), mk<yama::uint_t>(9, 1));
+    
+    _TEST_SUCC(yama::parse_uint("0", false), mk<yama::uint_t>(0, 1));
+    _TEST_SUCC(yama::parse_uint("1", false), mk<yama::uint_t>(1, 1));
+    _TEST_SUCC(yama::parse_uint("2", false), mk<yama::uint_t>(2, 1));
+    _TEST_SUCC(yama::parse_uint("3", false), mk<yama::uint_t>(3, 1));
+    _TEST_SUCC(yama::parse_uint("4", false), mk<yama::uint_t>(4, 1));
+    _TEST_SUCC(yama::parse_uint("5", false), mk<yama::uint_t>(5, 1));
+    _TEST_SUCC(yama::parse_uint("6", false), mk<yama::uint_t>(6, 1));
+    _TEST_SUCC(yama::parse_uint("7", false), mk<yama::uint_t>(7, 1));
+    _TEST_SUCC(yama::parse_uint("8", false), mk<yama::uint_t>(8, 1));
+    _TEST_SUCC(yama::parse_uint("9", false), mk<yama::uint_t>(9, 1));
+
+    _TEST_SUCC(yama::parse_uint("0_0_1u", false), mk<yama::uint_t>(1, 5));
+    _TEST_SUCC(yama::parse_uint("1_0_1u", false), mk<yama::uint_t>(101, 5));
+    _TEST_SUCC(yama::parse_uint("2_0_1u", false), mk<yama::uint_t>(201, 5));
+    _TEST_SUCC(yama::parse_uint("3_0_1u", false), mk<yama::uint_t>(301, 5));
+    _TEST_SUCC(yama::parse_uint("4_0_1u", false), mk<yama::uint_t>(401, 5));
+    _TEST_SUCC(yama::parse_uint("5_0_1u", false), mk<yama::uint_t>(501, 5));
+    _TEST_SUCC(yama::parse_uint("6_0_1u", false), mk<yama::uint_t>(601, 5));
+    _TEST_SUCC(yama::parse_uint("7_0_1u", false), mk<yama::uint_t>(701, 5));
+    _TEST_SUCC(yama::parse_uint("8_0_1u", false), mk<yama::uint_t>(801, 5));
+    _TEST_SUCC(yama::parse_uint("9_0_1u", false), mk<yama::uint_t>(901, 5));
+    
+    _TEST_SUCC(yama::parse_uint("0_0_1", false), mk<yama::uint_t>(1, 5));
+    _TEST_SUCC(yama::parse_uint("1_0_1", false), mk<yama::uint_t>(101, 5));
+    _TEST_SUCC(yama::parse_uint("2_0_1", false), mk<yama::uint_t>(201, 5));
+    _TEST_SUCC(yama::parse_uint("3_0_1", false), mk<yama::uint_t>(301, 5));
+    _TEST_SUCC(yama::parse_uint("4_0_1", false), mk<yama::uint_t>(401, 5));
+    _TEST_SUCC(yama::parse_uint("5_0_1", false), mk<yama::uint_t>(501, 5));
+    _TEST_SUCC(yama::parse_uint("6_0_1", false), mk<yama::uint_t>(601, 5));
+    _TEST_SUCC(yama::parse_uint("7_0_1", false), mk<yama::uint_t>(701, 5));
+    _TEST_SUCC(yama::parse_uint("8_0_1", false), mk<yama::uint_t>(801, 5));
+    _TEST_SUCC(yama::parse_uint("9_0_1", false), mk<yama::uint_t>(901, 5));
+
+    _TEST_SUCC(yama::parse_uint("1230u", false), mk<yama::uint_t>(1230, 4));
+    _TEST_SUCC(yama::parse_uint("1230uaa", false), mk<yama::uint_t>(1230, 4));
+    _TEST_SUCC(yama::parse_uint("001230u", false), mk<yama::uint_t>(1230, 6));
+    _TEST_SUCC(yama::parse_uint("001230uaa", false), mk<yama::uint_t>(1230, 6));
+    
+    _TEST_SUCC(yama::parse_uint("1230", false), mk<yama::uint_t>(1230, 4));
+    _TEST_SUCC(yama::parse_uint("1230aa", false), mk<yama::uint_t>(1230, 4));
+    _TEST_SUCC(yama::parse_uint("001230", false), mk<yama::uint_t>(1230, 6));
+    _TEST_SUCC(yama::parse_uint("001230aa", false), mk<yama::uint_t>(1230, 6));
+
+    // hexadecimal
+
+    _TEST_SUCC(yama::parse_uint("0x0u", false), mk<yama::uint_t>(0, 3));
+    _TEST_SUCC(yama::parse_uint("0x1u", false), mk<yama::uint_t>(1, 3));
+    _TEST_SUCC(yama::parse_uint("0x2u", false), mk<yama::uint_t>(2, 3));
+    _TEST_SUCC(yama::parse_uint("0x3u", false), mk<yama::uint_t>(3, 3));
+    _TEST_SUCC(yama::parse_uint("0x4u", false), mk<yama::uint_t>(4, 3));
+    _TEST_SUCC(yama::parse_uint("0x5u", false), mk<yama::uint_t>(5, 3));
+    _TEST_SUCC(yama::parse_uint("0x6u", false), mk<yama::uint_t>(6, 3));
+    _TEST_SUCC(yama::parse_uint("0x7u", false), mk<yama::uint_t>(7, 3));
+    _TEST_SUCC(yama::parse_uint("0x8u", false), mk<yama::uint_t>(8, 3));
+    _TEST_SUCC(yama::parse_uint("0x9u", false), mk<yama::uint_t>(9, 3));
+    
+    _TEST_SUCC(yama::parse_uint("0x0", false), mk<yama::uint_t>(0, 3));
+    _TEST_SUCC(yama::parse_uint("0x1", false), mk<yama::uint_t>(1, 3));
+    _TEST_SUCC(yama::parse_uint("0x2", false), mk<yama::uint_t>(2, 3));
+    _TEST_SUCC(yama::parse_uint("0x3", false), mk<yama::uint_t>(3, 3));
+    _TEST_SUCC(yama::parse_uint("0x4", false), mk<yama::uint_t>(4, 3));
+    _TEST_SUCC(yama::parse_uint("0x5", false), mk<yama::uint_t>(5, 3));
+    _TEST_SUCC(yama::parse_uint("0x6", false), mk<yama::uint_t>(6, 3));
+    _TEST_SUCC(yama::parse_uint("0x7", false), mk<yama::uint_t>(7, 3));
+    _TEST_SUCC(yama::parse_uint("0x8", false), mk<yama::uint_t>(8, 3));
+    _TEST_SUCC(yama::parse_uint("0x9", false), mk<yama::uint_t>(9, 3));
+
+    _TEST_SUCC(yama::parse_uint("0xau", false), mk<yama::uint_t>(10, 3));
+    _TEST_SUCC(yama::parse_uint("0xbu", false), mk<yama::uint_t>(11, 3));
+    _TEST_SUCC(yama::parse_uint("0xcu", false), mk<yama::uint_t>(12, 3));
+    _TEST_SUCC(yama::parse_uint("0xdu", false), mk<yama::uint_t>(13, 3));
+    _TEST_SUCC(yama::parse_uint("0xeu", false), mk<yama::uint_t>(14, 3));
+    _TEST_SUCC(yama::parse_uint("0xfu", false), mk<yama::uint_t>(15, 3));
+    
+    _TEST_SUCC(yama::parse_uint("0xa", false), mk<yama::uint_t>(10, 3));
+    _TEST_SUCC(yama::parse_uint("0xb", false), mk<yama::uint_t>(11, 3));
+    _TEST_SUCC(yama::parse_uint("0xc", false), mk<yama::uint_t>(12, 3));
+    _TEST_SUCC(yama::parse_uint("0xd", false), mk<yama::uint_t>(13, 3));
+    _TEST_SUCC(yama::parse_uint("0xe", false), mk<yama::uint_t>(14, 3));
+    _TEST_SUCC(yama::parse_uint("0xf", false), mk<yama::uint_t>(15, 3));
+
+    _TEST_SUCC(yama::parse_uint("0xAu", false), mk<yama::uint_t>(10, 3));
+    _TEST_SUCC(yama::parse_uint("0xBu", false), mk<yama::uint_t>(11, 3));
+    _TEST_SUCC(yama::parse_uint("0xCu", false), mk<yama::uint_t>(12, 3));
+    _TEST_SUCC(yama::parse_uint("0xDu", false), mk<yama::uint_t>(13, 3));
+    _TEST_SUCC(yama::parse_uint("0xEu", false), mk<yama::uint_t>(14, 3));
+    _TEST_SUCC(yama::parse_uint("0xFu", false), mk<yama::uint_t>(15, 3));
+    
+    _TEST_SUCC(yama::parse_uint("0xA", false), mk<yama::uint_t>(10, 3));
+    _TEST_SUCC(yama::parse_uint("0xB", false), mk<yama::uint_t>(11, 3));
+    _TEST_SUCC(yama::parse_uint("0xC", false), mk<yama::uint_t>(12, 3));
+    _TEST_SUCC(yama::parse_uint("0xD", false), mk<yama::uint_t>(13, 3));
+    _TEST_SUCC(yama::parse_uint("0xE", false), mk<yama::uint_t>(14, 3));
+    _TEST_SUCC(yama::parse_uint("0xF", false), mk<yama::uint_t>(15, 3));
+    
+    _TEST_SUCC(yama::parse_uint("0x0_aE_3u", false), mk<yama::uint_t>(0x0ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x1_aE_3u", false), mk<yama::uint_t>(0x1ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x2_aE_3u", false), mk<yama::uint_t>(0x2ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x3_aE_3u", false), mk<yama::uint_t>(0x3ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x4_aE_3u", false), mk<yama::uint_t>(0x4ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x5_aE_3u", false), mk<yama::uint_t>(0x5ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x6_aE_3u", false), mk<yama::uint_t>(0x6ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x7_aE_3u", false), mk<yama::uint_t>(0x7ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x8_aE_3u", false), mk<yama::uint_t>(0x8ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x9_aE_3u", false), mk<yama::uint_t>(0x9ae3, 8));
+    
+    _TEST_SUCC(yama::parse_uint("0x0_aE_3", false), mk<yama::uint_t>(0x0ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x1_aE_3", false), mk<yama::uint_t>(0x1ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x2_aE_3", false), mk<yama::uint_t>(0x2ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x3_aE_3", false), mk<yama::uint_t>(0x3ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x4_aE_3", false), mk<yama::uint_t>(0x4ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x5_aE_3", false), mk<yama::uint_t>(0x5ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x6_aE_3", false), mk<yama::uint_t>(0x6ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x7_aE_3", false), mk<yama::uint_t>(0x7ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x8_aE_3", false), mk<yama::uint_t>(0x8ae3, 8));
+    _TEST_SUCC(yama::parse_uint("0x9_aE_3", false), mk<yama::uint_t>(0x9ae3, 8));
+
+    _TEST_SUCC(yama::parse_uint("0xa_aE_3u", false), mk<yama::uint_t>(0xaae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xb_aE_3u", false), mk<yama::uint_t>(0xbae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xc_aE_3u", false), mk<yama::uint_t>(0xcae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xd_aE_3u", false), mk<yama::uint_t>(0xdae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xe_aE_3u", false), mk<yama::uint_t>(0xeae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xf_aE_3u", false), mk<yama::uint_t>(0xfae3, 8));
+    
+    _TEST_SUCC(yama::parse_uint("0xa_aE_3", false), mk<yama::uint_t>(0xaae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xb_aE_3", false), mk<yama::uint_t>(0xbae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xc_aE_3", false), mk<yama::uint_t>(0xcae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xd_aE_3", false), mk<yama::uint_t>(0xdae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xe_aE_3", false), mk<yama::uint_t>(0xeae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xf_aE_3", false), mk<yama::uint_t>(0xfae3, 8));
+
+    _TEST_SUCC(yama::parse_uint("0xA_aE_3u", false), mk<yama::uint_t>(0xaae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xB_aE_3u", false), mk<yama::uint_t>(0xbae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xC_aE_3u", false), mk<yama::uint_t>(0xcae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xD_aE_3u", false), mk<yama::uint_t>(0xdae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xE_aE_3u", false), mk<yama::uint_t>(0xeae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xF_aE_3u", false), mk<yama::uint_t>(0xfae3, 8));
+    
+    _TEST_SUCC(yama::parse_uint("0xA_aE_3", false), mk<yama::uint_t>(0xaae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xB_aE_3", false), mk<yama::uint_t>(0xbae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xC_aE_3", false), mk<yama::uint_t>(0xcae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xD_aE_3", false), mk<yama::uint_t>(0xdae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xE_aE_3", false), mk<yama::uint_t>(0xeae3, 8));
+    _TEST_SUCC(yama::parse_uint("0xF_aE_3", false), mk<yama::uint_t>(0xfae3, 8));
+    
+    _TEST_SUCC(yama::parse_uint("0x1aC23e4fu", false), mk<yama::uint_t>(0x1aC23e4f, 10));
+    _TEST_SUCC(yama::parse_uint("0x1aC23e4fuggg", false), mk<yama::uint_t>(0x1aC23e4f, 10));
+    _TEST_SUCC(yama::parse_uint("0x0001aC23e4fu", false), mk<yama::uint_t>(0x1aC23e4f, 13));
+    _TEST_SUCC(yama::parse_uint("0x0001aC23e4fuggg", false), mk<yama::uint_t>(0x1aC23e4f, 13));
+    
+    _TEST_SUCC(yama::parse_uint("0x1aC23e4f", false), mk<yama::uint_t>(0x1aC23e4f, 10));
+    _TEST_SUCC(yama::parse_uint("0x1aC23e4fggg", false), mk<yama::uint_t>(0x1aC23e4f, 10));
+    _TEST_SUCC(yama::parse_uint("0x0001aC23e4f", false), mk<yama::uint_t>(0x1aC23e4f, 13));
+    _TEST_SUCC(yama::parse_uint("0x0001aC23e4fggg", false), mk<yama::uint_t>(0x1aC23e4f, 13));
+
+    // binary
+
+    _TEST_SUCC(yama::parse_uint("0b0u", false), mk<yama::uint_t>(0b0, 3));
+    _TEST_SUCC(yama::parse_uint("0b1u", false), mk<yama::uint_t>(0b1, 3));
+    
+    _TEST_SUCC(yama::parse_uint("0b0", false), mk<yama::uint_t>(0b0, 3));
+    _TEST_SUCC(yama::parse_uint("0b1", false), mk<yama::uint_t>(0b1, 3));
+
+    _TEST_SUCC(yama::parse_uint("0b0_0_1u", false), mk<yama::uint_t>(0b001, 7));
+    _TEST_SUCC(yama::parse_uint("0b1_0_1u", false), mk<yama::uint_t>(0b101, 7));
+    
+    _TEST_SUCC(yama::parse_uint("0b0_0_1", false), mk<yama::uint_t>(0b001, 7));
+    _TEST_SUCC(yama::parse_uint("0b1_0_1", false), mk<yama::uint_t>(0b101, 7));
+
+    _TEST_SUCC(yama::parse_uint("0b101011u", false), mk<yama::uint_t>(0b101011, 8));
+    _TEST_SUCC(yama::parse_uint("0b101011uaaa", false), mk<yama::uint_t>(0b101011, 8));
+    _TEST_SUCC(yama::parse_uint("0b000101011u", false), mk<yama::uint_t>(0b101011, 11));
+    _TEST_SUCC(yama::parse_uint("0b000101011uaaa", false), mk<yama::uint_t>(0b101011, 11));
+    
+    _TEST_SUCC(yama::parse_uint("0b101011", false), mk<yama::uint_t>(0b101011, 8));
+    _TEST_SUCC(yama::parse_uint("0b101011aaa", false), mk<yama::uint_t>(0b101011, 8));
+    _TEST_SUCC(yama::parse_uint("0b000101011", false), mk<yama::uint_t>(0b101011, 11));
+    _TEST_SUCC(yama::parse_uint("0b000101011aaa", false), mk<yama::uint_t>(0b101011, 11));
+
+    // failures
+
+    _TEST_FAIL(yama::parse_uint("", false));
+    _TEST_FAIL(yama::parse_uint(" ", false));
+    _TEST_FAIL(yama::parse_uint("!@#", false));
+    _TEST_FAIL(yama::parse_uint("abc", false));
+
+    _TEST_FAIL(yama::parse_uint("-0u", false));
+    _TEST_FAIL(yama::parse_uint("+0u", false));
+
+    _TEST_FAIL(yama::parse_uint("_0u", false));
+    _TEST_FAIL(yama::parse_uint("0_u", false));
+    _TEST_FAIL(yama::parse_uint("0__0u", false));
+    _TEST_FAIL(yama::parse_uint("0_u", false));
+    //_TEST_FAIL(yama::parse_uint("0u_", false));
+
+    //_TEST_FAIL(yama::parse_uint("0X0u", false));
+    _TEST_FAIL(yama::parse_uint("0xu", false));
+    _TEST_FAIL(yama::parse_uint("_0x0u", false));
+    _TEST_FAIL(yama::parse_uint("0_x0u", false));
+    _TEST_FAIL(yama::parse_uint("0x_0u", false));
+    _TEST_FAIL(yama::parse_uint("0x0_u", false));
+    _TEST_FAIL(yama::parse_uint("0x0__0u", false));
+    _TEST_FAIL(yama::parse_uint("0x0_u", false));
+    //_TEST_FAIL(yama::parse_uint("0x0u_", false));
+
+    //_TEST_FAIL(yama::parse_uint("0B0u", false));
+    _TEST_FAIL(yama::parse_uint("0bu", false));
+    _TEST_FAIL(yama::parse_uint("_0b0u", false));
+    _TEST_FAIL(yama::parse_uint("0_b0u", false));
+    _TEST_FAIL(yama::parse_uint("0b_0u", false));
+    _TEST_FAIL(yama::parse_uint("0b0_u", false));
+    _TEST_FAIL(yama::parse_uint("0b0__0u", false));
+    _TEST_FAIL(yama::parse_uint("0b0_u", false));
+    //_TEST_FAIL(yama::parse_uint("0b0u_", false));
+}
+
 TEST(ScalarsTests, ParseUInt_Extremes) {
     // not gonna test underflow, as those shouldn't even parse
 
@@ -793,6 +1023,38 @@ TEST(ScalarsTests, ParseUInt_Extremes) {
         EXPECT_EQ(a->bytes, 21);
         EXPECT_TRUE(a->overflow);
         EXPECT_FALSE(a->underflow);
+    }
+}
+
+TEST(ScalarsTests, ParseUInt_NoU_Extremes) {
+    // not gonna test underflow, as those shouldn't even parse
+
+    // max uint_t == 18446744073709551615
+
+    // impl must be able to handle max uint_t
+    _TEST_SUCC(yama::parse_uint("18446744073709551615u", false), mk<yama::uint_t>(18446744073709551615, 20));
+    _TEST_SUCC(yama::parse_uint("18446744073709551615", false), mk<yama::uint_t>(18446744073709551615, 20));
+
+    // overflow (if one above max uint_t)
+    {
+        const auto a = yama::parse_uint("18446744073709551616u", false);
+        EXPECT_TRUE(a);
+        if (a) {
+            // value of a->v is unspecified
+            EXPECT_EQ(a->bytes, 20);
+            EXPECT_TRUE(a->overflow);
+            EXPECT_FALSE(a->underflow);
+        }
+    }
+    {
+        const auto a = yama::parse_uint("18446744073709551616", false);
+        EXPECT_TRUE(a);
+        if (a) {
+            // value of a->v is unspecified
+            EXPECT_EQ(a->bytes, 20);
+            EXPECT_TRUE(a->overflow);
+            EXPECT_FALSE(a->underflow);
+        }
     }
 }
 
@@ -1279,6 +1541,13 @@ TEST(ScalarsTests, ParseChar) {
     _TEST_SUCC(yama::parse_char("\\U0001f4a9"), mk<yama::char_t>(U'💩', 10));
     _TEST_SUCC(yama::parse_char("\\U0001f4a9aa"), mk<yama::char_t>(U'💩', 10));
 
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"Δ")), mk<yama::char_t>(U'Δ', 2));
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"Δaa")), mk<yama::char_t>(U'Δ', 2));
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"魂")), mk<yama::char_t>(U'魂', 3));
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"魂aa")), mk<yama::char_t>(U'魂', 3));
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"💩")), mk<yama::char_t>(U'💩', 4));
+    _TEST_SUCC(yama::parse_char(taul::utf8_s(u8"💩aa")), mk<yama::char_t>(U'💩', 4));
+    
     // illegal Unicode
 
     // UTF-16 surrogate codepoint

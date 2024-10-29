@@ -38,3 +38,5 @@
 #include "domain.h"
 #include "context.h"
 
+#include "yama_gram.h"
+

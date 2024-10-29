@@ -225,10 +225,78 @@ namespace yama::bc {
 
         jump,
 
+        // TODO: the below 'IMPORTANT' section, mixed w/ the extra 'load_none' instrs
+        //       our code gen impl's notion of 'sanitizing' will write (also in order
+        //       to maintain register coherence), demonstrate major shortcomings of
+        //       our static verification semantics, which are quite rigid
+        //
+        //       so, in the future, we may want to either replace static verification
+        //       altogether, or revise it to be more powerful
+        //
+        //       to do the ladder, we could introduce the notion of registers being
+        //       able to be in *indeterminate* states (ie. the verifier does not care
+        //       what the register's type is) and letting instrs be able to optionally
+        //       *consume* their inputs, marking the register as indeterminate, which
+        //       tells the verifier that we no longer need the register's current state,
+        //       and so not to worry if it and another *indeterminate* version of the
+        //       register don't agree on type
+
+        // IMPORTANT:
+        //      for jump_true and jump_false, they have the seemingly unnecessary
+        //      semantic of reinitializing R(A) to None
+        //
+        //      the reason is that w/out this semantic, implementing code gen for
+        //      if stmts was basically impossible to do w/out some really gross
+        //      things having to be done in order to avoid getting a register
+        //      coherence violation
+        //
+        //      the reason for the error has to do w/ the way if stmts work, taking
+        //      one of the two following forms:
+        //
+        //          (code gen for if stmt w/out else-part)
+        // 
+        //              ** cond expr populating R(A) w/ Bool **
+        //              jump_false R(A) exit
+        //              ** if true code **
+        //          exit:
+        //              ** code after if stmt **
+        //
+        //          (code gen for if stmt w/ else-part)
+        // 
+        //              ** cond expr populating R(A) w/ Bool **
+        //              jump_false R(A) else-part
+        //              ** if true code **
+        //              jump exit
+        //          else-part:
+        //              ** if false code **
+        //          exit:
+        //              ** code after if stmt **
+        //
+        //      the problem w/ the code gen above, specifically for the version
+        //      w/out an else-part, is that the initial register set of the block
+        //      starting at the exit label is GUARANTEED to contain Bool for the
+        //      register of the cond expr, as the jump_false instr will not (w/out
+        //      our special semantic) change it to None
+        //
+        //      the reason this register being Bool at the exit label is a problem
+        //      is that it forces the code of the if stmt's true code path to have
+        //      to guarantee the register is Bool at the end of it (which is gross),
+        //      or we'd need to perform two branches to/from a section of bcode which
+        //      reinitializes the register to None (which is also gross)
+        //
+        //      making it so jump_true and jump_false reinitialize R(A) to None nice
+        //      and cleanly solves the above problem, even if it's a bit of a hack
+        // 
+        //      the above *sorta* applies also to the version w/ an else-part, but
+        //      to a lesser degree, as both code paths can more cleanly deal w/ it,
+        //      since if they both can end w/ the register having been reinit to None,
+        //      or something else
+
         // jump_true R(A) sBx
 
         // jump_true conditionally jumps, adding sBx to program counter if 
-        // Bool in R(A) is true, falling-through otherwise
+        // Bool in R(A) is true, falling-through otherwise, and reinitializing
+        // R(A) to None in either case
 
         // jump_true operates on the program counter AFTER it's been incremented
         // from reading the instruction itself
@@ -252,7 +320,8 @@ namespace yama::bc {
         // jump_false R(A) sBx
 
         // jump_false conditionally jumps, adding sBx to program counter if 
-        // Bool in R(A) is false, falling-through otherwise
+        // Bool in R(A) is false, falling-through otherwise, and reinitializing
+        // R(A) to None in either case
 
         // jump_false operates on the program counter AFTER it's been incremented
         // from reading the instruction itself
@@ -357,10 +426,106 @@ namespace yama::bc {
         code& add_jump_false(uint8_t A, int16_t sBx);
 
 
+        code& append(const code& x);
+
+
+        static code concat(const code& a, const code& b);
+
+
     private:
+        friend class code_writer;
+
 
         std::vector<instr> _instrs;
         std::vector<bool> _reinit_flags;
+
+
+        void _reset();
+    };
+
+
+    // code_writer provides flexible and composable way of creating code objects by
+    // letting branch instrs be written as stubs up front, which then get automatically
+    // resolved later on using 'labels'
+
+    // code_writer makes the process of complex code generation easier by decoupling
+    // branch instrs from the exact sBx offsets they use
+
+    // take note that 'labels' are identified by ID values, w/ the values used for these
+    // being otherwise arbitrary, being only important in-so-far as they're all unique
+
+    class code_writer final {
+    public:
+
+        using label_id_t = uint32_t;
+
+
+        code_writer() = default;
+        code_writer(const code_writer&) = delete;
+        code_writer(code_writer&&) noexcept = default;
+        ~code_writer() noexcept = default;
+        code_writer& operator=(const code_writer&) = delete;
+        code_writer& operator=(code_writer&&) noexcept = default;
+
+
+        static_assert(opcodes == 11);
+
+        code_writer& add_noop();
+        code_writer& add_load_none(uint8_t A, bool reinit = false);
+        code_writer& add_load_const(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_load_arg(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_copy(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit = false);
+        code_writer& add_call_nr(uint8_t A, uint8_t B);
+        code_writer& add_ret(uint8_t A);
+        code_writer& add_jump(label_id_t label_id); // label_id may specify labels added later
+        code_writer& add_jump_true(uint8_t A, label_id_t label_id); // label_id may specify labels added later
+        code_writer& add_jump_false(uint8_t A, label_id_t label_id); // label_id may specify labels added later
+
+
+        // add_label maps label_id to the current code write position, overwriting
+        // any existing mapping
+
+        // label_id may be any arbitrary integer
+
+        code_writer& add_label(label_id_t label_id);
+
+
+        // TODO: the behaviour of done returning std::nullopt due to sBx issues has
+        //       not really been unit tested
+
+        // done finishes code writing, returning the final code object created,
+        // or std::nullopt if creation failed
+
+        // done resets the code writer's state if successful
+
+        // done will fail if a branch instr's label_id didn't correspond to any label
+
+        // done will fail if a branch instr's sBx field value cannot handle the offset
+        // resolved for it
+
+        // done will, if it fails, and label_not_found != nullptr, set *label_not_found
+        // to true if the issue was a missing label, and false if the issue was a sBx
+        // field value offset overflow/underflow
+
+        std::optional<code> done(bool* label_not_found = nullptr);
+
+
+    private:
+        code _result;
+        std::unordered_map<label_id_t, size_t> _label_id_map; // maps label IDs to instr indices
+        std::unordered_map<size_t, label_id_t> _label_id_user_map; // maps branch instr indices to IDs of labels they use
+
+
+        size_t _write_pos() const noexcept;
+
+        std::optional<size_t> _get_instr_index(label_id_t label_id);
+        void _bind_label_id(label_id_t label_id);
+
+        void _bind_label_id_user(label_id_t label_id);
+
+        void _reset();
+        bool _resolve(bool* label_not_found);
     };
 
 

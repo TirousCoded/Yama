@@ -16,6 +16,11 @@
 namespace yama {
 
 
+    namespace internal {
+        class second_pass;
+    }
+
+
     // IMPORTANT:
     //      this code is provided to allow for the end-user to define their own
     //      types, which they can then push to a yama::domain
@@ -207,6 +212,15 @@ namespace yama {
         const_table_info& add_char(char_t v);
         const_table_info& add_primitive_type(str fullname);
         const_table_info& add_function_type(str fullname, callsig_info callsig);
+
+
+    private:
+        friend class yama::internal::second_pass;
+
+
+        // hacky little thing needed for second_pass
+
+        const_table_info& _patch_function_type(const_t x, callsig_info new_callsig);
     };
 
 

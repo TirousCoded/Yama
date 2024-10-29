@@ -11,6 +11,8 @@
 #include <taul/unicode.h>
 #include <taul/encoding.h>
 
+#include "asserts.h"
+
 
 namespace yama {
 
@@ -102,14 +104,30 @@ namespace yama {
     // parse_uint returns an unspecified uint value if overflow/underflow, w/ overflow/underflow
     // field being set to true
 
+    // parse_uint allows requiring the final 'u' to be disabled, in which case any suffixial
+    // 'u' chars will be ignored when parsing (this is intended to allow for parsing positive
+    // signed integers which may exceed max int_t value)
+
     // parse_float returns inf/-inf in cases where value described overflows/underflows float range,
     // w/ overflow/underflow field being set to true
     
     std::optional<parsed_int> parse_int(std::string_view x);
-    std::optional<parsed_uint> parse_uint(std::string_view x);
+    std::optional<parsed_uint> parse_uint(std::string_view x, bool expect_u = true);
     std::optional<parsed_float> parse_float(std::string_view x);
     std::optional<parsed_bool> parse_bool(std::string_view x);
     std::optional<parsed_char> parse_char(std::string_view x);
+
+    inline std::optional<parsed_int> parse_int(const std::string& x) { return parse_int(std::string_view(x)); }
+    inline std::optional<parsed_uint> parse_uint(const std::string& x, bool expect_u = true) { return parse_uint(std::string_view(x), expect_u); }
+    inline std::optional<parsed_float> parse_float(const std::string& x) { return parse_float(std::string_view(x)); }
+    inline std::optional<parsed_bool> parse_bool(const std::string& x) { return parse_bool(std::string_view(x)); }
+    inline std::optional<parsed_char> parse_char(const std::string& x) { return parse_char(std::string_view(x)); }
+    
+    inline std::optional<parsed_int> parse_int(const char* x) { YAMA_ASSERT(x); return parse_int(std::string_view(x)); }
+    inline std::optional<parsed_uint> parse_uint(const char* x, bool expect_u = true) { YAMA_ASSERT(x); return parse_uint(std::string_view(x), expect_u); }
+    inline std::optional<parsed_float> parse_float(const char* x) { YAMA_ASSERT(x); return parse_float(std::string_view(x)); }
+    inline std::optional<parsed_bool> parse_bool(const char* x) { YAMA_ASSERT(x); return parse_bool(std::string_view(x)); }
+    inline std::optional<parsed_char> parse_char(const char* x) { YAMA_ASSERT(x); return parse_char(std::string_view(x)); }
 
 
     namespace internal {

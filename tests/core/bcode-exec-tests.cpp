@@ -35,7 +35,7 @@ protected:
         ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
 
 #if _DISABLE_LOGGING
-        dbg->cats &= ~yama::ctx_bcode_exec_c & ~yama::ctx_llcmd_c;
+        dbg->remove_cat(yama::bcode_exec_c | yama::ctx_llcmd_c);
 #endif
     }
 
@@ -72,7 +72,7 @@ TEST_F(BCodeExecTests, Instr_Noop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -105,7 +105,7 @@ TEST_F(BCodeExecTests, Instr_LoadNone) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -138,7 +138,7 @@ TEST_F(BCodeExecTests, Instr_LoadConst) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -169,7 +169,7 @@ TEST_F(BCodeExecTests, Instr_LoadArg) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -208,7 +208,7 @@ TEST_F(BCodeExecTests, Instr_Copy) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -273,8 +273,8 @@ TEST_F(BCodeExecTests, Instr_Call) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(plus_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(plus_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -350,9 +350,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(panic_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(panic_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -432,9 +432,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(panic_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(panic_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -453,7 +453,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
 }
 
 TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
-    ctx->dbg()->cats &= ~yama::ctx_bcode_exec_c; // make output easier to read
+    ctx->dbg()->remove_cat(yama::bcode_exec_c); // make output easier to read
 
     // this 'dummy' function is here as it will be the thing that will actually trigger
     // the call stack overflow, which otherwise would be fail_safe, but I don't want it
@@ -558,10 +558,10 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(dummy_info));
-    ASSERT_TRUE(ctx->dm().push(fail_safe_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(dummy_info));
+    ASSERT_TRUE(ctx->dm().upload(fail_safe_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -630,8 +630,8 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(plus_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(plus_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -707,9 +707,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(panic_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(panic_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -789,9 +789,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(panic_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(panic_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -810,7 +810,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
 }
 
 TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
-    ctx->dbg()->cats &= ~yama::ctx_bcode_exec_c; // make output easier to read
+    ctx->dbg()->remove_cat(yama::bcode_exec_c); // make output easier to read
 
     // this 'dummy' function is here as it will be the thing that will actually trigger
     // the call stack overflow, which otherwise would be fail_safe, but I don't want it
@@ -915,10 +915,10 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(dummy_info));
-    ASSERT_TRUE(ctx->dm().push(fail_safe_info));
-    ASSERT_TRUE(ctx->dm().push(never_reached_info));
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(dummy_info));
+    ASSERT_TRUE(ctx->dm().upload(fail_safe_info));
+    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -960,7 +960,7 @@ TEST_F(BCodeExecTests, Instr_Ret) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -998,7 +998,7 @@ TEST_F(BCodeExecTests, Instr_Jump) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1013,11 +1013,13 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
         yama::bc::code()
         // block #1
         .add_load_arg(0, 1, true)
-        .add_jump_true(0, 2)
+        .add_jump_true(0, 3)
         // block #2
+        .add_load_none(0) // asserts that R(0) must have been reinit to None
         .add_load_const(1, 2, true)
         .add_ret(1)
         // block #3
+        .add_load_none(0) // asserts that R(0) must have been reinit to None
         .add_load_const(1, 3, true)
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1038,7 +1040,7 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1057,11 +1059,13 @@ TEST_F(BCodeExecTests, Instr_JumpFalse) {
         yama::bc::code()
         // block #1
         .add_load_arg(0, 1, true)
-        .add_jump_false(0, 2)
+        .add_jump_false(0, 3)
         // block #2
+        .add_load_none(0) // asserts that R(0) must have been reinit to None
         .add_load_const(1, 2, true)
         .add_ret(1)
         // block #3
+        .add_load_none(0) // asserts that R(0) must have been reinit to None
         .add_load_const(1, 3, true)
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1082,7 +1086,7 @@ TEST_F(BCodeExecTests, Instr_JumpFalse) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(f_info));
+    ASSERT_TRUE(ctx->dm().upload(f_info));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1216,10 +1220,10 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(subtract_info));
-    ASSERT_TRUE(ctx->dm().push(multiply_info));
-    ASSERT_TRUE(ctx->dm().push(greaterThanZero_info));
-    ASSERT_TRUE(ctx->dm().push(factorial_info));
+    ASSERT_TRUE(ctx->dm().upload(subtract_info));
+    ASSERT_TRUE(ctx->dm().upload(multiply_info));
+    ASSERT_TRUE(ctx->dm().upload(greaterThanZero_info));
+    ASSERT_TRUE(ctx->dm().upload(factorial_info));
 
     const auto factorial = ctx->load("factorial"_str).value();
 
@@ -1330,9 +1334,9 @@ TEST_F(BCodeExecTests, Example_Counter) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().push(addOne_info));
-    ASSERT_TRUE(ctx->dm().push(lessThan_info));
-    ASSERT_TRUE(ctx->dm().push(counter_info));
+    ASSERT_TRUE(ctx->dm().upload(addOne_info));
+    ASSERT_TRUE(ctx->dm().upload(lessThan_info));
+    ASSERT_TRUE(ctx->dm().upload(counter_info));
 
     const auto counter = ctx->dm().load("counter"_str).value();
 
@@ -1355,7 +1359,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
     _EXAMPLE_TEST(1);
     _EXAMPLE_TEST(10);
 
-    dbg->cats &= ~yama::ctx_bcode_exec_c & ~yama::ctx_llcmd_c;
+    dbg->remove_cat(yama::bcode_exec_c | yama::ctx_llcmd_c);
 
     _EXAMPLE_TEST(100);
     _EXAMPLE_TEST(1000);

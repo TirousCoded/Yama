@@ -5,6 +5,8 @@
 
 #include <optional>
 
+#include <taul/source_code.h>
+
 #include "res.h"
 #include "api_component.h"
 #include "mas.h"
@@ -52,10 +54,21 @@ namespace yama {
         type load_char();
 
 
-        // push attempts to push new type information to the domain,
+        // upload attempts to upload new type information to the domain,
         // returning if successful
 
-        virtual bool push(type_info x) = 0;
+        bool upload(type_info x);
+        template<std::forward_iterator It>
+        inline bool upload(It first, It last); // exclusive range [first, last)
+        template<typename Iterable>
+        inline bool upload(const Iterable& x);
+        bool upload(std::initializer_list<type_info> x);
+
+        // these overloads upload source code which gets compiled
+
+        bool upload(const taul::source_code& src);
+        bool upload(const str& src);
+        bool upload(const std::filesystem::path& src_path);
 
 
     protected:
@@ -98,6 +111,19 @@ namespace yama {
         void fail_domain_setup();
 
 
+        // do_compile returns a vector of type_info compiled from x, if any
+
+        virtual std::optional<std::vector<type_info>> do_compile(const taul::source_code& src) = 0;
+
+        // do_verify returns if x passes static verification
+
+        virtual bool do_verify(const type_info& x) = 0;
+
+        // do_upload uploads x, w/ x having already been statically verified
+
+        virtual void do_upload(type_info&& x) = 0;
+
+
     private:
 
         struct _quick_access_t final {
@@ -106,5 +132,21 @@ namespace yama {
 
         std::optional<_quick_access_t> _quick_access;
     };
+
+    template<std::forward_iterator It>
+    inline bool domain::upload(It first, It last) {
+        for (It it = first; it != last; std::advance(it, 1)) {
+            if (!do_verify(*it)) return false;
+        }
+        for (It it = first; it != last; std::advance(it, 1)) {
+            do_upload(type_info(*it));
+        }
+        return true;
+    }
+
+    template<typename Iterable>
+    inline bool domain::upload(const Iterable& x) {
+        return upload(x.begin(), x.end());
+    }
 }
 
