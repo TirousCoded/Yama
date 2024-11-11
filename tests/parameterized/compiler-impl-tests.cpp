@@ -1,21 +1,17 @@
 ﻿
 
-#include <gtest/gtest.h>
+#include "compiler-impl-tests.h"
 
 #include <yama/core/general.h>
 #include <yama/core/scalars.h>
 #include <yama/core/callsig_info.h>
 #include <yama/core/const_table_info.h>
-#include <yama/core/domain.h>
-#include <yama/core/context.h>
-#include <yama/dm/compiler.h>
-#include <yama/debug-impls/stderr_debug.h>
-#include <yama/debug-impls/dsignal_debug.h>
-#include <yama/mas-impls/heap_mas.h>
-#include <yama/domain-impls/domain_st.h>
 
 
 using namespace yama::string_literals;
+
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CompilerImplTests);
 
 
 // IMPORTANT:
@@ -36,7 +32,7 @@ using namespace yama::string_literals;
 
 
 // IMPORTANT:
-//      in order to unit test yama::dm::compiler in a way that ensures we don't
+//      in order to unit test yama::compiler impls in a way that ensures we don't
 //      couple our tests to impl details, we're gonna assert the following:
 // 
 //          1) if the code compiles
@@ -91,13 +87,13 @@ sidefx_t sidefx; // global so our Yama functions can reference it
 // our Yama functions for side-effects + misc
 
 const auto consts =
-    yama::const_table_info()
-    .add_primitive_type("None"_str)
-    .add_primitive_type("Int"_str)
-    .add_primitive_type("UInt"_str)
-    .add_primitive_type("Float"_str)
-    .add_primitive_type("Bool"_str)
-    .add_primitive_type("Char"_str);
+yama::const_table_info()
+.add_primitive_type("None"_str)
+.add_primitive_type("Int"_str)
+.add_primitive_type("UInt"_str)
+.add_primitive_type("Float"_str)
+.add_primitive_type("Bool"_str)
+.add_primitive_type("Char"_str);
 
 yama::type_info observeNone_info{
     .fullname = "observeNone"_str,
@@ -232,39 +228,20 @@ const std::vector<yama::type_info> fns{
 };
 
 
-class CompilerTests : public testing::Test {
-public:
+void CompilerImplTests::SetUp() {
+    dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
+    dm = std::make_shared<yama::default_domain>(dbg);
+    ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
 
-    std::shared_ptr<yama::dsignal_debug> dbg;
-    std::shared_ptr<yama::domain> dm;
-    std::shared_ptr<yama::context> ctx;
+    comp = GetParam().factory(dbg);
 
-    std::unique_ptr<yama::dm::compiler> comp;
+    sidefx = sidefx_t{}; // can't forget to reset this each time
 
-    bool ready = false; // if fixture setup correctly
-
-
-protected:
-
-    void SetUp() override final {
-        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
-        dm = std::make_shared<yama::domain_st>(yama::make_res<yama::heap_mas>(dbg), dbg);
-        ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
-
-        comp = std::make_unique<yama::dm::compiler>(*dm, dbg);
-
-        sidefx = sidefx_t{}; // can't forget to reset this each time
-
-        ready = dm->upload(fns);
-    }
-
-    void TearDown() override final {
-        //
-    }
-};
+    ready = dm->upload(fns);
+}
 
 
-TEST_F(CompilerTests, Empty) {
+TEST_P(CompilerImplTests, Empty) {
     std::string txt = R"(
 
 // empty
@@ -274,13 +251,13 @@ TEST_F(CompilerTests, Empty) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(result->empty()); // can't really test w/ dm if *result is empty
 }
 
-TEST_F(CompilerTests, Fail_LexicalError) {
+TEST_P(CompilerImplTests, Fail_LexicalError) {
     std::string txt = R"(
 
 fn f() {
@@ -292,7 +269,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    ASSERT_FALSE(comp->compile(src));
+    ASSERT_FALSE(comp->compile(yama::res(dm), src));
 
     // IMPORTANT: I originally tried having seperate lexical/syntactic dsignal values,
     //            but I found that it's actually pretty hard to reliably differentiate
@@ -301,7 +278,7 @@ fn f() {
     ASSERT_EQ(dbg->count(yama::dsignal::compile_syntax_error), 1);
 }
 
-TEST_F(CompilerTests, Fail_SyntaxError) {
+TEST_P(CompilerImplTests, Fail_SyntaxError) {
     std::string txt = R"(
 
 fn f() {
@@ -313,7 +290,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    ASSERT_FALSE(comp->compile(src));
+    ASSERT_FALSE(comp->compile(yama::res(dm), src));
 
     ASSERT_EQ(dbg->count(yama::dsignal::compile_syntax_error), 1);
 }
@@ -344,7 +321,7 @@ fn f() {
 
 // default init None
 
-TEST_F(CompilerTests, General_DefaultInit_None) {
+TEST_P(CompilerImplTests, General_DefaultInit_None) {
     std::string txt = R"(
 
 fn f() -> None {
@@ -357,7 +334,7 @@ fn f() -> None {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -381,7 +358,7 @@ fn f() -> None {
 
 // default init Int
 
-TEST_F(CompilerTests, General_DefaultInit_Int) {
+TEST_P(CompilerImplTests, General_DefaultInit_Int) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -394,7 +371,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -418,7 +395,7 @@ fn f() -> Int {
 
 // default init UInt
 
-TEST_F(CompilerTests, General_DefaultInit_UInt) {
+TEST_P(CompilerImplTests, General_DefaultInit_UInt) {
     std::string txt = R"(
 
 fn f() -> UInt {
@@ -431,7 +408,7 @@ fn f() -> UInt {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -455,7 +432,7 @@ fn f() -> UInt {
 
 // default init Float
 
-TEST_F(CompilerTests, General_DefaultInit_Float) {
+TEST_P(CompilerImplTests, General_DefaultInit_Float) {
     std::string txt = R"(
 
 fn f() -> Float {
@@ -468,7 +445,7 @@ fn f() -> Float {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -492,7 +469,7 @@ fn f() -> Float {
 
 // default init Bool
 
-TEST_F(CompilerTests, General_DefaultInit_Bool) {
+TEST_P(CompilerImplTests, General_DefaultInit_Bool) {
     std::string txt = R"(
 
 fn f() -> Bool {
@@ -505,7 +482,7 @@ fn f() -> Bool {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -529,7 +506,7 @@ fn f() -> Bool {
 
 // default init Char
 
-TEST_F(CompilerTests, General_DefaultInit_Char) {
+TEST_P(CompilerImplTests, General_DefaultInit_Char) {
     std::string txt = R"(
 
 fn f() -> Char {
@@ -542,7 +519,7 @@ fn f() -> Char {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -566,7 +543,7 @@ fn f() -> Char {
 
 // default init function
 
-TEST_F(CompilerTests, General_DefaultInit_Fn) {
+TEST_P(CompilerImplTests, General_DefaultInit_Fn) {
     std::string txt = R"(
 
 fn g() {}
@@ -581,7 +558,7 @@ fn f() -> g {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -609,7 +586,7 @@ fn f() -> g {
 
 // None is non-callable
 
-TEST_F(CompilerTests, General_None_IsNonCallable) {
+TEST_P(CompilerImplTests, General_None_IsNonCallable) {
     std::string txt = R"(
 
 fn get_none() {}
@@ -623,14 +600,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // Int is non-callable
 
-TEST_F(CompilerTests, General_Int_IsNonCallable) {
+TEST_P(CompilerImplTests, General_Int_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
@@ -642,14 +619,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // UInt is non-callable
 
-TEST_F(CompilerTests, General_UInt_IsNonCallable) {
+TEST_P(CompilerImplTests, General_UInt_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
@@ -661,14 +638,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // Float is non-callable
 
-TEST_F(CompilerTests, General_Float_IsNonCallable) {
+TEST_P(CompilerImplTests, General_Float_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
@@ -680,14 +657,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // Bool is non-callable
 
-TEST_F(CompilerTests, General_Bool_IsNonCallable) {
+TEST_P(CompilerImplTests, General_Bool_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
@@ -699,14 +676,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // Char is non-callable
 
-TEST_F(CompilerTests, General_Char_IsNonCallable) {
+TEST_P(CompilerImplTests, General_Char_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
@@ -718,14 +695,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // functions are callable
 
-TEST_F(CompilerTests, General_Fns_AreCallable) {
+TEST_P(CompilerImplTests, General_Fns_AreCallable) {
     std::string txt = R"(
 
 fn identity_int(x: Int) -> Int {
@@ -741,7 +718,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -770,7 +747,7 @@ fn f() {
 
 // panic behaviour
 
-TEST_F(CompilerTests, General_PanicBehaviour) {
+TEST_P(CompilerImplTests, General_PanicBehaviour) {
     std::string txt = R"(
 
 fn f() {
@@ -784,7 +761,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -863,7 +840,7 @@ fn f() {
 // declaring types in global scope will result in new types being
 // made available to the domain upon upload
 
-TEST_F(CompilerTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponUpload) {
+TEST_P(CompilerImplTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponUpload) {
     std::string txt = R"(
 
 fn f() {}
@@ -873,7 +850,7 @@ fn f() {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -899,7 +876,7 @@ fn f() {}
 // by Yama code, including the built-in types None, Int, UInt, Float,
 // Bool, and Char
 
-TEST_F(CompilerTests, DeclAndScope_TypesDefinedPriorToCompilation_MayBeUsedByYamaCode) {
+TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedPriorToCompilation_MayBeUsedByYamaCode) {
     std::string txt = R"(
 
 fn f() {
@@ -930,7 +907,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -961,7 +938,7 @@ fn f() {
 // types defined by Yama code should be available for use by said 
 // Yama code
 
-TEST_F(CompilerTests, DeclAndScope_TypesDefinedInYamaCode_MayBeUsedByYamaCode) {
+TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedInYamaCode_MayBeUsedByYamaCode) {
     std::string txt = R"(
 
 fn a() {
@@ -987,7 +964,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1031,7 +1008,7 @@ fn f() {
 // tolerance of type/parameter/local var decls having common names so
 // long as they're in different blocks
 
-TEST_F(CompilerTests, DeclAndScope_DeclShadowingBehaviour) {
+TEST_P(CompilerImplTests, DeclAndScope_DeclShadowingBehaviour) {
     std::string txt = R"(
 
 fn a() {} // fn a will be shadowed by 'a's below, w/ this test covering coexistence mainly
@@ -1055,7 +1032,7 @@ fn f(a: Int) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -1093,7 +1070,7 @@ fn f(a: Int) {
 // the decl itself, w/ this meaning that the init exprs of the local var cannot
 // reference itself
 
-TEST_F(CompilerTests, DeclAndScope_LocalVarScopeBeginsWhenExpected) {
+TEST_P(CompilerImplTests, DeclAndScope_LocalVarScopeBeginsWhenExpected) {
     std::string txt = R"(
 
 fn f() {
@@ -1105,7 +1082,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -1114,7 +1091,7 @@ fn f() {
 // defined prior to compilation, including the built-in types None,
 // Int, UInt, Float, Bool, and Char
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByBuiltInType) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByBuiltInType) {
     std::string txt = R"(
 
 fn Int() {}
@@ -1124,12 +1101,12 @@ fn Int() {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByNonBuiltInType) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByNonBuiltInType) {
     std::string txt = R"(
 
 fn observeInt() {}
@@ -1139,14 +1116,14 @@ fn observeInt() {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
 
 // illegal to declare a two or more types in global scope w/ a common name
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByAnotherTypeInYamaCode) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByAnotherTypeInYamaCode) {
     std::string txt = R"(
 
 fn f() {}
@@ -1158,7 +1135,7 @@ fn f(a: Int) {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1166,7 +1143,7 @@ fn f(a: Int) {}
 // illegal for a parameter to have the same name as another parameter
 // in the same parameter list
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfTwoParamsShareName) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfTwoParamsShareName) {
     std::string txt = R"(
 
 fn f(a, a: Int) {}
@@ -1176,7 +1153,7 @@ fn f(a, a: Int) {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1184,7 +1161,7 @@ fn f(a, a: Int) {}
 // illegal to declare a local var in function body block w/ the name
 // of a parameter
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfParam) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfParam) {
     std::string txt = R"(
 
 fn f(a: Int) {
@@ -1196,7 +1173,7 @@ fn f(a: Int) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1204,7 +1181,7 @@ fn f(a: Int) {
 // illegal to declare a local var in function body block w/ the name
 // of another local var in that block
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInFnBodyBlock) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInFnBodyBlock) {
     std::string txt = R"(
 
 fn f() {
@@ -1217,7 +1194,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1225,7 +1202,7 @@ fn f() {
 // illegal to declare a local var in a nested local block w/ the name
 // of another local var in that block
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInNestedBlock) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInNestedBlock) {
     std::string txt = R"(
 
 fn f() {
@@ -1240,14 +1217,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
 
 // dead code is still subject to error checking
 
-TEST_F(CompilerTests, DeclAndScope_Fail_IfDeadCodeIsInError) {
+TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeadCodeIsInError) {
     std::string txt = R"(
 
 fn f() {
@@ -1262,7 +1239,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1277,7 +1254,7 @@ fn f() {
 
 // specify built-in type
 
-TEST_F(CompilerTests, TypeSpecifier_SpecifyBuiltInType) {
+TEST_P(CompilerImplTests, TypeSpecifier_SpecifyBuiltInType) {
     std::string txt = R"(
 
 fn f() {
@@ -1290,7 +1267,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1315,7 +1292,7 @@ fn f() {
 
 // specify type in Yama code
 
-TEST_F(CompilerTests, TypeSpecifier_SpecifyTypeInYamaCode) {
+TEST_P(CompilerImplTests, TypeSpecifier_SpecifyTypeInYamaCode) {
     std::string txt = R"(
 
 fn g() {}
@@ -1329,7 +1306,7 @@ fn f() -> g {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1357,7 +1334,7 @@ fn f() -> g {
 
 // illegal for type spec to specify non-type
 
-TEST_F(CompilerTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
+TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
     std::string txt = R"(
 
 fn f() {
@@ -1369,14 +1346,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
 // cannot reference type which has been shadowed by parameter
 
-TEST_F(CompilerTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
+TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
     std::string txt = R"(
 
 fn f(Int: Float) { // <- shadows Int type
@@ -1388,14 +1365,14 @@ fn f(Int: Float) { // <- shadows Int type
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
 
 // cannot reference type which has been shadowed by local var
 
-TEST_F(CompilerTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
+TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
     std::string txt = R"(
 
 fn f() {
@@ -1408,7 +1385,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
@@ -1442,7 +1419,7 @@ fn f() {
 
 // local var w/ just <type-annot>
 
-TEST_F(CompilerTests, VariableDecl_TypeAnnot_NoInitAssign) {
+TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_NoInitAssign) {
     std::string txt = R"(
 
 fn f() {
@@ -1455,7 +1432,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1480,7 +1457,7 @@ fn f() {
 
 // local var w/ just <init-assign>
 
-TEST_F(CompilerTests, VariableDecl_NoTypeAnnot_InitAssign) {
+TEST_P(CompilerImplTests, VariableDecl_NoTypeAnnot_InitAssign) {
     std::string txt = R"(
 
 fn f() {
@@ -1493,7 +1470,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1518,7 +1495,7 @@ fn f() {
 
 // local var w/ <type-annot> and <init-assign>
 
-TEST_F(CompilerTests, VariableDecl_TypeAnnot_InitAssign) {
+TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_InitAssign) {
     std::string txt = R"(
 
 fn f() {
@@ -1531,7 +1508,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1556,7 +1533,7 @@ fn f() {
 
 // illegal local var w/out <type-annot> nor <init-assign>
 
-TEST_F(CompilerTests, VariableDecl_Fail_If_NoTypeAnnot_NoInitAssign) {
+TEST_P(CompilerImplTests, VariableDecl_Fail_If_NoTypeAnnot_NoInitAssign) {
     std::string txt = R"(
 
 fn f() {
@@ -1568,14 +1545,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_local_var), 1);
 }
 
 // local var initialization and mutability
 
-TEST_F(CompilerTests, VariableDecl_InitializationAndMutability) {
+TEST_P(CompilerImplTests, VariableDecl_InitializationAndMutability) {
     std::string txt = R"(
 
 fn f() {
@@ -1596,7 +1573,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1625,7 +1602,7 @@ fn f() {
 
 // illegal to declare non-local var
 
-TEST_F(CompilerTests, VariableDecl_Fail_IfNonLocalVar) {
+TEST_P(CompilerImplTests, VariableDecl_Fail_IfNonLocalVar) {
     std::string txt = R"(
 
 var a = 10;
@@ -1635,14 +1612,14 @@ var a = 10;
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonlocal_var), 1);
 }
 
 // illegal to initialize local var w/ wrong typed expr
 
-TEST_F(CompilerTests, VariableDecl_Fail_InitExprIsWrongType) {
+TEST_P(CompilerImplTests, VariableDecl_Fail_InitExprIsWrongType) {
     std::string txt = R"(
 
 fn f() {
@@ -1654,7 +1631,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -1705,7 +1682,7 @@ fn f() {
 // function w/ explicit return type, which is NOT None, w/ all control paths exiting
 // via return stmt
 
-TEST_F(CompilerTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_AllControlPathsExitViaReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_AllControlPathsExitViaReturnStmt) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -1726,7 +1703,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1752,7 +1729,7 @@ fn f() -> Int {
 // function w/ explicit return type, which is NOT None, but w/ no return stmt on any
 // control paths, instead entering an infinite loop, exiting via panicking
 
-TEST_F(CompilerTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_NoReturnStmtOnAnyControlPath_InsteadEnterInfiniteLoop_ExitViaPanic) {
+TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_NoReturnStmtOnAnyControlPath_InsteadEnterInfiniteLoop_ExitViaPanic) {
     std::string txt = R"(
 
 fn f() -> Int { // <- non-None return type, so normally would need explicit return stmt on each control path
@@ -1777,7 +1754,7 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -1809,7 +1786,7 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
 // function w/ explicit return type, which is None, w/ all control paths exiting
 // via return stmt (of form 'return;')
 
-TEST_F(CompilerTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
     std::string txt = R"(
 
 fn f() -> None {
@@ -1830,7 +1807,7 @@ fn f() -> None {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1856,7 +1833,7 @@ fn f() -> None {
 // function w/ explicit return type, which is None, w/ all control paths NOT exiting
 // via (explicit) return stmt
 
-TEST_F(CompilerTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
     std::string txt = R"(
 
 fn f() -> None {
@@ -1876,7 +1853,7 @@ fn f() -> None {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1903,7 +1880,7 @@ fn f() -> None {
 // function w/out explicit return type (so has implicit return type None), w/ all control
 // paths exiting via return stmt (of form 'return;')
 
-TEST_F(CompilerTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
     std::string txt = R"(
 
 fn f() { // <- implies return type is None
@@ -1924,7 +1901,7 @@ fn f() { // <- implies return type is None
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1950,7 +1927,7 @@ fn f() { // <- implies return type is None
 // function w/out explicit return type (so has implicit return type None), w/ all control
 // paths NOT exiting via (explicit) return stmt
 
-TEST_F(CompilerTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
     std::string txt = R"(
 
 fn f() { // <- implies return type is None
@@ -1970,7 +1947,7 @@ fn f() { // <- implies return type is None
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -1997,7 +1974,7 @@ fn f() { // <- implies return type is None
 // function w/ param list '(a, b, c: Int, d: Float, e: Char)', which tests all the nuances
 // which a valid param list needs to be able to handle, and params are actually usable
 
-TEST_F(CompilerTests, FunctionDecl_ParamList) {
+TEST_P(CompilerImplTests, FunctionDecl_ParamList) {
     std::string txt = R"(
 
 fn f(a, b, c: Int, d: Bool, e: Char) {
@@ -2013,7 +1990,7 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2047,7 +2024,7 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
 
 // function w/ 24 parameters, and params are actually usable
 
-TEST_F(CompilerTests, FunctionDecl_ParamList_WithMaxParams) {
+TEST_P(CompilerImplTests, FunctionDecl_ParamList_WithMaxParams) {
     std::string txt = R"(
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23: Int) {
@@ -2082,7 +2059,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2154,7 +2131,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
 
 // illegal to declare local fn
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfLocalFn) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfLocalFn) {
     std::string txt = R"(
 
 fn f() {
@@ -2166,7 +2143,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_local_fn), 1);
 }
@@ -2174,7 +2151,7 @@ fn f() {
 // illegal function, w/ non-None return type, w/ a control path from entrypoint which 
 // does not end w/ a return stmt
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfNonNoneReturnType_AndControlPathFromEntrypointNotEndingInReturnStmt) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfNonNoneReturnType_AndControlPathFromEntrypointNotEndingInReturnStmt) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -2201,14 +2178,14 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_no_return_stmt), 1);
 }
 
 // illegal function w/ param list '(a, b: Int, c)'
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfInvalidParamList) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfInvalidParamList) {
     std::string txt = R"(
 
 fn f(a, b: Int, c) {}
@@ -2218,14 +2195,14 @@ fn f(a, b: Int, c) {}
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_param_list), 1);
 }
 
 // illegal function w/ >24 parameters
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfInvalidParamList_MoreThanTwentyFourParams) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfInvalidParamList_MoreThanTwentyFourParams) {
     std::string txt = R"(
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24: Int) {}
@@ -2235,20 +2212,20 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_param_list), 1);
 }
 
 // illegal function w/ params of non-object types
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfParamTypesAreNotObjectTypes) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfParamTypesAreNotObjectTypes) {
     // TODO: stub until we add non-object types
 }
 
 // illegal function w/ return type of non-object type
 
-TEST_F(CompilerTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
+TEST_P(CompilerImplTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
     // TODO: stub until we add non-object types
 }
 
@@ -2267,7 +2244,7 @@ TEST_F(CompilerTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 
 // basic usage
 
-TEST_F(CompilerTests, AssignmentStmt_BasicUsage) {
+TEST_P(CompilerImplTests, AssignmentStmt_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -2282,7 +2259,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2308,7 +2285,7 @@ fn f() {
 
 // illegal assignment of non-assignable expr
 
-TEST_F(CompilerTests, AssignmentStmt_Fail_IfAssignNonAssignableExpr) {
+TEST_P(CompilerImplTests, AssignmentStmt_Fail_IfAssignNonAssignableExpr) {
     std::string txt = R"(
 
 fn f() {
@@ -2320,14 +2297,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
 // illegal assignment type mismatch
 
-TEST_F(CompilerTests, AssignmentStmt_Fail_IfTypeMismatch) {
+TEST_P(CompilerImplTests, AssignmentStmt_Fail_IfTypeMismatch) {
     std::string txt = R"(
 
 fn f() {
@@ -2340,7 +2317,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -2356,7 +2333,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, ExprStmt_BasicUsage) {
+TEST_P(CompilerImplTests, ExprStmt_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -2369,7 +2346,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2410,7 +2387,7 @@ fn f() {
 
 // w/ no else
 
-TEST_F(CompilerTests, IfStmt_NoElse) {
+TEST_P(CompilerImplTests, IfStmt_NoElse) {
     std::string txt = R"(
 
 fn f(a: Bool) {
@@ -2426,7 +2403,7 @@ fn f(a: Bool) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2474,7 +2451,7 @@ fn f(a: Bool) {
 
 // w/ else
 
-TEST_F(CompilerTests, IfStmt_Else) {
+TEST_P(CompilerImplTests, IfStmt_Else) {
     std::string txt = R"(
 
 fn f(a: Bool) {
@@ -2493,7 +2470,7 @@ fn f(a: Bool) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2542,7 +2519,7 @@ fn f(a: Bool) {
 
 // w/ else-if chain
 
-TEST_F(CompilerTests, IfStmt_ElseIfChain) {
+TEST_P(CompilerImplTests, IfStmt_ElseIfChain) {
     std::string txt = R"(
 
 fn f(a: Char) {
@@ -2567,7 +2544,7 @@ fn f(a: Char) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -2669,7 +2646,7 @@ fn f(a: Char) {
 
 // illegal if stmt w/ expr not type Bool
 
-TEST_F(CompilerTests, IfStmt_Fail_IfTypeMismatch) {
+TEST_P(CompilerImplTests, IfStmt_Fail_IfTypeMismatch) {
     std::string txt = R"(
 
 fn f() {
@@ -2681,7 +2658,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -2695,7 +2672,7 @@ fn f() {
 
 // basic usage, exit via break
 
-TEST_F(CompilerTests, LoopStmt_BasicUsage_ExitViaBreak) {
+TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaBreak) {
     std::string txt = R"(
 
 fn f() {
@@ -2716,7 +2693,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2746,7 +2723,7 @@ fn f() {
 
 // basic usage, exit via return
 
-TEST_F(CompilerTests, LoopStmt_BasicUsage_ExitViaReturn) {
+TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaReturn) {
     std::string txt = R"(
 
 fn f() {
@@ -2767,7 +2744,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -2805,7 +2782,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, BreakStmt_BasicUsage) {
+TEST_P(CompilerImplTests, BreakStmt_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -2826,7 +2803,63 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
+    ASSERT_TRUE(result);
+
+    //std::cerr << std::format("{}\n", result->back());
+
+    ASSERT_TRUE(dm->upload(*result));
+
+    const auto f = dm->load("f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, *f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(-1);
+    expected.observe_int(0);
+    expected.observe_int(1);
+    expected.observe_int(2);
+    expected.observe_int(3);
+    expected.observe_int(-2);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// local var in loop body block, w/ this test existing to ensure impl
+// avoids issues we were having w/ it not being able to handle this
+
+TEST_P(CompilerImplTests, BreakStmt_LocalVarInLoopBody) {
+    std::string txt = R"(
+
+fn f() {
+    observeInt(-1);
+    var i = 0;
+    loop {
+        var localvar1 = 10;
+        observeInt(i);
+        if (isEqInt(i, 3)) {
+            var localvar2 = 'a'; // put another local var in nested if stmt body
+            break; // <- exit loop
+        }
+        i = doIncr(i);
+    }
+    observeInt(-2);
+}
+
+)";
+
+    taul::source_code src{};
+    src.add_str("src"_str, yama::str(txt));
+
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -2858,7 +2891,7 @@ fn f() {
 
 // illegal use outside loop stmt
 
-TEST_F(CompilerTests, BreakStmt_Fail_IfUsedOutsideLoopStmt) {
+TEST_P(CompilerImplTests, BreakStmt_Fail_IfUsedOutsideLoopStmt) {
     std::string txt = R"(
 
 fn f() {
@@ -2870,7 +2903,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_in_loop), 1);
 }
@@ -2886,7 +2919,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, ContinueStmt_BasicUsage) {
+TEST_P(CompilerImplTests, ContinueStmt_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -2908,7 +2941,64 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
+    ASSERT_TRUE(result);
+
+    //std::cerr << std::format("{}\n", result->back());
+
+    ASSERT_TRUE(dm->upload(*result));
+
+    const auto f = dm->load("f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+
+    ASSERT_TRUE(ctx->ll_load_fn(0, *f).good());
+    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(-1);
+    expected.observe_int(0);
+    expected.observe_int(1);
+    expected.observe_int(2);
+    expected.observe_int(3);
+    expected.observe_int(-2);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// local var in loop body block, w/ this test existing to ensure impl
+// avoids issues we were having w/ it not being able to handle this
+
+TEST_P(CompilerImplTests, ContinueStmt_LocalVarInLoopBody) {
+    std::string txt = R"(
+
+fn f() {
+    observeInt(-1);
+    var i = 0;
+    loop {
+        var localvar1 = 10;
+        observeInt(i);
+        if (isNotEqInt(i, 3)) {
+            var localvar2 = 'a'; // put another local var in nested if stmt body
+            i = doIncr(i);
+            continue; // <- avoid break
+        }
+        break; // <- exit loop
+    }
+    observeInt(-2);
+}
+
+)";
+
+    taul::source_code src{};
+    src.add_str("src"_str, yama::str(txt));
+
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -2940,7 +3030,7 @@ fn f() {
 
 // illegal use outside loop stmt
 
-TEST_F(CompilerTests, ContinueStmt_Fail_IfUsedOutsideLoopStmt) {
+TEST_P(CompilerImplTests, ContinueStmt_Fail_IfUsedOutsideLoopStmt) {
     std::string txt = R"(
 
 fn f() {
@@ -2952,7 +3042,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_in_loop), 1);
 }
@@ -2968,7 +3058,7 @@ fn f() {
 
 // basic usage, w/ non-None return type
 
-TEST_F(CompilerTests, ReturnStmt_BasicUsage_NonNoneReturnType) {
+TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NonNoneReturnType) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -2981,7 +3071,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3005,7 +3095,7 @@ fn f() -> Int {
 
 // basic usage, w/ None return type, w/ None return stmt
 
-TEST_F(CompilerTests, ReturnStmt_BasicUsage_NoneReturnType_NoneReturnStmt) {
+TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NoneReturnStmt) {
     std::string txt = R"(
 
 fn f() {
@@ -3018,7 +3108,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3042,7 +3132,7 @@ fn f() {
 
 // basic usage, w/ None return type, w/ None return stmt
 
-TEST_F(CompilerTests, ReturnStmt_BasicUsage_NoneReturnType_NonNoneReturnStmt) {
+TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NonNoneReturnStmt) {
     std::string txt = R"(
 
 fn g() {} // <- to get None object (as Yama currently lacks another way to get it)
@@ -3057,7 +3147,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3085,7 +3175,7 @@ fn f() {
 
 // illegal return stmt due to type mismatch, non-None return stmt
 
-TEST_F(CompilerTests, ReturnStmt_Fail_TypeMismatch_NonNoneReturnStmt) {
+TEST_P(CompilerImplTests, ReturnStmt_Fail_TypeMismatch_NonNoneReturnStmt) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3097,14 +3187,14 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
 
 // illegal return stmt due to type mismatch, None return stmt
 
-TEST_F(CompilerTests, ReturnStmt_Fail_TypeMismatch_NoneReturnStmt) {
+TEST_P(CompilerImplTests, ReturnStmt_Fail_TypeMismatch_NoneReturnStmt) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3116,7 +3206,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -3142,7 +3232,7 @@ fn f() -> Int {
 
 // access value of function reference
 
-TEST_F(CompilerTests, IdentifierExpr_AccessValueOf_Fn) {
+TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_Fn) {
     std::string txt = R"(
 
 fn f() -> g {
@@ -3156,7 +3246,7 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3184,7 +3274,7 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
 
 // access value of parameter reference
 
-TEST_F(CompilerTests, IdentifierExpr_AccessValueOf_Param) {
+TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_Param) {
     std::string txt = R"(
 
 fn f(a: Int) -> Int {
@@ -3197,7 +3287,7 @@ fn f(a: Int) -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -3225,7 +3315,7 @@ fn f(a: Int) -> Int {
 
 // access value of local var reference
 
-TEST_F(CompilerTests, IdentifierExpr_AccessValueOf_LocalVar) {
+TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_LocalVar) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3239,7 +3329,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3264,7 +3354,7 @@ fn f() -> Int {
 
 // function shadowed by parameter
 
-TEST_F(CompilerTests, IdentifierExpr_ParamShadowsFn) {
+TEST_P(CompilerImplTests, IdentifierExpr_ParamShadowsFn) {
     std::string txt = R"(
 
 fn g() {}
@@ -3278,7 +3368,7 @@ fn f(g: Int) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3308,7 +3398,7 @@ fn f(g: Int) {
 
 // function shadowed by local var
 
-TEST_F(CompilerTests, IdentifierExpr_LocalVarShadowsFn) {
+TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsFn) {
     std::string txt = R"(
 
 fn g() {}
@@ -3323,7 +3413,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3352,7 +3442,7 @@ fn f() {
 
 // local var shadowed by another local var
 
-TEST_F(CompilerTests, IdentifierExpr_LocalVarShadowsAnotherLocalVar) {
+TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsAnotherLocalVar) {
     std::string txt = R"(
 
 fn f() {
@@ -3370,7 +3460,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3397,7 +3487,7 @@ fn f() {
 
 // illegal reference to non-function type
 
-TEST_F(CompilerTests, IdentifierExpr_Fail_IfRefersToNonFnType) {
+TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToNonFnType) {
     std::string txt = R"(
 
 fn f() {
@@ -3409,14 +3499,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
 }
 
 // illegal reference to undeclared name
 
-TEST_F(CompilerTests, IdentifierExpr_Fail_IfRefersToUndeclaredName) {
+TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToUndeclaredName) {
     std::string txt = R"(
 
 fn f() {
@@ -3428,7 +3518,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -3436,7 +3526,7 @@ fn f() {
 // illegal reference to local var not yet in scope (ie. the identifier expr is
 // in the same block as the local var, but the local var isn't in scope yet)
 
-TEST_F(CompilerTests, IdentifierExpr_Fail_IfRefersToLocalVarNotYetInScope) {
+TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToLocalVarNotYetInScope) {
     std::string txt = R"(
 
 fn f() {
@@ -3449,14 +3539,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
 // illegal reference to local var which has gone out-of-scope
 
-TEST_F(CompilerTests, IdentifierExpr_Fail_IfRefersToLocalVarWhichIsOutOfScope) {
+TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToLocalVarWhichIsOutOfScope) {
     std::string txt = R"(
 
 fn f() {
@@ -3471,14 +3561,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
 // identifier expr is non-assignable, if function reference
 
-TEST_F(CompilerTests, IdentifierExpr_NonAssignable_IfFn) {
+TEST_P(CompilerImplTests, IdentifierExpr_NonAssignable_IfFn) {
     std::string txt = R"(
 
 fn g() {}
@@ -3496,14 +3586,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
 // identifier expr is non-assignable, if parameter reference
 
-TEST_F(CompilerTests, IdentifierExpr_NonAssignable_IfParam) {
+TEST_P(CompilerImplTests, IdentifierExpr_NonAssignable_IfParam) {
     std::string txt = R"(
 
 fn f(a: Int) {
@@ -3515,14 +3605,14 @@ fn f(a: Int) {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
 // identifier expr is assignable, if local var reference
 
-TEST_F(CompilerTests, IdentifierExpr_Assignable_IfLocalVar) {
+TEST_P(CompilerImplTests, IdentifierExpr_Assignable_IfLocalVar) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3537,7 +3627,7 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3572,7 +3662,7 @@ fn f() -> Int {
 
 // basic usage
 
-TEST_F(CompilerTests, IntLiteralExpr_BasicUsage) {
+TEST_P(CompilerImplTests, IntLiteralExpr_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -3603,7 +3693,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3647,7 +3737,7 @@ fn f() {
 
 // illegal if Int literal overflows
 
-TEST_F(CompilerTests, IntLiteralExpr_Fail_IfNumericOverflow) {
+TEST_P(CompilerImplTests, IntLiteralExpr_Fail_IfNumericOverflow) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3659,14 +3749,14 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_overflow), 1);
 }
 
 // illegal if Int literal underflows
 
-TEST_F(CompilerTests, IntLiteralExpr_Fail_IfNumericUnderflow) {
+TEST_P(CompilerImplTests, IntLiteralExpr_Fail_IfNumericUnderflow) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3678,14 +3768,14 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_underflow), 1);
 }
 
 // Int literal is non-assignable
 
-TEST_F(CompilerTests, IntLiteralExpr_NonAssignable) {
+TEST_P(CompilerImplTests, IntLiteralExpr_NonAssignable) {
     std::string txt = R"(
 
 fn f() {
@@ -3697,7 +3787,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3713,7 +3803,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, UIntLiteralExpr_BasicUsage) {
+TEST_P(CompilerImplTests, UIntLiteralExpr_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -3734,7 +3824,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -3770,7 +3860,7 @@ fn f() {
 
 // illegal if UInt literal overflows
 
-TEST_F(CompilerTests, UIntLiteralExpr_Fail_IfNumericOverflow) {
+TEST_P(CompilerImplTests, UIntLiteralExpr_Fail_IfNumericOverflow) {
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3782,14 +3872,14 @@ fn f() -> Int {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_overflow), 1);
 }
 
 // UInt literal is non-assignable
 
-TEST_F(CompilerTests, UIntLiteralExpr_NonAssignable) {
+TEST_P(CompilerImplTests, UIntLiteralExpr_NonAssignable) {
     std::string txt = R"(
 
 fn f() {
@@ -3801,7 +3891,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3817,7 +3907,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, FloatLiteralExpr_BasicUsage) {
+TEST_P(CompilerImplTests, FloatLiteralExpr_BasicUsage) {
     std::string txt = R"(
 
 fn f0() -> Float { return 0.0; }
@@ -3833,7 +3923,7 @@ fn f6() -> Float { return nan; }
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -3916,7 +4006,7 @@ fn f6() -> Float { return nan; }
 
 // inf if overflows
 
-TEST_F(CompilerTests, FloatLiteralExpr_InfIfOverflows) {
+TEST_P(CompilerImplTests, FloatLiteralExpr_InfIfOverflows) {
     std::string txt = R"(
 
 fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
@@ -3926,7 +4016,7 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3955,7 +4045,7 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 
 // -inf if underflows
 
-TEST_F(CompilerTests, FloatLiteralExpr_NegativeInfIfUnderflows) {
+TEST_P(CompilerImplTests, FloatLiteralExpr_NegativeInfIfUnderflows) {
     std::string txt = R"(
 
 fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
@@ -3965,7 +4055,7 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -3994,7 +4084,7 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 
 // Float literal is non-assignable
 
-TEST_F(CompilerTests, FloatLiteralExpr_NonAssignable) {
+TEST_P(CompilerImplTests, FloatLiteralExpr_NonAssignable) {
     std::string txt = R"(
 
 fn f() {
@@ -4006,7 +4096,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4020,7 +4110,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, BoolLiteralExpr_BasicUsage) {
+TEST_P(CompilerImplTests, BoolLiteralExpr_BasicUsage) {
     std::string txt = R"(
 
 fn f() {
@@ -4033,7 +4123,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -4059,7 +4149,7 @@ fn f() {
 
 // Bool literal is non-assignable
 
-TEST_F(CompilerTests, BoolLiteralExpr_NonAssignable) {
+TEST_P(CompilerImplTests, BoolLiteralExpr_NonAssignable) {
     std::string txt = R"(
 
 fn f() {
@@ -4071,7 +4161,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4085,7 +4175,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, CharLiteralExpr_BasicUsage) {
+TEST_P(CompilerImplTests, CharLiteralExpr_BasicUsage) {
     // IMPORTANT: for Unicode input to work, we gotta use a UTF-8 string literal
     std::u8string txt = u8R"(
 
@@ -4130,7 +4220,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(taul::utf8_s(txt)));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     //std::cerr << std::format("{}\n", result->back());
@@ -4185,7 +4275,7 @@ fn f() {
 
 // illegal Unicode, UTF-16 surrogate
 
-TEST_F(CompilerTests, CharLiteralExpr_Fail_IllegalUnicode_UTF16Surrogate) {
+TEST_P(CompilerImplTests, CharLiteralExpr_Fail_IllegalUnicode_UTF16Surrogate) {
     std::string txt = R"(
 
 fn f() {
@@ -4197,14 +4287,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_illegal_unicode), 1);
 }
 
 // illegal Unicode, out-of-bounds
 
-TEST_F(CompilerTests, CharLiteralExpr_Fail_IllegalUnicode_OutOfBounds) {
+TEST_P(CompilerImplTests, CharLiteralExpr_Fail_IllegalUnicode_OutOfBounds) {
     std::string txt = R"(
 
 fn f() {
@@ -4216,14 +4306,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_illegal_unicode), 1);
 }
 
 // Char literal is non-assignable
 
-TEST_F(CompilerTests, CharLiteralExpr_NonAssignable) {
+TEST_P(CompilerImplTests, CharLiteralExpr_NonAssignable) {
     std::string txt = R"(
 
 fn f() {
@@ -4235,7 +4325,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4260,7 +4350,7 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilerTests, CallExpr_BasicUsage) {
+TEST_P(CompilerImplTests, CallExpr_BasicUsage) {
     std::string txt = R"(
 
 fn choose(which: Bool, a, b: Int) -> Int {
@@ -4282,7 +4372,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -4312,7 +4402,7 @@ fn f() {
 
 // callobj/params evaluation order
 
-TEST_F(CompilerTests, CallExpr_EvalOrder) {
+TEST_P(CompilerImplTests, CallExpr_EvalOrder) {
     std::string txt = R"(
 
 fn get_callobj() -> g { observeChar('c'); return g; }
@@ -4332,7 +4422,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -4382,7 +4472,7 @@ fn f() {
 
 // call expr nesting
 
-TEST_F(CompilerTests, CallExpr_Nesting) {
+TEST_P(CompilerImplTests, CallExpr_Nesting) {
     std::string txt = R"(
 
 fn foo(x: Int) -> foo { observeInt(x); return foo; }
@@ -4396,7 +4486,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    const auto result = comp->compile(src);
+    const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
     ASSERT_TRUE(dm->upload(*result));
@@ -4430,7 +4520,7 @@ fn f() {
 
 // illegal call due to call object is non-callable type
 
-TEST_F(CompilerTests, CallExpr_Fail_CallObjIsNonCallableType) {
+TEST_P(CompilerImplTests, CallExpr_Fail_CallObjIsNonCallableType) {
     std::string txt = R"(
 
 fn f() {
@@ -4442,14 +4532,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // illegal call due to too many args
 
-TEST_F(CompilerTests, CallExpr_Fail_Args_TooMany) {
+TEST_P(CompilerImplTests, CallExpr_Fail_Args_TooMany) {
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4463,14 +4553,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 
 // illegal call due to too few args
 
-TEST_F(CompilerTests, CallExpr_Fail_Args_TooFew) {
+TEST_P(CompilerImplTests, CallExpr_Fail_Args_TooFew) {
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4484,14 +4574,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 
 // illegal call due to incorrect arg type(s) (ie. type mismatch)
 
-TEST_F(CompilerTests, CallExpr_Fail_Args_TypeMismatch) {
+TEST_P(CompilerImplTests, CallExpr_Fail_Args_TypeMismatch) {
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4505,14 +4595,14 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
 
 // call expr is non-assignable
 
-TEST_F(CompilerTests, CallExpr_NonAssignable) {
+TEST_P(CompilerImplTests, CallExpr_NonAssignable) {
     std::string txt = R"(
 
 fn g(a, b: Int) -> Int { return 0; }
@@ -4526,7 +4616,7 @@ fn f() {
     taul::source_code src{};
     src.add_str("src"_str, yama::str(txt));
 
-    EXPECT_FALSE(comp->compile(src));
+    EXPECT_FALSE(comp->compile(yama::res(dm), src));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }

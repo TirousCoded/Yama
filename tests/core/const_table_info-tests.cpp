@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <yama/debug-impls/stderr_debug.h>
+#include <yama/core/debug.h>
 #include <yama/core/const_table_info.h>
 
 

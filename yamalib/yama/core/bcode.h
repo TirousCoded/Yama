@@ -232,7 +232,7 @@ namespace yama::bc {
         //
         //       so, in the future, we may want to either replace static verification
         //       altogether, or revise it to be more powerful
-        //
+        // 
         //       to do the ladder, we could introduce the notion of registers being
         //       able to be in *indeterminate* states (ie. the verifier does not care
         //       what the register's type is) and letting instrs be able to optionally
@@ -468,6 +468,13 @@ namespace yama::bc {
         code_writer& operator=(code_writer&&) noexcept = default;
 
 
+        // TODO: count has not been unit tested
+
+        // count returns instruction count
+
+        size_t count() const noexcept;
+
+
         static_assert(opcodes == 11);
 
         code_writer& add_noop();
@@ -577,6 +584,10 @@ namespace yama::bc {
         // symbols are being used w/, as that association is a convention
 
         syms& add(size_t index, str origin, size_t ch, size_t ln);
+
+        // TODO: this overload has not been unit tested
+
+        syms& add(sym x);
 
 
     private:

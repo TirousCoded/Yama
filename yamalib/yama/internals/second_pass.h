@@ -187,6 +187,25 @@ namespace yama::internal {
         bc::code_writer cw;
 
 
+        // this is the bcode symbols we're outputting
+
+        bc::syms syms;
+
+        // _add_sym expects to be called AFTER the cw.add_# method call
+
+        void _add_sym(taul::source_pos pos);
+
+
+        // TODO: _args_node_to_expr_node_map is super rough, and there's probably a
+        //       more *elegant* way of doing what it exists to do
+
+        // this maps Args AST node IDs to the Expr AST node which corresponds to them,
+        // w/ this info being used for _add_sym, and deciding the src pos for
+        // compile errors
+
+        std::unordered_map<ast_id_t, const ast_Expr*> _args_node_to_expr_node_map;
+
+
         // as the AST is traversed, an oprand stack-like 'register stack' is used to
         // perform type checking, and register allocation
 
@@ -278,12 +297,12 @@ namespace yama::internal {
         // take note that the absolute register index below may refer to out-of-bounds
         // indices in order to sanitize registers which were popped (which is useful)
 
-        void _sanitize_regs(size_t index, size_t n = 1);
+        void _sanitize_regs(taul::source_pos pos, size_t index, size_t n = 1);
 
         // this is used to manually perform the sanitizing work that would normally only
         // be done at the end of the scope, then dumping _scope_regs_to_sanitize.back()
 
-        void _sanitize_here();
+        void _sanitize_here(taul::source_pos pos);
 
 
         // this set is used to record the body blocks of fn decls
@@ -336,6 +355,7 @@ namespace yama::internal {
 
         struct _loop_stmt_t final {
             label_id_t break_label, continue_label;
+            size_t first_reg; // the index where the first reg in the loop body's scope will be located on the stack
         };
 
         std::vector<_loop_stmt_t> _loop_stmts;
@@ -355,7 +375,7 @@ namespace yama::internal {
         Args&&... args) {
         YAMA_RAISE(_dbg, dsig);
         YAMA_LOG(
-            _dbg, compile_c,
+            _dbg, compile_error_c,
             "error: {} {}",
             _get_src().location_at(where.low_pos()),
             std::format(fmt, std::forward<Args&&>(args)...));

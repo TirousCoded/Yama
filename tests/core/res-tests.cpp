@@ -59,11 +59,6 @@ TEST(ResTests, MoveCtor) {
     EXPECT_EQ(r2.base(), ptr);
 }
 
-TEST(ResTests, NullptrCtorThrowsResErrorIfArgIsNullptr) {
-    // remember, this test is for init via std::nullptr_t, and NOT a std::shared_ptr value!
-    EXPECT_THROW(yama::res<B>(nullptr), yama::res_error);
-}
-
 TEST(ResTests, CopyAssign) {
     auto assigner_ptr = std::make_shared<B>();
     auto assignee_ptr = std::make_shared<B>();

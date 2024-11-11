@@ -82,11 +82,7 @@ namespace yama {
         template<typename U>
         inline explicit res(std::shared_ptr<U> other);
 
-        // ctor for illegal init w/ std::nullptr_t
-
-        // throws yama::res_error
-
-        inline res(std::nullptr_t);
+        res(std::nullptr_t) = delete; // delete to avoid confusing runtime errors due to implicit casts
 
         ~res() noexcept = default;
 
@@ -193,11 +189,6 @@ namespace yama {
     inline res<T>::res(std::shared_ptr<U> other)
         : _base(std::static_pointer_cast<T>(other)) {
         if (!other) _throw();
-    }
-
-    template<typename T>
-    inline res<T>::res(std::nullptr_t) {
-        _throw();
     }
 
     template<typename T>

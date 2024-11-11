@@ -1,17 +1,16 @@
 
 
-#include <gtest/gtest.h>
+#include "domain-impl-loading-tests.h"
 
 #include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
-#include <yama/dm/res_db.h>
-#include <yama/dm/type_instantiator.h>
-#include <yama/debug-impls/stderr_debug.h>
-#include <yama/debug-impls/dsignal_debug.h>
 
 
 using namespace yama::string_literals;
+
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplLoadingTests);
 
 
 // IMPORTANT:
@@ -25,31 +24,14 @@ using namespace yama::string_literals;
 //      one error may correspond to multiple dsignal raises
 
 
-class TypeInstantiatorTests : public testing::Test {
-public:
-
-    std::shared_ptr<yama::dsignal_debug> dbg;
-    yama::dm::res_db<yama::res<yama::type_info>> type_info_db;
-    yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_db;
-    yama::dm::res_db<yama::res<yama::dm::type_instance<std::allocator<void>>>> type_batch_db;
-
-    std::unique_ptr<yama::dm::type_instantiator<std::allocator<void>>> instant;
-
-
-protected:
-
-    void SetUp() override final {
-        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
-        instant = std::make_unique<yama::dm::type_instantiator<std::allocator<void>>>(
-            type_info_db, type_db, type_batch_db, 
-            std::allocator<void>{},
-            dbg);
-    }
-
-    void TearDown() override final {
-        //
-    }
-};
+// NOTE: in Yama, 'instantiation' refers to the part of loading where a type_info
+//       is used to create a new type, ready for use (w/ one load being able to
+//       instantiate multiple types)
+//
+//       the term 'loading' is largely a synonym for 'instantiate'
+//
+//       this test suite's terminology comes from an older test suite this one
+//       replaced for a (now internal) 'instantiator'
 
 
 // IMPORTANT:
@@ -58,7 +40,9 @@ protected:
 //      is nevertheless indirectly a part of its dep graph
 
 
-TEST_F(TypeInstantiatorTests, Instantiate_EnsureWorksWithAllConstTypes) {
+TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
+    const auto dm = GetParam().factory(dbg);
+
     static_assert(yama::const_types == 7);
     // dep graph:
     //      a <- Int -4         (not a dep)
@@ -114,35 +98,26 @@ TEST_F(TypeInstantiatorTests, Instantiate_EnsureWorksWithAllConstTypes) {
             .locals = 10,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b0_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b1_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b0_info,
+        b1_info,
+        }));
 
-    EXPECT_EQ(result, 3);
-
-    EXPECT_EQ(type_db.size(), 3);
-
-    const auto a = type_db.pull("a"_str);
-    const auto b0 = type_db.pull("b0"_str);
-    const auto b1 = type_db.pull("b1"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
+    const auto b0 = dm->load("b0"_str);
+    const auto b1 = dm->load("b1"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b0);
     ASSERT_TRUE(b1);
 
-    // for this test we only really care that type 'a' instantiated correctly
+    const yama::type aa = a.value();
+    const yama::type bb0 = b0.value();
+    const yama::type bb1 = b1.value();
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
-    const yama::type bb0(**b0);
-    const yama::type bb1(**b1);
+    // for this test we only really care that type 'a' instantiates correctly
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -159,7 +134,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_EnsureWorksWithAllConstTypes) {
     EXPECT_EQ(aa.consts().get<yama::function_type_const>(6), std::make_optional(bb1));
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_WithNoDeps) {
+TEST_P(DomainImplLoadingTests, Instantiate_WithNoDeps) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a
 
@@ -170,25 +147,16 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithNoDeps) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        }));
 
-    EXPECT_EQ(result, 1);
-
-    EXPECT_EQ(type_db.size(), 1);
-
-    const auto a = type_db.pull("a"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
 
     ASSERT_TRUE(a);
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
+    const yama::type aa = a.value();
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -196,7 +164,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithNoDeps) {
     EXPECT_EQ(aa.consts().size(), 0);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_WithDeps) {
+TEST_P(DomainImplLoadingTests, Instantiate_WithDeps) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b
     //        -> c
@@ -226,35 +196,24 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        }));
 
-    EXPECT_EQ(result, 3);
-
-    EXPECT_EQ(type_db.size(), 3);
-
-    const auto a = type_db.pull("a"_str);
-    const auto b = type_db.pull("b"_str);
-    const auto c = type_db.pull("c"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
+    const auto b = dm->load("b"_str);
+    const auto c = dm->load("c"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
     ASSERT_TRUE(c);
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-    EXPECT_EQ(b->get()->fullname(), "b"_str);
-    EXPECT_EQ(c->get()->fullname(), "c"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
-    const yama::type bb(**b);
-    const yama::type cc(**c);
+    const yama::type aa = a.value();
+    const yama::type bb = b.value();
+    const yama::type cc = c.value();
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -274,7 +233,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps) {
     EXPECT_EQ(cc.consts().size(), 0);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes) {
+TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b -> d
     //             -> e
@@ -333,25 +294,22 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
-    type_info_db.push(yama::make_res<yama::type_info>(d_info));
-    type_info_db.push(yama::make_res<yama::type_info>(e_info));
-    type_info_db.push(yama::make_res<yama::type_info>(f_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        d_info,
+        e_info,
+        f_info,
+        }));
 
-    EXPECT_EQ(result, 6);
-
-    EXPECT_EQ(type_db.size(), 6);
-
-    const auto a = type_db.pull("a"_str);
-    const auto b = type_db.pull("b"_str);
-    const auto c = type_db.pull("c"_str);
-    const auto d = type_db.pull("d"_str);
-    const auto e = type_db.pull("e"_str);
-    const auto f = type_db.pull("f"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
+    const auto b = dm->load("b"_str);
+    const auto c = dm->load("c"_str);
+    const auto d = dm->load("d"_str);
+    const auto e = dm->load("e"_str);
+    const auto f = dm->load("f"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
@@ -360,23 +318,12 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes
     ASSERT_TRUE(e);
     ASSERT_TRUE(f);
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-    EXPECT_EQ(b->get()->fullname(), "b"_str);
-    EXPECT_EQ(c->get()->fullname(), "c"_str);
-    EXPECT_EQ(d->get()->fullname(), "d"_str);
-    EXPECT_EQ(e->get()->fullname(), "e"_str);
-    EXPECT_EQ(f->get()->fullname(), "f"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
-    const yama::type bb(**b);
-    const yama::type cc(**c);
-    const yama::type dd(**d);
-    const yama::type ee(**e);
-    const yama::type ff(**f);
+    const yama::type aa = a.value();
+    const yama::type bb = b.value();
+    const yama::type cc = c.value();
+    const yama::type dd = d.value();
+    const yama::type ee = e.value();
+    const yama::type ff = f.value();
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -414,7 +361,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes
     EXPECT_EQ(ff.consts().size(), 0);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
+TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b -> d
     //        -> c -> d
@@ -461,40 +410,28 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_TypeReferencedMultipleTimesIn
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
-    type_info_db.push(yama::make_res<yama::type_info>(d_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        d_info,
+        }));
 
-    EXPECT_EQ(result, 4);
-
-    EXPECT_EQ(type_db.size(), 4);
-
-    const auto a = type_db.pull("a"_str);
-    const auto b = type_db.pull("b"_str);
-    const auto c = type_db.pull("c"_str);
-    const auto d = type_db.pull("d"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
+    const auto b = dm->load("b"_str);
+    const auto c = dm->load("c"_str);
+    const auto d = dm->load("d"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
     ASSERT_TRUE(c);
     ASSERT_TRUE(d);
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-    EXPECT_EQ(b->get()->fullname(), "b"_str);
-    EXPECT_EQ(c->get()->fullname(), "c"_str);
-    EXPECT_EQ(d->get()->fullname(), "d"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
-    const yama::type bb(**b);
-    const yama::type cc(**c);
-    const yama::type dd(**d);
+    const yama::type aa = a.value();
+    const yama::type bb = b.value();
+    const yama::type cc = c.value();
+    const yama::type dd = d.value();
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -523,7 +460,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_TypeReferencedMultipleTimesIn
     EXPECT_EQ(dd.consts().size(), 0);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_DepGraphCycle) {
+TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_DepGraphCycle) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b -> a     (back ref)
     //        -> a          (back ref)
@@ -549,30 +488,20 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_DepGraphCycle) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
 
-    const size_t result = instant->instantiate("a"_str);
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        }));
 
-    EXPECT_EQ(result, 2);
-
-    EXPECT_EQ(type_db.size(), 2);
-
-    const auto a = type_db.pull("a"_str);
-    const auto b = type_db.pull("b"_str);
+    const auto a = dm->load("a"_str); // <- main one under test
+    const auto b = dm->load("b"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
 
-    // assert expected type_instance fullnames
-
-    EXPECT_EQ(a->get()->fullname(), "a"_str);
-    EXPECT_EQ(b->get()->fullname(), "b"_str);
-
-    // assert expected types
-
-    const yama::type aa(**a);
-    const yama::type bb(**b);
+    const yama::type aa = a.value();
+    const yama::type bb = b.value();
 
     EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "a"_str);
@@ -588,55 +517,22 @@ TEST_F(TypeInstantiatorTests, Instantiate_WithDeps_DepGraphCycle) {
     EXPECT_EQ(bb.consts().type(0), std::make_optional(aa));
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeAlreadyInstantiated) {
+TEST_P(DomainImplLoadingTests, Instantiate_Fail_OriginalTypeNotFound) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
-    //      a
+    //      a           <- error is that no type_info 'a' provided
 
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
+    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
 
-    // instantiate 'a' up-front, then ensure instantiating 'a' again fails
-    // as it's already been instantiated
-
-    ASSERT_TRUE(instant->instantiate("a"_str));
-
-    EXPECT_EQ(type_db.size(), 1);
-    ASSERT_TRUE(type_db.exists("a"_str));
-
-    const auto result = instant->instantiate("a"_str);
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 1);
-    EXPECT_TRUE(type_db.exists("a"_str));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_already_instantiated), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_OriginalTypeNotFound) {
+TEST_P(DomainImplLoadingTests, Instantiate_Fail_ReferencedTypeNotFound) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
-    //      a           <- error is that no type_data 'a' provided
-
-    //type_data_db.push(yama::type_data(yama::primitive_info{ "a"_str }));
-    
-    const auto result = instant->instantiate("a"_str); // <- will fail due to no 'a'
-
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
-}
-
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_ReferencedTypeNotFound) {
-    // dep graph:
-    //      a -> b      <- error is that no type_data 'b' provided
+    //      a -> b      <- error is that no type_info 'b' provided
     //        -> c
 
     const auto a_consts =
@@ -664,22 +560,23 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_ReferencedTypeNotFound) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    //type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
-    const auto result = instant->instantiate("a"_str); // <- will fail due to no 'b'
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        //b_info,
+        c_info,
+        }));
 
-    EXPECT_EQ(result, 0);
+    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
 
-    EXPECT_EQ(type_db.size(), 0);
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound) {
+TEST_P(DomainImplLoadingTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
-    //      a -> b -> d     <- error is that no type_data 'd' provided
+    //      a -> b -> d     <- error is that no type_info 'd' provided
     //             -> e
     //        -> c -> f
 
@@ -736,23 +633,24 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound)
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
-    //type_info_db.push(yama::make_res<yama::type_info>(d_info));
-    type_info_db.push(yama::make_res<yama::type_info>(e_info));
-    type_info_db.push(yama::make_res<yama::type_info>(f_info));
 
-    const auto result = instant->instantiate("a"_str); // <- will fail due to no 'd'
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        //d_info,
+        e_info,
+        f_info,
+        }));
 
-    EXPECT_EQ(result, 0);
-
-    EXPECT_EQ(type_db.size(), 0);
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_type_not_found), 1);
+    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
+    
+    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
 }
 
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
+TEST_P(DomainImplLoadingTests, Instantiate_Fail_KindMismatch) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b -> c
 
@@ -789,17 +687,16 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
-    const auto result = instant->instantiate("a"_str); // <- will fail due to kind mismatch between 'a' and 'b'
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        }));
 
-    EXPECT_EQ(result, 0);
+    EXPECT_FALSE(dm->load("a"_str)); // <- should fail (due to kind mismatch between 'a' and 'b')
 
-    EXPECT_EQ(type_db.size(), 0);
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_kind_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instant_kind_mismatch), 1);
 }
 
 // TODO: maybe decompose below test into a few tests for each of the following cases:
@@ -808,7 +705,9 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_KindMismatch) {
 //          2) differ by return type indices (same const table)
 //          3) differ by const table (but have otherwise identical callsigs)
 
-TEST_F(TypeInstantiatorTests, Instantiate_Fail_CallSigMismatch) {
+TEST_P(DomainImplLoadingTests, Instantiate_Fail_CallSigMismatch) {
+    const auto dm = GetParam().factory(dbg);
+
     // dep graph:
     //      a -> b -> c
 
@@ -869,16 +768,15 @@ TEST_F(TypeInstantiatorTests, Instantiate_Fail_CallSigMismatch) {
             .ptype = yama::ptype::bool0,
         },
     };
-    type_info_db.push(yama::make_res<yama::type_info>(a_info));
-    type_info_db.push(yama::make_res<yama::type_info>(b_info));
-    type_info_db.push(yama::make_res<yama::type_info>(c_info));
 
-    const auto result = instant->instantiate("a"_str); // <- will fail due to callsig mismatch between 'a' and 'b'
+    ASSERT_TRUE(dm->upload({
+        a_info,
+        b_info,
+        c_info,
+        }));
 
-    EXPECT_EQ(result, 0);
+    EXPECT_FALSE(dm->load("a"_str)); // <- should fail (due to callsig mismatch between 'a' and 'b')
 
-    EXPECT_EQ(type_db.size(), 0);
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instantiate_callsig_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::instant_callsig_mismatch), 1);
 }
 

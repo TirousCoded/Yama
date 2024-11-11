@@ -3,10 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/general.h>
+#include <yama/core/domain.h>
 #include <yama/core/context.h>
-#include <yama/debug-impls/stderr_debug.h>
-#include <yama/mas-impls/heap_mas.h>
-#include <yama/domain-impls/domain_st.h>
 
 
 using namespace yama::string_literals;
@@ -101,7 +99,6 @@ public:
     
     yama::ctx_config config;
     std::shared_ptr<yama::debug> dbg;
-    std::shared_ptr<yama::mas> mas;
     std::shared_ptr<yama::domain> dm;
     std::shared_ptr<yama::context> ctx;
 
@@ -121,8 +118,7 @@ protected:
             .user_locals = 13,
         };
         dbg = std::make_shared<yama::stderr_debug>();
-        mas = std::make_shared<yama::heap_mas>(dbg);
-        dm = std::make_shared<yama::domain_st>(yama::res(mas), dbg);
+        dm = std::make_shared<yama::default_domain>(dbg);
         ctx = std::make_shared<yama::context>(yama::res(dm), config, dbg);
     }
 
@@ -142,10 +138,6 @@ TEST_F(ContextTests, DM) {
 
 TEST_F(ContextTests, GetConfig) {
     EXPECT_EQ(ctx->get_config(), config);
-}
-
-TEST_F(ContextTests, GetMAS) {
-    EXPECT_EQ(ctx->get_mas(), mas);
 }
 
 TEST_F(ContextTests, Load) {

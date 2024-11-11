@@ -5,26 +5,38 @@
 
 #include <set>
 
-#include "../core/api_component.h"
-#include "../core/type_info.h"
+#include "api_component.h"
+#include "type_info.h"
 
 
-namespace yama::dm {
+namespace yama {
 
 
-    // static_verifier performs static verification of type_data
+    // verifier performs static verification of type_data
 
-    // static verification is performed upon the pushing of type_data,
+    // static verification is performed upon the upload of type_data,
     // to determine if it's valid for use
 
     // static verification occurs in the absence of linkage info, which
     // is established later during instantiation
 
 
-    class static_verifier final : public api_component {
+    class verifier : public api_component {
     public:
 
-        static_verifier(std::shared_ptr<debug> dbg = nullptr);
+        verifier(std::shared_ptr<debug> dbg = nullptr);
+
+
+        // verify returns if subject passes static verification
+
+        virtual bool verify(const type_info& subject) = 0;
+    };
+
+
+    class default_verifier final : public verifier {
+    public:
+
+        default_verifier(std::shared_ptr<debug> dbg = nullptr);
 
 
         // verify returns if subject passes static verification
@@ -75,7 +87,7 @@ namespace yama::dm {
 
         std::string _fmt_branch(size_t from, size_t to);
 
-        void _dump_cfg(const bc::code& bcode);
+        void _dump_cfg(const type_info& subject, const bc::code& bcode);
 
 
         bool _verify(const type_info& subject);

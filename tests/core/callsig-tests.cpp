@@ -8,13 +8,20 @@
 #include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type.h>
-#include <yama/dm/type_instance.h>
+
+// TODO: type_instance used to be in frontend, but now it isn't,
+//       meaning our unit tests have backend code dependence,
+//       which is undesirable
+//
+//       I'm thinking maybe pull type_instance back to the frontend
+//       at some point
+#include <yama/internals/type_instance.h>
 
 
 using namespace yama::string_literals;
 
 
-yama::dm::type_instance<std::allocator<void>> make_type_inst_1(
+yama::internal::type_instance<std::allocator<void>> make_type_inst_1(
     yama::str fullname,
     yama::const_table_info consts) {
     yama::type_info info{
@@ -25,11 +32,11 @@ yama::dm::type_instance<std::allocator<void>> make_type_inst_1(
         },
     };
     return
-        yama::dm::type_instance<std::allocator<void>>(
+        yama::internal::type_instance<std::allocator<void>>(
             std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
 }
 
-yama::dm::type_instance<std::allocator<void>> make_type_inst_2(
+yama::internal::type_instance<std::allocator<void>> make_type_inst_2(
     yama::str fullname,
     yama::callsig_info callsig,
     yama::const_table_info consts) {
@@ -43,7 +50,7 @@ yama::dm::type_instance<std::allocator<void>> make_type_inst_2(
         },
     };
     return
-        yama::dm::type_instance<std::allocator<void>>(
+        yama::internal::type_instance<std::allocator<void>>(
             std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
 }
 

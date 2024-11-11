@@ -4,8 +4,14 @@
 
 #include <yama/core/const_table.h>
 #include <yama/core/type.h>
-#include <yama/dm/type_instance.h>
-#include <yama/debug-impls/stderr_debug.h>
+
+// TODO: type_instance used to be in frontend, but now it isn't,
+//       meaning our unit tests have backend code dependence,
+//       which is undesirable
+//
+//       I'm thinking maybe pull type_instance back to the frontend
+//       at some point
+#include <yama/internals/type_instance.h>
 
 
 using namespace yama::string_literals;
@@ -13,7 +19,7 @@ using namespace yama::string_literals;
 
 using alloc_t = std::allocator<void>;
 
-static yama::dm::type_instance<alloc_t> make_type_inst() {
+static yama::internal::type_instance<alloc_t> make_type_inst() {
     yama::type_info info{
         .fullname = "A"_str,
         .consts = {},
@@ -21,7 +27,7 @@ static yama::dm::type_instance<alloc_t> make_type_inst() {
             .ptype = yama::ptype::int0,
         },
     };
-    return yama::dm::type_instance<alloc_t>(alloc_t{}, "A"_str, yama::make_res<yama::type_info>(info));
+    return yama::internal::type_instance<alloc_t>(alloc_t{}, "A"_str, yama::make_res<yama::type_info>(info));
 }
 
 static yama::res<yama::type_info> make_info_1() {
@@ -68,7 +74,7 @@ static yama::res<yama::type_info> make_info_2() {
 TEST(ConstTableTests, InstanceCtor) {
     // this tests init of const_table via the const_table_instance ctor
     const auto a_info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_FALSE(a.complete());
@@ -95,7 +101,7 @@ TEST(ConstTableTests, InstanceCtor) {
 
 TEST(ConstTableTests, CopyCtor) {
     const auto info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
 
     yama::const_table a(a_inst);
     yama::const_table b(a); // copy a
@@ -105,7 +111,7 @@ TEST(ConstTableTests, CopyCtor) {
 
 TEST(ConstTableTests, MoveCtor) {
     const auto info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
 
     yama::const_table a(a_inst);
     yama::const_table b(std::move(a)); // move a
@@ -115,8 +121,8 @@ TEST(ConstTableTests, MoveCtor) {
 
 TEST(ConstTableTests, CopyAssign) {
     const auto info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
-    yama::dm::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
 
     yama::const_table a(a_inst);
     yama::const_table b(b_inst);
@@ -130,8 +136,8 @@ TEST(ConstTableTests, CopyAssign) {
 
 TEST(ConstTableTests, MoveAssign) {
     const auto info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
-    yama::dm::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
 
     yama::const_table a(a_inst);
     yama::const_table b(b_inst);
@@ -148,7 +154,7 @@ TEST(ConstTableTests, Complete) {
     yama::type t(ti);
 
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     ASSERT_FALSE(a.complete());
@@ -172,7 +178,7 @@ TEST(ConstTableTests, Complete) {
 
 TEST(ConstTableTests, Size) {
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_EQ(a.size(), 4);
@@ -183,7 +189,7 @@ TEST(ConstTableTests, IsStub) {
     yama::type t(ti);
 
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_TRUE(a.is_stub(0));
@@ -204,7 +210,7 @@ TEST(ConstTableTests, IsStub) {
 
 TEST(ConstTableTests, IsStub_OutOfBounds) {
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_TRUE(a.is_stub(4)); // out-of-bounds == (pseudo-)stub
@@ -215,7 +221,7 @@ TEST(ConstTableTests, Get) {
     yama::type t(ti);
 
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     a_inst.put<yama::float_const>(0, 3.21);
     a_inst.put<yama::int_const>(1, -3);
     a_inst.put<yama::primitive_type_const>(2, t);
@@ -233,7 +239,7 @@ TEST(ConstTableTests, Get_OutOfBounds) {
     yama::type t(ti);
 
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     a_inst.put<yama::float_const>(0, 3.21);
     a_inst.put<yama::int_const>(1, -3);
     a_inst.put<yama::primitive_type_const>(2, t);
@@ -248,7 +254,7 @@ TEST(ConstTableTests, Get_WrongConstType) {
     yama::type t(ti);
 
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     a_inst.put<yama::float_const>(0, 3.21);
     a_inst.put<yama::int_const>(1, -3);
     a_inst.put<yama::primitive_type_const>(2, t);
@@ -260,7 +266,7 @@ TEST(ConstTableTests, Get_WrongConstType) {
 
 TEST(ConstTableTests, Get_Stub) {
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_EQ(a.get<yama::float_const>(0), std::nullopt); // stub
@@ -272,7 +278,7 @@ TEST(ConstTableTests, Get_Stub) {
 TEST(ConstTableTests, ConstType) {
     // note that we're testing this w/ only stubs, as it should still work
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_EQ(a.const_type(0), std::make_optional(yama::float_const));
@@ -284,7 +290,7 @@ TEST(ConstTableTests, ConstType) {
 TEST(ConstTableTests, ConstType_OutOfBounds) {
     // note that we're testing this w/ only stubs, as it should still work
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_EQ(a.const_type(4), std::nullopt); // out-of-bounds
@@ -297,7 +303,7 @@ TEST(ConstTableTests, Type) {
     yama::type t2(ti2);
 
     const auto a_info = make_info_1();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
     static_assert(yama::const_types == 7);
     a_inst.put<yama::int_const>(0, -4);
@@ -319,7 +325,7 @@ TEST(ConstTableTests, Type) {
 
 TEST(ConstTableTests, Type_OutOfBounds) {
     const auto a_info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, a_info);
     yama::const_table a(a_inst);
 
     EXPECT_EQ(a.type(4), std::nullopt); // out-of-bounds
@@ -328,9 +334,9 @@ TEST(ConstTableTests, Type_OutOfBounds) {
 TEST(ConstTableTests, Equality) {
     // use same info to ensure instances are structurally identical
     const auto info = make_info_2();
-    yama::dm::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
-    yama::dm::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
-    yama::dm::type_instance<alloc_t> c_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> a_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> b_inst(alloc_t{}, ""_str, info);
+    yama::internal::type_instance<alloc_t> c_inst(alloc_t{}, ""_str, info);
 
     yama::const_table a1(a_inst);
     yama::const_table a2(a_inst);

@@ -3,7 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/general.h>
-#include <yama/dm/res_db.h>
+
+#include <yama/internals/res_db.h>
 
 
 using namespace yama::string_literals;
@@ -13,9 +14,9 @@ struct test_res final {
     yama::str fullname;
 };
 
-static_assert(yama::dm::fullnamed_type<test_res>);
+static_assert(yama::internal::fullnamed_type<test_res>);
 
-using test_res_db = yama::dm::res_db<test_res>;
+using test_res_db = yama::internal::res_db<test_res>;
 
 
 TEST(ResDBTests, Ctor) {
@@ -62,8 +63,8 @@ TEST(ResDBTests, Pull) {
     EXPECT_TRUE(a);
     EXPECT_FALSE(b);
     EXPECT_TRUE(c);
-    if (a) EXPECT_EQ(yama::dm::fullname_of(a), "a"_str);
-    if (c) EXPECT_EQ(yama::dm::fullname_of(c), "c"_str);
+    if (a) EXPECT_EQ(yama::internal::fullname_of(a), "a"_str);
+    if (c) EXPECT_EQ(yama::internal::fullname_of(c), "c"_str);
 }
 
 TEST(ResDBTests, Push) {

@@ -12,22 +12,13 @@
 
 
 namespace yama::internal {
+
+
     template<typename Allocator>
-    inline type_mem get_type_mem(const dm::type_instance<Allocator>& x) noexcept;
-}
-
-namespace yama::dm {
+    inline type_mem get_type_mem(const internal::type_instance<Allocator>& x) noexcept;
 
 
-    // TODO: maybe resolve some of the TODOs below about type_instance not
-    //       being independently unit tested by writing some tests for it
-
-    // IMPORTANT:
-    //      type_instance has not been unit tested on its own, instead being
-    //      unit tested as a component of yama::type, in its unit tests
-
-
-    // yama::dm::type_instance encapsulates the state of an instantiated
+    // yama::internal::type_instance encapsulates the state of an instantiated
     // Yama language type, being responsible for the ownership of it
 
     // type_instance exists for use ONLY in yama::domain impl backends, 
@@ -79,21 +70,15 @@ namespace yama::dm {
         type_instance& operator=(type_instance&&) noexcept = delete;
 
 
-        // TODO: get_allocator hasn't been unit tested
-
         // get_allocator returns the allocator of the type_instance
 
         inline Allocator get_allocator() const noexcept { return _al; }
 
 
-        // TODO: fullname hasn't been unit tested
-
         // fullname returns the fullname of the type of the type_instance
 
         inline const str& fullname() const noexcept;
 
-
-        // TODO: put hasn't been unit tested
 
         // put assigns v to the constant at index x in the constant table
         // of the type_instance, overwriting any existing value
@@ -111,7 +96,7 @@ namespace yama::dm {
 
     private:
 
-        friend yama::internal::type_mem yama::internal::get_type_mem<Allocator>(const dm::type_instance<Allocator>& x) noexcept;
+        friend yama::internal::type_mem yama::internal::get_type_mem<Allocator>(const internal::type_instance<Allocator>& x) noexcept;
 
 
         Allocator           _al;    // the allocator associated w/ the type_instance
@@ -129,24 +114,24 @@ namespace yama::dm {
 
 namespace yama::internal {
     template<typename Allocator>
-    inline type_mem get_type_mem(const dm::type_instance<Allocator>& x) noexcept {
+    inline type_mem get_type_mem(const internal::type_instance<Allocator>& x) noexcept {
         return x._mem;
     }
 }
 
 
 template<typename Allocator>
-yama::dm::type_instance<Allocator>::type_instance(Allocator al, str fullname, res<type_info> info)
+yama::internal::type_instance<Allocator>::type_instance(Allocator al, str fullname, res<type_info> info)
     : _al(al),
     _mem(_create_mem(al, fullname, info)) {}
 
 template<typename Allocator>
-yama::dm::type_instance<Allocator>::type_instance(Allocator al, str new_fullname, const type_instance& other)
+yama::internal::type_instance<Allocator>::type_instance(Allocator al, str new_fullname, const type_instance& other)
     : _al(al),
     _mem(_create_mem(al, new_fullname, other)) {}
 
 template<typename Allocator>
-inline yama::dm::type_instance<Allocator>::~type_instance() noexcept {
+inline yama::internal::type_instance<Allocator>::~type_instance() noexcept {
 #if _DUMP_LOG
     std::cerr << std::format("~type_instance @ {}\n", (void*)this);
 #endif
@@ -154,12 +139,12 @@ inline yama::dm::type_instance<Allocator>::~type_instance() noexcept {
 }
 
 template<typename Allocator>
-inline const yama::str& yama::dm::type_instance<Allocator>::fullname() const noexcept {
+inline const yama::str& yama::internal::type_instance<Allocator>::fullname() const noexcept {
     return _mem->fullname;
 }
 
 template<typename Allocator>
-inline yama::internal::type_mem yama::dm::type_instance<Allocator>::_create_mem(Allocator al, str fullname, res<type_info> info) {
+inline yama::internal::type_mem yama::internal::type_instance<Allocator>::_create_mem(Allocator al, str fullname, res<type_info> info) {
     internal::type_mem_header header{
         .fullname = fullname,
         .len    = info->consts.size(),
@@ -171,20 +156,20 @@ inline yama::internal::type_mem yama::dm::type_instance<Allocator>::_create_mem(
 }
 
 template<typename Allocator>
-inline yama::internal::type_mem yama::dm::type_instance<Allocator>::_create_mem(Allocator al, str new_fullname, const type_instance<Allocator>& other) {
+inline yama::internal::type_mem yama::internal::type_instance<Allocator>::_create_mem(Allocator al, str new_fullname, const type_instance<Allocator>& other) {
     auto result = internal::type_mem::clone(al, other._mem);
     result->fullname = new_fullname;
     return result;
 }
 
 template<typename Allocator>
-inline void yama::dm::type_instance<Allocator>::_destroy_mem(Allocator al, internal::type_mem mem) noexcept {
+inline void yama::internal::type_instance<Allocator>::_destroy_mem(Allocator al, internal::type_mem mem) noexcept {
     internal::type_mem::destroy(al, mem);
 }
 
 template<typename Allocator>
 template<yama::const_type C>
-inline void yama::dm::type_instance<Allocator>::put(const_t x, const const_data_of_t<C>& v) {
+inline void yama::internal::type_instance<Allocator>::put(const_t x, const const_data_of_t<C>& v) {
     YAMA_ASSERT(_mem->info->consts.const_type(x) == C); // out-of-bounds, or wrong C
     // decr stubs if we're assigning to a stub
     if (_mem.elems()[x].holds_stub()) {

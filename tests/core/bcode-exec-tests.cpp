@@ -3,10 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/bcode.h>
+#include <yama/core/domain.h>
 #include <yama/core/context.h>
-#include <yama/debug-impls/stderr_debug.h>
-#include <yama/mas-impls/heap_mas.h>
-#include <yama/domain-impls/domain_st.h>
 
 
 using namespace yama::string_literals;
@@ -21,7 +19,6 @@ class BCodeExecTests : public testing::Test {
 public:
 
     std::shared_ptr<yama::debug> dbg;
-    std::shared_ptr<yama::mas> mas;
     std::shared_ptr<yama::domain> dm;
     std::shared_ptr<yama::context> ctx;
 
@@ -30,8 +27,7 @@ protected:
 
     void SetUp() override final {
         dbg = std::make_shared<yama::stderr_debug>();
-        mas = std::make_shared<yama::heap_mas>(dbg);
-        dm = std::make_shared<yama::domain_st>(yama::res(mas), dbg);
+        dm = std::make_shared<yama::default_domain>(dbg);
         ctx = std::make_shared<yama::context>(yama::res(dm), yama::default_ctx_config, dbg);
 
 #if _DISABLE_LOGGING

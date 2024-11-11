@@ -8,7 +8,7 @@
 #include "../core/general.h"
 
 
-namespace yama::dm {
+namespace yama::internal {
 
 
     // this stuff is used to assist things like res_db in identifying the
@@ -79,7 +79,7 @@ namespace yama::dm {
     concept fullnamed_type =
         requires (const T cv)
     {
-        { yama::dm::fullname_of(cv) } -> std::convertible_to<str>;
+        { yama::internal::fullname_of(cv) } -> std::convertible_to<str>;
     };
 }
 

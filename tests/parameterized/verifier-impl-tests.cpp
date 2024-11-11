@@ -1,12 +1,6 @@
 
 
-#include <gtest/gtest.h>
-
-#include <yama/core/general.h>
-#include <yama/core/type_info.h>
-#include <yama/dm/static_verifier.h>
-#include <yama/debug-impls/stderr_debug.h>
-#include <yama/debug-impls/dsignal_debug.h>
+#include "verifier-impl-tests.h"
 
 
 using namespace yama::string_literals;
@@ -23,27 +17,7 @@ using namespace yama::string_literals;
 //      one error may correspond to multiple dsignal raises
 
 
-class StaticVerifierTests : public testing::Test {
-public:
-
-    std::shared_ptr<yama::dsignal_debug> dbg;
-    std::unique_ptr<yama::dm::static_verifier> verif;
-
-
-protected:
-
-    void SetUp() override final {
-        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
-        verif = std::make_unique<yama::dm::static_verifier>(dbg);
-    }
-
-    void TearDown() override final {
-        //
-    }
-};
-
-
-TEST_F(StaticVerifierTests, Verify) {
+TEST_P(VerifierImplTests, Verify) {
     // this is just a general test of successful usage of static_verifier
 
     const auto a_consts =
@@ -64,7 +38,7 @@ TEST_F(StaticVerifierTests, Verify) {
     EXPECT_TRUE(verif->verify(a));
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_ForTypeItself) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
         .add_primitive_type("b"_str);
@@ -81,11 +55,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_F
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_type_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_param_type_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_ForConstSymbol) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_ForConstSymbol) {
     const auto a_consts =
         yama::const_table_info()
         // illegal out-of-bounds constant index (for param type of b)
@@ -101,11 +75,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_F
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_constsym_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_param_type_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_ForTypeItself) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
         .add_primitive_type("b"_str);
@@ -122,11 +96,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_type_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_return_type_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_ForConstSymbol) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_ForConstSymbol) {
     const auto a_consts =
         yama::const_table_info()
         // illegal out-of-bounds constant index (for return type of b)
@@ -142,11 +116,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_constsym_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_return_type_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForTypeItself) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
         .add_primitive_type("b"_str)
@@ -164,11 +138,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForT
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_type_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_param_type_not_type_const), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_not_type_const), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForConstSymbol) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForConstSymbol) {
     const auto a_consts =
         yama::const_table_info()
         // illegal use of non-type constant index (for param type of b)
@@ -185,11 +159,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForC
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_constsym_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_param_type_not_type_const), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_not_type_const), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_ForTypeItself) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
         .add_primitive_type("b"_str)
@@ -207,11 +181,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_For
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_type_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_return_type_not_type_const), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_not_type_const), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_ForConstSymbol) {
+TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_ForConstSymbol) {
     const auto a_consts =
         yama::const_table_info()
         // illegal use of non-type constant index (for return type of b)
@@ -228,11 +202,11 @@ TEST_F(StaticVerifierTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_For
 
     EXPECT_FALSE(verif->verify(a));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_constsym_callsig_invalid), 1);
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_callsig_return_type_not_type_const), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_not_type_const), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_DisregardBCodeIfCallFnIsNotBCodeCallFn) {
+TEST_P(VerifierImplTests, Verify_BCode_DisregardBCodeIfCallFnIsNotBCodeCallFn) {
     const auto f_bcode =
         yama::bc::code(); // otherwise illegal empty bcode
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -253,7 +227,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_DisregardBCodeIfCallFnIsNotBCodeCallFn)
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_TolerateDeadCode) {
+TEST_P(VerifierImplTests, Verify_BCode_TolerateDeadCode) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -285,7 +259,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_TolerateDeadCode) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_TolerateAllControlPathsBeingCyclicalAndThusNoExitpoints) {
+TEST_P(VerifierImplTests, Verify_BCode_TolerateAllControlPathsBeingCyclicalAndThusNoExitpoints) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -311,7 +285,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_TolerateAllControlPathsBeingCyclicalAnd
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_RegistersAreInitToNoneObjectAtEntrypoint) {
+TEST_P(VerifierImplTests, Verify_BCode_RegistersAreInitToNoneObjectAtEntrypoint) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -340,7 +314,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_RegistersAreInitToNoneObjectAtEntrypoin
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_RegistersReinitsOverwriteOneAnother) {
+TEST_P(VerifierImplTests, Verify_BCode_RegistersReinitsOverwriteOneAnother) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -373,7 +347,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_RegistersReinitsOverwriteOneAnother) {
 //            register coherence allows for the reasonable changing of register types,
 //            and that this extends to merging control paths
 
-TEST_F(StaticVerifierTests, Verify_BCode_NoBranch) {
+TEST_P(VerifierImplTests, Verify_BCode_NoBranch) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -400,7 +374,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_NoBranch) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Branch_MultipleExitpoints) {
+TEST_P(VerifierImplTests, Verify_BCode_Branch_MultipleExitpoints) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -433,7 +407,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_MultipleExitpoints) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Branch_ControlPathsMerge) {
+TEST_P(VerifierImplTests, Verify_BCode_Branch_ControlPathsMerge) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -468,7 +442,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_ControlPathsMerge) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Branch_CyclicalControlPath) {
+TEST_P(VerifierImplTests, Verify_BCode_Branch_CyclicalControlPath) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -508,7 +482,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_CyclicalControlPath) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Branch_FallthroughDueToLastInstrOfBlockNotBeingBranchOrExitpoint) {
+TEST_P(VerifierImplTests, Verify_BCode_Branch_FallthroughDueToLastInstrOfBlockNotBeingBranchOrExitpoint) {
     // due to basic blocks being partitioned at each branch destination, it's possible for a basic block
     // to end w/ an instruction that is not a branch/exitpoint instruction
 
@@ -546,7 +520,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Branch_FallthroughDueToLastInstrOfBlock
     EXPECT_FALSE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Fail_BinaryIsEmpty) {
+TEST_P(VerifierImplTests, Verify_BCode_Fail_BinaryIsEmpty) {
     const auto f_bcode =
         yama::bc::code();
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -566,10 +540,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Fail_BinaryIsEmpty) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_binary_is_empty), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_binary_is_empty), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBoundsInstrs) {
+TEST_P(VerifierImplTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBoundsInstrs) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -597,12 +571,12 @@ TEST_F(StaticVerifierTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBounds
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_fallthrough_puts_PC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_fallthrough_puts_PC_out_of_bounds), 1);
 }
 
 static_assert(yama::bc::opcodes == 11);
 
-TEST_F(StaticVerifierTests, Verify_BCode_Noop) {
+TEST_P(VerifierImplTests, Verify_BCode_Noop) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -628,7 +602,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Noop) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadNone) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadNone) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -652,7 +626,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadNone) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -678,7 +652,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -701,10 +675,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -729,10 +703,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -759,7 +733,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -784,7 +758,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -809,10 +783,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -837,10 +811,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_KoB_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -865,10 +839,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_KoB_not_object_const), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_not_object_const), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -894,10 +868,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) 
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_and_KoB_types_differ), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_KoB_types_differ), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadArg) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadArg) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -930,7 +904,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -963,7 +937,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -989,10 +963,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1018,10 +992,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ArgB_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgB_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
+TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1047,10 +1021,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_and_ArgB_types_differ), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_ArgB_types_differ), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Copy) {
+TEST_P(VerifierImplTests, Verify_BCode_Copy) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1078,7 +1052,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Copy) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Copy_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1106,7 +1080,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Copy_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1133,10 +1107,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1163,10 +1137,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RB_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1193,10 +1167,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_and_RB_types_differ), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_RB_types_differ), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call) {
+TEST_P(VerifierImplTests, Verify_BCode_Call) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1232,7 +1206,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1267,7 +1241,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1299,10 +1273,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ArgRs_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1329,10 +1303,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ArgRs_zero_objects), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1367,10 +1341,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) 
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_illegal_callobj), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_illegal_callobj), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1406,10 +1380,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_number), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1443,10 +1417,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_number), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1481,10 +1455,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes)
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_types), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_types), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1519,10 +1493,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RC_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1557,10 +1531,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Call_Fail_RC_WrongType) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RC_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_wrong_type), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1595,7 +1569,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1627,10 +1601,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ArgRs_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1657,10 +1631,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ArgRs_zero_objects), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1695,10 +1669,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_illegal_callobj), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_illegal_callobj), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1734,10 +1708,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) 
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_number), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1771,10 +1745,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_number), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1809,10 +1783,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongType
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_ParamArgRs_wrong_types), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_types), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Ret) {
+TEST_P(VerifierImplTests, Verify_BCode_Ret) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1837,7 +1811,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Ret) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Ret_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1859,10 +1833,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Ret_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Ret_Fail_RA_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1886,10 +1860,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Ret_Fail_RA_WrongType) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Jump) {
+TEST_P(VerifierImplTests, Verify_BCode_Jump) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1921,7 +1895,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_Jump) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_PutsPCOutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1943,10 +1917,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_PutsPCOutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_puts_PC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
+TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1981,10 +1955,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_violates_register_coherence), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2015,7 +1989,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2047,10 +2021,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2082,10 +2056,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2117,10 +2091,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_puts_PC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2165,10 +2139,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_violates_register_coherence), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2201,7 +2175,7 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2233,10 +2207,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2268,10 +2242,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2303,10 +2277,10 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_puts_PC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
 
-TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherence) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherence) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2351,6 +2325,6 @@ TEST_F(StaticVerifierTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherenc
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verify_violates_register_coherence), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
 

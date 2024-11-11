@@ -7,6 +7,7 @@
 #include <string>
 #include <format>
 #include <memory>
+#include <array>
 
 #include "macros.h"
 #include "asserts.h"
@@ -34,33 +35,48 @@ namespace yama {
     enum class dcat : uint32_t {
         // this enum is intended to define bit flags
 
-        none            = 0,
-        all             = uint32_t(-1),
-        defaults        = all,
+        general             = 1 << 0,           // otherwise uncategorized
+        domain              = 1 << 1,           // domain behaviour trace
+        compile             = 1 << 2,           // compiler behaviour trace
+        compile_error       = 1 << 3,           // compiler error
+        verif               = 1 << 4,           // static verification behaviour trace
+        verif_error         = 1 << 5,           // static verification error
+        verif_warning       = 1 << 6,           // static verification warning
+        instant             = 1 << 7,           // type instantiation behaviour trace
+        instant_error       = 1 << 8,           // type instantiation error
+        ctx_panic           = 1 << 9,           // context panic
+        ctx_llcmd           = 1 << 10,          // low-level command behaviour trace
+        bcode_exec          = 1 << 11,          // bcode execution trace
 
-        general         = 1 << 0,           // general is for all otherwise uncategorized debug logs
-        compile         = 1 << 1,           // compiler debug logs
-        verify          = 1 << 2,           // static verification debug logs
-        instantiate     = 1 << 3,           // type instantiation debug logs
-        ctx_panic       = 1 << 4,           // context panic debug logs
-        ctx_llcmd       = 1 << 5,           // low-level command behaviour debug logs
-        bcode_exec      = 1 << 6,           // bcode execution trace debug logs
+        none                = 0,
+        all                 = uint32_t(-1),
+        defaults            = general
+                            | compile_error
+                            | verif_error
+                            | verif_warning
+                            | instant_error
+                            | ctx_panic,
     };
 
 
     // these are used to summarize usage of yama::dcat
 
-    constexpr auto none_c           = dcat::none;
-    constexpr auto all_c            = dcat::all;
-    constexpr auto defaults_c       = dcat::defaults;
+    constexpr auto general_c            = dcat::general;
+    constexpr auto domain_c             = dcat::domain;
+    constexpr auto compile_c            = dcat::compile;
+    constexpr auto compile_error_c      = dcat::compile_error;
+    constexpr auto verif_c              = dcat::verif;
+    constexpr auto verif_error_c        = dcat::verif_error;
+    constexpr auto verif_warning_c      = dcat::verif_warning;
+    constexpr auto instant_c            = dcat::instant;
+    constexpr auto instant_error_c      = dcat::instant_error;
+    constexpr auto ctx_panic_c          = dcat::ctx_panic;
+    constexpr auto ctx_llcmd_c          = dcat::ctx_llcmd;
+    constexpr auto bcode_exec_c         = dcat::bcode_exec;
 
-    constexpr auto general_c        = dcat::general;
-    constexpr auto compile_c        = dcat::compile;
-    constexpr auto verify_c         = dcat::verify;
-    constexpr auto instantiate_c    = dcat::instantiate;
-    constexpr auto ctx_panic_c      = dcat::ctx_panic;
-    constexpr auto ctx_llcmd_c      = dcat::ctx_llcmd;
-    constexpr auto bcode_exec_c     = dcat::bcode_exec;
+    constexpr auto none_c               = dcat::none;
+    constexpr auto all_c                = dcat::all;
+    constexpr auto defaults_c           = dcat::defaults;
 }
 
 // TODO: the below have not been unit tested
@@ -155,37 +171,36 @@ namespace yama {
         compile_invalid_operation,
         compile_wrong_arg_count,
 
-        verify_type_callsig_invalid,
-        verify_constsym_callsig_invalid,
-        verify_callsig_param_type_out_of_bounds,
-        verify_callsig_return_type_out_of_bounds,
-        verify_callsig_param_type_not_type_const,
-        verify_callsig_return_type_not_type_const,
-        verify_binary_is_empty,
-        verify_RA_out_of_bounds,
-        verify_RA_wrong_type,
-        verify_RA_illegal_callobj,
-        verify_RB_out_of_bounds,
-        verify_RC_out_of_bounds,
-        verify_RC_wrong_type,
-        verify_KoB_out_of_bounds,
-        verify_KoB_not_object_const,
-        verify_ArgB_out_of_bounds,
-        verify_RA_and_RB_types_differ,
-        verify_RA_and_KoB_types_differ,
-        verify_RA_and_ArgB_types_differ,
-        verify_ArgRs_out_of_bounds,
-        verify_ArgRs_zero_objects,
-        verify_ParamArgRs_wrong_number,
-        verify_ParamArgRs_wrong_types,
-        verify_puts_PC_out_of_bounds,
-        verify_fallthrough_puts_PC_out_of_bounds,
-        verify_violates_register_coherence,
+        verif_type_callsig_invalid,
+        verif_constsym_callsig_invalid,
+        verif_callsig_param_type_out_of_bounds,
+        verif_callsig_return_type_out_of_bounds,
+        verif_callsig_param_type_not_type_const,
+        verif_callsig_return_type_not_type_const,
+        verif_binary_is_empty,
+        verif_RA_out_of_bounds,
+        verif_RA_wrong_type,
+        verif_RA_illegal_callobj,
+        verif_RB_out_of_bounds,
+        verif_RC_out_of_bounds,
+        verif_RC_wrong_type,
+        verif_KoB_out_of_bounds,
+        verif_KoB_not_object_const,
+        verif_ArgB_out_of_bounds,
+        verif_RA_and_RB_types_differ,
+        verif_RA_and_KoB_types_differ,
+        verif_RA_and_ArgB_types_differ,
+        verif_ArgRs_out_of_bounds,
+        verif_ArgRs_zero_objects,
+        verif_ParamArgRs_wrong_number,
+        verif_ParamArgRs_wrong_types,
+        verif_puts_PC_out_of_bounds,
+        verif_fallthrough_puts_PC_out_of_bounds,
+        verif_violates_register_coherence,
 
-        instantiate_type_already_instantiated,
-        instantiate_type_not_found,
-        instantiate_kind_mismatch,
-        instantiate_callsig_mismatch,
+        instant_type_not_found,
+        instant_kind_mismatch,
+        instant_callsig_mismatch,
 
         num, // not a valid dsignal
     };
@@ -194,7 +209,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 51);
+        static_assert(dsignals == 50);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -221,37 +236,36 @@ namespace yama {
             _YAMA_ENTRY_(compile_invalid_operation);
             _YAMA_ENTRY_(compile_wrong_arg_count);
 
-            _YAMA_ENTRY_(verify_type_callsig_invalid);
-            _YAMA_ENTRY_(verify_constsym_callsig_invalid);
-            _YAMA_ENTRY_(verify_callsig_param_type_out_of_bounds);
-            _YAMA_ENTRY_(verify_callsig_return_type_out_of_bounds);
-            _YAMA_ENTRY_(verify_callsig_param_type_not_type_const);
-            _YAMA_ENTRY_(verify_callsig_return_type_not_type_const);
-            _YAMA_ENTRY_(verify_binary_is_empty);
-            _YAMA_ENTRY_(verify_RA_out_of_bounds);
-            _YAMA_ENTRY_(verify_RA_wrong_type);
-            _YAMA_ENTRY_(verify_RA_illegal_callobj);
-            _YAMA_ENTRY_(verify_RB_out_of_bounds);
-            _YAMA_ENTRY_(verify_RC_out_of_bounds);
-            _YAMA_ENTRY_(verify_RC_wrong_type);
-            _YAMA_ENTRY_(verify_KoB_out_of_bounds);
-            _YAMA_ENTRY_(verify_KoB_not_object_const);
-            _YAMA_ENTRY_(verify_ArgB_out_of_bounds);
-            _YAMA_ENTRY_(verify_RA_and_RB_types_differ);
-            _YAMA_ENTRY_(verify_RA_and_KoB_types_differ);
-            _YAMA_ENTRY_(verify_RA_and_ArgB_types_differ);
-            _YAMA_ENTRY_(verify_ArgRs_out_of_bounds);
-            _YAMA_ENTRY_(verify_ArgRs_zero_objects);
-            _YAMA_ENTRY_(verify_ParamArgRs_wrong_number);
-            _YAMA_ENTRY_(verify_ParamArgRs_wrong_types);
-            _YAMA_ENTRY_(verify_puts_PC_out_of_bounds);
-            _YAMA_ENTRY_(verify_fallthrough_puts_PC_out_of_bounds);
-            _YAMA_ENTRY_(verify_violates_register_coherence);
+            _YAMA_ENTRY_(verif_type_callsig_invalid);
+            _YAMA_ENTRY_(verif_constsym_callsig_invalid);
+            _YAMA_ENTRY_(verif_callsig_param_type_out_of_bounds);
+            _YAMA_ENTRY_(verif_callsig_return_type_out_of_bounds);
+            _YAMA_ENTRY_(verif_callsig_param_type_not_type_const);
+            _YAMA_ENTRY_(verif_callsig_return_type_not_type_const);
+            _YAMA_ENTRY_(verif_binary_is_empty);
+            _YAMA_ENTRY_(verif_RA_out_of_bounds);
+            _YAMA_ENTRY_(verif_RA_wrong_type);
+            _YAMA_ENTRY_(verif_RA_illegal_callobj);
+            _YAMA_ENTRY_(verif_RB_out_of_bounds);
+            _YAMA_ENTRY_(verif_RC_out_of_bounds);
+            _YAMA_ENTRY_(verif_RC_wrong_type);
+            _YAMA_ENTRY_(verif_KoB_out_of_bounds);
+            _YAMA_ENTRY_(verif_KoB_not_object_const);
+            _YAMA_ENTRY_(verif_ArgB_out_of_bounds);
+            _YAMA_ENTRY_(verif_RA_and_RB_types_differ);
+            _YAMA_ENTRY_(verif_RA_and_KoB_types_differ);
+            _YAMA_ENTRY_(verif_RA_and_ArgB_types_differ);
+            _YAMA_ENTRY_(verif_ArgRs_out_of_bounds);
+            _YAMA_ENTRY_(verif_ArgRs_zero_objects);
+            _YAMA_ENTRY_(verif_ParamArgRs_wrong_number);
+            _YAMA_ENTRY_(verif_ParamArgRs_wrong_types);
+            _YAMA_ENTRY_(verif_puts_PC_out_of_bounds);
+            _YAMA_ENTRY_(verif_fallthrough_puts_PC_out_of_bounds);
+            _YAMA_ENTRY_(verif_violates_register_coherence);
 
-            _YAMA_ENTRY_(instantiate_type_already_instantiated);
-            _YAMA_ENTRY_(instantiate_type_not_found);
-            _YAMA_ENTRY_(instantiate_kind_mismatch);
-            _YAMA_ENTRY_(instantiate_callsig_mismatch);
+            _YAMA_ENTRY_(instant_type_not_found);
+            _YAMA_ENTRY_(instant_kind_mismatch);
+            _YAMA_ENTRY_(instant_callsig_mismatch);
 
         default: YAMA_DEADEND; break;
         }
@@ -314,4 +328,127 @@ YAMA_COND( \
 YAMA_COND( \
 (debug_layer_ptr), \
 (debug_layer_ptr)->raise((sig)))
+
+
+namespace yama {
+
+
+    class null_debug final : public debug {
+    public:
+
+        inline null_debug(dcat cats = defaults_c)
+            : debug(cats) {}
+
+
+    protected:
+
+        inline void do_log(dcat, const std::string&) override final {
+            // do nothing
+        }
+    };
+
+
+    class stderr_debug final : public debug {
+    public:
+
+        inline stderr_debug(dcat cats = defaults_c)
+            : debug(cats) {}
+
+
+    protected:
+
+        inline void do_log(dcat, const std::string& msg) override final {
+            std::cerr << msg << '\n';
+        }
+    };
+
+
+    class stdout_debug final : public debug {
+    public:
+
+        inline stdout_debug(dcat cats = defaults_c)
+            : debug(cats) {}
+
+
+    protected:
+
+        inline void do_log(dcat, const std::string& msg) override final {
+            std::cout << msg << '\n';
+        }
+    };
+
+
+    // proxy_debug is a general-purpose proxy for debug impls, used to provide
+    // a way to restrict the categories of logs allowed upstream
+
+    class proxy_debug final : public debug {
+    public:
+
+        const std::shared_ptr<debug> base = nullptr;
+
+
+        // the final cats field of the proxy will equal base->cats & cats_mask
+
+        proxy_debug(std::shared_ptr<debug> base, dcat cats_mask = all_c);
+
+
+    protected:
+
+        void do_log(dcat cat, const std::string& msg) override final;
+        void do_raise(dsignal sig) override final;
+    };
+
+    // proxy_dbg returns a proxy_debug layer for base, w/ cats, or nullptr if base == nullptr
+
+    // the final cats field of the proxy, if any, will equal base->cats & cats_mask
+
+    // proxy_dbg exists due to the fact that YAMA_LOG only skips (potentially costly) formatted
+    // string preparation if there is no debug layer provided to it (ie. it's provided nullptr),
+    // meaning that situations where a proxy_debug is used, but where there is no upstream debug
+    // layer, YAMA_LOG won't skip formatted string preparation, leading to unwanted allocations
+
+    // proxy_dbg addresses this problem by acting as a ctor for proxy_debug when there is an
+    // upstream debug layer, but returning nullptr instead if there isn't, which allows the
+    // lack up upstream debug layer to *propagate* downstream
+
+    // proxy_dbg by extension also helps avoid the heap allocation of unneeded proxy_debug objects
+
+    std::shared_ptr<proxy_debug> proxy_dbg(std::shared_ptr<debug> base, dcat cats_mask = all_c);
+
+
+    // debug impl which provides mechanism to *count* number of times a particular
+    // dsignal has been raised (w/ this being useful in unit testing)
+
+    // this impl can also act as a proxy for another debug object injected into it
+
+    // TODO: this class hasn't been unit tested
+
+    class dsignal_debug final : public debug {
+    public:
+
+        std::array<size_t, dsignals> counts = { 0 };
+        const std::shared_ptr<debug> base = nullptr;
+
+
+        // ctor doesn't provide explicit control over cats as all this
+        // debug impl does w/ it is forward logs as a proxy
+
+        // ctor sets cats == base->cats if base != nullptr
+
+        // ctor sets cats == none_c if base == nullptr
+
+        dsignal_debug(std::shared_ptr<debug> base);
+
+
+        size_t count(dsignal sig) const noexcept;
+
+        void reset() noexcept;
+
+
+    protected:
+
+        void do_log(dcat cat, const std::string& msg) override final;
+        void do_raise(dsignal sig) override final;
+    };
+}
 

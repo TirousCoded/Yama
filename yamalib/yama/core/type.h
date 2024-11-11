@@ -19,12 +19,9 @@ namespace yama {
     class callsig;
     class const_table;
 
-    namespace dm {
+    namespace internal {
         template<typename Allocator>
         class type_instance;
-    }
-
-    namespace internal {
         type_mem get_type_mem(type x) noexcept;
     }
 
@@ -52,7 +49,7 @@ namespace yama {
         // ctor for init via type_instance
 
         template<typename Allocator>
-        explicit inline type(const dm::type_instance<Allocator>& instance) noexcept;
+        inline explicit type(const yama::internal::type_instance<Allocator>& instance) noexcept;
 
         type() = delete;
         type(const type&) = default;
@@ -100,7 +97,7 @@ namespace yama {
     private:
 
         template<typename Allocator>
-        friend class yama::dm::type_instance;
+        friend class yama::internal::type_instance;
 
         friend internal::type_mem yama::internal::get_type_mem(type x) noexcept;
 
@@ -123,6 +120,6 @@ YAMA_SETUP_FORMAT(yama::type, x.fmt());
 
 
 template<typename Allocator>
-inline yama::type::type(const dm::type_instance<Allocator>& instance) noexcept
+inline yama::type::type(const yama::internal::type_instance<Allocator>& instance) noexcept
     : _mem(instance._mem) {}
 

@@ -2,21 +2,29 @@
 
 #include "compiler.h"
 
+#include "domain.h"
+
 #include "../internals/ast.h"
 #include "../internals/first_pass.h"
 #include "../internals/second_pass.h"
 
 
-yama::dm::compiler::compiler(domain& dm, std::shared_ptr<debug> dbg)
-    : api_component(dbg),
-    _dm_ptr(&dm) {}
+yama::compiler::compiler(std::shared_ptr<debug> dbg)
+    : api_component(dbg) {}
 
-std::optional<std::vector<yama::type_info>> yama::dm::compiler::compile(const taul::source_code& src) {
+yama::default_compiler::default_compiler(std::shared_ptr<debug> dbg)
+    : compiler(dbg),
+    _dm_ptr(nullptr) {}
+
+std::optional<std::vector<yama::type_info>> yama::default_compiler::compile(
+    res<domain> dm,
+    const taul::source_code& src) {
+    _dm_ptr = dm.get();
     const auto ast = yama::internal::ast_parser().parse(src);
     if (const auto syntax_error = ast.syntax_error) {
         YAMA_RAISE(dbg(), dsignal::compile_syntax_error);
         YAMA_LOG(
-            dbg(), compile_c,
+            dbg(), compile_error_c,
             "error: {0} syntax error!",
             src.location_at(*syntax_error));
         return std::nullopt;
@@ -34,5 +42,9 @@ std::optional<std::vector<yama::type_info>> yama::dm::compiler::compile(const ta
         return std::nullopt;
     }
     return sp.results;
+}
+
+yama::domain& yama::default_compiler::_dm() const noexcept {
+    return deref_assert(_dm_ptr);
 }
 

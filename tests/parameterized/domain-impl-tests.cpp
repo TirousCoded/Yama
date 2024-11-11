@@ -36,6 +36,13 @@ yama::type_info c_info{
         .ptype = yama::ptype::bool0,
     },
 };
+yama::type_info d_info{
+    .fullname = "d"_str,
+    .consts = {},
+    .info = yama::primitive_info{
+        .ptype = yama::ptype::bool0,
+    },
+};
 
 static const auto f_consts =
 yama::const_table_info()
@@ -127,6 +134,182 @@ TEST_P(DomainImplTests, Builtins) {
     EXPECT_EQ(_Float->ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(_Bool->ptype(), std::make_optional(yama::ptype::bool0));
     EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
+}
+
+TEST_P(DomainImplTests, LockedAndFork) {
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_TRUE(dm->upload(a_info));
+    ASSERT_TRUE(dm->upload(b_info));
+
+    const auto dm_a = dm->load("a"_str);
+    const auto dm_b = dm->load("b"_str);
+
+    ASSERT_TRUE(dm_a);
+    ASSERT_TRUE(dm_b);
+
+
+    ASSERT_FALSE(dm->locked()); // dm not locked yet
+
+    auto subdm = dm->fork();
+
+    ASSERT_TRUE(subdm);
+    ASSERT_FALSE(subdm->locked());
+    ASSERT_EQ(subdm->upstream().lock(), std::shared_ptr<yama::domain>(dm));
+
+    ASSERT_TRUE(dm->locked()); // dm is now locked
+
+    // upload c and d to subdm (but dm won't see them)
+
+    ASSERT_TRUE(subdm->upload(c_info));
+    ASSERT_TRUE(subdm->upload(d_info));
+
+    const auto subdm_a = subdm->load("a"_str);
+    const auto subdm_b = subdm->load("b"_str);
+    const auto subdm_c = subdm->load("c"_str);
+    const auto subdm_d = subdm->load("d"_str);
+
+    ASSERT_TRUE(subdm_a);
+    ASSERT_TRUE(subdm_b);
+    ASSERT_TRUE(subdm_c);
+    ASSERT_TRUE(subdm_d);
+
+    // a and b are the same in both dm and subdm
+
+    ASSERT_EQ(dm_a.value(), subdm_a.value());
+    ASSERT_EQ(dm_b.value(), subdm_b.value());
+
+
+    subdm = nullptr; // destroy subdm
+
+    ASSERT_FALSE(dm->locked()); // dm no longer locked
+
+    // dm does not have c or d, but subdm did
+
+    ASSERT_FALSE(dm->load("c"_str));
+    ASSERT_FALSE(dm->load("d"_str));
+}
+
+TEST_P(DomainImplTests, LockedAndFork_Committing) {
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_TRUE(dm->upload(a_info));
+    ASSERT_TRUE(dm->upload(b_info)); // defer loading so we can instantiate it in subdomain
+
+    ASSERT_TRUE(dm->load("a"_str)); // instantiate a
+
+
+    ASSERT_FALSE(dm->locked());
+    
+    auto subdm = dm->fork();
+    
+    ASSERT_TRUE(subdm);
+
+    ASSERT_TRUE(dm->locked());
+
+
+    ASSERT_TRUE(subdm->upload(c_info)); // upload in subdomain
+
+    const auto subdm_a = subdm->load("a"_str);
+    const auto subdm_b = subdm->load("b"_str); // uploaded to dm, but instantiated in subdm
+    const auto subdm_c = subdm->load("c"_str);
+
+    ASSERT_TRUE(subdm_a);
+    ASSERT_TRUE(subdm_b);
+    ASSERT_TRUE(subdm_c);
+
+    subdm->commit(); // commit c into upstream dm
+
+    // d will be lost due to uncommitted
+
+    ASSERT_TRUE(subdm->upload(d_info)); // upload in subdomain
+
+    const auto subdm_d = subdm->load("d"_str);
+
+    ASSERT_TRUE(subdm_d);
+
+
+    subdm = nullptr; // destroy subdm
+
+    ASSERT_FALSE(dm->locked()); // dm no longer locked
+
+
+    // c is now available to dm, and b should be the same as subdm_b
+
+    const auto dm_a = dm->load("a"_str);
+    const auto dm_b = dm->load("b"_str); // uploaded to dm, but instantiated in subdm
+    const auto dm_c = dm->load("c"_str);
+
+    ASSERT_TRUE(dm_a);
+    ASSERT_TRUE(dm_b);
+    ASSERT_TRUE(dm_c);
+
+    ASSERT_EQ(dm_a.value(), subdm_a.value());
+    ASSERT_EQ(dm_b.value(), subdm_b.value());
+    ASSERT_EQ(dm_c.value(), subdm_c.value());
+
+    // d does not exist in dm
+
+    ASSERT_FALSE(dm->load("d"_str));
+}
+
+TEST_P(DomainImplTests, LockedAndFork_ForkOverloadWithoutInjectedDebugLayer) {
+    const auto debug_1 = yama::make_res<yama::stderr_debug>();
+
+    const auto dm = GetParam().factory(debug_1);
+
+    auto subdm = dm->fork();
+
+    ASSERT_EQ(dm->dbg(), debug_1.base());
+    ASSERT_EQ(subdm->dbg(), debug_1.base());
+
+    subdm = nullptr; // destroy subdm
+}
+
+TEST_P(DomainImplTests, LockedAndFork_ForkOverloadWithoutInjectedDebugLayer_NoDebugLayer) {
+    const auto dm = GetParam().factory(nullptr);
+
+    auto subdm = dm->fork();
+
+    ASSERT_EQ(dm->dbg(), nullptr);
+    ASSERT_EQ(subdm->dbg(), nullptr);
+
+    subdm = nullptr; // destroy subdm
+}
+
+TEST_P(DomainImplTests, LockedAndFork_ForkOverloadWithInjectedDebugLayer) {
+    const auto debug_1 = yama::make_res<yama::stderr_debug>();
+    const auto debug_2 = yama::make_res<yama::stderr_debug>();
+
+    const auto dm = GetParam().factory(debug_1);
+
+    auto subdm = dm->fork(debug_2);
+
+    ASSERT_EQ(dm->dbg(), debug_1.base());
+    ASSERT_EQ(subdm->dbg(), debug_2.base());
+
+    subdm = nullptr; // destroy subdm
+}
+
+TEST_P(DomainImplTests, LockedAndFork_ForkOverloadWithInjectedDebugLayer_NoDebugLayer) {
+    const auto debug_1 = yama::make_res<yama::stderr_debug>();
+
+    const auto dm = GetParam().factory(debug_1);
+
+    auto subdm = dm->fork(nullptr);
+
+    ASSERT_EQ(dm->dbg(), debug_1.base());
+    ASSERT_EQ(subdm->dbg(), nullptr);
+
+    subdm = nullptr; // destroy subdm
+}
+
+TEST_P(DomainImplTests, LockedAndFork_SubdomainCanHandleBeingDestroyedAfterUpstreamDomainIs) {
+    auto dm = GetParam().factory(dbg).base();
+    auto subdm = dm->fork(); // forked subdomain
+
+    dm = nullptr; // domain destroyed first
+    subdm = nullptr; // subdomain destroyed second
 }
 
 TEST_P(DomainImplTests, Load) {
@@ -324,7 +507,7 @@ TEST_P(DomainImplTests, Upload_One_FailDueToStaticVerificationError) {
     EXPECT_FALSE(dm->load("bad"_str));
 }
 
-TEST_P(DomainImplTests, Upload_MultiViaIterPair) {
+TEST_P(DomainImplTests, Upload_MultiViaSpan) {
     const auto dm = GetParam().factory(dbg);
 
     // upload types f, a, b, and c, to test that upload works broadly
@@ -336,7 +519,7 @@ TEST_P(DomainImplTests, Upload_MultiViaIterPair) {
         c_info,
     };
 
-    ASSERT_TRUE(dm->upload(group.begin(), group.end()));
+    ASSERT_TRUE(dm->upload(std::span(group.begin(), group.end())));
 
     // test that uploaded types are acknowledged by the domain impl correctly
 
@@ -382,7 +565,7 @@ TEST_P(DomainImplTests, Upload_MultiViaIterPair) {
     EXPECT_EQ(cc->consts().size(), 0);
 }
 
-TEST_P(DomainImplTests, Upload_MultiViaIterPair_FailDueToStaticVerificationError) {
+TEST_P(DomainImplTests, Upload_MultiViaSpan_FailDueToStaticVerificationError) {
     const auto dm = GetParam().factory(dbg);
 
     std::vector<yama::type_info> group{
@@ -392,7 +575,7 @@ TEST_P(DomainImplTests, Upload_MultiViaIterPair_FailDueToStaticVerificationError
         c_info,
     };
 
-    EXPECT_FALSE(dm->upload(group.begin(), group.end()));
+    EXPECT_FALSE(dm->upload(std::span(group.begin(), group.end())));
 
     // test that no new types were made available
 
@@ -402,7 +585,7 @@ TEST_P(DomainImplTests, Upload_MultiViaIterPair_FailDueToStaticVerificationError
     EXPECT_FALSE(dm->load("c"_str));
 }
 
-TEST_P(DomainImplTests, Upload_MultiViaIterable) {
+TEST_P(DomainImplTests, Upload_MultiViaVector) {
     const auto dm = GetParam().factory(dbg);
 
     // upload types f, a, b, and c, to test that upload works broadly
@@ -460,7 +643,7 @@ TEST_P(DomainImplTests, Upload_MultiViaIterable) {
     EXPECT_EQ(cc->consts().size(), 0);
 }
 
-TEST_P(DomainImplTests, Upload_MultiViaIterable_FailDueToStaticVerificationError) {
+TEST_P(DomainImplTests, Upload_MultiViaVector_FailDueToStaticVerificationError) {
     const auto dm = GetParam().factory(dbg);
 
     std::vector<yama::type_info> group{

@@ -6,7 +6,6 @@
 #include "scalars.h"
 #include "res.h"
 #include "api_component.h"
-#include "mas.h"
 #include "domain.h"
 #include "object_ref.h"
 
@@ -157,13 +156,6 @@ namespace yama {
         // get_config returns the config details of this context
 
         const ctx_config& get_config() const noexcept;
-
-
-        // get_mas returns the MAS used internally by this context
-        
-        // this MAS is provided by the domain upon context init
-
-        res<mas> get_mas() const noexcept;
 
 
         // NOTE: try not to get the below load methods confused w/ the notion
@@ -418,7 +410,6 @@ namespace yama {
 
         res<domain> _dm;
         ctx_config _config;
-        res<mas> _mas;
 
         std::allocator<void> _al;
 
@@ -584,7 +575,6 @@ namespace yama {
             dbg(), ctx_panic_c,
             msg, 
             std::forward<Args>(args)...);
-        YAMA_LOG(dbg(), ctx_panic_c, "{}", fmt_stacktrace());
         ll_panic();
     }
 }

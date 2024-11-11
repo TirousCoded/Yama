@@ -9,7 +9,7 @@
 #include "fullnamed_type.h"
 
 
-namespace yama::dm {
+namespace yama::internal {
 
 
     // res_db encapsulates a database of mappings of 'fullname' string
@@ -20,9 +20,10 @@ namespace yama::dm {
     public:
 
         res_db() = default;
+        inline res_db(res_db<T>& upstream);
 
 
-        // TODO: begin, cbegin, end, and cend, have not been unit tested
+        // these do not traverse upstream resources
 
         inline auto begin() const noexcept;
         inline auto cbegin() const noexcept { return begin(); }
@@ -32,13 +33,17 @@ namespace yama::dm {
 
         // size returns the number of resources in the database
 
+        // size doesn't include upstream resources
+
         inline size_t size() const noexcept;
 
 
         // exists checks if a resource exists in the database
         // under fullname
 
-        inline bool exists(const str& fullname) const noexcept;
+        // exists includes checking upstream (unless local_only == true)
+
+        inline bool exists(const str& fullname, bool local_only = false) const noexcept;
 
 
         // NOTE: pull is non-noexcept as copying T could throw
@@ -46,7 +51,9 @@ namespace yama::dm {
         // pull attempts to pull a copy of the resource under 
         // fullname, if any
 
-        inline std::optional<T> pull(const str& fullname) const;
+        // pull includes pulling from upstream (unless local_only == true)
+
+        inline std::optional<T> pull(const str& fullname, bool local_only = false) const;
 
 
         // push attempts to push a new resource to the database,
@@ -59,6 +66,8 @@ namespace yama::dm {
 
 
         // reset resets database state
+
+        // upstream resources are not reset
 
         inline void reset() noexcept;
 
@@ -73,14 +82,25 @@ namespace yama::dm {
         inline bool transfer(res_db<T>& target);
 
 
+        // commit transfers resources from here to upstream,
+        // doing nothing if there is no upstream
+
+        inline bool commit();
+
+
     private:
 
         std::unordered_map<str, T> _db;
+        res_db<T>* _upstream = nullptr;
 
 
         inline bool _overlaps(const res_db<T>& other) const noexcept;
     };
 
+
+    template<fullnamed_type T>
+    inline res_db<T>::res_db(res_db<T>& upstream)
+        : _upstream(&upstream) {}
 
     template<fullnamed_type T>
     inline auto res_db<T>::begin() const noexcept {
@@ -98,12 +118,19 @@ namespace yama::dm {
     }
 
     template<fullnamed_type T>
-    inline bool res_db<T>::exists(const str& fullname) const noexcept {
-        return _db.contains(fullname);
+    inline bool res_db<T>::exists(const str& fullname, bool local_only) const noexcept {
+        return
+            ((_upstream && !local_only) ? _upstream->exists(fullname) : false) ||
+            _db.contains(fullname);
     }
     
     template<fullnamed_type T>
-    inline std::optional<T> res_db<T>::pull(const str& fullname) const {
+    inline std::optional<T> res_db<T>::pull(const str& fullname, bool local_only) const {
+        if (_upstream && !local_only) {
+            if (const auto result = _upstream->pull(fullname)) {
+                return result;
+            }
+        }
         const auto found = _db.find(fullname);
         return
             found != _db.end()
@@ -132,18 +159,26 @@ namespace yama::dm {
     }
 
     template<fullnamed_type T>
+    inline bool res_db<T>::commit() {
+        return
+            _upstream
+            ? transfer(*_upstream)
+            : false;
+    }
+
+    template<fullnamed_type T>
     inline bool res_db<T>::_overlaps(const res_db<T>& other) const noexcept {
         // choose either *this or other based on which is smaller, then check
         // if the smaller one's elems are overlapping w/ the other, w/ this
         // way of doing it being fast as it minimizes iterations
         if (size() < other.size()) {
             for (const auto& I : *this) {
-                if (other.exists(I.first)) return true;
+                if (other.exists(I.first, true)) return true;
             }
         }
         else {
             for (const auto& I : other) {
-                if (exists(I.first)) return true;
+                if (exists(I.first, true)) return true;
             }
         }
         return false;

@@ -34,14 +34,15 @@ void yama::internal::second_pass::visit_begin(res<ast_Block> x) {
             _compile_error(
                 *x,
                 dsignal::compile_type_mismatch,
-                "expr is {0}, but expected {1}!",
+                "if stmt condition expr is type {0}, but expected {1}!",
                 _top_reg().type, "Bool"_str);
             return; // abort
         }
-        _sanitize_here(); // sanitize before branch
+        _sanitize_here(x->low_pos()); // sanitize before branch
         // write branch to else-part or exit if cond is false
         cw.add_jump_false(uint8_t(_top_if_stmt().cond_reg_index.value()),
             _top_if_stmt().has_else_part ? _top_if_stmt().else_part_label : _top_if_stmt().exit_label);
+        _add_sym(x->low_pos());
         // pop the Bool cond temporary of the if stmt
         _pop_temp();
     }
@@ -69,12 +70,16 @@ void yama::internal::second_pass::visit_begin(res<ast_LoopStmt> x) {
         return;
     }
     _push_loop_stmt(*x);
-    _sanitize_here(); // sanitize before branch (fallthrough branch)
+    _sanitize_here(x->low_pos()); // sanitize before branch (fallthrough branch)
     // write continue label
     cw.add_label(_top_loop_stmt().continue_label);
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
+    // add entries to _args_node_to_expr_node_map
+    for (const auto& I : x->args) {
+        _args_node_to_expr_node_map[I->id] = x.get();
+    }
     // IMPORTANT:
     //      expr eval operates as follows:
     //          1) this occurs, when evals the primary expr at the base of the expr,
@@ -109,6 +114,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 //            so we gotta incr the fn param index to account for this
                 // write load_arg loading param into temporary
                 cw.add_load_arg(uint8_t(_top_reg().index), uint8_t(_target_param_index(name).value() + 1), true);
+                _add_sym(x->primary->name->low_pos());
             }
             else if (symbol->is<var_csym>()) {
                 // gotta account for the edge case where the code is something like 'var a = a;', in which
@@ -117,6 +123,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                     _push_temp(*x, localvar_type.value());
                     // write copy from local var into temporary
                     cw.add_copy(uint8_t(_localvar_reg(*symbol->node).index), uint8_t(_top_reg().index), true);
+                    _add_sym(x->primary->name->low_pos());
                 }
                 else {
                     _compile_error(
@@ -131,6 +138,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 _push_temp(*x, name);
                 // write load_const loading fn object into temporary
                 cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_fn_type_c(name)), true);
+                _add_sym(x->primary->name->low_pos());
             }
             else { // not a param, local var, or fn
                 _compile_error(
@@ -173,6 +181,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             else { // valid
                 _push_temp(*x, "Int"_str);
                 cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_int_c(v.v)), true);
+                _add_sym(x->primary->lit->low_pos());
             }
         }
         else if (x->primary->lit->is_uint()) {
@@ -189,6 +198,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             else { // valid
                 _push_temp(*x, "UInt"_str);
                 cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_uint_c(v.v)), true);
+                _add_sym(x->primary->lit->low_pos());
             }
         }
         else if (x->primary->lit->is_float()) {
@@ -197,12 +207,14 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             // below can handle cases of overflow/underflow
             _push_temp(*x, "Float"_str);
             cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_float_c(v.v)), true);
+            _add_sym(x->primary->lit->low_pos());
         }
         else if (x->primary->lit->is_bool()) {
             const auto lit_nd = res(x->primary->lit->as_bool());
             const parsed_bool v = parse_bool(lit_nd->lit.str(_get_src())).value();
             _push_temp(*x, "Bool"_str);
             cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_bool_c(v.v)), true);
+            _add_sym(x->primary->lit->low_pos());
         }
         else if (x->primary->lit->is_char()) {
             const auto lit_nd = res(x->primary->lit->as_char());
@@ -220,6 +232,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             else { // valid
                 _push_temp(*x, "Char"_str);
                 cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_char_c(v.v)), true);
+                _add_sym(x->primary->lit->low_pos());
             }
         }
         else YAMA_DEADEND;
@@ -239,7 +252,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
                 _compile_error(
                     *x,
                     dsignal::compile_type_mismatch,
-                    "expr is {0}, but expected {1}!",
+                    "var decl initializer expr is type {0}, but expected {1}!",
                     _top_reg().type, type);
                 return; // abort
             }
@@ -270,27 +283,34 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
                     // write bcode which inits our local var w/ default value
                     if (type == "None"_str) {
                         cw.add_load_none(uint8_t(_top_reg().index), true);
+                        _add_sym(x->low_pos());
                     }
                     else if (type == "Int"_str) {
                         cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_int_c(0)), true);
+                        _add_sym(x->low_pos());
                     }
                     else if (type == "UInt"_str) {
                         cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_uint_c(0u)), true);
+                        _add_sym(x->low_pos());
                     }
                     else if (type == "Float"_str) {
                         cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_float_c(0.0)), true);
+                        _add_sym(x->low_pos());
                     }
                     else if (type == "Bool"_str) {
                         cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_bool_c(false)), true);
+                        _add_sym(x->low_pos());
                     }
                     else if (type == "Char"_str) {
                         cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_char_c(U'\0')), true);
+                        _add_sym(x->low_pos());
                     }
                     else YAMA_DEADEND;
                 }
                 else if (symbol->is<fn_csym>()) { // fn type
                     // write bcode which inits our local var w/ default value
                     cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_fn_type_c(type)), true);
+                    _add_sym(x->low_pos());
                 }
                 else { // not a primitive or fn type
                     _compile_error(
@@ -338,15 +358,18 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
         if (is_none_returning && not_all_paths_return_or_loop) {
             _push_temp(*x, "None"_str);
             cw.add_load_none(uint8_t(_top_reg().index), true);
+            _add_sym(x->high_pos());
             cw.add_ret(uint8_t(_top_reg().index));
+            _add_sym(x->high_pos());
             _pop_temp();
         }
     }
     _pop_scope(*x);
     if (_is_if_stmt_body(*x) && _top_if_stmt().has_else_part) {
-        _sanitize_here(); // sanitize before branch
+        _sanitize_here(x->high_pos()); // sanitize before branch
         // write unconditional branch to the exit label to skip the else-part (if any)
         cw.add_jump(_top_if_stmt().exit_label);
+        _add_sym(x->high_pos());
         // write else-part label
         cw.add_label(_top_if_stmt().else_part_label);
     }
@@ -368,13 +391,14 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
                         _compile_error(
                             *x,
                             dsignal::compile_type_mismatch,
-                            "expr is {0}, but expected {1}!",
+                            "assigning expr is type {0}, but expected {1}!",
                             _top_reg().type, info.type.value());
                         return; // abort
                     }
                     else {
                         // write copy of temporary assigned w/ onto local var
                         cw.add_copy(uint8_t(_top_reg().index), uint8_t(_localvar_reg(*symbol->node).index));
+                        _add_sym(x->low_pos());
                         _pop_temp(); // consume temporary assigned w/
                     }
                 }
@@ -427,7 +451,7 @@ void yama::internal::second_pass::visit_end(res<ast_IfStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(); // sanitize before branch (fallthrough branch)
+    _sanitize_here(x->high_pos()); // sanitize before branch (fallthrough branch)
     // write exit label
     cw.add_label(_top_if_stmt().exit_label);
     _pop_if_stmt();
@@ -437,9 +461,10 @@ void yama::internal::second_pass::visit_end(res<ast_LoopStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(); // sanitize before branch
+    _sanitize_here(x->high_pos()); // sanitize before branch
     // write unconditional branch to continue label
     cw.add_jump(_top_loop_stmt().continue_label);
+    _add_sym(x->high_pos());
     // write break label
     cw.add_label(_top_loop_stmt().break_label);
     _pop_loop_stmt();
@@ -449,18 +474,29 @@ void yama::internal::second_pass::visit_end(res<ast_BreakStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(); // sanitize before branch
+    _sanitize_here(x->low_pos()); // sanitize before branch
     // write unconditional branch to break label
     cw.add_jump(_top_loop_stmt().break_label);
+    _add_sym(x->low_pos());
 }
 
 void yama::internal::second_pass::visit_end(res<ast_ContinueStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(); // sanitize before branch
+    _sanitize_here(x->low_pos()); // sanitize before branch
+    // alongside usual sanitize, we also gotta write load_none instrs to drop any
+    // local vars which will go out-of-scope as a result of our branch, w/ this
+    // being needed in order to avoid register coherence violations
+    for (size_t i = _top_loop_stmt().first_reg; i < _regs(); i++) {
+        if (_reg(i).is_localvar()) {
+            cw.add_load_none(uint8_t(i), true);
+            _add_sym(x->low_pos());
+        }
+    }
     // write unconditional branch to continue label
     cw.add_jump(_top_loop_stmt().continue_label);
+    _add_sym(x->low_pos());
 }
 
 void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
@@ -473,11 +509,12 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
             _compile_error(
                 *x,
                 dsignal::compile_type_mismatch,
-                "expr is {0}, but expected {1}!",
+                "return stmt expr is type {0}, but expected {1}!",
                 _top_reg().type, _target_csym().return_type.value_or("None"_str));
             return; // abort
         }
         cw.add_ret(uint8_t(_top_reg().index));
+        _add_sym(x->low_pos());
         _pop_temp(); // consume return value temporary
     }
     else { // form 'return;'
@@ -492,6 +529,7 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
         }
         _push_temp(*x, "None"_str);
         cw.add_ret(uint8_t(_top_reg().index));
+        _add_sym(x->low_pos());
         _pop_temp();
     }
 }
@@ -504,6 +542,7 @@ void yama::internal::second_pass::visit_end(res<ast_Expr> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_Args> x) {
+    YAMA_ASSERT(_args_node_to_expr_node_map.contains(x->id));
     if (err) {
         return;
     }
@@ -521,9 +560,9 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         // whatever the callobj is, it's not a callable type
         if (!symbol->is<fn_csym>()) {
             _compile_error(
-                *x,
+                deref_assert(_args_node_to_expr_node_map.at(x->id)),
                 dsignal::compile_invalid_operation,
-                "cannot call non-callable {}!",
+                "cannot call non-callable type {}!",
                 _reg(callobj_reg_index).type);
             return; // abort
         }
@@ -531,7 +570,7 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         // check that arg count is correct
         if (arg_count != info.params.size()) {
             _compile_error(
-                *x,
+                deref_assert(_args_node_to_expr_node_map.at(x->id)),
                 dsignal::compile_wrong_arg_count,
                 "call to {} given {} args, but expected {}!",
                 _reg(callobj_reg_index).type, arg_count, info.params.size());
@@ -544,8 +583,8 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
                 _compile_error(
                     *x->args[i],
                     dsignal::compile_type_mismatch,
-                    "expr is {0}, but expected {1}!",
-                    _reg(callobj_reg_index + i + 1).type, info.params[i].type.value());
+                    "arg {0} expr is type {1}, but expected {2}!",
+                    i + 1, _reg(callobj_reg_index + i + 1).type, info.params[i].type.value());
                 args_are_correct_types = false;
             }
         }
@@ -559,6 +598,7 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         YAMA_ASSERT(callobj_reg_index == _top_reg().index); // return value should overwrite callobj
         // write the call instr
         cw.add_call(uint8_t(callobj_reg_index), uint8_t(arg_count + 1), uint8_t(_top_reg().index), true);
+        _add_sym(deref_assert(_args_node_to_expr_node_map.at(x->id)).low_pos());
     }
     else YAMA_DEADEND;
 }
@@ -605,6 +645,7 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
         bool label_not_found{};
         if (auto fn_bcode = cw.done(&label_not_found)) {
             info.bcode = fn_bcode.value();
+            info.bcodesyms = std::move(syms);
         }
         else {
             if (label_not_found) { // if this, then the compiler is broken
@@ -774,6 +815,11 @@ yama::callsig_info yama::internal::second_pass::_build_callsig_for_fn_type(str f
     return result;
 }
 
+void yama::internal::second_pass::_add_sym(taul::source_pos pos) {
+    const auto loc = _get_src().location_at(pos);
+    syms.add(cw.count() - 1, loc.origin, loc.chr, loc.line);
+}
+
 void yama::internal::second_pass::_push_scope() {
     _scope_depth++;
     _scope_regs_to_sanitize.push_back(std::unordered_set<size_t>{});
@@ -791,7 +837,7 @@ void yama::internal::second_pass::_pop_scope(const ast_Block& x) {
         _regstk.pop_back();
     }
     if (!_is_fn_body_block(x)) { // we 100% know we don't need to sanitize fn body block (+ avoids dead code issue)
-        _sanitize_here();
+        _sanitize_here(x.high_pos()); // use high pos here so sanitizing load_none(s) are specified as being at end of block
     }
     _scope_regs_to_sanitize.pop_back();
 }
@@ -870,16 +916,17 @@ std::optional<yama::str> yama::internal::second_pass::_get_localvar_type(const a
         : std::nullopt;
 }
 
-void yama::internal::second_pass::_sanitize_regs(size_t index, size_t n) {
+void yama::internal::second_pass::_sanitize_regs(taul::source_pos pos, size_t index, size_t n) {
     YAMA_ASSERT(index + n <= _target().locals());
     for (size_t i = 0; i < n; i++) {
         cw.add_load_none(uint8_t(index + i), true);
+        _add_sym(pos);
     }
 }
 
-void yama::internal::second_pass::_sanitize_here() {
+void yama::internal::second_pass::_sanitize_here(taul::source_pos pos) {
     for (const auto& I : _scope_regs_to_sanitize.back()) {
-        _sanitize_regs(I);
+        _sanitize_regs(pos, I);
     }
     _scope_regs_to_sanitize.back().clear();
 }
@@ -942,6 +989,7 @@ void yama::internal::second_pass::_push_loop_stmt(const ast_LoopStmt& x) {
     _loop_stmts.push_back(_loop_stmt_t{
         .break_label = _gen_label(),
         .continue_label = _gen_label(),
+        .first_reg = _regs(),
         });
 }
 

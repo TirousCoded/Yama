@@ -35,8 +35,12 @@
 
 #include "object_ref.h"
 
+#include "verifier.h"
+#include "compiler.h"
 #include "domain.h"
 #include "context.h"
 
 #include "yama_gram.h"
+
+#include "supplements.h"
 

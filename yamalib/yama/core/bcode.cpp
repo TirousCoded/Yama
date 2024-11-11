@@ -209,6 +209,15 @@ yama::bc::syms& yama::bc::syms::add(size_t index, str origin, size_t ch, size_t 
     return *this;
 }
 
+yama::bc::syms& yama::bc::syms::add(sym x) {
+    _syms[x.index] = std::move(x);
+    return *this;
+}
+
+size_t yama::bc::code_writer::count() const noexcept {
+    return _result.count();
+}
+
 yama::bc::code_writer& yama::bc::code_writer::add_noop() {
     _result.add_noop();
     return *this;

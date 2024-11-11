@@ -6,14 +6,15 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/res.h>
+#include <yama/core/debug.h>
 #include <yama/core/domain.h>
 
 
-struct DomainImplTestsParam final {
+struct DomainImplLoadingTestsParam final {
     std::function<yama::res<yama::domain>(std::shared_ptr<yama::debug> dbg)> factory;
 };
 
-class DomainImplTests : public testing::TestWithParam<DomainImplTestsParam> {
+class DomainImplLoadingTests : public testing::TestWithParam<DomainImplLoadingTestsParam> {
 public:
 
     std::shared_ptr<yama::dsignal_debug> dbg;

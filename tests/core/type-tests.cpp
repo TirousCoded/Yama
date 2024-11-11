@@ -7,7 +7,14 @@
 #include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type.h>
-#include <yama/dm/type_instance.h>
+
+// TODO: type_instance used to be in frontend, but now it isn't,
+//       meaning our unit tests have backend code dependence,
+//       which is undesirable
+//
+//       I'm thinking maybe pull type_instance back to the frontend
+//       at some point
+#include <yama/internals/type_instance.h>
 
 
 using namespace yama::string_literals;
@@ -39,7 +46,7 @@ TEST(TypeTests, TypeInstanceCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -62,7 +69,7 @@ TEST(TypeTests, CopyCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -89,7 +96,7 @@ TEST(TypeTests, MoveCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -117,8 +124,8 @@ TEST(TypeTests, CopyAssign) {
             .ptype = yama::ptype::bool0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
-    yama::dm::type_instance b_inst(std::allocator<void>(), b_info.fullname, yama::make_res<yama::type_info>(b_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance b_inst(std::allocator<void>(), b_info.fullname, yama::make_res<yama::type_info>(b_info));
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -153,8 +160,8 @@ TEST(TypeTests, MoveAssign) {
             .ptype = yama::ptype::bool0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
-    yama::dm::type_instance b_inst(std::allocator<void>(), b_info.fullname, yama::make_res<yama::type_info>(b_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance b_inst(std::allocator<void>(), b_info.fullname, yama::make_res<yama::type_info>(b_info));
 
     yama::type a(a_inst);
     yama::type b(b_inst);
@@ -176,7 +183,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
+    yama::internal::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
 
     yama::type link(link_inst);
 
@@ -187,7 +194,7 @@ TEST(TypeTests, Complete_IncompleteType) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     a_inst.put<yama::primitive_type_const>(0, link);
     //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
@@ -206,7 +213,7 @@ TEST(TypeTests, Complete_CompleteType) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
+    yama::internal::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
 
     yama::type link(link_inst);
 
@@ -217,7 +224,7 @@ TEST(TypeTests, Complete_CompleteType) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     a_inst.put<yama::primitive_type_const>(0, link);
     a_inst.put<yama::primitive_type_const>(1, link);
@@ -236,7 +243,7 @@ TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -251,7 +258,7 @@ TEST(TypeTests, Fullname) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), 
+    yama::internal::type_instance a_inst(std::allocator<void>(), 
         "def"_str, // <- fullname *differs* from a_info.fullname
         yama::make_res<yama::type_info>(a_info));
 
@@ -269,7 +276,7 @@ TEST(TypeTests, PType) {
             .ptype = yama::ptype::uint,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -286,7 +293,7 @@ TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
             .locals = 10,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -305,7 +312,7 @@ TEST(TypeTests, CallFn) {
             .locals = 10,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -320,7 +327,7 @@ TEST(TypeTests, CallFn_NoCallFnForNonCallableTypes) {
             .ptype = yama::ptype::uint,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -337,7 +344,7 @@ TEST(TypeTests, Locals) {
             .locals = 10,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -352,7 +359,7 @@ TEST(TypeTests, Locals_ZeroForNonCallableTypes) {
             .ptype = yama::ptype::uint,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -367,7 +374,7 @@ TEST(TypeTests, Consts) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
+    yama::internal::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
 
     yama::type link(link_inst);
 
@@ -378,7 +385,7 @@ TEST(TypeTests, Consts) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     a_inst.put<yama::primitive_type_const>(0, link);
     //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
@@ -397,10 +404,10 @@ TEST(TypeTests, Equality) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
     // b_inst is a clone of a_inst, and exists to ensure that yama::type objects
     // of a_inst are not equal to those of b_inst
-    yama::dm::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst);
+    yama::internal::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst);
 
     yama::type a0(a_inst);
     yama::type a1(a_inst);
@@ -440,7 +447,7 @@ TEST(TypeTests, TypeInstance_RegularCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -463,7 +470,7 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
+    yama::internal::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
 
     yama::type link(link_inst);
 
@@ -474,13 +481,13 @@ TEST(TypeTests, TypeInstance_CloneCtor) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     a_inst.put<yama::primitive_type_const>(0, link);
     //a_inst.put<yama::primitive_type_const>(1, link);
     a_inst.put<yama::primitive_type_const>(2, link);
 
-    yama::dm::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
+    yama::internal::type_instance b_inst(std::allocator<void>(), "def"_str, a_inst); // clone ctor
 
     yama::type a(a_inst);
     yama::type b(b_inst); // <- gotten from b_inst
@@ -520,7 +527,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToTypeAndConstTabl
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
+    yama::internal::type_instance link_inst(std::allocator<void>(), link_info.fullname, yama::make_res<yama::type_info>(link_info));
 
     yama::type link(link_inst);
 
@@ -531,7 +538,7 @@ TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToTypeAndConstTabl
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type t(a_inst);           // yama::type can see changes
     yama::const_table ct(a_inst);   // yama::const_table can see changes
@@ -579,7 +586,7 @@ TEST(TypeTests, Primitive) {
             .ptype = yama::ptype::float0,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 
@@ -605,7 +612,7 @@ TEST(TypeTests, Function) {
             .locals = 17,
         },
     };
-    yama::dm::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
+    yama::internal::type_instance a_inst(std::allocator<void>(), a_info.fullname, yama::make_res<yama::type_info>(a_info));
 
     yama::type a(a_inst);
 

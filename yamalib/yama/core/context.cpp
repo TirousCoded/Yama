@@ -14,7 +14,6 @@ yama::context::context(res<domain> dm, ctx_config config, std::shared_ptr<debug>
     : api_component(dbg),
     _dm(dm),
     _config(config),
-    _mas(dm->get_mas()),
     _al(std::allocator<void>{}),
     _callstk(_al) {
     YAMA_ASSERT(get_config().max_call_frames >= 1);
@@ -31,10 +30,6 @@ yama::domain& yama::context::dm() const noexcept {
 
 const yama::ctx_config& yama::context::get_config() const noexcept {
     return _config;
-}
-
-yama::res<yama::mas> yama::context::get_mas() const noexcept {
-    return _mas;
 }
 
 std::optional<yama::type> yama::context::load(const str& fullname) {
@@ -251,6 +246,7 @@ void yama::context::ll_panic() {
     if (ll_panicking()) return; // don't count another panic if we're already panicking
     _panics++;
     _panicking = true;
+    YAMA_LOG(dbg(), ctx_panic_c, "{}", fmt_stacktrace());
     _try_handle_panic_for_user_cf(); // in case panicking outside of a ll_call call
 }
 

@@ -262,7 +262,7 @@ namespace yama::internal {
         Args&&... args) {
         YAMA_RAISE(_dbg, dsig);
         YAMA_LOG(
-            _dbg, compile_c,
+            _dbg, compile_error_c,
             "error: {} {}",
             _get_src().location_at(where.low_pos()),
             std::format(fmt, std::forward<Args&&>(args)...));

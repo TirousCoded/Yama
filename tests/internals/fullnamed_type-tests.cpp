@@ -4,7 +4,8 @@
 
 #include <yama/core/general.h>
 #include <yama/core/res.h>
-#include <yama/dm/fullnamed_type.h>
+
+#include <yama/internals/fullnamed_type.h>
 
 
 using namespace yama::string_literals;
@@ -28,9 +29,9 @@ TEST(FullnamedTypeTests, Usage) {
     const auto type3 = test_fullnamed_2{ "abc"_str };
     const auto type4 = yama::make_res<test_fullnamed_2>("abc"_str);
 
-    EXPECT_EQ(yama::dm::fullname_of(type1), "abc"_str);
-    EXPECT_EQ(yama::dm::fullname_of(type2), "abc"_str);
-    EXPECT_EQ(yama::dm::fullname_of(type3), "abc"_str);
-    EXPECT_EQ(yama::dm::fullname_of(type4), "abc"_str);
+    EXPECT_EQ(yama::internal::fullname_of(type1), "abc"_str);
+    EXPECT_EQ(yama::internal::fullname_of(type2), "abc"_str);
+    EXPECT_EQ(yama::internal::fullname_of(type3), "abc"_str);
+    EXPECT_EQ(yama::internal::fullname_of(type4), "abc"_str);
 }
 

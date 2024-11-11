@@ -11,7 +11,6 @@
 #include <yama/core/scalars.h>
 #include <yama/core/debug.h>
 #include <yama/core/yama_gram.h>
-#include <yama/debug-impls/stderr_debug.h>
 
 
 // IMPORTANT: see yama_gram.cpp for config about whether or not the below unit tests

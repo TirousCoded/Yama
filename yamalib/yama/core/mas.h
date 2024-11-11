@@ -207,6 +207,8 @@ namespace yama {
         inline mas(std::shared_ptr<debug> dbg = nullptr) 
             : api_component(dbg) {}
 
+        virtual ~mas() noexcept = default;
+
 
         // report returns a string encapsulating diagnostic
         // information about MAS memory usage
