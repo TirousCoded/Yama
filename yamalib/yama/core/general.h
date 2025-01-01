@@ -37,7 +37,7 @@ namespace yama {
     concept hashable_type = 
         requires (const T v)
     {
-        { std::hash<T>{}(v) } -> std::convertible_to<size_t>;
+        { std::hash<T>{}(v) } noexcept -> std::convertible_to<size_t>;
     };
 
     template<typename To, typename From>

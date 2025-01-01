@@ -608,7 +608,7 @@ yama::internal::ast_Chunk& yama::internal::second_pass::_get_root() const noexce
 }
 
 const taul::source_code& yama::internal::second_pass::_get_src() const noexcept {
-    return deref_assert(_src);
+    return yama::deref_assert(_src);
 }
 
 yama::internal::csymtab_group_ctti& yama::internal::second_pass::_get_csymtabs() const noexcept {

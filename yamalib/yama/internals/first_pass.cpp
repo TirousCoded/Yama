@@ -150,7 +150,7 @@ yama::internal::ast_Chunk& yama::internal::first_pass::_get_root() const noexcep
 }
 
 const taul::source_code& yama::internal::first_pass::_get_src() const noexcept {
-    return deref_assert(_src);
+    return yama::deref_assert(_src);
 }
 
 yama::internal::csymtab_group_ctti& yama::internal::first_pass::_get_csymtabs() const noexcept {

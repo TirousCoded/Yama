@@ -9,6 +9,8 @@
 #include "general.h"
 #include "res.h"
 
+#include "spinlock.h"
+
 #include "scalars.h"
 
 #include "debug.h"

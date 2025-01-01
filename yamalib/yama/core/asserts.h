@@ -26,22 +26,9 @@
 // nullptr* in scenarios where we otherwise 100% know the pointer is safe
 
 namespace yama {
-    template<typename T>
-    concept deref_assert_input_type =
-        requires (T v)
-    {
-        // TODO: how can be require *v to not return void?
-
-        // we don't care what T derefs to
-        *v;
-
-        { (bool)v } -> std::convertible_to<bool>;
-    };
-
-    template<deref_assert_input_type T>
-    inline auto&& deref_assert(T x) {
-        YAMA_ASSERT(bool(x));
-        return *x;
+    template<taul::deref_assert_input_type T>
+    inline auto&& deref_assert(T&& x) {
+        return taul::deref_assert(std::forward<T>(x));
     }
 }
 

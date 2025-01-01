@@ -121,12 +121,8 @@ inline yama::const_table::const_table(const internal::type_instance<Allocator>& 
 
 template<yama::const_type C>
 inline std::optional<yama::const_data_of_t<C>> yama::const_table::get(const_t x) const noexcept {
-    if (x >= size()) { // out-of-bounds
-        return std::nullopt;
-    }
-    if (!_mem.elems()[x].holds(C)) { // wrong const_type, or is a stub
-        return std::nullopt;
-    }
-    return std::make_optional(_mem.elems()[x].as<C>());
+    if (x >= size())                return std::nullopt; // out-of-bounds
+    if (!_mem.elems()[x].holds(C))  return std::nullopt; // wrong const_type, or is a stub
+    return _mem.elems()[x].as<C>();
 }
 
