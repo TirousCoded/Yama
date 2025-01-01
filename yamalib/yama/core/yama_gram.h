@@ -9,7 +9,7 @@
 namespace yama {
 
 
-    // NOTE: this is tested in tests/taul-specs/yama-spec-tests.cpp
+    // NOTE: this is tested in tests/taul-specs/yama-gram-tests.cpp
 
     // yama::yama_gram loads the Yama grammar
 

@@ -20,7 +20,7 @@
 using namespace yama::string_literals;
 
 
-class YamaSpecTests : public testing::Test {
+class YamaGramTests : public testing::Test {
 protected:
     
     std::shared_ptr<yama::debug> dbg;
@@ -43,14 +43,14 @@ protected:
     }
 };
 
-std::optional<taul::grammar> YamaSpecTests::gram = std::nullopt;
+std::optional<taul::grammar> YamaGramTests::gram = std::nullopt;
 
 
-TEST_F(YamaSpecTests, GrammarLoads) {
+TEST_F(YamaGramTests, GrammarLoads) {
     ASSERT_TRUE(gram);
 }
 
-TEST_F(YamaSpecTests, LPRs) {
+TEST_F(YamaGramTests, LPRs) {
     ASSERT_TRUE(gram);
 
     EXPECT_EQ(gram->nonsupport_lprs(), 33);
@@ -164,7 +164,7 @@ auto _fail =\
 // TODO: replace w/ TAUL library utils for unit testing Yama spec LPRs
 
 #define _KW_TEST(_KW_, _LITERAL_, _LEN_) \
-TEST_F(YamaSpecTests, _KW_) {\
+TEST_F(YamaGramTests, _KW_) {\
     _SETUP_FOR_LPR(taul::str::lit(#_KW_));\
 \
     constexpr taul::source_len len = _LEN_;\
@@ -188,7 +188,7 @@ TEST_F(YamaSpecTests, _KW_) {\
 // need this quick-n'-dirty *alt* version to account for NAN being taken by a preprocessor def
 
 #define _KW_TEST_ALT(_KW_, _LITERAL_, _LEN_) \
-TEST_F(YamaSpecTests, _KW_ ## 0) {\
+TEST_F(YamaGramTests, _KW_ ## 0) {\
     _SETUP_FOR_LPR(taul::str::lit(#_KW_));\
 \
     constexpr taul::source_len len = _LEN_;\
@@ -225,7 +225,7 @@ _KW_TEST(RETURN, "return", 6);
 // TODO: replace w/ TAUL library utils for unit testing Yama spec LPRs
 
 #define _OP_TEST(_OP_, _LITERAL_, _LEN_) \
-TEST_F(YamaSpecTests, _OP_) {\
+TEST_F(YamaGramTests, _OP_) {\
     _SETUP_FOR_LPR(taul::str::lit(#_OP_));\
 \
     constexpr taul::source_len len = _LEN_;\
@@ -257,7 +257,7 @@ _OP_TEST(COMMA, ","_str, 1);
 _OP_TEST(COLON, ":"_str, 1);
 _OP_TEST(SEMI, ";"_str, 1);
 
-TEST_F(YamaSpecTests, IDENTIFIER) {
+TEST_F(YamaGramTests, IDENTIFIER) {
     _SETUP_FOR_LPR("IDENTIFIER"_str);
 
     _succeed("a"_str, 1);
@@ -277,7 +277,7 @@ TEST_F(YamaSpecTests, IDENTIFIER) {
     _fail("?*&"_str);
 }
 
-TEST_F(YamaSpecTests, FLOAT) {
+TEST_F(YamaGramTests, FLOAT) {
     _SETUP_FOR_LPR("FLOAT"_str);
 
     _succeed("0.0"_str, 3);
@@ -449,7 +449,7 @@ TEST_F(YamaSpecTests, FLOAT) {
     _fail("nan"_str);
 }
 
-TEST_F(YamaSpecTests, INT_DEC) {
+TEST_F(YamaGramTests, INT_DEC) {
     _SETUP_FOR_LPR("INT_DEC"_str);
 
     _succeed("0"_str, 1);
@@ -505,7 +505,7 @@ TEST_F(YamaSpecTests, INT_DEC) {
     _fail("-10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
-TEST_F(YamaSpecTests, INT_HEX) {
+TEST_F(YamaGramTests, INT_HEX) {
     _SETUP_FOR_LPR("INT_HEX"_str);
 
     _succeed("0x0"_str, 3);
@@ -588,7 +588,7 @@ TEST_F(YamaSpecTests, INT_HEX) {
     _fail("-0x10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
-TEST_F(YamaSpecTests, INT_BIN) {
+TEST_F(YamaGramTests, INT_BIN) {
     _SETUP_FOR_LPR("INT_BIN"_str);
 
     _succeed("0b0"_str, 3);
@@ -631,7 +631,7 @@ TEST_F(YamaSpecTests, INT_BIN) {
     _fail("-0b10u"_str); // legal int, except for the 'u' at the end (this prevents uint misinterpret)
 }
 
-TEST_F(YamaSpecTests, UINT_DEC) {
+TEST_F(YamaGramTests, UINT_DEC) {
     _SETUP_FOR_LPR("UINT_DEC"_str);
 
     _succeed("0u"_str, 2);
@@ -666,7 +666,7 @@ TEST_F(YamaSpecTests, UINT_DEC) {
     _fail("__10u"_str);
 }
 
-TEST_F(YamaSpecTests, UINT_HEX) {
+TEST_F(YamaGramTests, UINT_HEX) {
     _SETUP_FOR_LPR("UINT_HEX"_str);
 
     _succeed("0x0u"_str, 4);
@@ -716,7 +716,7 @@ TEST_F(YamaSpecTests, UINT_HEX) {
     _fail("0xu"_str);
 }
 
-TEST_F(YamaSpecTests, UINT_BIN) {
+TEST_F(YamaGramTests, UINT_BIN) {
     _SETUP_FOR_LPR("UINT_BIN"_str);
 
     _succeed("0b0u"_str, 4);
@@ -746,7 +746,7 @@ TEST_F(YamaSpecTests, UINT_BIN) {
     _fail("0bu"_str);
 }
 
-TEST_F(YamaSpecTests, CHAR) {
+TEST_F(YamaGramTests, CHAR) {
     _SETUP_FOR_LPR("CHAR"_str);
 
     for (yama::char_t i = 0x00; i < 0x80; i++) {
@@ -816,7 +816,7 @@ TEST_F(YamaSpecTests, CHAR) {
     _fail("abc'"_str);
 }
 
-TEST_F(YamaSpecTests, WHITESPACE) {
+TEST_F(YamaGramTests, WHITESPACE) {
     _SETUP_FOR_LPR("WHITESPACE"_str);
     lexer.cut_skip_tokens = false;
 
@@ -849,7 +849,7 @@ TEST_F(YamaSpecTests, WHITESPACE) {
     _fail("?*&"_str);
 }
 
-TEST_F(YamaSpecTests, NEWLINE) {
+TEST_F(YamaGramTests, NEWLINE) {
     _SETUP_FOR_LPR("NEWLINE"_str);
     lexer.cut_skip_tokens = false;
 
@@ -883,7 +883,7 @@ TEST_F(YamaSpecTests, NEWLINE) {
     _fail("?*&"_str);
 }
 
-TEST_F(YamaSpecTests, SL_COMMENT) {
+TEST_F(YamaGramTests, SL_COMMENT) {
     _SETUP_FOR_LPR("SL_COMMENT"_str);
     lexer.cut_skip_tokens = false;
 
@@ -1012,7 +1012,7 @@ static std::shared_ptr<taul::parser> prep_for_ppr_test(
 
 static bool pprs_ready = false;
 
-TEST_F(YamaSpecTests, PPRs) {
+TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram);
 
     EXPECT_EQ(gram->pprs(), 27);
@@ -1061,7 +1061,7 @@ TEST_F(YamaSpecTests, PPRs) {
 }
 
 
-TEST_F(YamaSpecTests, Chunk_Empty) {
+TEST_F(YamaGramTests, Chunk_Empty) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1093,7 +1093,7 @@ TEST_F(YamaSpecTests, Chunk_Empty) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Chunk_NonEmpty) {
+TEST_F(YamaGramTests, Chunk_NonEmpty) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1152,7 +1152,7 @@ TEST_F(YamaSpecTests, Chunk_NonEmpty) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Decl_VarDecl) {
+TEST_F(YamaGramTests, Decl_VarDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1182,7 +1182,7 @@ TEST_F(YamaSpecTests, Decl_VarDecl) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Decl_FnDecl) {
+TEST_F(YamaGramTests, Decl_FnDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1222,7 +1222,7 @@ TEST_F(YamaSpecTests, Decl_FnDecl) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_NoAssign) {
+TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_NoAssign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1249,7 +1249,7 @@ TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_NoAssign) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_TypeAnnot_NoAssign) {
+TEST_F(YamaGramTests, VarDecl_TypeAnnot_NoAssign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1285,7 +1285,7 @@ TEST_F(YamaSpecTests, VarDecl_TypeAnnot_NoAssign) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_Assign) {
+TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_Assign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1331,7 +1331,7 @@ TEST_F(YamaSpecTests, VarDecl_NoTypeAnnot_Assign) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, VarDecl_TypeAnnot_Assign) {
+TEST_F(YamaGramTests, VarDecl_TypeAnnot_Assign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1386,7 +1386,7 @@ TEST_F(YamaSpecTests, VarDecl_TypeAnnot_Assign) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, FnDecl) {
+TEST_F(YamaGramTests, FnDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1425,7 +1425,7 @@ TEST_F(YamaSpecTests, FnDecl) {
 
 // IMPORTANT: 'CallSig', 'ParamDecl', and 'Result' will be tested as a unit
 
-TEST_F(YamaSpecTests, CallSig_NoParams_NoResult) {
+TEST_F(YamaGramTests, CallSig_NoParams_NoResult) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1450,7 +1450,7 @@ TEST_F(YamaSpecTests, CallSig_NoParams_NoResult) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, CallSig_NoParams_Result) {
+TEST_F(YamaGramTests, CallSig_NoParams_Result) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1485,7 +1485,7 @@ TEST_F(YamaSpecTests, CallSig_NoParams_Result) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, CallSig_Params_NoResult) {
+TEST_F(YamaGramTests, CallSig_Params_NoResult) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1550,7 +1550,7 @@ TEST_F(YamaSpecTests, CallSig_Params_NoResult) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, CallSig_Params_Result) {
+TEST_F(YamaGramTests, CallSig_Params_Result) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1625,7 +1625,7 @@ TEST_F(YamaSpecTests, CallSig_Params_Result) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Block_NoStmt) {
+TEST_F(YamaGramTests, Block_NoStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1650,7 +1650,7 @@ TEST_F(YamaSpecTests, Block_NoStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Block_Stmt) {
+TEST_F(YamaGramTests, Block_Stmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1704,7 +1704,7 @@ TEST_F(YamaSpecTests, Block_Stmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_Decl) {
+TEST_F(YamaGramTests, Stmt_Decl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1737,7 +1737,7 @@ TEST_F(YamaSpecTests, Stmt_Decl) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_ExprStmt) {
+TEST_F(YamaGramTests, Stmt_ExprStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1777,7 +1777,7 @@ TEST_F(YamaSpecTests, Stmt_ExprStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_IfStmt) {
+TEST_F(YamaGramTests, Stmt_IfStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1826,7 +1826,7 @@ TEST_F(YamaSpecTests, Stmt_IfStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_LoopStmt) {
+TEST_F(YamaGramTests, Stmt_LoopStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1859,7 +1859,7 @@ TEST_F(YamaSpecTests, Stmt_LoopStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_BreakStmt) {
+TEST_F(YamaGramTests, Stmt_BreakStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1887,7 +1887,7 @@ TEST_F(YamaSpecTests, Stmt_BreakStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_ContinueStmt) {
+TEST_F(YamaGramTests, Stmt_ContinueStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1915,7 +1915,7 @@ TEST_F(YamaSpecTests, Stmt_ContinueStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Stmt_ReturnStmt) {
+TEST_F(YamaGramTests, Stmt_ReturnStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1943,7 +1943,7 @@ TEST_F(YamaSpecTests, Stmt_ReturnStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ExprStmt) {
+TEST_F(YamaGramTests, ExprStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1980,7 +1980,7 @@ TEST_F(YamaSpecTests, ExprStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ExprStmt_AssignStmt) {
+TEST_F(YamaGramTests, ExprStmt_AssignStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2030,7 +2030,7 @@ TEST_F(YamaSpecTests, ExprStmt_AssignStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IfStmt_NoElse) {
+TEST_F(YamaGramTests, IfStmt_NoElse) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2076,7 +2076,7 @@ TEST_F(YamaSpecTests, IfStmt_NoElse) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IfStmt_Else) {
+TEST_F(YamaGramTests, IfStmt_Else) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2130,7 +2130,7 @@ TEST_F(YamaSpecTests, IfStmt_Else) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IfStmt_ElseIf) {
+TEST_F(YamaGramTests, IfStmt_ElseIf) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2205,7 +2205,7 @@ TEST_F(YamaSpecTests, IfStmt_ElseIf) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, LoopStmt) {
+TEST_F(YamaGramTests, LoopStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2235,7 +2235,7 @@ TEST_F(YamaSpecTests, LoopStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, BreakStmt) {
+TEST_F(YamaGramTests, BreakStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2260,7 +2260,7 @@ TEST_F(YamaSpecTests, BreakStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ContinueStmt) {
+TEST_F(YamaGramTests, ContinueStmt) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2285,7 +2285,7 @@ TEST_F(YamaSpecTests, ContinueStmt) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ReturnStmt_NoExpr) {
+TEST_F(YamaGramTests, ReturnStmt_NoExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2310,7 +2310,7 @@ TEST_F(YamaSpecTests, ReturnStmt_NoExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, ReturnStmt_Expr) {
+TEST_F(YamaGramTests, ReturnStmt_Expr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2349,7 +2349,7 @@ TEST_F(YamaSpecTests, ReturnStmt_Expr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Expr_PrimaryExpr) {
+TEST_F(YamaGramTests, Expr_PrimaryExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2382,7 +2382,7 @@ TEST_F(YamaSpecTests, Expr_PrimaryExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Expr_CallExpr) {
+TEST_F(YamaGramTests, Expr_CallExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2414,7 +2414,7 @@ TEST_F(YamaSpecTests, Expr_CallExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Expr_SuffixNesting) {
+TEST_F(YamaGramTests, Expr_SuffixNesting) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2456,7 +2456,7 @@ TEST_F(YamaSpecTests, Expr_SuffixNesting) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, PrimaryExpr_IdentifierExpr) {
+TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2480,7 +2480,7 @@ TEST_F(YamaSpecTests, PrimaryExpr_IdentifierExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, PrimaryExpr_LitExpr) {
+TEST_F(YamaGramTests, PrimaryExpr_LitExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2510,7 +2510,7 @@ TEST_F(YamaSpecTests, PrimaryExpr_LitExpr) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Lit_IntLit) {
+TEST_F(YamaGramTests, Lit_IntLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2537,7 +2537,7 @@ TEST_F(YamaSpecTests, Lit_IntLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Lit_UIntLit) {
+TEST_F(YamaGramTests, Lit_UIntLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2564,7 +2564,7 @@ TEST_F(YamaSpecTests, Lit_UIntLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Lit_FloatLit) {
+TEST_F(YamaGramTests, Lit_FloatLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2591,7 +2591,7 @@ TEST_F(YamaSpecTests, Lit_FloatLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Lit_BoolLit) {
+TEST_F(YamaGramTests, Lit_BoolLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2618,7 +2618,7 @@ TEST_F(YamaSpecTests, Lit_BoolLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Lit_CharLit) {
+TEST_F(YamaGramTests, Lit_CharLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2645,7 +2645,7 @@ TEST_F(YamaSpecTests, Lit_CharLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IntLit_Dec) {
+TEST_F(YamaGramTests, IntLit_Dec) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2669,7 +2669,7 @@ TEST_F(YamaSpecTests, IntLit_Dec) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IntLit_Hex) {
+TEST_F(YamaGramTests, IntLit_Hex) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2693,7 +2693,7 @@ TEST_F(YamaSpecTests, IntLit_Hex) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, IntLit_Bin) {
+TEST_F(YamaGramTests, IntLit_Bin) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2717,7 +2717,7 @@ TEST_F(YamaSpecTests, IntLit_Bin) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, UIntLit_Dec) {
+TEST_F(YamaGramTests, UIntLit_Dec) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2741,7 +2741,7 @@ TEST_F(YamaSpecTests, UIntLit_Dec) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, UIntLit_Hex) {
+TEST_F(YamaGramTests, UIntLit_Hex) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2765,7 +2765,7 @@ TEST_F(YamaSpecTests, UIntLit_Hex) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, UIntLit_Bin) {
+TEST_F(YamaGramTests, UIntLit_Bin) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2789,7 +2789,7 @@ TEST_F(YamaSpecTests, UIntLit_Bin) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, FloatLit_FLOAT) {
+TEST_F(YamaGramTests, FloatLit_FLOAT) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2813,7 +2813,7 @@ TEST_F(YamaSpecTests, FloatLit_FLOAT) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, FloatLit_INF) {
+TEST_F(YamaGramTests, FloatLit_INF) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2837,7 +2837,7 @@ TEST_F(YamaSpecTests, FloatLit_INF) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, FloatLit_NAN) {
+TEST_F(YamaGramTests, FloatLit_NAN) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2861,7 +2861,7 @@ TEST_F(YamaSpecTests, FloatLit_NAN) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, BoolLit_True) {
+TEST_F(YamaGramTests, BoolLit_True) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2885,7 +2885,7 @@ TEST_F(YamaSpecTests, BoolLit_True) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, BoolLit_False) {
+TEST_F(YamaGramTests, BoolLit_False) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2909,7 +2909,7 @@ TEST_F(YamaSpecTests, BoolLit_False) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, CharLit) {
+TEST_F(YamaGramTests, CharLit) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2933,7 +2933,7 @@ TEST_F(YamaSpecTests, CharLit) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Assign) {
+TEST_F(YamaGramTests, Assign) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2971,7 +2971,7 @@ TEST_F(YamaSpecTests, Assign) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Args_Empty) {
+TEST_F(YamaGramTests, Args_Empty) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2996,7 +2996,7 @@ TEST_F(YamaSpecTests, Args_Empty) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, Args_NonEmpty) {
+TEST_F(YamaGramTests, Args_NonEmpty) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -3064,7 +3064,7 @@ TEST_F(YamaSpecTests, Args_NonEmpty) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, TypeAnnot) {
+TEST_F(YamaGramTests, TypeAnnot) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -3093,7 +3093,7 @@ TEST_F(YamaSpecTests, TypeAnnot) {
     EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
 }
 
-TEST_F(YamaSpecTests, TypeSpec) {
+TEST_F(YamaGramTests, TypeSpec) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};

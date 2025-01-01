@@ -69,10 +69,18 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
     const auto end = _callstk.crend();
     for (auto it = begin; it != end; std::advance(it, 1)) {
         const auto& callframe = *it;
-        result +=
-            callframe.t
-            ? std::format("\n{}[{}] {}", tab, number, deref_assert(callframe.t))
-            : std::format("\n{}[{}] <user>", tab, number);
+        if (number >= 10) {
+            result +=
+                callframe.t
+                ? std::format("\n{}[{}] {}", tab, number, deref_assert(callframe.t))
+                : std::format("\n{}[{}] <user>", tab, number);
+        }
+        else {
+            result +=
+                callframe.t
+                ? std::format("\n{}[0{}] {}", tab, number, deref_assert(callframe.t))
+                : std::format("\n{}[0{}] <user>", tab, number);
+        }
         // check for symbol info, and if so, add it to result
         if (callframe.t) {
             const auto info = internal::get_type_mem(deref_assert(callframe.t))->info;
