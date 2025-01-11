@@ -183,18 +183,8 @@ parser section:
     ContinueStmt                    : CONTINUE SEMI ;
     ReturnStmt                      : RETURN Expr? SEMI ;
 
-    # TODO: when we add more 'suffixes' to below, be sure to update our unit tests to
-    #       test that Yama can properly handle this kind of suffix-based nesting
-    #
-    #       we have a 'Expr_SuffixNesting' test, so be sure to revise this test to
-    #       cover multiple types of suffixes, and expand semantic tests, too
-
-    # TODO: put unary operator alts above PrimaryExpr stuff below
-
-    Expr                            : PrimaryExpr           # primary expr (if no suffix)
-                                        ( Args              # call expr
-                                        # TODO: place other expr 'suffixes' here
-                                        )*
+    precedence Expr                 : Expr Args             # call expr
+                                    | PrimaryExpr           # primary expr
                                     ;
                                     
     PrimaryExpr                     : IDENTIFIER            # identifier expr

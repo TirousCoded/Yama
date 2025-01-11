@@ -131,15 +131,17 @@ namespace yama {
         
         // instruction-level verif checks
 
-        bool _verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_RTop_exists(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RTop_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_none(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_none_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         // NOTE: 'this call' refers to the call the instruction is in, for verifying ret instrs
         bool _verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
-        bool _verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RC_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RC_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
@@ -151,9 +153,10 @@ namespace yama {
         bool _verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_arg_registers_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_param_arg_registers_are_correct_number_and_types(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_pushing_does_not_overflow(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
 
         // block-level verif checks
 
@@ -173,6 +176,14 @@ namespace yama {
         bool _jump_dest_in_bounds(const bc::code& bcode, size_t i, int16_t sBx);
 
         std::optional<size_t> _find_type_const(const type_info& subject, const str& x);
+
+        bool _is_newtop(uint8_t x) const noexcept;
+
+        void _push(str type, _cfg_block& block);
+        void _put(str type, size_t index, _cfg_block& block);
+        void _pop(size_t n, _cfg_block& block);
+
+        static std::string fmt_reg_set_state_diagnostic(const _reg_set_state& x);
     };
 }
 

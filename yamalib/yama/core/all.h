@@ -23,6 +23,7 @@
 
 #include "ptype.h"
 #include "call_fn.h"
+#include "newtop.h"
 #include "bcode.h"
 
 #include "callsig_info.h"

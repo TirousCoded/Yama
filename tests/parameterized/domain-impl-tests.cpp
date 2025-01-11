@@ -56,7 +56,7 @@ yama::type_info f_info{
     .info = yama::function_info{
         .callsig = f_callsig,
         .call_fn = yama::noop_call_fn,
-        .locals = 4,
+        .max_locals = 4,
     },
 };
 
@@ -74,7 +74,7 @@ yama::type_info bad_info{
     .info = yama::function_info{
         .callsig = bad_callsig,
         .call_fn = yama::noop_call_fn,
-        .locals = 4,
+        .max_locals = 4,
     },
 };
 
@@ -761,9 +761,9 @@ fn pi() -> Float {
 
     EXPECT_TRUE(dm->load("pi"_str));
 
-    yama::context ctx(dm, yama::default_ctx_config, dbg);
+    yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
     ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
 
     EXPECT_TRUE(ctx.ll_local(0));
@@ -792,9 +792,9 @@ fn pi() -> Float {
 
     EXPECT_TRUE(dm->load("pi"_str));
 
-    yama::context ctx(dm, yama::default_ctx_config, dbg);
+    yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
     ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
 
     EXPECT_TRUE(ctx.ll_local(0));
@@ -812,9 +812,9 @@ TEST_P(DomainImplTests, Upload_FilePath) {
 
     EXPECT_TRUE(dm->load("pi"_str));
 
-    yama::context ctx(dm, yama::default_ctx_config, dbg);
+    yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_load_fn(0, dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
     ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
 
     EXPECT_TRUE(ctx.ll_local(0));

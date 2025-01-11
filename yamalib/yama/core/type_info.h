@@ -33,7 +33,7 @@ namespace yama {
     struct function_info final {
         callsig_info                    callsig;        // the call signature
         call_fn                         call_fn;        // the call_fn encapsulating call behaviour
-        size_t                          locals;         // the call frame's local register table size
+        size_t                          max_locals;     // the max local object stack height
         bc::code                        bcode;          // the bytecode (no static verif check if call_fn != bcode_call_fn)
         bc::syms                        bcodesyms;      // the bytecode symbol info
 
@@ -59,7 +59,7 @@ namespace yama {
         std::optional<ptype> ptype() const noexcept;
         const callsig_info* callsig() const noexcept;
         std::optional<call_fn> call_fn() const noexcept;
-        size_t locals() const noexcept; // returns 0 if the type is not callable
+        size_t max_locals() const noexcept; // returns 0 if the type is not callable
         const bc::code* bcode() const noexcept;
         const bc::syms* bcodesyms() const noexcept;
 

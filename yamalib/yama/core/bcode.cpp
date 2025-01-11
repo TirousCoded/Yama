@@ -7,12 +7,13 @@
 
 std::string yama::bc::fmt_opcode(opcode x) {
     std::string result{};
-    static_assert(opcodes == 11);
+    static_assert(opcodes == 12);
     switch (x) {
     case opcode::noop:          result = "noop";        break;
-    case opcode::load_none:     result = "load_none";   break;
-    case opcode::load_const:    result = "load_const";  break;
-    case opcode::load_arg:      result = "load_arg";    break;
+    case opcode::pop:           result = "pop";         break;
+    case opcode::put_none:      result = "put_none";    break;
+    case opcode::put_const:     result = "put_const";   break;
+    case opcode::put_arg:       result = "put_arg";     break;
     case opcode::copy:          result = "copy";        break;
     case opcode::call:          result = "call";        break;
     case opcode::call_nr:       result = "call_nr";     break;
@@ -47,27 +48,35 @@ std::string yama::bc::code::fmt_instr(size_t x, const char* tab) const {
     YAMA_ASSERT(tab);
     YAMA_ASSERT(x < count());
     const auto& instr = get(x);
+    auto maybe_nt =
+        [](uint8_t x) -> std::string {
+        return
+            x == uint8_t(newtop)
+            ? "NT"
+            : std::format("{}", x);
+        };
     std::string a{};
-    static_assert(opcodes == 11);
+    static_assert(opcodes == 12);
     switch (instr.opc) {
-    case opcode::noop:          a = std::format("{: <12}", ' ');                                    break;
-    case opcode::load_none:     a = std::format("{: <12}", instr.A);                                break;
-    case opcode::load_const:    a = std::format("{: <4}{: <8}", instr.A, instr.B);                  break;
-    case opcode::load_arg:      a = std::format("{: <4}{: <8}", instr.A, instr.B);                  break;
-    case opcode::copy:          a = std::format("{: <4}{: <8}", instr.A, instr.B);                  break;
-    case opcode::call:          a = std::format("{: <4}{: <4}{: <4}", instr.A, instr.B, instr.C);   break;
-    case opcode::call_nr:       a = std::format("{: <4}{: <8}", instr.A, instr.B);                  break;
-    case opcode::ret:           a = std::format("{: <12}", instr.A);                                break;
-    case opcode::jump:          a = std::format("{: <12}", instr.sBx);                              break;
-    case opcode::jump_true:     a = std::format("{: <4}{: <8}", instr.A, instr.sBx);                break;
-    case opcode::jump_false:    a = std::format("{: <4}{: <8}", instr.A, instr.sBx);                break;
-    default:                    YAMA_DEADEND;                                                       break;
+    case opcode::noop:          a = std::format("{: <12}", ' ');                                            break;
+    case opcode::pop:           a = std::format("{: <12}", instr.A);                                        break;
+    case opcode::put_none:      a = std::format("{: <12}", maybe_nt(instr.A));                              break;
+    case opcode::put_const:     a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);                break;
+    case opcode::put_arg:       a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);                break;
+    case opcode::copy:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));                break;
+    case opcode::call:          a = std::format("{: <4}{: <4}{: <4}", instr.A, instr.B, maybe_nt(instr.C)); break;
+    case opcode::call_nr:       a = std::format("{: <4}{: <8}", instr.A, instr.B);                          break;
+    case opcode::ret:           a = std::format("{: <12}", instr.A);                                        break;
+    case opcode::jump:          a = std::format("{: <12}", instr.sBx);                                      break;
+    case opcode::jump_true:     a = std::format("{: <4}{: <8}", instr.A, instr.sBx);                        break;
+    case opcode::jump_false:    a = std::format("{: <4}{: <8}", instr.A, instr.sBx);                        break;
+    default:                    YAMA_DEADEND;                                                               break;
     }
     std::string result = std::format("{}{: <5}{: <16}{}", tab, x, get(x).opc, a);
     if (reinit_flag(x)) {
         result += "(reinit)";
     }
-    static_assert(opcodes == 11);
+    static_assert(opcodes == 12);
     if (
         get(x).opc == opcode::jump ||
         get(x).opc == opcode::jump_true ||
@@ -96,21 +105,27 @@ yama::bc::code& yama::bc::code::add_noop() {
     return *this;
 }
 
-yama::bc::code& yama::bc::code::add_load_none(uint8_t A, bool reinit) {
-    _instrs.push_back(instr{ .opc = opcode::load_none, .A = A });
+yama::bc::code& yama::bc::code::add_pop(uint8_t A) {
+    _instrs.push_back(instr{ .opc = opcode::pop, .A = A });
+    _reinit_flags.push_back(false);
+    return *this;
+}
+
+yama::bc::code& yama::bc::code::add_put_none(uint8_t A, bool reinit) {
+    _instrs.push_back(instr{ .opc = opcode::put_none, .A = A });
     _reinit_flags.push_back(reinit);
     return *this;
 }
 
-yama::bc::code& yama::bc::code::add_load_const(uint8_t A, uint8_t B, bool reinit) {
-    _instrs.push_back(instr{ .opc = opcode::load_const, .A = A });
+yama::bc::code& yama::bc::code::add_put_const(uint8_t A, uint8_t B, bool reinit) {
+    _instrs.push_back(instr{ .opc = opcode::put_const, .A = A });
     _instrs.back().B = B;
     _reinit_flags.push_back(reinit);
     return *this;
 }
 
-yama::bc::code& yama::bc::code::add_load_arg(uint8_t A, uint8_t B, bool reinit) {
-    _instrs.push_back(instr{ .opc = opcode::load_arg, .A = A });
+yama::bc::code& yama::bc::code::add_put_arg(uint8_t A, uint8_t B, bool reinit) {
+    _instrs.push_back(instr{ .opc = opcode::put_arg, .A = A });
     _instrs.back().B = B;
     _reinit_flags.push_back(reinit);
     return *this;
@@ -223,18 +238,23 @@ yama::bc::code_writer& yama::bc::code_writer::add_noop() {
     return *this;
 }
 
-yama::bc::code_writer& yama::bc::code_writer::add_load_none(uint8_t A, bool reinit) {
-    _result.add_load_none(A, reinit);
+yama::bc::code_writer& yama::bc::code_writer::add_pop(uint8_t A) {
+    _result.add_pop(A);
     return *this;
 }
 
-yama::bc::code_writer& yama::bc::code_writer::add_load_const(uint8_t A, uint8_t B, bool reinit) {
-    _result.add_load_const(A, B, reinit);
+yama::bc::code_writer& yama::bc::code_writer::add_put_none(uint8_t A, bool reinit) {
+    _result.add_put_none(A, reinit);
     return *this;
 }
 
-yama::bc::code_writer& yama::bc::code_writer::add_load_arg(uint8_t A, uint8_t B, bool reinit) {
-    _result.add_load_arg(A, B, reinit);
+yama::bc::code_writer& yama::bc::code_writer::add_put_const(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_put_const(A, B, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_put_arg(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_put_arg(A, B, reinit);
     return *this;
 }
 

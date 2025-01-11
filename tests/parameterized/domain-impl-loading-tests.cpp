@@ -95,7 +95,7 @@ TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 5), // ie. fn() -> b0
             .call_fn = yama::noop_call_fn,
-            .locals = 10,
+            .max_locals = 10,
         },
     };
 
@@ -677,7 +677,7 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_KindMismatch) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::noop_call_fn,
-            .locals = 10,
+            .max_locals = 10,
         },
     };
     yama::type_info c_info{
@@ -749,7 +749,7 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_CallSigMismatch) {
         .info = yama::function_info{
             .callsig = clever_callsig_info_for_test,
             .call_fn = yama::noop_call_fn,
-            .locals = 10,
+            .max_locals = 10,
         },
     };
     yama::type_info b_info{
@@ -758,7 +758,7 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_CallSigMismatch) {
         .info = yama::function_info{
             .callsig = clever_callsig_info_for_test,
             .call_fn = yama::noop_call_fn,
-            .locals = 10,
+            .max_locals = 10,
         },
     };
     yama::type_info c_info{

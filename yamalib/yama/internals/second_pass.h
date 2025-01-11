@@ -19,6 +19,8 @@ namespace yama::internal {
 
     // IMPORTANT:
     //      second pass responsibilities:
+    //          - resolve deduced types of local var symbols
+    //          - resolve register indices of local var symbols
     //          - code generation
     //              - type_info
     //              - constant tables
@@ -213,57 +215,40 @@ namespace yama::internal {
         // it during their visit_end method call
 
         // the stack holds two types of registers: 'temporaries' and 'local vars'
-        
-        // alongside this stack, a counter is used to record how deeply nested the
-        // evaluation is within Yama blocks
-
-        // each register on the register stack records the scope depth value when it
-        // was pushed, w/ this info being used to automatically unwind local vars once
-        // they go out-of-scope
-
-        // alongside this mechanism, temporaries may be consumed during expr eval
-
-        // finally, notice that local vars also get an additional mechanism used to
-        // look them up by var decl ast_id_t (as we CANNOT use local var name strings,
-        // due to shadowing!)
 
         struct _reg_t final {
-            str                     type;               // the name of the type encapsulated by the register
-            std::optional<ast_id_t> localvar;           // ast_id_t of the local var of this register (or std::nullopt if a temporary)
-            size_t                  index       = 0;    // the stack index of this register
-            size_t                  depth       = 0;    // how nested is this register
+            str                             type;               // the name of the type encapsulated by the register
+            std::optional<str>              localvar;           // name of the local var of this register (or std::nullopt if a temporary)
+            size_t                          index       = 0;    // the stack index of this register
 
 
             inline bool is_temp() const noexcept { return !localvar.has_value(); }
             inline bool is_localvar() const noexcept { return !is_temp(); }
         };
 
+        struct _scope_t final {
+            size_t                          regs        = 0;    // how many temporaries/local vars this scope has
+            size_t                          first_reg   = 0;    // the first reg on stack which belongs to this scope
+        };
+
         // IMPORTANT:
-        //      we impose a limit of 255 registers allocated at a time, w/ us raising an
+        //      we impose a limit of 254 registers allocated at a time, w/ us raising an
         //      error if this limit is exceeded
         //
         //      the rest of the system, however, doesn't see this limit, and will simply
         //      continue to operate w/out regards for this limit
         //
         //      when using cw to write bcode, writing stack indices into register fields
-        //      A, B, and C, which are >255, will result in a mangled value being written
+        //      A, B, and C, which are >254, will result in a mangled value being written
         //      as a result of the overflow from casting to uint8_t
+        //
+        //      the reason 254 was chosen instead of 255 is to ensure that no issues occur
+        //      w/ the yama::newtop constant
 
-        static constexpr size_t _reg_limit = std::numeric_limits<uint8_t>::max();
+        static constexpr size_t _reg_limit = size_t((uint8_t)yama::newtop) - 1;
 
-        // below, _scope_regs_to_sanitize is used to keep track of what registers where
-        // allocated, then deallocated, during eval of the block, and which remain deallocated
-        // at the block's end, and thus should be *sanitized* w/ load_none instrs in order
-        // to maintain register coherence
-
-        size_t _scope_depth = 0;
-        std::vector<std::unordered_set<size_t>> _scope_regs_to_sanitize;
         std::vector<_reg_t> _regstk;
-        std::unordered_map<ast_id_t, size_t> _localvars_map;
-        std::unordered_map<ast_id_t, str> _localvar_type_map;
-
-        void _push_scope(); // enters new nested scope
-        void _pop_scope(const ast_Block& x); // exists inner-most nested scope, unwinding local vars
+        std::vector<_scope_t> _scopestk;
 
         size_t _regs() const noexcept;
 
@@ -272,37 +257,36 @@ namespace yama::internal {
         _reg_t& _reg_abs(size_t index);
         _reg_t& _reg(ssize_t index); // negative values index from top downward (in Lua style)
         _reg_t& _top_reg();
-        _reg_t& _localvar_reg(const ast_node& x);
+
+        _scope_t& _top_scope();
+
+        // IMPORTANT: _pop_temp can auto-write pop instr, but _push_temp does not auto-write
+        //            instr pushing the temporary
+
+        // IMPORTANT: _pop_temp can pop local var registers, but it WILL NOT REMOVE THE METADATA
+        //            FOR THE LOCAL VAR, meaning that if you pop a local var register, and then
+        //            lookup the local var, you'll get its entry even though it shouldn't be
+        //            valid anymore
 
         void _push_temp(const ast_node& x, str type);
-        void _pop_temp(size_t n = 1);
+        void _pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos = 0);
+
+        // _reinit_temp is used to change the type of existing temporaries/local vars
+
+        void _reinit_temp(ssize_t index, str new_type); // allows negative indices, like _reg
+
+        void _push_scope();
+        void _pop_scope(const ast_Block& x, bool write_pop_instr); // unwinds local vars
 
         // for local vars, we're gonna have it be that we *promote* temporaries to local vars
 
-        void _promote_to_localvar(const ast_VarDecl& x);
+        // this updates the symbol table entry w/
+
+        void _promote_to_localvar(ast_VarDecl& x);
 
         // for type checking, the following is used to check the type expect of a register
 
         bool _reg_type_check(ssize_t index, str expected); // allows negative indices, like _reg
-
-        // this is needed as unannotated types must deduce their type from their initializer
-
-        std::optional<str> _get_localvar_type(const ast_VarDecl& x);
-
-        // this is used to write load_none instrs to *sanitize* registers which have been
-        // deallocated, in order to preserve register coherence
-
-        // specifically, register indices [index, index+n) are sanitized
-
-        // take note that the absolute register index below may refer to out-of-bounds
-        // indices in order to sanitize registers which were popped (which is useful)
-
-        void _sanitize_regs(taul::source_pos pos, size_t index, size_t n = 1);
-
-        // this is used to manually perform the sanitizing work that would normally only
-        // be done at the end of the scope, then dumping _scope_regs_to_sanitize.back()
-
-        void _sanitize_here(taul::source_pos pos);
 
 
         // this set is used to record the body blocks of fn decls

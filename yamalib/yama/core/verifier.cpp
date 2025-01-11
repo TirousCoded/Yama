@@ -10,6 +10,9 @@
 using namespace yama::string_literals;
 
 
+#define _LOG_SYMBOLIC_EXEC 0
+
+
 yama::verifier::verifier(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
 
@@ -29,7 +32,7 @@ std::string yama::default_verifier::_cfg_block::fmt() const {
 }
 
 bool yama::default_verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 11);
+    static_assert(bc::opcodes == 12);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
     case bc::opcode::jump:          return true;
@@ -40,7 +43,7 @@ bool yama::default_verifier::_cfg_block::final_instr_has_jump(const bc::code& bc
 }
 
 bool yama::default_verifier::_cfg_block::final_instr_has_fallthrough(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 11);
+    static_assert(bc::opcodes == 12);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
     case bc::opcode::jump:          return false;
@@ -97,7 +100,7 @@ void yama::default_verifier::_dump_cfg(const yama::type_info& subject, const bc:
         }
         else {
             for (size_t j = 0; j < b.initial_reg_set.size(); j++) {
-                YAMA_LOG(dbg(), verif_error_c, "{}{}register {}: {}", tab, tab, j, b.initial_reg_set[j]);
+                YAMA_LOG(dbg(), verif_error_c, "{}{}R({}): {}", tab, tab, j, b.initial_reg_set[j]);
             }
         }
         YAMA_LOG(dbg(), verif_error_c, "{}final register states:", tab);
@@ -109,7 +112,7 @@ void yama::default_verifier::_dump_cfg(const yama::type_info& subject, const bc:
         }
         else {
             for (size_t j = 0; j < b.final_reg_set.size(); j++) {
-                YAMA_LOG(dbg(), verif_error_c, "{}{}register {}: {}", tab, tab, j, b.final_reg_set[j]);
+                YAMA_LOG(dbg(), verif_error_c, "{}{}R({}): {}", tab, tab, j, b.final_reg_set[j]);
             }
         }
     }
@@ -331,7 +334,7 @@ void yama::default_verifier::_build_cfg_division_points(const bc::code& bcode) {
     _add_start_and_end_division_points(bcode);
     for (size_t i = 0; i < bcode.count(); i++) {
         const auto instr = bcode[i];
-        static_assert(bc::opcodes == 11);
+        static_assert(bc::opcodes == 12);
         if (instr.opc == bc::opcode::ret) {
             _add_end_of_instr_division_point(bcode, i);
         }
@@ -414,6 +417,10 @@ bool yama::default_verifier::_visit_entrypoint_block(const type_info& subject, c
             dbg(), verif_warning_c,
             "warning: {} bcode symbolic execution aborted; there may be additional issues which hadn't yet been detected!",
             subject.fullname);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "{}",
+            subject.consts);
         if (const auto bc = subject.bcode()) {
             YAMA_LOG(
                 dbg(), verif_error_c,
@@ -483,26 +490,43 @@ bool yama::default_verifier::_visit_unprocessed_block(const type_info& subject, 
 }
 
 bool yama::default_verifier::_verify_no_register_coherence_violation(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
-    YAMA_ASSERT(block.initial_reg_set.size() == incoming_reg_set.size());
     bool success = true;
-    for (size_t i = 0; i < block.initial_reg_set.size(); i++) {
-        const auto& incoming = incoming_reg_set[i];
-        const auto& expected = block.initial_reg_set[i];
-        if (incoming == expected) {
-            continue;
+    if (block.initial_reg_set.size() == incoming_reg_set.size()) {
+        for (size_t i = 0; i < block.initial_reg_set.size(); i++) {
+            const auto& incoming = incoming_reg_set[i];
+            const auto& expected = block.initial_reg_set[i];
+            if (incoming == expected) {
+                continue;
+            }
+            YAMA_RAISE(dbg(), dsignal::verif_violates_register_coherence);
+            YAMA_LOG(
+                dbg(), verif_error_c,
+                "error: {} bcode register coherence violation: for {}, incoming register {} is type {}, but dest {} expected type {}!",
+                subject.fullname, _fmt_branch(incoming_branched_from, block.first), i, incoming, block.fmt(), expected);
+            // don't abort after detecting one violation, instead report for any and all registers in error
+            success = false;
         }
+    }
+    else {
         YAMA_RAISE(dbg(), dsignal::verif_violates_register_coherence);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode register coherence violation: for {}, incoming register {} is type {}, but dest {} expected type {}!",
-            subject.fullname, _fmt_branch(incoming_branched_from, block.first), i, incoming, block.fmt(), expected);
-        // don't abort after detecting one violation, instead report for any and all registers in error
+            "error: {} bcode register coherence violation: for {}, incoming register count is {}, but expected {}!",
+            subject.fullname, _fmt_branch(incoming_branched_from, block.first), incoming_reg_set.size(), block.initial_reg_set.size());
         success = false;
     }
     return success;
 }
 
 bool yama::default_verifier::_symbolic_exec(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+#if _LOG_SYMBOLIC_EXEC == 1
+    YAMA_LOG(
+        dbg(), general_c,
+        "symbolic exec (subject {}) (block {})\n(no success msg means exec failed)\ninitial_reg_set ~> {}",
+        subject.fullname,
+        block.fmt(),
+        fmt_reg_set_state_diagnostic(block.initial_reg_set));
+#endif
     for (size_t i = block.first; i < block.last; i++) {
         if (!_symbolic_exec_step(subject, bcode, block, incoming_reg_set, incoming_branched_from, i)) {
             return false;
@@ -520,86 +544,169 @@ bool yama::default_verifier::_symbolic_exec(const type_info& subject, const bc::
         !_verify_program_counter_valid_after_fallthrough(subject, bcode, block, block.final_instr_index())) {
         return false;
     }
+#if _LOG_SYMBOLIC_EXEC == 1
+        YAMA_LOG(
+            dbg(), general_c,
+            "symbolic exec *success*");
+#endif
     return true;
 }
 
 bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from, size_t i) {
     const auto instr = bcode[i];
-    static_assert(bc::opcodes == 11);
+#if _LOG_SYMBOLIC_EXEC == 1
+        YAMA_LOG(
+            dbg(), general_c,
+            "\n{}",
+            bcode.fmt_instr(i));
+#endif
+    static_assert(bc::opcodes == 12);
     switch (instr.opc) {
     case bc::opcode::noop:
     {
         // do nothing
     }
     break;
-    case bc::opcode::load_none:
+    case bc::opcode::pop:
     {
-        const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
-            _verify_RA_is_type_none_skip_if_reinit(subject, bcode, block, i);
-        if (!valid) {
-            return false;
-        }
-        block.final_reg_set[instr.A] = _none_type();
+        _pop(instr.A, block);
     }
     break;
-    case bc::opcode::load_const:
+    case bc::opcode::put_none:
     {
-        const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
+        if (_is_newtop(instr.A)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _push(_none_type(), block);
+        }
+        else {
+            const bool valid =
+                _verify_RA_in_bounds(subject, bcode, block, i) &&
+                _verify_RA_is_type_none_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _put(_none_type(), instr.A, block);
+        }
+    }
+    break;
+    case bc::opcode::put_const:
+    {
+        const bool valid0 =
             _verify_KoB_in_bounds(subject, bcode, i) &&
-            _verify_KoB_is_object_const(subject, bcode, i) &&
-            _verify_RA_and_KoB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
-        if (!valid) {
+            _verify_KoB_is_object_const(subject, bcode, i);
+        if (!valid0) {
             return false;
         }
-        block.final_reg_set[instr.A] = _Ko_type(subject, instr.B);
+        if (_is_newtop(instr.A)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _push(_Ko_type(subject, instr.B), block);
+        }
+        else {
+            const bool valid =
+                _verify_RA_in_bounds(subject, bcode, block, i) &&
+                _verify_RA_and_KoB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _put(_Ko_type(subject, instr.B), instr.A, block);
+        }
     }
     break;
-    case bc::opcode::load_arg:
+    case bc::opcode::put_arg:
     {
-        const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
-            _verify_ArgB_in_bounds(subject, bcode, i) &&
-            _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
-        if (!valid) {
+        const bool valid0 =
+            _verify_ArgB_in_bounds(subject, bcode, i);
+        if (!valid0) {
             return false;
         }
-        block.final_reg_set[instr.A] = _Arg_type(subject, instr.B);
+        if (_is_newtop(instr.A)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _push(_Arg_type(subject, instr.B), block);
+        }
+        else {
+            const bool valid =
+                _verify_RA_in_bounds(subject, bcode, block, i) &&
+                _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _put(_Arg_type(subject, instr.B), instr.A, block);
+        }
     }
     break;
     case bc::opcode::copy:
     {
-        const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
-            _verify_RB_in_bounds(subject, bcode, i) &&
-            _verify_RA_and_RB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
-        if (!valid) {
+        const bool valid0 =
+            _verify_RA_in_bounds(subject, bcode, block, i);
+        if (!valid0) {
             return false;
         }
-        // NOTE: for copy, R(B) is the one that gets mutated by R(A), not the other way around
-        block.final_reg_set[instr.B] = _R_type(block, instr.A);
+        if (_is_newtop(instr.B)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            // NOTE: for copy, R(B) is the one that gets mutated by R(A), not the other way around
+            _push(_R_type(block, instr.A), block);
+        }
+        else {
+            const bool valid =
+                _verify_RB_in_bounds(subject, bcode, block, i) &&
+                _verify_RA_and_RB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            // NOTE: for copy, R(B) is the one that gets mutated by R(A), not the other way around
+            _put(_R_type(block, instr.A), instr.B, block);
+        }
     }
     break;
     case bc::opcode::call:
     {
-        const bool valid =
-            _verify_arg_registers_in_bounds(subject, bcode, i) &&
+        const bool valid0 =
+            _verify_arg_registers_in_bounds(subject, bcode, block, i) &&
             _verify_arg_registers_have_at_least_one_object(subject, bcode, i) &&
             _verify_RA_is_legal_call_object(subject, bcode, block, i) &&
-            _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i) &&
-            _verify_RC_in_bounds(subject, bcode, i) &&
-            _verify_RC_is_return_type_of_call_object_skip_if_reinit(subject, bcode, block, i);
-        if (!valid) {
+            _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i);
+        if (!valid0) {
             return false;
         }
-        block.final_reg_set[instr.C] = _R_call_object_type_return_type(subject, block, instr.A);
+        if (_is_newtop(instr.C)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _push(_R_call_object_type_return_type(subject, block, instr.A), block);
+        }
+        else {
+            const bool valid =
+                _verify_RC_in_bounds(subject, bcode, block, i) &&
+                _verify_RC_is_return_type_of_call_object_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _put(_R_call_object_type_return_type(subject, block, instr.A), instr.C, block);
+        }
     }
     break;
     case bc::opcode::call_nr:
     {
         const bool valid =
-            _verify_arg_registers_in_bounds(subject, bcode, i) &&
+            _verify_arg_registers_in_bounds(subject, bcode, block, i) &&
             _verify_arg_registers_have_at_least_one_object(subject, bcode, i) &&
             _verify_RA_is_legal_call_object(subject, bcode, block, i) &&
             _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i);
@@ -611,7 +718,7 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
     case bc::opcode::ret:
     {
         const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
+            _verify_RA_in_bounds(subject, bcode, block, i) &&
             _verify_RA_is_return_type_of_this_call(subject, bcode, block, i);
         if (!valid) {
             return false;
@@ -635,12 +742,12 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
         // NOTE: see _symbolic_exec for general branch-related verif checks (which get done at *block-level*)
         // NOTE: see _visit_unprocessed_block for branch-related code which calls _visit_block (again, *block-level*)
         const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
-            _verify_RA_is_type_bool(subject, bcode, block, i);
+            _verify_RTop_exists(subject, bcode, block, i) &&
+            _verify_RTop_is_type_bool(subject, bcode, block, i);
         if (!valid) {
             return false;
         }
-        block.final_reg_set[instr.A] = _none_type();
+        _pop(instr.A, block);
     }
     break;
     case bc::opcode::jump_false:
@@ -648,12 +755,12 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
         // NOTE: see _symbolic_exec for general branch-related verif checks (which get done at *block-level*)
         // NOTE: see _visit_unprocessed_block for branch-related code which calls _visit_block (again, *block-level*)
         const bool valid =
-            _verify_RA_in_bounds(subject, bcode, i) &&
-            _verify_RA_is_type_bool(subject, bcode, block, i);
+            _verify_RTop_exists(subject, bcode, block, i) &&
+            _verify_RTop_is_type_bool(subject, bcode, block, i);
         if (!valid) {
             return false;
         }
-        block.final_reg_set[instr.A] = _none_type();
+        _pop(instr.A, block);
     }
     break;
     default: YAMA_DEADEND; break;
@@ -661,8 +768,34 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].A >= subject.locals()) {
+bool yama::default_verifier::_verify_RTop_exists(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (block.final_reg_set.size() == 0) {
+        YAMA_RAISE(dbg(), dsignal::verif_RTop_does_not_exist);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} bcode instr {}: R(top) does not exist!",
+            subject.fullname, i);
+        return false;
+    }
+    return true;
+}
+
+bool yama::default_verifier::_verify_RTop_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    const auto _RTop = _R_type(block, block.final_reg_set.size() - 1);
+    const auto _other = _bool_type();
+    if (_RTop != _other) {
+        YAMA_RAISE(dbg(), dsignal::verif_RTop_wrong_type);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} bcode instr {}: R(top) (top == {}) is type {}, but it must be {}!",
+            subject.fullname, i, block.final_reg_set.size(), _RTop, _other);
+        return false;
+    }
+    return true;
+}
+
+bool yama::default_verifier::_verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (bcode[i].A >= block.final_reg_set.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_RA_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -739,8 +872,8 @@ bool yama::default_verifier::_verify_RA_is_return_type_of_this_call(const type_i
     return true;
 }
 
-bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].B >= subject.locals()) {
+bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (bcode[i].B >= block.final_reg_set.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_RB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -751,8 +884,8 @@ bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, cons
     return true;
 }
 
-bool yama::default_verifier::_verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].C >= subject.locals()) {
+bool yama::default_verifier::_verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (bcode[i].C >= block.final_reg_set.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_RC_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -889,10 +1022,10 @@ bool yama::default_verifier::_verify_RA_and_ArgB_agree_on_type_skip_if_reinit(co
         : _verify_RA_and_ArgB_agree_on_type(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::default_verifier::_verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto args_index = bcode[i].A;
     const auto args_count = bcode[i].B;
-    if (!internal::range_contains<size_t>(0, subject.locals(), size_t(args_index), size_t(args_index) + size_t(args_count))) {
+    if (!internal::range_contains<size_t>(0, block.final_reg_set.size(), size_t(args_index), size_t(args_index) + size_t(args_count))) {
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -922,7 +1055,7 @@ bool yama::default_verifier::_verify_param_arg_registers_are_correct_number_and_
     const auto callobj_index = _find_type_const(subject, callobj_type).value();
     const auto& callobj_params = deref_assert(subject.consts.callsig(callobj_index)).params;
     YAMA_ASSERT(args_count >= 1);
-    YAMA_ASSERT(internal::range_contains<size_t>(0, subject.locals(), args_index, args_index + args_count));
+    YAMA_ASSERT(internal::range_contains<size_t>(0, block.final_reg_set.size(), args_index, args_index + args_count));
     const auto param_args_index = args_index + 1;
     const auto param_args_count = args_count - 1;
     const auto expected_param_args_count = callobj_params.size();
@@ -956,6 +1089,18 @@ bool yama::default_verifier::_verify_param_arg_registers_are_correct_number_and_
     return success;
 }
 
+bool yama::default_verifier::_verify_pushing_does_not_overflow(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (block.final_reg_set.size() == subject.max_locals()) {
+        YAMA_RAISE(dbg(), dsignal::verif_pushing_overflows);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} bcode instr {}: pushing new register would overflow max locals count of {}!",
+            subject.fullname, i, subject.max_locals());
+        return false;
+    }
+    return true;
+}
+
 bool yama::default_verifier::_verify_program_counter_valid_after_jump_by_sBx_offset(const type_info& subject, const bc::code& bcode, size_t i) {
     if (!_jump_dest_in_bounds(bcode, i, bcode[i].sBx)) {
         YAMA_RAISE(dbg(), dsignal::verif_puts_PC_out_of_bounds);
@@ -981,9 +1126,7 @@ bool yama::default_verifier::_verify_program_counter_valid_after_fallthrough(con
 }
 
 yama::default_verifier::_reg_set_state yama::default_verifier::_make_entrypoint_initial_reg_set(const type_info& subject) {
-    _reg_set_state result{};
-    result.resize(subject.locals(), _none_type());
-    return result;
+    return _reg_set_state{};
 }
 
 yama::str yama::default_verifier::_none_type() {
@@ -1048,5 +1191,58 @@ std::optional<size_t> yama::default_verifier::_find_type_const(const type_info& 
         }
     }
     return std::nullopt;
+}
+
+bool yama::default_verifier::_is_newtop(uint8_t x) const noexcept {
+    return x == uint8_t(yama::newtop);
+}
+
+void yama::default_verifier::_push(str type, _cfg_block& block) {
+    block.final_reg_set.push_back(type);
+#if _LOG_SYMBOLIC_EXEC == 1
+    YAMA_LOG(
+        dbg(), general_c,
+        "*push* {}\nfinal_reg_set   ~> {}",
+        type.fmt(),
+        fmt_reg_set_state_diagnostic(block.final_reg_set));
+#endif
+}
+
+void yama::default_verifier::_put(str type, size_t index, _cfg_block& block) {
+    if (index < block.final_reg_set.size()) {
+        block.final_reg_set[index] = type;
+#if _LOG_SYMBOLIC_EXEC == 1
+        YAMA_LOG(
+            dbg(), general_c,
+            "*put* {} {}\nfinal_reg_set   ~> {}",
+            index,
+            type.fmt(),
+            fmt_reg_set_state_diagnostic(block.final_reg_set));
+#endif
+    }
+    else YAMA_DEADEND;
+}
+
+void yama::default_verifier::_pop(size_t n, _cfg_block& block) {
+    if (n >= block.final_reg_set.size())    block.final_reg_set.clear();
+    else                                    for (auto nn = n; nn >= 1; nn--) block.final_reg_set.pop_back();
+#if _LOG_SYMBOLIC_EXEC == 1
+    YAMA_LOG(
+        dbg(), general_c,
+        "*pop* {}\nfinal_reg_set   ~> {}",
+        n,
+        fmt_reg_set_state_diagnostic(block.final_reg_set));
+#endif
+}
+
+std::string yama::default_verifier::fmt_reg_set_state_diagnostic(const _reg_set_state& x) {
+    std::string result{};
+    bool not_first = false;
+    for (const auto& I : x) {
+        if (not_first) result += ", ";
+        result += I.fmt();
+        not_first = true;
+    }
+    return std::format("[ {} ]", result);
 }
 

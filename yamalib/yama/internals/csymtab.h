@@ -20,6 +20,12 @@ namespace yama::internal {
     };
     struct var_csym final {
         std::optional<str> type;
+        std::optional<size_t> reg; // register index of local var (resolved in second pass)
+
+
+        // var_csym is recognized as a 'local var symbol' only once reg has been assigned
+
+        inline bool is_localvar() const noexcept { return reg.has_value(); }
     };
     struct fn_csym final {
         struct param final {

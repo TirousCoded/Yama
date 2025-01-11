@@ -10,13 +10,11 @@
 using namespace yama::string_literals;
 
 
-yama::context::context(res<domain> dm, ctx_config config, std::shared_ptr<debug> dbg)
+yama::context::context(res<domain> dm, std::shared_ptr<debug> dbg)
     : api_component(dbg),
     _dm(dm),
-    _config(config),
     _al(std::allocator<void>{}),
     _callstk(_al) {
-    YAMA_ASSERT(get_config().max_call_frames >= 1);
     _push_user_cf();
 }
 
@@ -26,10 +24,6 @@ yama::res<yama::domain> yama::context::get_domain() const noexcept {
 
 yama::domain& yama::context::dm() const noexcept {
     return *_dm;
-}
-
-const yama::ctx_config& yama::context::get_config() const noexcept {
-    return _config;
 }
 
 std::optional<yama::type> yama::context::load(const str& fullname) {
@@ -211,12 +205,12 @@ bool yama::context::ll_is_user() noexcept {
     return ll_call_frames() == 1;
 }
 
-size_t yama::context::ll_max_call_frames() noexcept {
-    return _config.max_call_frames;
-}
-
 size_t yama::context::ll_call_frames() noexcept {
     return _callstk.size();
+}
+
+size_t yama::context::ll_max_call_frames() noexcept {
+    return max_call_frames;
 }
 
 yama::const_table yama::context::ll_consts() noexcept {
@@ -230,7 +224,11 @@ size_t yama::context::ll_args() noexcept {
 
 size_t yama::context::ll_locals() noexcept {
     YAMA_ASSERT(!_callstk.empty());
-    return _top_cf().locals_count;
+    return _registers.size() - _top_cf().locals_offset;
+}
+
+size_t yama::context::ll_max_locals() noexcept {
+    return _top_cf().max_locals;
 }
 
 std::optional<yama::object_ref> yama::context::ll_arg(arg_t x) {
@@ -258,47 +256,52 @@ void yama::context::ll_panic() {
     _try_handle_panic_for_user_cf(); // in case panicking outside of a ll_call call
 }
 
-yama::cmd_status yama::context::ll_load(local_t x, borrowed_ref v) {
+yama::cmd_status yama::context::ll_pop(size_t n) {
+    _pop_regs(n);
+    return cmd_status::init(true);
+}
+
+yama::cmd_status yama::context::ll_put(local_t x, borrowed_ref v) {
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), v);
-    return _load(x, ll_clone_ref(v));
+    return _put(x, ll_clone_ref(v));
 }
 
-yama::cmd_status yama::context::ll_load_none(local_t x) {
-    return ll_load(x, ll_new_none());
+yama::cmd_status yama::context::ll_put_none(local_t x) {
+    return ll_put(x, ll_new_none());
 }
 
-yama::cmd_status yama::context::ll_load_int(local_t x, int_t v) {
-    return ll_load(x, ll_new_int(v));
+yama::cmd_status yama::context::ll_put_int(local_t x, int_t v) {
+    return ll_put(x, ll_new_int(v));
 }
 
-yama::cmd_status yama::context::ll_load_uint(local_t x, uint_t v) {
-    return ll_load(x, ll_new_uint(v));
+yama::cmd_status yama::context::ll_put_uint(local_t x, uint_t v) {
+    return ll_put(x, ll_new_uint(v));
 }
 
-yama::cmd_status yama::context::ll_load_float(local_t x, float_t v) {
-    return ll_load(x, ll_new_float(v));
+yama::cmd_status yama::context::ll_put_float(local_t x, float_t v) {
+    return ll_put(x, ll_new_float(v));
 }
 
-yama::cmd_status yama::context::ll_load_bool(local_t x, bool v) {
-    return ll_load(x, ll_new_bool(v));
+yama::cmd_status yama::context::ll_put_bool(local_t x, bool v) {
+    return ll_put(x, ll_new_bool(v));
 }
 
-yama::cmd_status yama::context::ll_load_char(local_t x, char_t v) {
-    return ll_load(x, ll_new_char(v));
+yama::cmd_status yama::context::ll_put_char(local_t x, char_t v) {
+    return ll_put(x, ll_new_char(v));
 }
 
-yama::cmd_status yama::context::ll_load_fn(local_t x, type f) {
-    return _load_fn(x, f);
+yama::cmd_status yama::context::ll_put_fn(local_t x, type f) {
+    return _put_fn(x, f);
 }
 
-yama::cmd_status yama::context::ll_load_const(local_t x, const_t c) {
+yama::cmd_status yama::context::ll_put_const(local_t x, const_t c) {
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Ko(c));
-    return _load_const(x, c);
+    return _put_const(x, c);
 }
 
-yama::cmd_status yama::context::ll_load_arg(local_t x, arg_t arg) {
+yama::cmd_status yama::context::ll_put_arg(local_t x, arg_t arg) {
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Arg(arg));
-    return _load_arg(x, arg);
+    return _put_arg(x, arg);
 }
 
 yama::cmd_status yama::context::ll_copy(local_t src, local_t dest) {
@@ -341,7 +344,10 @@ yama::cmd_status yama::context::ll_call(local_t args_start, size_t args_n, local
             _fmt_R(args_start + 1),
             _fmt_R(args_start + args_n - 1));
     }
-    if (!_call_ret_to_local_precheck(ret)) return yama::cmd_status::init(false);
+    // ensure prechecks occur BEFORE _call
+    if (!_call_ret_to_local_prechecks(ret)) {
+        return yama::cmd_status::init(false);
+    }
     return _call_ret_to_local(_call(args_start, args_n), ret);
 }
 
@@ -410,13 +416,14 @@ yama::context::_cf_view_t yama::context::_view_top_cf() {
         },
         .locals = std::span<object_ref>{
             _registers.begin() + cf.locals_offset,
-            cf.locals_count,
+            ll_locals(),
         },
     };
 }
 
 yama::context::_cf_view_t yama::context::_view_below_top_cf() {
     const auto& cf = _below_top_cf();
+    const size_t locals_belonging_to_below_top_cf = _top_cf().locals_offset - cf.locals_offset;
     return _cf_view_t{
         .args = std::span<object_ref>{
             _registers.begin() + cf.args_offset,
@@ -424,7 +431,7 @@ yama::context::_cf_view_t yama::context::_view_below_top_cf() {
         },
         .locals = std::span<object_ref>{
             _registers.begin() + cf.locals_offset,
-            cf.locals_count,
+            locals_belonging_to_below_top_cf,
         },
     };
 }
@@ -437,18 +444,17 @@ bool yama::context::_has_curr_type() noexcept {
     return _top_cf().t.has_value();
 }
 
-bool yama::context::_push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t locals) {
+bool yama::context::_push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t max_locals) {
     if (ll_call_frames() == ll_max_call_frames()) return false; // overflow
     const bool has_top_cf = !_callstk.empty();
     YAMA_ASSERT(has_top_cf || args_start == 0); // if pushing user call frame then args_start == 0
     // prep new call frame
     _cf_t new_cf{
         .t              = t,
-        // 0 below is fail-safe for user call frame
-        .args_offset    = has_top_cf ? _top_cf().locals_offset + args_start : 0,
+        .args_offset    = has_top_cf ? _top_cf().locals_offset + args_start : 0, // <- 0 is fail-safe for user call frame
         .args_count     = args_n,
         .locals_offset  = _registers.size(), // <- breaks if _add_registers is moved to above this
-        .locals_count   = locals,
+        .max_locals     = max_locals,
         .returned       = std::nullopt,
 
         .pc             = 0,
@@ -456,32 +462,35 @@ bool yama::context::_push_cf(std::optional<type> t, local_t args_start, size_t a
     };
     // push new call frame
     _callstk.push_back(std::move(new_cf));
-    // add registers
-    _add_registers(locals);
     return true;
 }
 
 void yama::context::_pop_cf() {
     if (_callstk.empty()) return;
-    _remove_registers(_top_cf().locals_count);
+    _pop_regs(ll_locals());
     _callstk.pop_back();
 }
 
 void yama::context::_push_user_cf() {
     YAMA_ASSERT(_callstk.empty());
-    const bool success = _push_cf(std::nullopt, 0, 0, _config.user_locals);
+    const bool success = _push_cf(std::nullopt, 0, 0, user_max_locals);
     YAMA_ASSERT(success);
 }
 
-void yama::context::_add_registers(size_t n) {
-    // since ll_new_none returns a canonical_ref, we need-not incr ref counts
-    _registers.resize(_registers.size() + n, ll_new_none());
+void yama::context::_push_reg(stolen_ref x) {
+    YAMA_ASSERT(!ll_panicking());
+    YAMA_ASSERT(ll_locals() < ll_max_locals());
+    _registers.push_back(x); // no incr/decr needed for stolen_ref
 }
 
-void yama::context::_remove_registers(size_t n) {
-    if (n > _registers.size()) n = _registers.size();
+void yama::context::_pop_regs(size_t n) {
+    // correct n both to ensure pop_back doesn't have undefined behaviour, and to
+    // ensure that we can't pop regs on lower call frames
+    if (n > ll_locals()) n = ll_locals();
+    // defer log until after correcting n
+    YAMA_LOG(dbg(), ctx_llcmd_c, " >       pop {: <11} ({} -> {} objects)", n, ll_locals(), ll_locals() - n);
     for (; n > 0; n--) {
-        // ll_drop_ref each one, in reverse order (ie. going top -> bottom)
+        // *deinit* each one, in reverse order (ie. going top -> bottom)
         ll_drop_ref(_registers.back());
         _registers.pop_back();
     }
@@ -526,31 +535,49 @@ std::string yama::context::_fmt_Arg(arg_t x) {
         : std::format("Arg({})=*error*", x);
 }
 
-yama::cmd_status yama::context::_load(local_t x, stolen_ref v) {
-    if (_load_err_x_out_of_bounds(x, v)) {
-        return cmd_status::init(false);
+yama::cmd_status yama::context::_put(local_t x, stolen_ref v, const char* verb) {
+    YAMA_ASSERT(verb);
+    if (x == local_t(newtop)) {
+        if (_put_err_pushing_overflows(v)) {
+            return cmd_status::init(false);
+        }
+        _push_reg(v); // forward stolen v
     }
-    auto& x_local = _view_top_cf().locals[x];
-    ll_move_ref(v, x_local);
+    else {
+        if (_put_err_x_out_of_bounds(x, v, verb)) {
+            return cmd_status::init(false);
+        }
+        auto& x_local = _view_top_cf().locals[x];
+        ll_move_ref(v, x_local);
+    }
     return cmd_status::init(true);
 }
 
-bool yama::context::_load_err_x_out_of_bounds(local_t x, borrowed_ref v) {
-    if (_view_top_cf().locals_bounds_check(x)) return false;
+bool yama::context::_put_err_pushing_overflows(borrowed_ref v) {
+    if (ll_locals() < ll_max_locals()) return false;
     _panic(
-        "error: panic from attempt to load object {} into local register at out-of-bounds index {}!",
-        v, x);
+        "error: panic from attempt to push object {}, overflowing local object stack!",
+        v);
     return true;
 }
 
-yama::cmd_status yama::context::_load_fn(local_t x, type f) {
-    if (_load_fn_err_f_not_callable_type(f)) {
-        return cmd_status::init(false);
-    }
-    return ll_load(x, ll_new_fn(f).value());
+bool yama::context::_put_err_x_out_of_bounds(local_t x, borrowed_ref v, const char* verb) {
+    YAMA_ASSERT(verb);
+    if (_view_top_cf().locals_bounds_check(x)) return false;
+    _panic(
+        "error: panic from attempt to {} object {} into register at out-of-bounds index {}!",
+        verb, v, x);
+    return true;
 }
 
-bool yama::context::_load_fn_err_f_not_callable_type(type f) {
+yama::cmd_status yama::context::_put_fn(local_t x, type f) {
+    if (_put_fn_err_f_not_callable_type(f)) {
+        return cmd_status::init(false);
+    }
+    return _put(x, ll_new_fn(f).value());
+}
+
+bool yama::context::_put_fn_err_f_not_callable_type(type f) {
     if (is_callable(f.kind())) return false;
     _panic(
         "error: panic from attempt to load function object of non-callable type {}!",
@@ -558,7 +585,7 @@ bool yama::context::_load_fn_err_f_not_callable_type(type f) {
     return true;
 }
 
-yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
+yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     static_assert(
         []() constexpr -> bool {
             // NOTE: extend this each time we add a new loadable object constant
@@ -572,16 +599,16 @@ yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
                 !yama::is_object_const(yama::primitive_type_const) &&
                 yama::is_object_const(yama::function_type_const);
         }());
-    if (_load_const_err_in_user_call_frame()) {
+    if (_put_const_err_in_user_call_frame()) {
         return cmd_status::init(false);
     }
-    if (_load_const_err_c_out_of_bounds(c)) {
+    if (_put_const_err_c_out_of_bounds(c)) {
         return cmd_status::init(false);
     }
-    if (_load_const_err_c_is_not_object_constant(c)) {
+    if (_put_const_err_c_is_not_object_constant(c)) {
         return cmd_status::init(false);
     }
-    return _load(x,
+    return _put(x,
         [&]() -> canonical_ref {
             const auto& cc = ll_consts();
             static_assert(const_types == 7);
@@ -596,14 +623,14 @@ yama::cmd_status yama::context::_load_const(local_t x, const_t c) {
         }());
 }
 
-bool yama::context::_load_const_err_in_user_call_frame() {
+bool yama::context::_put_const_err_in_user_call_frame() {
     if (!ll_is_user()) return false;
     _panic(
         "error: panic from attempt to load object constant from the user call frame!");
     return true;
 }
 
-bool yama::context::_load_const_err_c_out_of_bounds(const_t c) {
+bool yama::context::_put_const_err_c_out_of_bounds(const_t c) {
     if (c < ll_consts().size()) {
         return false;
     }
@@ -613,7 +640,7 @@ bool yama::context::_load_const_err_c_out_of_bounds(const_t c) {
     return true;
 }
 
-bool yama::context::_load_const_err_c_is_not_object_constant(const_t c) {
+bool yama::context::_put_const_err_c_is_not_object_constant(const_t c) {
     if (is_object_const(ll_consts().const_type(c).value())) {
         return false;
     }
@@ -623,24 +650,24 @@ bool yama::context::_load_const_err_c_is_not_object_constant(const_t c) {
     return true;
 }
 
-yama::cmd_status yama::context::_load_arg(local_t x, arg_t arg) {
-    if (_load_arg_err_in_user_call_frame()) {
+yama::cmd_status yama::context::_put_arg(local_t x, arg_t arg) {
+    if (_put_arg_err_in_user_call_frame()) {
         return cmd_status::init(false);
     }
-    if (_load_arg_err_arg_out_of_bounds(arg)) {
+    if (_put_arg_err_arg_out_of_bounds(arg)) {
         return cmd_status::init(false);
     }
-    return _load(x, ll_arg(arg).value());
+    return _put(x, ll_arg(arg).value());
 }
 
-bool yama::context::_load_arg_err_in_user_call_frame() {
+bool yama::context::_put_arg_err_in_user_call_frame() {
     if (!ll_is_user()) return false;
     _panic(
         "error: panic from attempt to load argument object from the user call frame!");
     return true;
 }
 
-bool yama::context::_load_arg_err_arg_out_of_bounds(arg_t arg) {
+bool yama::context::_put_arg_err_arg_out_of_bounds(arg_t arg) {
     if (_view_top_cf().args_bounds_check(arg)) return false;
     _panic(
         "error: panic from attempt to load argument object from out-of-bounds argument index {}!",
@@ -653,28 +680,14 @@ yama::cmd_status yama::context::_copy(local_t src, local_t dest) {
         return cmd_status::init(false);
     }
     auto& src_local = _view_top_cf().locals[src];
-    if (_copy_err_dest_out_of_bounds(dest, src_local)) {
-        // TODO: I'm *PRETTY SURE* we don't need to decr x ref count, right? as panic will clean up everything, right?
-        return cmd_status::init(false);
-    }
-    auto& dest_local = _view_top_cf().locals[dest];
-    ll_move_ref(src_local, dest_local); // perform move-assign
-    return cmd_status::init(true);
+    return _put(dest, ll_clone_ref(src_local), "copy");
 }
 
 bool yama::context::_copy_err_src_out_of_bounds(local_t src) {
     if (_view_top_cf().locals_bounds_check(src)) return false;
     _panic(
-        "error: panic from attempt to copy object from out-of-bounds local register index {}!",
+        "error: panic from attempt to copy object from out-of-bounds register index {}!",
         src);
-    return true;
-}
-
-bool yama::context::_copy_err_dest_out_of_bounds(local_t dest, borrowed_ref src_object) {
-    if (_view_top_cf().locals_bounds_check(dest)) return false;
-    _panic(
-        "error: panic from attempt to copy object {} to out-of-bounds local register index {}!",
-        src_object, dest);
     return true;
 }
 
@@ -696,7 +709,7 @@ std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t 
         return std::nullopt;
     }
     // push our new call frame
-    const bool push_cf_result = _push_cf(std::make_optional(callobj_type), args_start, args_n, callobj_type.locals());
+    const bool push_cf_result = _push_cf(std::make_optional(callobj_type), args_start, args_n, callobj_type.max_locals());
     if (_call_err_push_cf_would_overflow(callobj, push_cf_result)) {
         return std::nullopt;
     }
@@ -722,7 +735,7 @@ std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t 
         return std::nullopt;
     }
     // move-assign call frame's returned object (ie. don't need to incr/decr any ref counts)
-    auto returned = std::move(_top_cf().returned);
+    std::optional<object_ref> returned = std::move(_top_cf().returned);
     // cleanup call frame of call and return
     _pop_cf();
     return returned;
@@ -731,10 +744,10 @@ std::optional<yama::object_ref> yama::context::_call(local_t args_start, size_t 
 yama::cmd_status yama::context::_call_ret_to_local(std::optional<stolen_ref> ret, local_t target) {
     if (!ret) return cmd_status::init(false); // fail quietly if upstream failed
     // NOTE: this method occurs in the caller's call frame, w/ the call's having already been unwound
-    YAMA_ASSERT(_view_top_cf().locals_bounds_check(target));
-    auto& target_objref = _view_top_cf().locals[target];
-    ll_move_ref(*ret, target_objref); // perform move-assign
-    return cmd_status::init(true);
+    // TODO: _put *technically* involves some redundant checks, but whatever...
+    const auto result = _put(target, ret.value());
+    YAMA_ASSERT(result.good()); // _put should NOT be able to fail by this point
+    return result;
 }
 
 yama::cmd_status yama::context::_call_ret_to_no_result(std::optional<stolen_ref> ret) {
@@ -745,8 +758,11 @@ yama::cmd_status yama::context::_call_ret_to_no_result(std::optional<stolen_ref>
     return cmd_status::init(true);
 }
 
-bool yama::context::_call_ret_to_local_precheck(local_t target) {
-    return !_call_err_ret_ouf_of_bounds(target);
+bool yama::context::_call_ret_to_local_prechecks(local_t target) {
+    return
+        target == local_t(newtop)
+        ? !_call_err_ret_pushing_overflows()
+        : !_call_err_ret_out_of_bounds(target);
 }
 
 bool yama::context::_call_err_no_callobj(size_t args_n) {
@@ -759,7 +775,7 @@ bool yama::context::_call_err_no_callobj(size_t args_n) {
 bool yama::context::_call_err_args_out_of_bounds(local_t args_start, size_t args_n) {
     const auto top_cf_view = _view_top_cf();
     // remember that here [args_start, args_start+args_n) is referring to indices
-    // into the caller's local register table
+    // into the caller's local object stack
     const bool first_in_bounds = top_cf_view.locals_bounds_check(args_start);
     const bool last_in_bounds = top_cf_view.locals_bounds_check(args_start + args_n - 1);
     if (first_in_bounds && last_in_bounds) return false;
@@ -801,10 +817,17 @@ bool yama::context::_call_err_no_return_value_object(borrowed_ref callobj) {
     return true;
 }
 
-bool yama::context::_call_err_ret_ouf_of_bounds(local_t ret) {
+bool yama::context::_call_err_ret_pushing_overflows() {
+    if (ll_locals() < ll_max_locals()) return false;
+    _panic(
+        "error: panic from attempt to call but pushing return value would overflow local object stack!");
+    return true;
+}
+
+bool yama::context::_call_err_ret_out_of_bounds(local_t ret) {
     if (_view_top_cf().locals_bounds_check(ret)) return false;
     _panic(
-        "error: panic from attempt to call with return value object at out-of-bounds local register index {}!",
+        "error: panic from attempt to call with return value object at out-of-bounds register index {}!",
         ret);
     return true;
 }
@@ -836,7 +859,7 @@ bool yama::context::_ret_err_in_user_call_frame() {
 bool yama::context::_ret_err_x_out_of_bounds(local_t x) {
     if (_view_top_cf().locals_bounds_check(x)) return false;
     _panic(
-        "error: panic from attempt to return object from out-of-bounds local register index {}!",
+        "error: panic from attempt to return object from out-of-bounds register index {}!",
         x);
     return true;
 }
@@ -879,36 +902,41 @@ yama::bc::instr yama::context::_bcode_fetch_instr() {
 
 void yama::context::_bcode_exec_instr(bc::instr x) {
     YAMA_LOG(dbg(), bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
-    static_assert(bc::opcodes == 11);
+    static_assert(bc::opcodes == 12);
     switch (x.opc) {
     case bc::opcode::noop:
     {
         // do nothing
     }
     break;
-    case bc::opcode::load_none:
+    case bc::opcode::pop:
     {
-        if (ll_load_none(x.A).bad()) return;
+        if (ll_pop(x.A).bad()) return;
     }
     break;
-    case bc::opcode::load_const:
+    case bc::opcode::put_none:
     {
-        if (ll_load_const(x.A, x.B).bad()) return;
+        if (ll_put_none(_maybe_newtop(x.A)).bad()) return;
     }
     break;
-    case bc::opcode::load_arg:
+    case bc::opcode::put_const:
     {
-        if (ll_load_arg(x.A, x.B).bad()) return;
+        if (ll_put_const(_maybe_newtop(x.A), x.B).bad()) return;
+    }
+    break;
+    case bc::opcode::put_arg:
+    {
+        if (ll_put_arg(_maybe_newtop(x.A), x.B).bad()) return;
     }
     break;
     case bc::opcode::copy:
     {
-        if (ll_copy(x.A, x.B).bad()) return;
+        if (ll_copy(x.A, _maybe_newtop(x.B)).bad()) return;
     }
     break;
     case bc::opcode::call:
     {
-        if (ll_call(x.A, x.B, x.C).bad()) return;
+        if (ll_call(x.A, x.B, _maybe_newtop(x.C)).bad()) return;
     }
     break;
     case bc::opcode::call_nr:
@@ -929,22 +957,22 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
     break;
     case bc::opcode::jump_true:
     {
-        const auto& input = deref_assert(ll_local(x.A));
-        const bool should_jump = input.as_bool();
+        const auto& top = deref_assert(ll_local(ll_locals() - 1));
+        const bool should_jump = top.as_bool();
         if (should_jump) {
             _bcode_jump(x.sBx);
         }
-        if (ll_load_none(x.A).bad()) return;
+        if (ll_pop(x.A).bad()) return;
     }
     break;
     case bc::opcode::jump_false:
     {
-        const auto& input = deref_assert(ll_local(x.A));
-        const bool should_jump = !input.as_bool();
+        const auto& top = deref_assert(ll_local(ll_locals() - 1));
+        const bool should_jump = !top.as_bool();
         if (should_jump) {
             _bcode_jump(x.sBx);
         }
-        if (ll_load_none(x.A).bad()) return;
+        if (ll_pop(x.A).bad()) return;
     }
     break;
     default: YAMA_DEADEND; break;
@@ -965,5 +993,9 @@ void yama::context::_bcode_halt() {
 void yama::context::_bcode_jump(int16_t offset) {
     _top_cf().pc += std::make_signed_t<size_t>(offset);
     YAMA_LOG(dbg(), bcode_exec_c, " > jump (to {})", _top_cf().pc);
+}
+
+size_t yama::context::_maybe_newtop(uint8_t x) const noexcept {
+    return x == uint8_t(yama::newtop) ? yama::newtop : size_t(x);
 }
 

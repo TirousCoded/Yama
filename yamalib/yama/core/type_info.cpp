@@ -36,10 +36,10 @@ std::optional<yama::call_fn> yama::type_info::call_fn() const noexcept {
         : std::nullopt;
 }
 
-size_t yama::type_info::locals() const noexcept {
+size_t yama::type_info::max_locals() const noexcept {
     return
         std::holds_alternative<function_info>(info)
-        ? std::get<function_info>(info).locals
+        ? std::get<function_info>(info).max_locals
         : 0;
 }
 
@@ -69,9 +69,9 @@ std::string yama::function_info::fmt(const const_table_info& consts, const char*
     YAMA_ASSERT(tab);
     std::string result{};
     result += "function_info";
-    result += std::format("\n{}callsig: {}", tab, callsig.fmt(consts));
-    result += std::format("\n{}call_fn: {}", tab, call_fn == bcode_call_fn ? "bcode" : "C++");
-    result += std::format("\n{}locals : {}", tab, locals);
+    result += std::format("\n{}callsig    : {}", tab, callsig.fmt(consts));
+    result += std::format("\n{}call_fn    : {}", tab, call_fn == bcode_call_fn ? "bcode" : "C++");
+    result += std::format("\n{}max_locals : {}", tab, max_locals);
     result += std::format("\n{}", bcode.fmt_disassembly(tab));
     return result;
 }

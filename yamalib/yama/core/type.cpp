@@ -43,8 +43,8 @@ std::optional<yama::call_fn> yama::type::call_fn() const noexcept {
     return _mem->info->call_fn();
 }
 
-size_t yama::type::locals() const noexcept {
-    return _mem->info->locals();
+size_t yama::type::max_locals() const noexcept {
+    return _mem->info->max_locals();
 }
 
 std::string yama::type::fmt() const {

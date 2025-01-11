@@ -46,7 +46,7 @@ yama::internal::type_instance<std::allocator<void>> make_type_inst_2(
         .info = yama::function_info{
             .callsig = callsig,
             .call_fn = yama::noop_call_fn,
-            .locals = 10,
+            .max_locals = 10,
         },
     };
     return

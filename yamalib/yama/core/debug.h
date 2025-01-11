@@ -178,6 +178,8 @@ namespace yama {
         verif_callsig_param_type_not_type_const,
         verif_callsig_return_type_not_type_const,
         verif_binary_is_empty,
+        verif_RTop_does_not_exist,
+        verif_RTop_wrong_type,
         verif_RA_out_of_bounds,
         verif_RA_wrong_type,
         verif_RA_illegal_callobj,
@@ -196,6 +198,7 @@ namespace yama {
         verif_ParamArgRs_wrong_types,
         verif_puts_PC_out_of_bounds,
         verif_fallthrough_puts_PC_out_of_bounds,
+        verif_pushing_overflows,
         verif_violates_register_coherence,
 
         instant_type_not_found,
@@ -209,7 +212,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 50);
+        static_assert(dsignals == 53);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -243,6 +246,8 @@ namespace yama {
             _YAMA_ENTRY_(verif_callsig_param_type_not_type_const);
             _YAMA_ENTRY_(verif_callsig_return_type_not_type_const);
             _YAMA_ENTRY_(verif_binary_is_empty);
+            _YAMA_ENTRY_(verif_RTop_does_not_exist);
+            _YAMA_ENTRY_(verif_RTop_wrong_type);
             _YAMA_ENTRY_(verif_RA_out_of_bounds);
             _YAMA_ENTRY_(verif_RA_wrong_type);
             _YAMA_ENTRY_(verif_RA_illegal_callobj);
@@ -261,6 +266,7 @@ namespace yama {
             _YAMA_ENTRY_(verif_ParamArgRs_wrong_types);
             _YAMA_ENTRY_(verif_puts_PC_out_of_bounds);
             _YAMA_ENTRY_(verif_fallthrough_puts_PC_out_of_bounds);
+            _YAMA_ENTRY_(verif_pushing_overflows);
             _YAMA_ENTRY_(verif_violates_register_coherence);
 
             _YAMA_ENTRY_(instant_type_not_found);
@@ -377,6 +383,8 @@ namespace yama {
         }
     };
 
+
+    // TODO: maybe rename to 'filter_debug'
 
     // proxy_debug is a general-purpose proxy for debug impls, used to provide
     // a way to restrict the categories of logs allowed upstream

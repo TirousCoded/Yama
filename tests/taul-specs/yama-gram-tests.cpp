@@ -1074,23 +1074,23 @@ TEST_F(YamaGramTests, Chunk_Empty) {
     //            that here, basically everything except the end-of-input has been cut, so we should
     //            expect syntax tree to start at the vary end of the input
 
-    parse_tree_builder b(*gram);
-    b.skip_newline();
-    b.skip_newline();
-    b.skip_text("// empty"_str);
-    b.skip_newline();
-    b.skip_newline();
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    pattern
+        .skip("\r\n", cntr)
+        .skip("\r\n", cntr)
+        .skip("// empty", cntr)
+        .skip("\r\n", cntr)
+        .skip("\r\n", cntr);
     {
-        auto node0 = b.syntactic("Chunk"_str);
+        auto node0 = pattern.syntactic_autoclose("Chunk"_str, cntr);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Chunk"_str);
+    auto result = parser->parse("Chunk"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Chunk_NonEmpty) {
@@ -1102,54 +1102,51 @@ TEST_F(YamaGramTests, Chunk_NonEmpty) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
-    b.skip_newline();
-    b.skip_newline();
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    pattern.skip("\r\n", cntr);
+    pattern.skip("\r\n", cntr);
     {
-        auto node0 = b.syntactic("Chunk"_str);
+        auto node0 = pattern.syntactic_autoclose("Chunk"_str, cntr);
         {
-            auto node1 = b.syntactic("Decl"_str);
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
             {
-                auto node2 = b.syntactic("VarDecl"_str);
-                b.lexical("VAR"_str, 3);
-                b.skip_text(" "_str);
-                b.lexical("IDENTIFIER"_str, 1);
-                b.lexical("SEMI"_str, 1);
+                auto node2 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+                pattern.lexical("VAR"_str, cntr, 3);
+                pattern.skip(" ", cntr);
+                pattern.lexical("IDENTIFIER"_str, cntr, 1);
+                pattern.lexical("SEMI"_str, cntr, 1);
             }
         }
-        b.skip_newline();
-        b.skip_newline();
+        pattern.skip("\r\n", cntr);
+        pattern.skip("\r\n", cntr);
         {
-            auto node1 = b.syntactic("Decl"_str);
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
             {
-                auto node2 = b.syntactic("FnDecl"_str);
-                b.lexical("FN"_str, 2);
-                b.skip_text(" "_str);
-                b.lexical("IDENTIFIER"_str, 3);
+                auto node2 = pattern.syntactic_autoclose("FnDecl"_str, cntr);
+                pattern.lexical("FN"_str, cntr, 2);
+                pattern.skip(" ", cntr);
+                pattern.lexical("IDENTIFIER"_str, cntr, 3);
                 {
-                    auto node3 = b.syntactic("CallSig"_str);
-                    b.lexical("L_ROUND"_str, 1);
-                    b.lexical("R_ROUND"_str, 1);
+                    auto node3 = pattern.syntactic_autoclose("CallSig"_str, cntr);
+                    pattern.lexical("L_ROUND"_str, cntr, 1);
+                    pattern.lexical("R_ROUND"_str, cntr, 1);
                 }
-                b.skip_text(" "_str);
+                pattern.skip(" ", cntr);
                 {
-                    auto node3 = b.syntactic("Block"_str);
-                    b.lexical("L_CURLY"_str, 1);
-                    b.lexical("R_CURLY"_str, 1);
+                    auto node3 = pattern.syntactic_autoclose("Block"_str, cntr);
+                    pattern.lexical("L_CURLY"_str, cntr, 1);
+                    pattern.lexical("R_CURLY"_str, cntr, 1);
                 }
             }
         }
-        b.skip_newline();
-        b.skip_newline();
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Chunk"_str);
+    auto result = parser->parse("Chunk"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Decl_VarDecl) {
@@ -1161,25 +1158,24 @@ TEST_F(YamaGramTests, Decl_VarDecl) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("Decl"_str);
+        auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
         {
-            auto node2 = b.syntactic("VarDecl"_str);
-            b.lexical("VAR"_str, 3);
-            b.skip_text(" "_str);
-            b.lexical("IDENTIFIER"_str, 1);
-            b.lexical("SEMI"_str, 1);
+            auto node2 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+            pattern.lexical("VAR"_str, cntr, 3);
+            pattern.skip(" ", cntr);
+            pattern.lexical("IDENTIFIER"_str, cntr, 1);
+            pattern.lexical("SEMI"_str, cntr, 1);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Decl"_str);
+    auto result = parser->parse("Decl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Decl_FnDecl) {
@@ -1191,35 +1187,26 @@ TEST_F(YamaGramTests, Decl_FnDecl) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("Decl"_str);
+        auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
         {
-            auto node2 = b.syntactic("FnDecl"_str);
-            b.lexical("FN"_str, 2);
-            b.skip_text(" "_str);
-            b.lexical("IDENTIFIER"_str, 3);
-            {
-                auto node3 = b.syntactic("CallSig"_str);
-                b.lexical("L_ROUND"_str, 1);
-                b.lexical("R_ROUND"_str, 1);
-            }
-            b.skip_text(" "_str);
-            {
-                auto node3 = b.syntactic("Block"_str);
-                b.lexical("L_CURLY"_str, 1);
-                b.lexical("R_CURLY"_str, 1);
-            }
+            auto node2 = pattern.syntactic_autoclose("FnDecl"_str, cntr);
+            pattern.lexical("FN"_str, cntr, 2);
+            pattern.skip(" ", cntr);
+            pattern.lexical("IDENTIFIER"_str, cntr, 3);
+            pattern.loose_syntactic("CallSig"_str, cntr, 2);
+            pattern.skip(" ", cntr);
+            pattern.loose_syntactic("Block"_str, cntr, 2);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Decl"_str);
+    auto result = parser->parse("Decl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_NoAssign) {
@@ -1231,22 +1218,21 @@ TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_NoAssign) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("VarDecl"_str);
-        b.lexical("VAR"_str, 3);
-        b.skip_text(" "_str);
-        b.lexical("IDENTIFIER"_str, 1);
-        b.lexical("SEMI"_str, 1);
+        auto node1 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+        pattern.lexical("VAR"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("VarDecl"_str);
+    auto result = parser->parse("VarDecl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, VarDecl_TypeAnnot_NoAssign) {
@@ -1258,31 +1244,22 @@ TEST_F(YamaGramTests, VarDecl_TypeAnnot_NoAssign) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("VarDecl"_str);
-        b.lexical("VAR"_str, 3);
-        b.skip_text(" "_str);
-        b.lexical("IDENTIFIER"_str, 1);
-        {
-            auto node2 = b.syntactic("TypeAnnot"_str);
-            b.lexical("COLON"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node3 = b.syntactic("TypeSpec"_str);
-                b.lexical("IDENTIFIER"_str, 3);
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node1 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+        pattern.lexical("VAR"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.loose_syntactic("TypeAnnot"_str, cntr, 5);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("VarDecl"_str);
+    auto result = parser->parse("VarDecl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_Assign) {
@@ -1294,41 +1271,23 @@ TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_Assign) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("VarDecl"_str);
-        b.lexical("VAR"_str, 3);
-        b.skip_text(" "_str);
-        b.lexical("IDENTIFIER"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("Assign"_str);
-            b.lexical("ASSIGN"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node3 = b.syntactic("Expr"_str);
-                {
-                    auto node4 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node5 = b.syntactic("Lit"_str);
-                        {
-                            auto node6 = b.syntactic("IntLit"_str);
-                            b.lexical("INT_DEC"_str, 3);
-                        }
-                    }
-                }
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node1 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+        pattern.lexical("VAR"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Assign"_str, cntr, 5);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("VarDecl"_str);
+    auto result = parser->parse("VarDecl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, VarDecl_TypeAnnot_Assign) {
@@ -1340,50 +1299,24 @@ TEST_F(YamaGramTests, VarDecl_TypeAnnot_Assign) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("VarDecl"_str);
-        b.lexical("VAR"_str, 3);
-        b.skip_text(" "_str);
-        b.lexical("IDENTIFIER"_str, 1);
-        {
-            auto node2 = b.syntactic("TypeAnnot"_str);
-            b.lexical("COLON"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node3 = b.syntactic("TypeSpec"_str);
-                b.lexical("IDENTIFIER"_str, 3);
-            }
-        }
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("Assign"_str);
-            b.lexical("ASSIGN"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node3 = b.syntactic("Expr"_str);
-                {
-                    auto node4 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node5 = b.syntactic("Lit"_str);
-                        {
-                            auto node6 = b.syntactic("IntLit"_str);
-                            b.lexical("INT_DEC"_str, 3);
-                        }
-                    }
-                }
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node1 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
+        pattern.lexical("VAR"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.loose_syntactic("TypeAnnot"_str, cntr, 5);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Assign"_str, cntr, 5);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("VarDecl"_str);
+    auto result = parser->parse("VarDecl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, FnDecl) {
@@ -1395,35 +1328,24 @@ TEST_F(YamaGramTests, FnDecl) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = b.syntactic("FnDecl"_str);
-        b.lexical("FN"_str, 2);
-        b.skip_text(" "_str);
-        b.lexical("IDENTIFIER"_str, 3);
-        {
-            auto node2 = b.syntactic("CallSig"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
+        auto node1 = pattern.syntactic_autoclose("FnDecl"_str, cntr);
+        pattern.lexical("FN"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        pattern.loose_syntactic("CallSig"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("FnDecl"_str);
+    auto result = parser->parse("FnDecl"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
-
-// IMPORTANT: 'CallSig', 'ParamDecl', and 'Result' will be tested as a unit
 
 TEST_F(YamaGramTests, CallSig_NoParams_NoResult) {
     ASSERT_TRUE(pprs_ready);
@@ -1434,20 +1356,19 @@ TEST_F(YamaGramTests, CallSig_NoParams_NoResult) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("CallSig"_str);
-        b.lexical("L_ROUND"_str, 1);
-        b.lexical("R_ROUND"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("CallSig"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("CallSig"_str);
+    auto result = parser->parse("CallSig"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, CallSig_NoParams_Result) {
@@ -1459,30 +1380,21 @@ TEST_F(YamaGramTests, CallSig_NoParams_Result) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("CallSig"_str);
-        b.lexical("L_ROUND"_str, 1);
-        b.lexical("R_ROUND"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Result"_str);
-            b.lexical("R_ARROW"_str, 2);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("TypeSpec"_str);
-                b.lexical("IDENTIFIER"_str, 3);
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("CallSig"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Result"_str, cntr, 6);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("CallSig"_str);
+    auto result = parser->parse("CallSig"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, CallSig_Params_NoResult) {
@@ -1494,60 +1406,29 @@ TEST_F(YamaGramTests, CallSig_Params_NoResult) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("CallSig"_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-            {
-                auto node3 = b.syntactic("TypeAnnot"_str);
-                b.lexical("COLON"_str, 1);
-                b.skip_text(" "_str);
-                {
-                    auto node4 = b.syntactic("TypeSpec"_str);
-                    b.lexical("IDENTIFIER"_str, 3);
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-            {
-                auto node3 = b.syntactic("TypeAnnot"_str);
-                b.lexical("COLON"_str, 1);
-                b.skip_text(" "_str);
-                {
-                    auto node4 = b.syntactic("TypeSpec"_str);
-                    b.lexical("IDENTIFIER"_str, 5);
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        b.lexical("R_ROUND"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("CallSig"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 1);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 6);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 8);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 1);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("CallSig"_str);
+    auto result = parser->parse("CallSig"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, CallSig_Params_Result) {
@@ -1559,70 +1440,100 @@ TEST_F(YamaGramTests, CallSig_Params_Result) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("CallSig"_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-            {
-                auto node3 = b.syntactic("TypeAnnot"_str);
-                b.lexical("COLON"_str, 1);
-                b.skip_text(" "_str);
-                {
-                    auto node4 = b.syntactic("TypeSpec"_str);
-                    b.lexical("IDENTIFIER"_str, 3);
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-            {
-                auto node3 = b.syntactic("TypeAnnot"_str);
-                b.lexical("COLON"_str, 1);
-                b.skip_text(" "_str);
-                {
-                    auto node4 = b.syntactic("TypeSpec"_str);
-                    b.lexical("IDENTIFIER"_str, 5);
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node2 = b.syntactic("ParamDecl"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        b.lexical("R_ROUND"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Result"_str);
-            b.lexical("R_ARROW"_str, 2);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("TypeSpec"_str);
-                b.lexical("IDENTIFIER"_str, 3);
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("CallSig"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 1);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 6);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 8);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("ParamDecl"_str, cntr, 1);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Result"_str, cntr, 6);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("CallSig"_str);
+    auto result = parser->parse("CallSig"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ParamDecl_NoTypeAnnot) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "a"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    pattern.loose_syntactic("ParamDecl"_str, cntr, 1);
+
+    auto result = parser->parse("ParamDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ParamDecl_TypeAnnot) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "a: Int"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("ParamDecl"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.loose_syntactic("TypeAnnot"_str, cntr, 5);
+    }
+
+    auto result = parser->parse("ParamDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, Result) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "-> Int"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("Result"_str, cntr);
+        pattern.lexical("R_ARROW"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("TypeSpec"_str, cntr, 3);
+    }
+
+    auto result = parser->parse("Result"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Block_NoStmt) {
@@ -1634,20 +1545,19 @@ TEST_F(YamaGramTests, Block_NoStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Block"_str);
-        b.lexical("L_CURLY"_str, 1);
-        b.lexical("R_CURLY"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("Block"_str, cntr);
+        pattern.lexical("L_CURLY"_str, cntr, 1);
+        pattern.lexical("R_CURLY"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Block"_str);
+    auto result = parser->parse("Block"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Block_Stmt) {
@@ -1659,49 +1569,24 @@ TEST_F(YamaGramTests, Block_Stmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Block"_str);
-        b.lexical("L_CURLY"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Stmt"_str);
-            {
-                auto node2 = b.syntactic("Decl"_str);
-                {
-                    auto node3 = b.syntactic("VarDecl"_str);
-                    b.lexical("VAR"_str, 3);
-                    b.skip_text(" "_str);
-                    b.lexical("IDENTIFIER"_str, 1);
-                    b.lexical("SEMI"_str, 1);
-                }
-            }
-        }
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Stmt"_str);
-            {
-                auto node2 = b.syntactic("Decl"_str);
-                {
-                    auto node3 = b.syntactic("VarDecl"_str);
-                    b.lexical("VAR"_str, 3);
-                    b.skip_text(" "_str);
-                    b.lexical("IDENTIFIER"_str, 1);
-                    b.lexical("SEMI"_str, 1);
-                }
-            }
-        }
-        b.skip_text(" "_str);
-        b.lexical("R_CURLY"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("Block"_str, cntr);
+        pattern.lexical("L_CURLY"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Stmt"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Stmt"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.lexical("R_CURLY"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Block"_str);
+    auto result = parser->parse("Block"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_Decl) {
@@ -1713,28 +1598,21 @@ TEST_F(YamaGramTests, Stmt_Decl) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("Decl"_str);
-            {
-                auto node2 = b.syntactic("VarDecl"_str);
-                b.lexical("VAR"_str, 3);
-                b.skip_text(" "_str);
-                b.lexical("IDENTIFIER"_str, 1);
-                b.lexical("SEMI"_str, 1);
-            }
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
+            pattern.loose_syntactic("VarDecl"_str, cntr, 6);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_ExprStmt) {
@@ -1746,35 +1624,22 @@ TEST_F(YamaGramTests, Stmt_ExprStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("ExprStmt"_str);
-            {
-                auto node2 = b.syntactic("Expr"_str);
-                {
-                    auto node3 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node4 = b.syntactic("Lit"_str);
-                        {
-                            auto node5 = b.syntactic("IntLit"_str);
-                            b.lexical("INT_DEC"_str, 3);
-                        }
-                    }
-                }
-            }
-            b.lexical("SEMI"_str, 1);
+            auto node1 = pattern.syntactic_autoclose("ExprStmt"_str, cntr);
+            pattern.loose_syntactic("Expr"_str, cntr, 3);
+            pattern.lexical("SEMI"_str, cntr, 1);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_IfStmt) {
@@ -1786,44 +1651,27 @@ TEST_F(YamaGramTests, Stmt_IfStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("IfStmt"_str);
-            b.lexical("IF"_str, 2);
-            b.skip_text(" "_str);
-            b.lexical("L_ROUND"_str, 1);
-            {
-                auto node2 = b.syntactic("Expr"_str);
-                {
-                    auto node3 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node4 = b.syntactic("Lit"_str);
-                        {
-                            auto node5 = b.syntactic("BoolLit"_str);
-                            b.lexical("TRUE"_str, 4);
-                        }
-                    }
-                }
-            }
-            b.lexical("R_ROUND"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("Block"_str);
-                b.lexical("L_CURLY"_str, 1);
-                b.lexical("R_CURLY"_str, 1);
-            }
+            auto node1 = pattern.syntactic_autoclose("IfStmt"_str, cntr);
+            pattern.lexical("IF"_str, cntr, 2);
+            pattern.skip(" ", cntr);
+            pattern.lexical("L_ROUND"_str, cntr, 1);
+            pattern.loose_syntactic("Expr"_str, cntr, 4);
+            pattern.lexical("R_ROUND"_str, cntr, 1);
+            pattern.skip(" ", cntr);
+            pattern.loose_syntactic("Block"_str, cntr, 2);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_LoopStmt) {
@@ -1835,28 +1683,23 @@ TEST_F(YamaGramTests, Stmt_LoopStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("LoopStmt"_str);
-            b.lexical("LOOP"_str, 4);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("Block"_str);
-                b.lexical("L_CURLY"_str, 1);
-                b.lexical("R_CURLY"_str, 1);
-            }
+            auto node1 = pattern.syntactic_autoclose("LoopStmt"_str, cntr);
+            pattern.lexical("LOOP"_str, cntr, 4);
+            pattern.skip(" ", cntr);
+            pattern.loose_syntactic("Block"_str, cntr, 2);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_BreakStmt) {
@@ -1868,23 +1711,22 @@ TEST_F(YamaGramTests, Stmt_BreakStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("BreakStmt"_str);
-            b.lexical("BREAK"_str, 5);
-            b.lexical("SEMI"_str, 1);
+            auto node1 = pattern.syntactic_autoclose("BreakStmt"_str, cntr);
+            pattern.lexical("BREAK"_str, cntr, 5);
+            pattern.lexical("SEMI"_str, cntr, 1);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_ContinueStmt) {
@@ -1896,23 +1738,22 @@ TEST_F(YamaGramTests, Stmt_ContinueStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("ContinueStmt"_str);
-            b.lexical("CONTINUE"_str, 8);
-            b.lexical("SEMI"_str, 1);
+            auto node1 = pattern.syntactic_autoclose("ContinueStmt"_str, cntr);
+            pattern.lexical("CONTINUE"_str, cntr, 8);
+            pattern.lexical("SEMI"_str, cntr, 1);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Stmt_ReturnStmt) {
@@ -1924,23 +1765,22 @@ TEST_F(YamaGramTests, Stmt_ReturnStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Stmt"_str);
+        auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = b.syntactic("ReturnStmt"_str);
-            b.lexical("RETURN"_str, 6);
-            b.lexical("SEMI"_str, 1);
+            auto node1 = pattern.syntactic_autoclose("ReturnStmt"_str, cntr);
+            pattern.lexical("RETURN"_str, cntr, 6);
+            pattern.lexical("SEMI"_str, cntr, 1);
         }
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Stmt"_str);
+    auto result = parser->parse("Stmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, ExprStmt) {
@@ -1952,32 +1792,19 @@ TEST_F(YamaGramTests, ExprStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("ExprStmt"_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
-                    }
-                }
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("ExprStmt"_str, cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 3);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("ExprStmt"_str);
+    auto result = parser->parse("ExprStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, ExprStmt_AssignStmt) {
@@ -1989,45 +1816,21 @@ TEST_F(YamaGramTests, ExprStmt_AssignStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("ExprStmt"_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
-                    }
-                }
-            }
-        }
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Assign"_str);
-            b.lexical("ASSIGN"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("Expr"_str);
-                {
-                    auto node3 = b.syntactic("PrimaryExpr"_str);
-                    b.lexical("IDENTIFIER"_str, 3);
-                }
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("ExprStmt"_str, cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Assign"_str, cntr, 5);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("ExprStmt"_str);
+    auto result = parser->parse("ExprStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IfStmt_NoElse) {
@@ -2039,41 +1842,24 @@ TEST_F(YamaGramTests, IfStmt_NoElse) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IfStmt"_str);
-        b.lexical("IF"_str, 2);
-        b.skip_text(" "_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("BoolLit"_str);
-                        b.lexical("TRUE"_str, 4);
-                    }
-                }
-            }
-        }
-        b.lexical("R_ROUND"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
+        auto node0 = pattern.syntactic_autoclose("IfStmt"_str, cntr);
+        pattern.lexical("IF"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 4);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IfStmt"_str);
+    auto result = parser->parse("IfStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IfStmt_Else) {
@@ -2085,49 +1871,28 @@ TEST_F(YamaGramTests, IfStmt_Else) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IfStmt"_str);
-        b.lexical("IF"_str, 2);
-        b.skip_text(" "_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("BoolLit"_str);
-                        b.lexical("TRUE"_str, 4);
-                    }
-                }
-            }
-        }
-        b.lexical("R_ROUND"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
-        b.skip_text(" "_str);
-        b.lexical("ELSE"_str, 4);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
+        auto node0 = pattern.syntactic_autoclose("IfStmt"_str, cntr);
+        pattern.lexical("IF"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 4);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("ELSE"_str, cntr, 4);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IfStmt"_str);
+    auto result = parser->parse("IfStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IfStmt_ElseIf) {
@@ -2139,70 +1904,28 @@ TEST_F(YamaGramTests, IfStmt_ElseIf) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IfStmt"_str);
-        b.lexical("IF"_str, 2);
-        b.skip_text(" "_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("BoolLit"_str);
-                        b.lexical("TRUE"_str, 4);
-                    }
-                }
-            }
-        }
-        b.lexical("R_ROUND"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
-        b.skip_text(" "_str);
-        b.lexical("ELSE"_str, 4);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("IfStmt"_str);
-            b.lexical("IF"_str, 2);
-            b.skip_text(" "_str);
-            b.lexical("L_ROUND"_str, 1);
-            {
-                auto node2 = b.syntactic("Expr"_str);
-                {
-                    auto node3 = b.syntactic("PrimaryExpr"_str);
-                    {
-                        auto node4 = b.syntactic("Lit"_str);
-                        {
-                            auto node5 = b.syntactic("BoolLit"_str);
-                            b.lexical("FALSE"_str, 5);
-                        }
-                    }
-                }
-            }
-            b.lexical("R_ROUND"_str, 1);
-            b.skip_text(" "_str);
-            {
-                auto node2 = b.syntactic("Block"_str);
-                b.lexical("L_CURLY"_str, 1);
-                b.lexical("R_CURLY"_str, 1);
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("IfStmt"_str, cntr);
+        pattern.lexical("IF"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 4);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
+        pattern.skip(" ", cntr);
+        pattern.lexical("ELSE"_str, cntr, 4);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("IfStmt"_str, cntr, 13);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IfStmt"_str);
+    auto result = parser->parse("IfStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, LoopStmt) {
@@ -2214,25 +1937,20 @@ TEST_F(YamaGramTests, LoopStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("LoopStmt"_str);
-        b.lexical("LOOP"_str, 4);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Block"_str);
-            b.lexical("L_CURLY"_str, 1);
-            b.lexical("R_CURLY"_str, 1);
-        }
+        auto node0 = pattern.syntactic_autoclose("LoopStmt"_str, cntr);
+        pattern.lexical("LOOP"_str, cntr, 4);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Block"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("LoopStmt"_str);
+    auto result = parser->parse("LoopStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, BreakStmt) {
@@ -2244,20 +1962,19 @@ TEST_F(YamaGramTests, BreakStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("BreakStmt"_str);
-        b.lexical("BREAK"_str, 5);
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("BreakStmt"_str, cntr);
+        pattern.lexical("BREAK"_str, cntr, 5);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("BreakStmt"_str);
+    auto result = parser->parse("BreakStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, ContinueStmt) {
@@ -2269,20 +1986,19 @@ TEST_F(YamaGramTests, ContinueStmt) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("ContinueStmt"_str);
-        b.lexical("CONTINUE"_str, 8);
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("ContinueStmt"_str, cntr);
+        pattern.lexical("CONTINUE"_str, cntr, 8);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("ContinueStmt"_str);
+    auto result = parser->parse("ContinueStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, ReturnStmt_NoExpr) {
@@ -2294,20 +2010,19 @@ TEST_F(YamaGramTests, ReturnStmt_NoExpr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("ReturnStmt"_str);
-        b.lexical("RETURN"_str, 6);
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("ReturnStmt"_str, cntr);
+        pattern.lexical("RETURN"_str, cntr, 6);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("ReturnStmt"_str);
+    auto result = parser->parse("ReturnStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, ReturnStmt_Expr) {
@@ -2319,34 +2034,21 @@ TEST_F(YamaGramTests, ReturnStmt_Expr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("ReturnStmt"_str);
-        b.lexical("RETURN"_str, 6);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("FloatLit"_str);
-                        b.lexical("FLOAT"_str, 7);
-                    }
-                }
-            }
-        }
-        b.lexical("SEMI"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("ReturnStmt"_str, cntr);
+        pattern.lexical("RETURN"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 7);
+        pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("ReturnStmt"_str);
+    auto result = parser->parse("ReturnStmt"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Expr_PrimaryExpr) {
@@ -2358,28 +2060,18 @@ TEST_F(YamaGramTests, Expr_PrimaryExpr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Expr"_str);
-        {
-            auto node1 = b.syntactic("PrimaryExpr"_str);
-            {
-                auto node2 = b.syntactic("Lit"_str);
-                {
-                    auto node3 = b.syntactic("IntLit"_str);
-                    b.lexical("INT_DEC"_str, 3);
-                }
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("PrimaryExpr"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Expr"_str);
+    auto result = parser->parse("Expr"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Expr_CallExpr) {
@@ -2391,27 +2083,19 @@ TEST_F(YamaGramTests, Expr_CallExpr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Expr"_str);
-        {
-            auto node1 = b.syntactic("PrimaryExpr"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        {
-            auto node1 = b.syntactic("Args"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
+        pattern.loose_syntactic("Args"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Expr"_str);
+    auto result = parser->parse("Expr"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Expr_SuffixNesting) {
@@ -2423,37 +2107,21 @@ TEST_F(YamaGramTests, Expr_SuffixNesting) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Expr"_str);
-        {
-            auto node1 = b.syntactic("PrimaryExpr"_str);
-            b.lexical("IDENTIFIER"_str, 1);
-        }
-        {
-            auto node1 = b.syntactic("Args"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
-        {
-            auto node1 = b.syntactic("Args"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
-        {
-            auto node1 = b.syntactic("Args"_str);
-            b.lexical("L_ROUND"_str, 1);
-            b.lexical("R_ROUND"_str, 1);
-        }
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
+        pattern.loose_syntactic("Args"_str, cntr, 2);
+        pattern.loose_syntactic("Args"_str, cntr, 2);
+        pattern.loose_syntactic("Args"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Expr"_str);
+    auto result = parser->parse("Expr"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr) {
@@ -2465,19 +2133,18 @@ TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("PrimaryExpr"_str);
-        b.lexical("IDENTIFIER"_str, 3);
+        auto node0 = pattern.syntactic_autoclose("PrimaryExpr"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("PrimaryExpr"_str);
+    auto result = parser->parse("PrimaryExpr"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, PrimaryExpr_LitExpr) {
@@ -2489,25 +2156,18 @@ TEST_F(YamaGramTests, PrimaryExpr_LitExpr) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("PrimaryExpr"_str);
-        {
-            auto node1 = b.syntactic("Lit"_str);
-            {
-                auto node2 = b.syntactic("IntLit"_str);
-                b.lexical("INT_DEC"_str, 3);
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("PrimaryExpr"_str, cntr);
+        pattern.loose_syntactic("Lit"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("PrimaryExpr"_str);
+    auto result = parser->parse("PrimaryExpr"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Lit_IntLit) {
@@ -2519,22 +2179,18 @@ TEST_F(YamaGramTests, Lit_IntLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Lit"_str);
-        {
-            auto node1 = b.syntactic("IntLit"_str);
-            b.lexical("INT_DEC"_str, 3);
-        }
+        auto node0 = pattern.syntactic_autoclose("Lit"_str, cntr);
+        pattern.loose_syntactic("IntLit"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Lit"_str);
+    auto result = parser->parse("Lit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Lit_UIntLit) {
@@ -2546,22 +2202,18 @@ TEST_F(YamaGramTests, Lit_UIntLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Lit"_str);
-        {
-            auto node1 = b.syntactic("UIntLit"_str);
-            b.lexical("UINT_DEC"_str, 4);
-        }
+        auto node0 = pattern.syntactic_autoclose("Lit"_str, cntr);
+        pattern.loose_syntactic("UIntLit"_str, cntr, 4);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Lit"_str);
+    auto result = parser->parse("Lit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Lit_FloatLit) {
@@ -2573,22 +2225,18 @@ TEST_F(YamaGramTests, Lit_FloatLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Lit"_str);
-        {
-            auto node1 = b.syntactic("FloatLit"_str);
-            b.lexical("FLOAT"_str, 5);
-        }
+        auto node0 = pattern.syntactic_autoclose("Lit"_str, cntr);
+        pattern.loose_syntactic("FloatLit"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Lit"_str);
+    auto result = parser->parse("Lit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Lit_BoolLit) {
@@ -2600,22 +2248,18 @@ TEST_F(YamaGramTests, Lit_BoolLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Lit"_str);
-        {
-            auto node1 = b.syntactic("BoolLit"_str);
-            b.lexical("TRUE"_str, 4);
-        }
+        auto node0 = pattern.syntactic_autoclose("Lit"_str, cntr);
+        pattern.loose_syntactic("BoolLit"_str, cntr, 4);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Lit"_str);
+    auto result = parser->parse("Lit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Lit_CharLit) {
@@ -2627,22 +2271,18 @@ TEST_F(YamaGramTests, Lit_CharLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Lit"_str);
-        {
-            auto node1 = b.syntactic("CharLit"_str);
-            b.lexical("CHAR"_str, 3);
-        }
+        auto node0 = pattern.syntactic_autoclose("Lit"_str, cntr);
+        pattern.loose_syntactic("CharLit"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Lit"_str);
+    auto result = parser->parse("Lit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IntLit_Dec) {
@@ -2654,19 +2294,18 @@ TEST_F(YamaGramTests, IntLit_Dec) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IntLit"_str);
-        b.lexical("INT_DEC"_str, 3);
+        auto node0 = pattern.syntactic_autoclose("IntLit"_str, cntr);
+        pattern.lexical("INT_DEC"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IntLit"_str);
+    auto result = parser->parse("IntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IntLit_Hex) {
@@ -2678,19 +2317,18 @@ TEST_F(YamaGramTests, IntLit_Hex) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IntLit"_str);
-        b.lexical("INT_HEX"_str, 5);
+        auto node0 = pattern.syntactic_autoclose("IntLit"_str, cntr);
+        pattern.lexical("INT_HEX"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IntLit"_str);
+    auto result = parser->parse("IntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, IntLit_Bin) {
@@ -2702,19 +2340,18 @@ TEST_F(YamaGramTests, IntLit_Bin) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("IntLit"_str);
-        b.lexical("INT_BIN"_str, 5);
+        auto node0 = pattern.syntactic_autoclose("IntLit"_str, cntr);
+        pattern.lexical("INT_BIN"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("IntLit"_str);
+    auto result = parser->parse("IntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, UIntLit_Dec) {
@@ -2726,19 +2363,18 @@ TEST_F(YamaGramTests, UIntLit_Dec) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("UIntLit"_str);
-        b.lexical("UINT_DEC"_str, 4);
+        auto node0 = pattern.syntactic_autoclose("UIntLit"_str, cntr);
+        pattern.lexical("UINT_DEC"_str, cntr, 4);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("UIntLit"_str);
+    auto result = parser->parse("UIntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, UIntLit_Hex) {
@@ -2750,19 +2386,18 @@ TEST_F(YamaGramTests, UIntLit_Hex) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("UIntLit"_str);
-        b.lexical("UINT_HEX"_str, 6);
+        auto node0 = pattern.syntactic_autoclose("UIntLit"_str, cntr);
+        pattern.lexical("UINT_HEX"_str, cntr, 6);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("UIntLit"_str);
+    auto result = parser->parse("UIntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, UIntLit_Bin) {
@@ -2774,19 +2409,18 @@ TEST_F(YamaGramTests, UIntLit_Bin) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("UIntLit"_str);
-        b.lexical("UINT_BIN"_str, 6);
+        auto node0 = pattern.syntactic_autoclose("UIntLit"_str, cntr);
+        pattern.lexical("UINT_BIN"_str, cntr, 6);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("UIntLit"_str);
+    auto result = parser->parse("UIntLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, FloatLit_FLOAT) {
@@ -2798,19 +2432,18 @@ TEST_F(YamaGramTests, FloatLit_FLOAT) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("FloatLit"_str);
-        b.lexical("FLOAT"_str, 6);
+        auto node0 = pattern.syntactic_autoclose("FloatLit"_str, cntr);
+        pattern.lexical("FLOAT"_str, cntr, 6);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("FloatLit"_str);
+    auto result = parser->parse("FloatLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, FloatLit_INF) {
@@ -2822,19 +2455,18 @@ TEST_F(YamaGramTests, FloatLit_INF) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("FloatLit"_str);
-        b.lexical("INF"_str, 3);
+        auto node0 = pattern.syntactic_autoclose("FloatLit"_str, cntr);
+        pattern.lexical("INF"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("FloatLit"_str);
+    auto result = parser->parse("FloatLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, FloatLit_NAN) {
@@ -2846,19 +2478,18 @@ TEST_F(YamaGramTests, FloatLit_NAN) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("FloatLit"_str);
-        b.lexical("NAN"_str, 3);
+        auto node0 = pattern.syntactic_autoclose("FloatLit"_str, cntr);
+        pattern.lexical("NAN"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("FloatLit"_str);
+    auto result = parser->parse("FloatLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, BoolLit_True) {
@@ -2870,19 +2501,18 @@ TEST_F(YamaGramTests, BoolLit_True) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("BoolLit"_str);
-        b.lexical("TRUE"_str, 4);
+        auto node0 = pattern.syntactic_autoclose("BoolLit"_str, cntr);
+        pattern.lexical("TRUE"_str, cntr, 4);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("BoolLit"_str);
+    auto result = parser->parse("BoolLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, BoolLit_False) {
@@ -2894,19 +2524,18 @@ TEST_F(YamaGramTests, BoolLit_False) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("BoolLit"_str);
-        b.lexical("FALSE"_str, 5);
+        auto node0 = pattern.syntactic_autoclose("BoolLit"_str, cntr);
+        pattern.lexical("FALSE"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("BoolLit"_str);
+    auto result = parser->parse("BoolLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, CharLit) {
@@ -2918,19 +2547,18 @@ TEST_F(YamaGramTests, CharLit) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("CharLit"_str);
-        b.lexical("CHAR"_str, 3);
+        auto node0 = pattern.syntactic_autoclose("CharLit"_str, cntr);
+        pattern.lexical("CHAR"_str, cntr, 3);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("CharLit"_str);
+    auto result = parser->parse("CharLit"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Assign) {
@@ -2942,33 +2570,20 @@ TEST_F(YamaGramTests, Assign) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Assign"_str);
-        b.lexical("ASSIGN"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 2);
-                    }
-                }
-            }
-        }
+        auto node0 = pattern.syntactic_autoclose("Assign"_str, cntr);
+        pattern.lexical("ASSIGN"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 2);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Assign"_str);
+    auto result = parser->parse("Assign"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Args_Empty) {
@@ -2980,20 +2595,19 @@ TEST_F(YamaGramTests, Args_Empty) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Args"_str);
-        b.lexical("L_ROUND"_str, 1);
-        b.lexical("R_ROUND"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("Args"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Args"_str);
+    auto result = parser->parse("Args"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, Args_NonEmpty) {
@@ -3005,63 +2619,26 @@ TEST_F(YamaGramTests, Args_NonEmpty) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("Args"_str);
-        b.lexical("L_ROUND"_str, 1);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 2);
-                    }
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 1);
-                    }
-                }
-            }
-        }
-        b.lexical("COMMA"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("Expr"_str);
-            {
-                auto node2 = b.syntactic("PrimaryExpr"_str);
-                {
-                    auto node3 = b.syntactic("Lit"_str);
-                    {
-                        auto node4 = b.syntactic("IntLit"_str);
-                        b.lexical("INT_DEC"_str, 3);
-                    }
-                }
-            }
-        }
-        b.lexical("R_ROUND"_str, 1);
+        auto node0 = pattern.syntactic_autoclose("Args"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 2);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 1);
+        pattern.lexical("COMMA"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("Expr"_str, cntr, 3);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("Args"_str);
+    auto result = parser->parse("Args"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, TypeAnnot) {
@@ -3073,24 +2650,20 @@ TEST_F(YamaGramTests, TypeAnnot) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("TypeAnnot"_str);
-        b.lexical("COLON"_str, 1);
-        b.skip_text(" "_str);
-        {
-            auto node1 = b.syntactic("TypeSpec"_str);
-            b.lexical("IDENTIFIER"_str, 5);
-        }
+        auto node0 = pattern.syntactic_autoclose("TypeAnnot"_str, cntr);
+        pattern.lexical("COLON"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.loose_syntactic("TypeSpec"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("TypeAnnot"_str);
+    auto result = parser->parse("TypeAnnot"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
 TEST_F(YamaGramTests, TypeSpec) {
@@ -3102,18 +2675,17 @@ TEST_F(YamaGramTests, TypeSpec) {
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
 
-    parse_tree_builder b(*gram);
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = b.syntactic("TypeSpec"_str);
-        b.lexical("IDENTIFIER"_str, 5);
+        auto node0 = pattern.syntactic_autoclose("TypeSpec"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 5);
     }
 
-    auto expected = b.done();
-    auto actual = parser->parse("TypeSpec"_str);
+    auto result = parser->parse("TypeSpec"_str);
 
-    YAMA_LOG(dbg, yama::general_c, "expected:\n{}", expected);
-    YAMA_LOG(dbg, yama::general_c, "actual:\n{}", actual);
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
-    EXPECT_EQ(expected.fmt(), actual.fmt()); // easier to diagnose problems by comparing strings
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 

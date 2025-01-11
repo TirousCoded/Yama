@@ -6,6 +6,9 @@
 using namespace yama::string_literals;
 
 
+#define _LOG_REG_AND_SCOPE_STK_MANIP 0
+
+
 yama::internal::second_pass::second_pass(
     std::shared_ptr<debug> dbg,
     ast_Chunk& root,
@@ -38,13 +41,15 @@ void yama::internal::second_pass::visit_begin(res<ast_Block> x) {
                 _top_reg().type, "Bool"_str);
             return; // abort
         }
-        _sanitize_here(x->low_pos()); // sanitize before branch
         // write branch to else-part or exit if cond is false
-        cw.add_jump_false(uint8_t(_top_if_stmt().cond_reg_index.value()),
-            _top_if_stmt().has_else_part ? _top_if_stmt().else_part_label : _top_if_stmt().exit_label);
+        const auto selected_label =
+            _top_if_stmt().has_else_part
+            ? _top_if_stmt().else_part_label
+            : _top_if_stmt().exit_label;
+        cw.add_jump_false(1, selected_label);
         _add_sym(x->low_pos());
-        // pop the Bool cond temporary of the if stmt
-        _pop_temp();
+        // pops the Bool cond temporary of the if stmt
+        _pop_temp(1, false); // jump_false handles popping, so no pop instr
     }
     _push_scope();
 }
@@ -53,9 +58,7 @@ void yama::internal::second_pass::visit_begin(res<ast_ExprStmt> x) {
     if (err) {
         return;
     }
-    if (x->assign) {
-        _mark_as_assign_stmt_lvalue(*x->expr);
-    }
+    if (x->assign) _mark_as_assign_stmt_lvalue(*x->expr);
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_IfStmt> x) {
@@ -70,7 +73,6 @@ void yama::internal::second_pass::visit_begin(res<ast_LoopStmt> x) {
         return;
     }
     _push_loop_stmt(*x);
-    _sanitize_here(x->low_pos()); // sanitize before branch (fallthrough branch)
     // write continue label
     cw.add_label(_top_loop_stmt().continue_label);
 }
@@ -112,17 +114,18 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 _push_temp(*x, symbol->as<param_csym>().type.value());
                 // IMPORTANT: remember that the indices of the args of an ll_call include the callobj,
                 //            so we gotta incr the fn param index to account for this
-                // write load_arg loading param into temporary
-                cw.add_load_arg(uint8_t(_top_reg().index), uint8_t(_target_param_index(name).value() + 1), true);
+                // write put_arg loading param into temporary
+                cw.add_put_arg(yama::newtop, uint8_t(_target_param_index(name).value() + 1));
                 _add_sym(x->primary->name->low_pos());
             }
             else if (symbol->is<var_csym>()) {
+                auto& info = symbol->as<var_csym>();
                 // gotta account for the edge case where the code is something like 'var a = a;', in which
                 // the var 'a' exists, but it's not been fully setup yet
-                if (const auto localvar_type = _get_localvar_type(*std::static_pointer_cast<ast_VarDecl>(symbol->node))) {
-                    _push_temp(*x, localvar_type.value());
+                if (info.is_localvar()) {
+                    _push_temp(*x, info.type.value());
                     // write copy from local var into temporary
-                    cw.add_copy(uint8_t(_localvar_reg(*symbol->node).index), uint8_t(_top_reg().index), true);
+                    cw.add_copy(uint8_t(info.reg.value()), yama::newtop);
                     _add_sym(x->primary->name->low_pos());
                 }
                 else {
@@ -136,8 +139,8 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             }
             else if (symbol->is<fn_csym>()) {
                 _push_temp(*x, name);
-                // write load_const loading fn object into temporary
-                cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_fn_type_c(name)), true);
+                // write put_const loading fn object into temporary
+                cw.add_put_const(yama::newtop, uint8_t(_pull_fn_type_c(name)));
                 _add_sym(x->primary->name->low_pos());
             }
             else { // not a param, local var, or fn
@@ -180,7 +183,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             }
             else { // valid
                 _push_temp(*x, "Int"_str);
-                cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_int_c(v.v)), true);
+                cw.add_put_const(yama::newtop, uint8_t(_pull_int_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
         }
@@ -197,7 +200,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             }
             else { // valid
                 _push_temp(*x, "UInt"_str);
-                cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_uint_c(v.v)), true);
+                cw.add_put_const(yama::newtop, uint8_t(_pull_uint_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
         }
@@ -206,14 +209,14 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const parsed_float v = parse_float(lit_nd->lit.str(_get_src())).value();
             // below can handle cases of overflow/underflow
             _push_temp(*x, "Float"_str);
-            cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_float_c(v.v)), true);
+            cw.add_put_const(yama::newtop, uint8_t(_pull_float_c(v.v)));
             _add_sym(x->primary->lit->low_pos());
         }
         else if (x->primary->lit->is_bool()) {
             const auto lit_nd = res(x->primary->lit->as_bool());
             const parsed_bool v = parse_bool(lit_nd->lit.str(_get_src())).value();
             _push_temp(*x, "Bool"_str);
-            cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_bool_c(v.v)), true);
+            cw.add_put_const(yama::newtop, uint8_t(_pull_bool_c(v.v)));
             _add_sym(x->primary->lit->low_pos());
         }
         else if (x->primary->lit->is_char()) {
@@ -231,7 +234,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             }
             else { // valid
                 _push_temp(*x, "Char"_str);
-                cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_char_c(v.v)), true);
+                cw.add_put_const(yama::newtop, uint8_t(_pull_char_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
         }
@@ -259,17 +262,6 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
         }
         // promote temporary within the var decl into local var
         _promote_to_localvar(*x);
-        // if var decl has no type annotation, then its type is deduced, meaning that
-        // right now its csymtab entry will have not stated type, so we need to update
-        // the csymtab entry to say it has deduced type
-        if (const auto symbol = _get_csymtabs().lookup(*x, x->name.str(_get_src()), x->high_pos())) {
-            if (symbol->is<var_csym>()) {
-                auto& info = symbol->as<var_csym>();
-                if (!info.type) {
-                    info.type = _top_reg().type;
-                }
-            }
-        }
     }
     else {
         if (x->type) {
@@ -282,34 +274,34 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
                 if (symbol->is<prim_csym>()) { // primitive type
                     // write bcode which inits our local var w/ default value
                     if (type == "None"_str) {
-                        cw.add_load_none(uint8_t(_top_reg().index), true);
+                        cw.add_put_none(yama::newtop);
                         _add_sym(x->low_pos());
                     }
                     else if (type == "Int"_str) {
-                        cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_int_c(0)), true);
+                        cw.add_put_const(yama::newtop, uint8_t(_pull_int_c(0)));
                         _add_sym(x->low_pos());
                     }
                     else if (type == "UInt"_str) {
-                        cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_uint_c(0u)), true);
+                        cw.add_put_const(yama::newtop, uint8_t(_pull_uint_c(0u)));
                         _add_sym(x->low_pos());
                     }
                     else if (type == "Float"_str) {
-                        cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_float_c(0.0)), true);
+                        cw.add_put_const(yama::newtop, uint8_t(_pull_float_c(0.0)));
                         _add_sym(x->low_pos());
                     }
                     else if (type == "Bool"_str) {
-                        cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_bool_c(false)), true);
+                        cw.add_put_const(yama::newtop, uint8_t(_pull_bool_c(false)));
                         _add_sym(x->low_pos());
                     }
                     else if (type == "Char"_str) {
-                        cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_char_c(U'\0')), true);
+                        cw.add_put_const(yama::newtop, uint8_t(_pull_char_c(U'\0')));
                         _add_sym(x->low_pos());
                     }
                     else YAMA_DEADEND;
                 }
                 else if (symbol->is<fn_csym>()) { // fn type
                     // write bcode which inits our local var w/ default value
-                    cw.add_load_const(uint8_t(_top_reg().index), uint8_t(_pull_fn_type_c(type)), true);
+                    cw.add_put_const(yama::newtop, uint8_t(_pull_fn_type_c(type)));
                     _add_sym(x->low_pos());
                 }
                 else { // not a primitive or fn type
@@ -350,23 +342,23 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
     if (err) {
         return;
     }
-    if (_is_fn_body_block(*x)) {
+    const bool this_is_fn_body_block = _is_fn_body_block(*x);
+    if (this_is_fn_body_block) {
         // if we're None returning, and not all control paths have an explicit return
         // stmt or enter infinite loops, write a ret instr
         const bool is_none_returning = _target_csym().return_type.value_or("None"_str) == "None";
         const bool not_all_paths_return_or_loop = !_target_csym().all_paths_return_or_loop.value();
         if (is_none_returning && not_all_paths_return_or_loop) {
             _push_temp(*x, "None"_str);
-            cw.add_load_none(uint8_t(_top_reg().index), true);
+            cw.add_put_none(yama::newtop);
             _add_sym(x->high_pos());
             cw.add_ret(uint8_t(_top_reg().index));
             _add_sym(x->high_pos());
-            _pop_temp();
+            _pop_temp(1, false); // pop instr after ret would just be dead code
         }
     }
-    _pop_scope(*x);
+    _pop_scope(*x, !this_is_fn_body_block); // pop instr after ret would just be dead code
     if (_is_if_stmt_body(*x) && _top_if_stmt().has_else_part) {
-        _sanitize_here(x->high_pos()); // sanitize before branch
         // write unconditional branch to the exit label to skip the else-part (if any)
         cw.add_jump(_top_if_stmt().exit_label);
         _add_sym(x->high_pos());
@@ -396,10 +388,10 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
                         return; // abort
                     }
                     else {
-                        // write copy of temporary assigned w/ onto local var
-                        cw.add_copy(uint8_t(_top_reg().index), uint8_t(_localvar_reg(*symbol->node).index));
+                        // write copy of temporary assigned w/ onto local var, performing the assignment
+                        cw.add_copy(uint8_t(_top_reg().index), uint8_t(info.reg.value()));
                         _add_sym(x->low_pos());
-                        _pop_temp(); // consume temporary assigned w/
+                        _pop_temp(1, true, x->low_pos()); // consume temporary assigned w/
                     }
                 }
                 else if (symbol->is<param_csym>()) { // non-assignable
@@ -443,7 +435,7 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
     }
     else { // expr stmt
         // consume temporary from our expr
-        _pop_temp();
+        _pop_temp(1, true, x->low_pos());
     }
 }
 
@@ -451,7 +443,6 @@ void yama::internal::second_pass::visit_end(res<ast_IfStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(x->high_pos()); // sanitize before branch (fallthrough branch)
     // write exit label
     cw.add_label(_top_if_stmt().exit_label);
     _pop_if_stmt();
@@ -461,7 +452,6 @@ void yama::internal::second_pass::visit_end(res<ast_LoopStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(x->high_pos()); // sanitize before branch
     // write unconditional branch to continue label
     cw.add_jump(_top_loop_stmt().continue_label);
     _add_sym(x->high_pos());
@@ -474,7 +464,12 @@ void yama::internal::second_pass::visit_end(res<ast_BreakStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(x->low_pos()); // sanitize before branch
+    // IMPORTANT: we can't just pop all the registers of the current scope, as
+    //            loop stmt blocks can have *multiple levels* of nested scope
+    // pop all temporaries and local vars to *exit* loop block scope
+    const auto total_regs_in_loop_stmt = _regstk.size() - _top_loop_stmt().first_reg;
+    cw.add_pop(uint8_t(total_regs_in_loop_stmt));
+    _add_sym(x->low_pos());
     // write unconditional branch to break label
     cw.add_jump(_top_loop_stmt().break_label);
     _add_sym(x->low_pos());
@@ -484,16 +479,12 @@ void yama::internal::second_pass::visit_end(res<ast_ContinueStmt> x) {
     if (err) {
         return;
     }
-    _sanitize_here(x->low_pos()); // sanitize before branch
-    // alongside usual sanitize, we also gotta write load_none instrs to drop any
-    // local vars which will go out-of-scope as a result of our branch, w/ this
-    // being needed in order to avoid register coherence violations
-    for (size_t i = _top_loop_stmt().first_reg; i < _regs(); i++) {
-        if (_reg(i).is_localvar()) {
-            cw.add_load_none(uint8_t(i), true);
-            _add_sym(x->low_pos());
-        }
-    }
+    // IMPORTANT: we can't just pop all the registers of the current scope, as
+    //            loop stmt blocks can have *multiple levels* of nested scope
+    // pop all temporaries and local vars to *restart* loop block scope
+    const auto total_regs_in_loop_stmt = _regstk.size() - _top_loop_stmt().first_reg;
+    cw.add_pop(uint8_t(total_regs_in_loop_stmt));
+    _add_sym(x->low_pos());
     // write unconditional branch to continue label
     cw.add_jump(_top_loop_stmt().continue_label);
     _add_sym(x->low_pos());
@@ -515,7 +506,7 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
         }
         cw.add_ret(uint8_t(_top_reg().index));
         _add_sym(x->low_pos());
-        _pop_temp(); // consume return value temporary
+        _pop_temp(1, false); // consume return value temporary + pop instr after ret would just be dead code
     }
     else { // form 'return;'
         // this form may not be used if return type isn't None
@@ -528,9 +519,11 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
             return; // abort
         }
         _push_temp(*x, "None"_str);
+        cw.add_put_none(yama::newtop);
+        _add_sym(x->low_pos());
         cw.add_ret(uint8_t(_top_reg().index));
         _add_sym(x->low_pos());
-        _pop_temp();
+        _pop_temp(1, false); // pop instr after ret would just be dead code
     }
 }
 
@@ -579,26 +572,31 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         // type check the args
         bool args_are_correct_types = true;
         for (size_t i = 0; i < arg_count; i++) {
-            if (!_reg_type_check(callobj_reg_index + i + 1, info.params[i].type.value())) {
+            const auto arg_reg_index = callobj_reg_index + i + 1;
+            const auto arg_number = i + 1;
+            if (!_reg_type_check(arg_reg_index, info.params[i].type.value())) {
                 _compile_error(
                     *x->args[i],
                     dsignal::compile_type_mismatch,
                     "arg {0} expr is type {1}, but expected {2}!",
-                    i + 1, _reg(callobj_reg_index + i + 1).type, info.params[i].type.value());
+                    arg_number, _reg(arg_reg_index).type, info.params[i].type.value());
                 args_are_correct_types = false;
             }
         }
         if (!args_are_correct_types) { // don't return until we've type checked ALL args
             return; // abort
         }
-        // pop callobj and args
-        _pop_temp(arg_count + 1);
-        // push return value
-        _push_temp(*x, info.return_type.value_or("None"_str));
-        YAMA_ASSERT(callobj_reg_index == _top_reg().index); // return value should overwrite callobj
+        const taul::source_pos expr_pos = deref_assert(_args_node_to_expr_node_map.at(x->id)).low_pos();
+        // return value should overwrite callobj
+        const size_t return_value_reg_index = callobj_reg_index;
         // write the call instr
-        cw.add_call(uint8_t(callobj_reg_index), uint8_t(arg_count + 1), uint8_t(_top_reg().index), true);
-        _add_sym(deref_assert(_args_node_to_expr_node_map.at(x->id)).low_pos());
+        cw.add_call(uint8_t(callobj_reg_index), uint8_t(arg_count + 1), uint8_t(return_value_reg_index), true);
+        _add_sym(expr_pos);
+        // reinit our return value (formerly callobj) register to the correct type
+        const auto return_type = info.return_type.value_or("None"_str);
+        _reinit_temp(return_value_reg_index, return_type);
+        // pop args, but NOT callobj, as that register is reused for our return value
+        _pop_temp(arg_count, true, expr_pos);
     }
     else YAMA_DEADEND;
 }
@@ -627,7 +625,7 @@ void yama::internal::second_pass::_push_target(str fullname) {
         .info = yama::function_info{
             .callsig = callsig_info{}, // stub
             .call_fn = yama::bcode_call_fn,
-            .locals = 0,
+            .max_locals = 0,
         },
     };
     results.push_back(std::move(new_type));
@@ -667,8 +665,8 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
 
 void yama::internal::second_pass::_update_target_locals() {
     YAMA_ASSERT(std::holds_alternative<function_info>(_target().info));
-    auto& locals = std::get<function_info>(_target().info).locals;
-    locals = std::max(locals, _regstk.size());
+    auto& max_locals = std::get<function_info>(_target().info).max_locals;
+    max_locals = std::max(max_locals, _regstk.size());
 }
 
 const yama::internal::fn_csym& yama::internal::second_pass::_target_csym() {
@@ -745,13 +743,9 @@ yama::const_t yama::internal::second_pass::_pull_type_c(str fullname) {
     const auto symbol = _get_csymtabs().lookup(_get_root(), fullname, 0);
     YAMA_ASSERT(symbol);
     // resolve based on what we found
-    if (symbol->is<prim_csym>()) {
-        return _pull_prim_type_c(fullname);
-    }
-    else if (symbol->is<fn_csym>()) {
-        return _pull_fn_type_c(fullname);
-    }
-    else YAMA_DEADEND;
+    if (symbol->is<prim_csym>())    return _pull_prim_type_c(fullname);
+    else if (symbol->is<fn_csym>()) return _pull_fn_type_c(fullname);
+    else                            YAMA_DEADEND;
     return const_t{};
 }
 
@@ -759,11 +753,8 @@ yama::const_t yama::internal::second_pass::_pull_prim_type_c(str fullname) {
     auto& _consts = _target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
-        if (const auto c_ptr = _consts.get<yama::primitive_type_const>(i)) {
-            const auto& c = deref_assert(c_ptr);
-            if (c.fullname != fullname) {
-                continue;
-            }
+        if (const auto ptr = _consts.get<yama::primitive_type_const>(i)) {
+            if (deref_assert(ptr).fullname != fullname) continue;
             return i;
         }
     }
@@ -776,11 +767,8 @@ yama::const_t yama::internal::second_pass::_pull_fn_type_c(str fullname) {
     auto& _consts = _target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
-        if (const auto c_ptr = _consts.get<yama::function_type_const>(i)) {
-            const auto& c = deref_assert(c_ptr);
-            if (c.fullname != fullname) {
-                continue;
-            }
+        if (const auto ptr = _consts.get<yama::function_type_const>(i)) {
+            if (deref_assert(ptr).fullname != fullname) continue;
             return i;
         }
     }
@@ -820,28 +808,6 @@ void yama::internal::second_pass::_add_sym(taul::source_pos pos) {
     syms.add(cw.count() - 1, loc.origin, loc.chr, loc.line);
 }
 
-void yama::internal::second_pass::_push_scope() {
-    _scope_depth++;
-    _scope_regs_to_sanitize.push_back(std::unordered_set<size_t>{});
-}
-
-void yama::internal::second_pass::_pop_scope(const ast_Block& x) {
-    _scope_depth--;
-    while (_regs() > 0 && _top_reg().depth > _scope_depth) { // stop at first in-scope reg
-        if (_top_reg().is_localvar()) { // remove local var mapping, if any
-            _localvars_map.erase(_top_reg().localvar.value());
-        }
-        if (_top_reg().type != "None"_str) {
-            _scope_regs_to_sanitize.back().insert(_top_reg().index);
-        }
-        _regstk.pop_back();
-    }
-    if (!_is_fn_body_block(x)) { // we 100% know we don't need to sanitize fn body block (+ avoids dead code issue)
-        _sanitize_here(x.high_pos()); // use high pos here so sanitizing load_none(s) are specified as being at end of block
-    }
-    _scope_regs_to_sanitize.pop_back();
-}
-
 size_t yama::internal::second_pass::_regs() const noexcept {
     return _regstk.size();
 }
@@ -862,73 +828,122 @@ yama::internal::second_pass::_reg_t& yama::internal::second_pass::_top_reg() {
     return _regstk.back();
 }
 
-yama::internal::second_pass::_reg_t& yama::internal::second_pass::_localvar_reg(const ast_node& x) {
-    return _reg_abs(_localvars_map.at(x.id));
+yama::internal::second_pass::_scope_t& yama::internal::second_pass::_top_scope() {
+    return _scopestk.back();
 }
 
 void yama::internal::second_pass::_push_temp(const ast_node& x, str type) {
-    const auto ind = _regs();
-    _reg_t new_reg{
-        .type = type,
-        .localvar = std::nullopt,
-        .index = ind,
-        .depth = _scope_depth,
-    };
-    _regstk.push_back(std::move(new_reg));
-    _update_target_locals(); // can't forget to propagate this to code gen target
-    if (_regs() > _reg_limit) { // register count exceeds impl limit
+    if (_regs() >= _reg_limit) { // register count exceeds impl limit
         _compile_error(
             x,
             dsignal::compile_impl_limits,
             "fn {} contains parts requiring >{} registers to store all temporaries and local vars, exceeding limit!",
             results.back().fullname, _reg_limit);
+        return;
     }
-    _scope_regs_to_sanitize.back().erase(ind);
+    const auto ind = _regs();
+    _regstk.push_back(_reg_t{ .type = type, .index = ind });
+    _update_target_locals(); // can't forget to propagate this to code gen target
+    _top_scope().regs++;
+#if _LOG_REG_AND_SCOPE_STK_MANIP == 1
+    std::string list_of_regs{};
+    {
+        bool not_first = false;
+        for (const auto& I : _regstk) {
+            if (not_first) {
+                list_of_regs += ", ";
+            }
+            list_of_regs += I.type.fmt();
+            not_first = true;
+        }
+    }
+    YAMA_LOG(
+        _dbg, general_c,
+        "*push* reg {: <15} ({} -> {}) ~> [ {} ]",
+        type,
+        _top_scope().first_reg + _top_scope().regs - 1,
+        _top_scope().first_reg + _top_scope().regs,
+        list_of_regs);
+#endif
 }
 
-void yama::internal::second_pass::_pop_temp(size_t n) {
-    for (size_t i = 0; i < n; i++) {
-        YAMA_ASSERT(_top_reg().is_temp());
-        _scope_regs_to_sanitize.back().insert(_top_reg().index);
-        _regstk.pop_back();
+void yama::internal::second_pass::_pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos) {
+    if (n > _regstk.size()) n = _regstk.size(); // <- avoid undefined behaviour for pop_back
+    if (write_pop_instr) {
+        cw.add_pop(uint8_t(n));
+        _add_sym(pop_instr_pos);
     }
+    _top_scope().regs -= n;
+    for (auto nn = n; nn >= 1; nn--) _regstk.pop_back();
+#if _LOG_REG_AND_SCOPE_STK_MANIP == 1
+    std::string list_of_regs{};
+    {
+        bool not_first = false;
+        for (const auto& I : _regstk) {
+            if (not_first) {
+                list_of_regs += ", ";
+            }
+            list_of_regs += I.type.fmt();
+            not_first = true;
+        }
+    }
+    YAMA_LOG(
+        _dbg, general_c,
+        "*pop* reg {: <16} ({} -> {}) ~> [ {} ]",
+        n,
+        _top_scope().first_reg + _top_scope().regs + n,
+        _top_scope().first_reg + _top_scope().regs,
+        list_of_regs);
+#endif
 }
 
-void yama::internal::second_pass::_promote_to_localvar(const ast_VarDecl& x) {
-    YAMA_ASSERT(!_get_localvar_type(x));
+void yama::internal::second_pass::_reinit_temp(ssize_t index, str new_type) {
+    _reg(index).type = new_type;
+#if _LOG_REG_AND_SCOPE_STK_MANIP == 1
+    YAMA_LOG(_dbg, general_c, "*reinit* reg {} {}", _reg_abs_index(index), new_type);
+#endif
+}
+
+void yama::internal::second_pass::_push_scope() {
+    _scopestk.push_back(_scope_t{ .regs = 0, .first_reg = _regstk.size() });
+#if _LOG_REG_AND_SCOPE_STK_MANIP == 1
+    YAMA_LOG(_dbg, general_c, "\n*enter* scope #{}\n", _scopestk.size());
+#endif
+}
+
+void yama::internal::second_pass::_pop_scope(const ast_Block& x, bool write_pop_instr) {
+    _pop_temp(_top_scope().regs, write_pop_instr, x.high_pos()); // unwind temporaries and local vars
+    _scopestk.pop_back();
+#if _LOG_REG_AND_SCOPE_STK_MANIP == 1
+    YAMA_LOG(_dbg, general_c, "\n*exit* scope #{}\n", _scopestk.size() + 1);
+#endif
+}
+
+void yama::internal::second_pass::_promote_to_localvar(ast_VarDecl& x) {
     YAMA_ASSERT(_top_reg().is_temp());
-    _top_reg().localvar = x.id;
-    _localvars_map[x.id] = _top_reg().index;
-    _localvar_type_map[x.id] = _top_reg().type;
+    const auto localvar_name = x.name.str(_get_src());
+    const auto localvar_type = _top_reg().type; // *deduce* local var type from type of temporary
+    // tell the temporary (now local var) register the name of its local var
+    _top_reg().localvar = localvar_name;
+    // update symbol table entry
+    if (const auto symbol = _get_csymtabs().lookup(x, localvar_name, x.high_pos())) {
+        if (symbol->is<var_csym>()) {
+            auto& info = symbol->as<var_csym>();
+            // if var decl has no type annotation, then its type is deduced, meaning that
+            // right now its csymtab entry will have no stated type, so we need to update
+            // the csymtab entry to say it has deduced type
+            if (!info.type) info.type = localvar_type;
+            // when we promote a temporary to a local var, its symbol is expected to not
+            // yet have an associated register index, w/ this assigning one
+            YAMA_ASSERT(!info.reg);
+            info.reg = _top_reg().index;
+        }
+    }
     YAMA_ASSERT(_top_reg().is_localvar());
-    YAMA_ASSERT(_get_localvar_type(x) == _top_reg().type);
 }
 
 bool yama::internal::second_pass::_reg_type_check(ssize_t index, str expected) {
     return _reg(index).type == expected;
-}
-
-std::optional<yama::str> yama::internal::second_pass::_get_localvar_type(const ast_VarDecl& x) {
-    const auto it = _localvar_type_map.find(x.id);
-    return
-        it != _localvar_type_map.end()
-        ? std::make_optional(it->second)
-        : std::nullopt;
-}
-
-void yama::internal::second_pass::_sanitize_regs(taul::source_pos pos, size_t index, size_t n) {
-    YAMA_ASSERT(index + n <= _target().locals());
-    for (size_t i = 0; i < n; i++) {
-        cw.add_load_none(uint8_t(index + i), true);
-        _add_sym(pos);
-    }
-}
-
-void yama::internal::second_pass::_sanitize_here(taul::source_pos pos) {
-    for (const auto& I : _scope_regs_to_sanitize.back()) {
-        _sanitize_regs(pos, I);
-    }
-    _scope_regs_to_sanitize.back().clear();
 }
 
 void yama::internal::second_pass::_mark_as_fn_body_block(const ast_Block& x) {

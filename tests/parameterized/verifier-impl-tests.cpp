@@ -31,7 +31,7 @@ TEST_P(VerifierImplTests, Verify) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 0),
             .call_fn = yama::noop_call_fn,
-            .locals = 4,
+            .max_locals = 4,
         },
     };
 
@@ -49,7 +49,7 @@ TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ParamType_For
             // illegal out-of-bounds constant index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
-            .locals = 4,
+            .max_locals = 4,
         },
     };
 
@@ -90,7 +90,7 @@ TEST_P(VerifierImplTests, Verify_Fail_CallSigConstIndexOutOfBounds_ReturnType_Fo
             // illegal out-of-bounds constant index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
-            .locals = 4,
+            .max_locals = 4,
         },
     };
 
@@ -132,7 +132,7 @@ TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ParamType_ForTyp
             // illegal use of non-type constant index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
-            .locals = 4,
+            .max_locals = 4,
         },
     };
 
@@ -175,7 +175,7 @@ TEST_P(VerifierImplTests, Verify_Fail_CallSigConstNotATypeConst_ReturnType_ForTy
             // illegal use of non-type constant index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
-            .locals = 4,
+            .max_locals = 4,
         },
     };
 
@@ -219,7 +219,7 @@ TEST_P(VerifierImplTests, Verify_BCode_DisregardBCodeIfCallFnIsNotBCodeCallFn) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::noop_call_fn, // <- NOT bcode_call_fn
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -240,6 +240,7 @@ TEST_P(VerifierImplTests, Verify_BCode_TolerateDeadCode) {
         .add_noop()
         // block #3
         .add_noop()
+        .add_put_none(yama::newtop)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -251,7 +252,7 @@ TEST_P(VerifierImplTests, Verify_BCode_TolerateDeadCode) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -277,7 +278,7 @@ TEST_P(VerifierImplTests, Verify_BCode_TolerateAllControlPathsBeingCyclicalAndTh
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -285,42 +286,14 @@ TEST_P(VerifierImplTests, Verify_BCode_TolerateAllControlPathsBeingCyclicalAndTh
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_RegistersAreInitToNoneObjectAtEntrypoint) {
+TEST_P(VerifierImplTests, Verify_BCode_RegisterReinitsOverwriteOneAnother) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        // no reinit means types MUST be None
-        .add_load_none(0)
-        .add_load_none(1)
-        .add_load_none(2)
-        .add_load_none(3)
-        .add_load_none(4)
-        .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
-    const auto f_consts =
-        yama::const_table_info()
-        .add_primitive_type("None"_str);
-    yama::type_info f{
-        .fullname = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
-            .call_fn = yama::bcode_call_fn,
-            .locals = 5,
-            .bcode = f_bcode,
-        },
-    };
-
-    EXPECT_TRUE(verif->verify(f));
-}
-
-TEST_P(VerifierImplTests, Verify_BCode_RegistersReinitsOverwriteOneAnother) {
-    const auto f_bcode =
-        yama::bc::code()
-        // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int -4)
-        .add_load_const(0, 2, true) // reinit R(0) (to Char 'y')
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_put_none(yama::newtop)
+        .add_put_const(0, 1, true) // reinits R(0) (to Int -4)
+        .add_put_const(0, 2, true) // reinits R(0) (to Char 'y')
+        .add_put_const(0, 3, true) // reinits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -335,7 +308,7 @@ TEST_P(VerifierImplTests, Verify_BCode_RegistersReinitsOverwriteOneAnother) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -351,8 +324,9 @@ TEST_P(VerifierImplTests, Verify_BCode_NoBranch) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
+        .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_noop()
-        .add_load_const(1, 1, true) // reinit R(1)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Float 3.14159)
         .add_noop()
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -366,7 +340,7 @@ TEST_P(VerifierImplTests, Verify_BCode_NoBranch) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -378,14 +352,14 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_MultipleExitpoints) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) (to Bool true)
-        .add_jump_true(0, 2)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Bool true)
+        .add_jump_true(1, 2)
         // block #2 (exitpoint)
-        .add_load_const(1, 1, true) // reinit R(1) (to Float 3.14159)
-        .add_ret(1)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 3.14159)
+        .add_ret(0)
         // block #3 (exitpoint)
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 0.05)
-        .add_ret(1);
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -399,7 +373,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_MultipleExitpoints) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -411,16 +385,16 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_ControlPathsMerge) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) (to Bool true)
-        .add_jump_true(0, 2)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Bool true)
+        .add_jump_true(1, 2)
         // block #2
-        .add_load_const(1, 1, true) // reinit R(1) (to Float 3.14159)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 3.14159)
         .add_jump(1) // merges into block #4
         // block #3
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         // fallthrough merges into block #4
         // block #4
-        .add_ret(1); // R(1) is merge of the two above Float reinits
+        .add_ret(0); // R(0) is merge of the two above Float reinits
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -434,7 +408,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_ControlPathsMerge) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -446,17 +420,15 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_CyclicalControlPath) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         // block #2
-        .add_load_const(0, 2) // no reinit R(0), so R(0) MUST be an Int already
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
-        .add_load_const(1, 4, true) // reinit R(1) (to Bool true)
-        .add_jump_true(1, 3) // jump to block #4, or fallthrough to block #3
+        .add_put_const(0, 2) // no reinits R(0), so R(0) MUST be an Int already
+        .add_put_const(0, 3, true) // reinits R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 4) // inits R(1) (to Bool true)
+        .add_jump_true(1, 2) // jump to block #4, or fallthrough to block #3
         // block #3
-        .add_load_const(0, 5, true) // reinit R(0) (to Int 100)
-        // notice: block #2 is entered w/ R(1) being None, NOT Bool, so we gotta reinit R(1)
-        .add_load_none(1, true) // reinit R(1) (to None)
-        .add_jump(-7) // jump to block #2 (forming control path cycle)
+        .add_put_const(0, 5, true) // reinits R(0) (to Int 100)
+        .add_jump(-6) // jump to block #2 (forming control path cycle)
         // block #4
         .add_ret(0); // R(0) must be a Float by this point
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -474,7 +446,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_CyclicalControlPath) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -500,7 +472,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_FallthroughDueToLastInstrOfBlockNo
         // fallthrough to block #2
         // block #2
         .add_noop() // jump destination
-        .add_load_arg(0, 100, true) // <- error!
+        .add_put_arg(yama::newtop, 100, true) // <- error!
         .add_jump(-3);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -512,7 +484,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Branch_FallthroughDueToLastInstrOfBlockNo
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -533,7 +505,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Fail_BinaryIsEmpty) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -547,12 +519,12 @@ TEST_P(VerifierImplTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBoundsIn
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(A) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
         // block #2
-        .add_noop() // jump destination (so R(A) is always Bool)
+        .add_noop() // jump destination (so R(0) is always Bool)
         .add_noop()
         // we're using jump_if to test more nuanced scenario than just a simple fallthrough due to no branch or exitpoint
-        .add_jump_true(0, -3); // illegal fallthrough to out-of-bounds instruction
+        .add_jump_true(1, -3); // illegal fallthrough to out-of-bounds instruction
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -564,7 +536,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBoundsIn
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -574,7 +546,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Fail_FinalBlockFallthroughToOutOfBoundsIn
     EXPECT_EQ(dbg->count(yama::dsignal::verif_fallthrough_puts_PC_out_of_bounds), 1);
 }
 
-static_assert(yama::bc::opcodes == 11);
+static_assert(yama::bc::opcodes == 12);
 
 TEST_P(VerifierImplTests, Verify_BCode_Noop) {
     const auto f_bcode =
@@ -583,6 +555,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Noop) {
         .add_noop()
         .add_noop()
         .add_noop()
+        .add_put_none(yama::newtop)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -594,7 +567,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Noop) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -602,23 +575,26 @@ TEST_P(VerifierImplTests, Verify_BCode_Noop) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadNone) {
+TEST_P(VerifierImplTests, Verify_BCode_Pop) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_none(0) // no reinit, so R(0) MUST be None already
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_pop(1) // pops R(0)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("Int"_str)
+        .add_int(31);
     yama::type_info f{
         .fullname = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -626,12 +602,125 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_Pop_Zero) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_none(0, true) // reinit R(0) (to None)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
+        .add_pop(0) // pops *nothing*
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(31);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Pop_Many) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_put_none(yama::newtop) // inits R(2) (to None)
+        .add_put_none(yama::newtop) // inits R(3) (to None)
+        .add_put_none(yama::newtop) // inits R(4) (to None)
+        .add_pop(5) // pops R(0), R(1), ..., R(4)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(31);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Pop_MoreThanAreOnStack) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_pop(100) // pops R(0) (and more if there were any)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(31);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutNone) {
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // helper
+        .add_call(0, 1, 0, true) // call helper, putting None into R(0)
+        .add_put_none(0) // no reinit, so R(0) MUST be None already
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        // quick-n'-dirty fn to let us push None w/out put_none
+        .add_function_type("helper"_str, yama::make_callsig_info({}, 0));
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Reinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_none(0, true) // reinits R(0) (to None) via index
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -644,7 +733,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -652,11 +741,65 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Newtop) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_none(1) // R(1) out-of-bounds
+        .add_put_none(yama::newtop) // inits R(0) (to None) via newtop
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop, true) // inits R(0) (to None) via newtop
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Fail_RA_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        // push then pop R(1) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_pop(1) // pops R(1)
+        .add_put_none(1) // R(1) out-of-bounds
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -668,7 +811,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -678,12 +821,39 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit) {
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Fail_RA_IsNewtopButPushingOverflows) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_none(0) // R(0) not type None
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_none(yama::newtop) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Fail_RA_WrongType_AndNotReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_none(0) // R(0) not type None
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -696,7 +866,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit) 
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -706,12 +876,40 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadNone_Fail_RA_WrongType_AndNotReinit) 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst) {
+TEST_P(VerifierImplTests, Verify_BCode_PutNone_Fail_PushingMustNotOverflow) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(0, 2) // no reinit, so R(0) MUST be Int already
+        .add_put_none(yama::newtop) // R(0) not type None
+        .add_put_none(yama::newtop) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutConst) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(0, 2) // no reinit, so R(0) MUST be Int already
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -725,7 +923,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -733,11 +931,12 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_const(0, 1, true) // reinits R(0) (to Int 10) via index
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -750,7 +949,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -758,12 +957,65 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Newtop) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(1, 1) // R(1) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) via newtop
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1, true) // inits R(0) (to Int 10) via newtop
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_RA_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) <- return value
+        // push then pop R(1) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_pop(1) // pops R(1)
+        .add_put_const(1, 1, true) // R(1) out-of-bounds
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -776,7 +1028,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -786,12 +1038,40 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_RA_IsNewtopButPushingOverflows) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(0, 2) // Ko(2) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) <- return value
+        .add_put_const(yama::newtop, 1) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_KoB_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(0, 2) // Ko(2) out-of-bounds
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -804,7 +1084,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -814,12 +1094,12 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_KoB_NotAnObjectConst) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(0, 0) // Ko(0) not an object constant
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(0, 0) // Ko(0) not an object constant
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -832,7 +1112,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -842,12 +1122,12 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_KoB_NotAnObjectConst) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_not_object_const), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_RA_And_KoB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(0, 2) // Ko(2) not type Int
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(0, 2) // Ko(2) not type Int
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -861,7 +1141,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -871,16 +1151,45 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadConst_Fail_RA_And_KoB_TypesDiffer) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_KoB_types_differ), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadArg) {
+TEST_P(VerifierImplTests, Verify_BCode_PutConst_Fail_PushingMustNotOverflow) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 2, true) // reinit R(0) (to f object)
-        .add_load_const(1, 3, true) // reinit R(1) (to Bool true)
-        .add_load_const(2, 4, true) // reinit R(2) (to Float 0.05)
-        .add_load_arg(0, 0) // load callobj f arg into R(0), w/out reinit
-        .add_load_arg(1, 1) // load Bool arg into R(1), w/out reinit
-        .add_load_arg(2, 2) // load Float arg into R(2), w/out reinit
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(yama::newtop, 1) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_int(10)
+        .add_char(U'y');
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutArg) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 2) // inits R(0) (to f object)
+        .add_put_const(yama::newtop, 3) // inits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 4) // inits R(2) (to Float 0.05)
+        .add_put_arg(0, 0) // load callobj f arg into R(0), w/out reinit
+        .add_put_arg(1, 1) // load Bool arg into R(1), w/out reinit
+        .add_put_arg(2, 2) // load Float arg into R(2), w/out reinit
         .add_ret(2);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -896,7 +1205,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 3,
+            .max_locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -904,16 +1213,19 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Reinit) {
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_arg(0, 0, true) // load callobj f arg into R(0), w/ reinit
-        .add_load_arg(1, 1, true) // load Bool arg into R(1), w/ reinit
-        .add_load_arg(2, 2, true) // load Float arg into R(2), w/ reinit
-        .add_load_const(0, 2) // no reinit, so R(0) MUST be f already
-        .add_load_const(1, 3) // no reinit, so R(1) MUST be Bool already
-        .add_load_const(2, 4) // no reinit, so R(2) MUST be Float already
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_put_none(yama::newtop) // inits R(2) (to None)
+        .add_put_arg(0, 0, true) // load callobj f arg into R(0), w/ reinit
+        .add_put_arg(1, 1, true) // load Bool arg into R(1), w/ reinit
+        .add_put_arg(2, 2, true) // load Float arg into R(2), w/ reinit
+        .add_put_const(0, 2) // no reinit, so R(0) MUST be f already
+        .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
+        .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
         .add_ret(2);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -929,7 +1241,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 3,
+            .max_locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -937,12 +1249,81 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Reinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Newtop) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
-        .add_load_arg(1, 0) // R(1) out-of-bounds
+        .add_put_arg(yama::newtop, 0) // load callobj f arg into R(0), w/ reinit
+        .add_put_arg(yama::newtop, 1) // load Bool arg into R(1), w/ reinit
+        .add_put_arg(yama::newtop, 2) // load Float arg into R(2), w/ reinit
+        .add_put_const(0, 2) // no reinit, so R(0) MUST be f already
+        .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
+        .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
+        .add_ret(2);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_primitive_type("Float"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_bool(true)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0, 1 }, 1),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 3,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_arg(yama::newtop, 0, true) // load callobj f arg into R(0), w/ reinit
+        .add_put_arg(yama::newtop, 1, true) // load Bool arg into R(1), w/ reinit
+        .add_put_arg(yama::newtop, 2, true) // load Float arg into R(2), w/ reinit
+        .add_put_const(0, 2) // no reinit, so R(0) MUST be f already
+        .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
+        .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
+        .add_ret(2);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_primitive_type("Float"_str)
+        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_bool(true)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0, 1 }, 1),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 3,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Fail_RA_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05) <- return value
+        // push then pop R(1) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_pop(1) // pops R(1)
+        .add_put_arg(1, 0, true) // R(1) out-of-bounds
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -956,7 +1337,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -966,12 +1347,12 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Fail_RA_IsNewtopButPushingOverflows) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
-        .add_load_arg(0, 3) // Arg(3) out-of-bounds
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05) <- return value
+        .add_put_arg(yama::newtop, 0) // overflow!
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -985,7 +1366,36 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Fail_ArgB_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
+        .add_put_arg(0, 3) // Arg(3) out-of-bounds
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_primitive_type("Float"_str)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0, 1 }, 1),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -995,12 +1405,12 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_ArgB_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgB_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Fail_RA_And_ArgB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
-        .add_load_arg(0, 1) // Arg(1) not type Float
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
+        .add_put_arg(0, 1) // Arg(1) not type Float
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1014,7 +1424,7 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1024,12 +1434,41 @@ TEST_P(VerifierImplTests, Verify_BCode_LoadArg_Fail_RA_And_ArgB_TypesDiffer) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_ArgB_types_differ), 1);
 }
 
+TEST_P(VerifierImplTests, Verify_BCode_PutArg_Fail_PushingMustNotOverflow) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_arg(yama::newtop, 1)
+        .add_put_arg(yama::newtop, 1) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_primitive_type("Float"_str)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0, 1 }, 1),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
 TEST_P(VerifierImplTests, Verify_BCode_Copy) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Float 0.05)
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 3.14159)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(1) (to Float 3.14159)
         .add_copy(0, 1) // no reinit, so R(1) MUST be Float already
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1044,7 +1483,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -1056,9 +1495,9 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Float 0.05)
-        .add_load_const(1, 2, true) // reinit R(1) (to Int 10)
-        .add_copy(0, 1, true) // reinit R(1) (to Float)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(1) (to Int 10)
+        .add_copy(0, 1, true) // reinits R(1) (to Float)
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1072,7 +1511,61 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Newtop) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_copy(0, yama::newtop) // inits R(1) (to Float)
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_float(0.05)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 2,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_copy(0, yama::newtop, true) // inits R(1) (to Float)
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_float(0.05)
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -1084,9 +1577,12 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Float 0.05)
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 3.14159)
-        .add_copy(2, 1) // R(2) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(1) (to Float 3.14159)
+        // push then pop R(2) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(2) (to None)
+        .add_pop(1) // pops R(2)
+        .add_copy(2, 1, true) // R(2) out-of-bounds
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1100,7 +1596,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -1114,9 +1610,12 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Float 0.05)
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 3.14159)
-        .add_copy(0, 2) // R(2) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(1) (to Float 3.14159)
+        // push then pop R(2) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(2) (to None)
+        .add_pop(2) // pops R(2)
+        .add_copy(0, 2, true) // R(2) out-of-bounds
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1130,7 +1629,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 3,
             .bcode = f_bcode,
         },
     };
@@ -1140,12 +1639,41 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RB_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
 }
 
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RB_IsNewtopButPushingOverflows) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_copy(0, yama::newtop) // overflow!
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_float(0.05)
+        .add_float(3.14159);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
 TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_load_const(1, 2, true) // reinit R(1) (to Float 0.05)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_const(yama::newtop, 2) // inits R(1) (to Float 0.05)
         .add_copy(0, 1) // R(1) not type Int
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1160,7 +1688,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -1170,16 +1698,45 @@ TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_RB_types_differ), 1);
 }
 
+TEST_P(VerifierImplTests, Verify_BCode_Copy_Fail_PushingMustNotOverflow) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_copy(0, yama::newtop) // overflow!
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Float"_str)
+        .add_int(10)
+        .add_float(0.05);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
 TEST_P(VerifierImplTests, Verify_BCode_Call) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 7, true) // reinit R(4) to type of return value
-        .add_call(0, 4, 4)
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
+        .add_call(0, 4, 4) // no reinit, so R(4) MUST be Char already
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1198,7 +1755,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1210,10 +1767,11 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_none(yama::newtop) // inits R(4) (to None)
         .add_call(0, 4, 4, true) // reinits R(4) to return type Char
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1233,7 +1791,77 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Reinit) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Call_Newtop) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_call(0, 4, yama::newtop) // inits R(4) to return type Char
+        .add_ret(4);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_primitive_type("Float"_str)
+        .add_primitive_type("Char"_str)
+        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_int(10)
+        .add_float(0.05)
+        .add_int(-4)
+        .add_char(U'y');
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 2),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_Call_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_call(0, 4, yama::newtop, true) // inits R(4) to return type Char
+        .add_ret(4);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_primitive_type("Float"_str)
+        .add_primitive_type("Char"_str)
+        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_int(10)
+        .add_float(0.05)
+        .add_int(-4)
+        .add_char(U'y');
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 2),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1245,9 +1873,13 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object ()
-        .add_load_const(1, 7, true) // reinit R(1) to type of return value
-        .add_call(0, 4, 1) // [R(0), R(3)] out-of-bounds
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        // push then pop R(2) and R(3) to better test impl robustness
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_pop(2) // pops R(2) and R(3)
+        .add_call(0, 4, yama::newtop) // [R(0), R(3)] out-of-bounds
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1266,7 +1898,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1280,9 +1912,9 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        // NOTE: R(A) being a valid call object ensures error couldn't be about R(A) not being one
-        .add_load_const(0, 1, true) // reinit R(0) to type of call object (though this will go unused)
-        .add_load_none(1, true) // reinit R(1) to type of return value
+        // NOTE: R(A) being an otherwise valid call object ensures error couldn't be about R(A) not being one
+        .add_put_const(yama::newtop, 1) // inits R(0) to type of call object (though this will go unused)
+        .add_put_none(yama::newtop) // inits R(1) to type of return value
         .add_call(0, 0, 1) // B == 0 means no call object specified
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1296,7 +1928,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1310,11 +1942,11 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 7, true) // reinit R(4) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
         .add_call(0, 4, 4) // R(0) cannot be used as call object
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1334,7 +1966,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1348,12 +1980,12 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 6, true) // reinit R(4) to type of arg #4
-        .add_load_const(5, 7, true) // reinit R(5) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #4
+        .add_put_const(yama::newtop, 7) // inits R(5) to type of return value
         .add_call(0, 5, 5) // 5 is too many args for call to g
         .add_ret(5);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1373,7 +2005,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 6,
+            .max_locals = 6,
             .bcode = f_bcode,
         },
     };
@@ -1387,10 +2019,10 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 7, true) // reinit R(5) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 7) // inits R(3) to type of return value
         .add_call(0, 3, 3) // 3 is too few args for call to g
         .add_ret(3);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1410,7 +2042,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 4,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1424,11 +2056,11 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 7, true) // reinit R(4) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
         .add_call(0, 4, 4) // arg #2 is UInt, but a Float was expected
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1448,7 +2080,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1462,12 +2094,15 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 7, true) // reinit R(4) to type of return value
-        .add_call(0, 4, 5) // R(5) out-of-bounds
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
+        // push then pop R(5) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(5) (to None)
+        .add_pop(1) // pops R(5)
+        .add_call(0, 4, 5, true) // R(5) out-of-bounds
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1486,7 +2121,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 6,
             .bcode = f_bcode,
         },
     };
@@ -1496,15 +2131,49 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_out_of_bounds), 1);
 }
 
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_IsNewtopButPushingOverflows) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_call(0, 1, yama::newtop) // overflow!
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_primitive_type("Float"_str)
+        .add_primitive_type("Char"_str)
+        .add_function_type("g"_str, yama::make_callsig_info({}, 2)) // fn() -> Char
+        .add_int(10)
+        .add_float(0.05)
+        .add_int(-4)
+        .add_char(U'y');
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 2),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
 TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 7, true) // reinit R(4) to NOT type of return value
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 7) // inits R(4) to NOT type of return value
         .add_call(0, 4, 4) // R(4) not type Char
         .add_ret(4);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1524,7 +2193,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1534,23 +2203,53 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_wrong_type), 1);
 }
 
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_PushingMustNotOverflow) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) to type of call object
+        .add_call(0, 1, yama::newtop) // overflow!
+        .add_ret(2);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Int"_str)
+        .add_function_type("g"_str, yama::make_callsig_info({}, 0)) // fn() -> Int
+        .add_int(10);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
 TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call_nr(0, 4)
-        .add_ret(4); // return the None object from R(4)
+        .add_put_none(0, true)
+        .add_ret(0); // return the None object from R(0)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("Int"_str)
         .add_primitive_type("Float"_str)
         .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 7)) // fn(Int, Float, Int) -> None
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
@@ -1561,7 +2260,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 7),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1573,9 +2272,14 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        // push then pop R(2) and R(3) to better test impl robustness
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_pop(2) // pops R(2) and R(3)
         .add_call_nr(0, 4) // [R(0), R(3)] out-of-bounds
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1594,7 +2298,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1609,9 +2313,9 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
         yama::bc::code()
         // block #1
         // NOTE: R(A) being a valid call object ensures error couldn't be about R(A) not being one
-        .add_load_const(0, 1, true) // reinit R(0) to type of call object (though this will go unused)
+        .add_put_const(yama::newtop, 1) // inits R(0) to type of call object (though this will go unused)
         .add_call_nr(0, 0) // B == 0 means no call object specified
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1624,7 +2328,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1638,12 +2342,12 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) 
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call_nr(0, 4) // R(0) cannot be used as call object
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1662,7 +2366,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) 
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1676,13 +2380,13 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
-        .add_load_const(4, 6, true) // reinit R(4) to type of arg #4
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #4
         .add_call_nr(0, 5) // 5 is too many args for call to g
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1701,7 +2405,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 6,
+            .max_locals = 6,
             .bcode = f_bcode,
         },
     };
@@ -1715,11 +2419,11 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_call_nr(0, 3) // 3 is too few args for call to g
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1738,7 +2442,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 4,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1752,12 +2456,12 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes)
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 3, true) // reinit R(0) to type of call object
-        .add_load_const(1, 4, true) // reinit R(1) to type of arg #1
-        .add_load_const(2, 5, true) // reinit R(2) to type of arg #2
-        .add_load_const(3, 6, true) // reinit R(3) to type of arg #3
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call_nr(0, 4) // arg #2 is UInt, but a Float was expected
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1776,7 +2480,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes)
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
-            .locals = 5,
+            .max_locals = 5,
             .bcode = f_bcode,
         },
     };
@@ -1790,7 +2494,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
         .add_ret(0); // return Float
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1803,7 +2507,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1815,7 +2519,10 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_ret(1); // R(1) out-of-bounds
+        // push then pop R(0) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_pop(1) // pops R(0)
+        .add_ret(0); // R(0) out-of-bounds
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1826,7 +2533,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1840,7 +2547,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_ret(0); // R(0) not type Float
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1853,7 +2560,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Ret_Fail_RA_WrongType) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1870,10 +2577,10 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump) {
         .add_jump(2) // jump to block #3
         // block #2 (dead code)
         // this dead code block ensures that we actually *jump over* block #2
-        .add_load_const(0, 1, true) // reinit R(0) (to Int 10)
-        .add_ret(0)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_ret(0) // <- static verif error if reachable
         // block #3
-        .add_load_const(0, 2, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1887,7 +2594,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1910,7 +2617,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_PutsPCOutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1924,16 +2631,16 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinits R(0) (to Bool true)
-        .add_jump_true(0, 2)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_true(0, 2) // jump to block #3, or fallthrough to block #2
         // block #2
-        .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
-        .add_jump(2) // merge R(0) into block #4 as Float
+        .add_put_const(0, 2, true) // reinits R(0) (to Float 3.14159)
+        .add_jump(2) // merge R(0) into block #4 as Float (thus ALL branches to block #4 must have R(0) be Float)
         // block #3
-        .add_load_const(0, 3, true) // reinits R(0) (to Int 100)
+        .add_put_const(0, 3, true) // reinits R(0) (to Int 100)
         .add_jump(0) // merge R(0) into block #4 as Int (violating register coherence w/ above R(0) being Float)
         // block #5
-        .add_load_none(0, true) // reinits R(0) (to None)
+        .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1948,7 +2655,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -1958,17 +2665,18 @@ TEST_P(VerifierImplTests, Verify_BCode_Jump_Fail_ViolatesRegisterCoherence) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpTrue) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_PopOne) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_true(0, 2) // jump to block #3, or fallthrough to block #2, either way reiniting R(0) to Bool
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_jump_true(1, 1) // jump to block #3, or fallthrough to block #2, either way popping R(0)
         // block #2
-        .add_load_none(0) // expect R(0) to be None
+        // expect R(0) to still be good
         .add_ret(0)
         // block #3
-        .add_load_none(0) // expect R(0) to be None
+        // expect R(0) to still be good
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1981,7 +2689,7 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -1989,17 +2697,124 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_PopZero) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_true(1, 2) // R(1) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_true(0, 1) // jump to block #3, or fallthrough to block #2, *popping nothing*
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        // expect R(0) to still be good
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        // expect R(0) to still be good
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_PopMany) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(2) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(3) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(4) (to Bool true)
+        .add_jump_true(5, 2) // jump to block #3, or fallthrough to block #2, either way popping R(0), R(1), ..., R(4)
+        // block #2
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0)
+        // block #3
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_PopMoreThanAreOnStack) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(2) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(3) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(4) (to Bool true)
+        .add_jump_true(100, 2) // jump to block #3, or fallthrough to block #2, either way popping R(0), R(1), ..., R(4)
+        // block #2
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0)
+        // block #3
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RTop_DoesNotExist) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        // push then pop R(0) to better test impl robustness
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_pop(1) // pops R(0)
+        .add_jump_true(1, 2) // R(top) (aka. R(0)) does not exist
+        // block #2
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
+        .add_ret(0)
+        // block #3
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2014,27 +2829,27 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_does_not_exist), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RTop_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int -4)
-        .add_jump_true(0, 2) // R(0) not type Bool
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int -4)
+        .add_jump_true(1, 2) // R(0) not type Bool
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2049,27 +2864,27 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_RA_WrongType) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_wrong_type), 1);
 }
 
 TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_true(0, 10'000) // branches to out-of-bounds instruction
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_true(1, 10'000) // branches to out-of-bounds instruction
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2084,7 +2899,7 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -2098,26 +2913,29 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) 
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
-        .add_jump_true(1, 5)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_true(1, 5) // branch to block #4, or fallthrough to block #2
         // block #2
-        .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 3.14159)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        // using jump_true instead of jump as the former is the one under test
         .add_jump_true(1, 7) // merge R(0) into block #6 as Float
         // block #3
         // this block is here just to provide a place to fallthrough to
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0)
         // block #4
-        .add_load_const(0, 3, true) // reinits R(0) (to Int 100)
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Int 100)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        // using jump_true instead of jump as the former is the one under test
         .add_jump_true(1, 2) // merge R(0) into block #6 as Int (violating register coherence w/ above R(0) being Float)
         // block #5
         // this block is here just to provide a place to fallthrough to
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0)
         // block #6
-        .add_load_none(0, true) // reinits R(0) (to None)
+        // R(0) will be either Float or Int by this point, violating register coherence
+        .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2132,7 +2950,7 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) 
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -2142,32 +2960,31 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpTrue_Fail_ViolatesRegisterCoherence) 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpFalse) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_PopOne) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_false(0, 2) // jump to block #3, or fallthrough to block #2, either way reiniting R(0) to None
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_jump_false(1, 1) // jump to block #3, or fallthrough to block #2, either way popping R(0)
         // block #2
-        .add_load_none(0) // expect R(0) to be None
+        // expect R(0) to still be good
         .add_ret(0)
         // block #3
-        .add_load_none(0) // expect R(0) to be None
+        // expect R(0) to still be good
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("None"_str)
-        .add_bool(true)
-        .add_float(10.5)
-        .add_float(0.05);
+        .add_bool(true);
     yama::type_info f{
         .fullname = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -2175,17 +2992,124 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_PopZero) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_false(1, 2) // R(1) out-of-bounds
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_false(0, 1) // jump to block #3, or fallthrough to block #2, *popping nothing*
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        // expect R(0) to still be good
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        // expect R(0) to still be good
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("Bool"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_PopMany) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(2) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(3) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(4) (to Bool true)
+        .add_jump_false(5, 2) // jump to block #3, or fallthrough to block #2, either way popping R(0), R(1), ..., R(4)
+        // block #2
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0)
+        // block #3
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_PopMoreThanAreOnStack) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(2) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(3) (to Bool true)
+        .add_put_const(yama::newtop, 1) // inits R(4) (to Bool true)
+        .add_jump_false(100, 2) // jump to block #3, or fallthrough to block #2, either way popping R(0), R(1), ..., R(4)
+        // block #2
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0)
+        // block #3
+        // pushing should push None to R(0) as stack should be empty
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("None"_str)
+        .add_bool(true);
+    yama::type_info f{
+        .fullname = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f));
+}
+
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RTop_DoesNotExist) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        // push then pop R(0) to better test impl robustness
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_pop(1) // pops R(0)
+        .add_jump_false(1, 2) // R(top) (aka. R(0)) does not exist
+        // block #2
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
+        .add_ret(0)
+        // block #3
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2200,27 +3124,27 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_OutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_does_not_exist), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
+TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RTop_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Int -4)
-        .add_jump_false(0, 2) // R(0) not type Bool
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int -4)
+        .add_jump_false(1, 2) // R(0) not type Bool
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2235,27 +3159,27 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_RA_WrongType) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_wrong_type), 1);
 }
 
 TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(0, 1, true) // reinit R(0) (to Bool true)
-        .add_jump_false(0, 10'000) // branches to out-of-bounds instruction
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_false(1, 10'000) // branches to out-of-bounds instruction
         // block #2
-        .add_load_const(0, 2, true) // reinit R(0) (to Int 10)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0)
         // block #3
-        .add_load_const(0, 3, true) // reinit R(0) (to Float 0.05)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2270,7 +3194,7 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 1,
+            .max_locals = 1,
             .bcode = f_bcode,
         },
     };
@@ -2284,26 +3208,29 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherence)
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
-        .add_jump_false(1, 5)
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Bool true)
+        .add_jump_false(1, 5) // branch to block #4, or fallthrough to block #2
         // block #2
-        .add_load_const(0, 2, true) // reinits R(0) (to Float 3.14159)
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 2) // inits R(0) (to Float 3.14159)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        // using jump_false instead of jump as the former is the one under test
         .add_jump_false(1, 7) // merge R(0) into block #6 as Float
         // block #3
         // this block is here just to provide a place to fallthrough to
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0)
         // block #4
-        .add_load_const(0, 3, true) // reinits R(0) (to Int 100)
-        .add_load_const(1, 1, true) // reinits R(1) (to Bool true)
+        .add_put_const(yama::newtop, 3) // inits R(0) (to Int 100)
+        .add_put_const(yama::newtop, 1) // inits R(1) (to Bool true)
+        // using jump_false instead of jump as the former is the one under test
         .add_jump_false(1, 2) // merge R(0) into block #6 as Int (violating register coherence w/ above R(0) being Float)
         // block #5
         // this block is here just to provide a place to fallthrough to
-        .add_load_none(0, true)
+        .add_put_none(0, true)
         .add_ret(0)
         // block #6
-        .add_load_none(0, true) // reinits R(0) (to None)
+        // R(0) will be either Float or Int by this point, violating register coherence
+        .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2318,7 +3245,7 @@ TEST_P(VerifierImplTests, Verify_BCode_JumpFalse_Fail_ViolatesRegisterCoherence)
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .locals = 2,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };

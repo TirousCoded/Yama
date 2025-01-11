@@ -8,6 +8,7 @@
 
 #include "general.h"
 #include "macros.h"
+#include "newtop.h"
 
 
 namespace yama::bc {
@@ -18,38 +19,35 @@ namespace yama::bc {
     //      static verif procedure outlined in our bytecode.txt
     //      design doc:
     // 
-    //          1) instead of each basic block having a *stack* of
-    //             object registers, they'll have a fixed-size arrays 
-    //             of registers, w/ the entrypoint block's array's
-    //             registers being initialized to the None object
-    // 
-    //          2) by default, when symbol execution occurs, it occurs
+    //          1) by default, when symbol execution occurs, it occurs
     //             as normal, w/ instructions being checked to see that
     //             the types involved in their inputs/outputs are in line
     //             w/ the instruction's semantics
     // 
-    //          3) instructions may be marked as 'reinitializing', which
+    //          2) instructions may be marked as 'reinitializing', which
     //             means that the rules in #2 are augmented to allow for
     //             the instruction to CHANGE the type of registers output
     //             to by *reinitializing* them
+    //                  * instrs which use yama::newtop need-not be marked 'reinit',
+    //                    but are allowed to be
     //
-    //          4) the rule where a block which is branched to by some set
+    //          3) the rule where a block which is branched to by some set
     //             of incoming blocks must all have the same object register
     //             type state is gonna be called 'register coherence', and
     //             thus a violation of this is a 'register coherence violation'
     // 
-    //          5) unreachable, and thus dead, basic blocks will be tolerated
+    //          4) unreachable, and thus dead, basic blocks will be tolerated
     //             (and thus should raise *warnings*)
     //              * TODO: what if there's illegal instrs in dead code blocks?
     //
-    //          6) entrypoint block always begins at instruction 0 (pretty obvious)
+    //          5) entrypoint block always begins at instruction 0 (pretty obvious)
     //
-    //          7) the final block the bcode binary is partitioned into must
+    //          6) the final block the bcode binary is partitioned into must
     //             not allow for control to fallthrough to the out-of-bounds
     //             instruction indices following the block
     //              * TODO: what should we do for dead code final blocks?
     //
-    //          8) control-flow graphs composed of nothing but cyclical control
+    //          7) control-flow graphs composed of nothing but cyclical control
     //             paths (ie. no 'exitpoint' blocks) are legal, as the infinite
     //             loop they create means there won't be any issue of the wrong
     //             type of object being returned
@@ -66,17 +64,18 @@ namespace yama::bc {
     // the opcode, and the remaining 24 encoding oprand fields
 
     // instructions may use the following oprand fields:
-    //      A       : unsigned, 8-bit
-    //      B       : unsigned, 8-bit
-    //      C       : unsigned, 8-bit
-    //      sBx     : signed,   16-bit (uses bits of B and C)
+    //      A           : unsigned, 8-bit
+    //      B           : unsigned, 8-bit
+    //      C           : unsigned, 8-bit
+    //      sBx         : signed,   16-bit (uses bits of B and C)
 
     // in opcode descs below, the following notation is used
     // to describe intent, w/ X specifying an oprand field:
-    //      R(X)    : local register X
-    //      Arg(X)  : argument X
-    //      Ko(X)   : object constant at X
-    //      Kt(X)   : type constant at X
+    //      R(X)        : local register X
+    //      R(top)      : top register on local object stack
+    //      Arg(X)      : argument X
+    //      Ko(X)       : object constant at X
+    //      Kt(X)       : type constant at X
 
     enum class opcode : uint8_t {
         // noop
@@ -91,47 +90,62 @@ namespace yama::bc {
 
         noop,
 
-        // load_none R(A)
+        // pop A
 
-        // load_none performs ll_load_none(R(A))
-
-        // panic conditions:
-        //      n/a
-
-        // static verif requires:
-        //      - R(A) must be in-bounds
-        //      - R(A) must be of type None (unless reinit)
-
-        load_none,
-
-        // load_const R(A) Ko(B)
-
-        // load_const performs ll_load_const(R(A), Ko(B))
+        // pop performs ll_pop(A)
 
         // panic conditions:
         //      n/a
 
         // static verif requires:
-        //      - R(A) must be in-bounds
+        //      n/a
+
+        pop,
+
+        // put_none R(A)
+
+        // put_none performs ll_put_none(R(A))
+
+        // panic conditions:
+        //      n/a
+
+        // static verif requires:
+        //      - R(A) must be in-bounds (unless newtop)
+        //      - R(A) must be of type None (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
+
+        put_none,
+
+        // put_const R(A) Ko(B)
+
+        // put_const performs ll_put_const(R(A), Ko(B))
+
+        // panic conditions:
+        //      n/a
+
+        // static verif requires:
+        //      - R(A) must be in-bounds (unless newtop)
         //      - Ko(B) must be in-bounds
         //      - Ko(B) must be an object constant
-        //      - R(A) and Ko(B) must agree on type (unless reinit)
+        //      - R(A) and Ko(B) must agree on type (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
 
-        load_const,
+        put_const,
 
-        // load_arg R(A) Arg(B)
+        // put_arg R(A) Arg(B)
 
-        // load_arg performs ll_load_arg(R(A), Arg(B))
+        // put_arg performs ll_put_arg(R(A), Arg(B))
 
         // panic conditions:
         //      n/a
 
         // static verif requires:
-        //      - R(A) must be in-bounds
+        //      - R(A) must be in-bounds (unless newtop)
         //      - Arg(B) must be in-bounds
-        //      - R(A) and Arg(B) must agree on type (unless reinit)
+        //      - R(A) and Arg(B) must agree on type (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
 
-        load_arg,
+        put_arg,
 
         // copy R(A) R(B)
 
@@ -142,8 +156,9 @@ namespace yama::bc {
 
         // static verif requires:
         //      - R(A) must be in-bounds
-        //      - R(B) must be in-bounds
-        //      - R(A) and R(B) must agree on type (unless reinit)
+        //      - R(B) must be in-bounds (unless newtop)
+        //      - R(A) and R(B) must agree on type (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
 
         copy,
 
@@ -165,8 +180,9 @@ namespace yama::bc {
         //      - arg registers must include at least one object (ie. B must be >=1)
         //      - R(A) must be legal to use as call object
         //      - param arg registers, if any, must be of number and param types expected by call object
-        //      - R(C) must be in-bounds
-        //      - R(C) must be of return type expected by call object (unless reinit)
+        //      - R(C) must be in-bounds (unless newtop)
+        //      - R(C) must be of return type expected by call object (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
 
         call,
 
@@ -225,118 +241,59 @@ namespace yama::bc {
 
         jump,
 
-        // TODO: the below 'IMPORTANT' section, mixed w/ the extra 'load_none' instrs
-        //       our code gen impl's notion of 'sanitizing' will write (also in order
-        //       to maintain register coherence), demonstrate major shortcomings of
-        //       our static verification semantics, which are quite rigid
-        //
-        //       so, in the future, we may want to either replace static verification
-        //       altogether, or revise it to be more powerful
-        // 
-        //       to do the ladder, we could introduce the notion of registers being
-        //       able to be in *indeterminate* states (ie. the verifier does not care
-        //       what the register's type is) and letting instrs be able to optionally
-        //       *consume* their inputs, marking the register as indeterminate, which
-        //       tells the verifier that we no longer need the register's current state,
-        //       and so not to worry if it and another *indeterminate* version of the
-        //       register don't agree on type
+        // jump_true A sBx
 
-        // IMPORTANT:
-        //      for jump_true and jump_false, they have the seemingly unnecessary
-        //      semantic of reinitializing R(A) to None
-        //
-        //      the reason is that w/out this semantic, implementing code gen for
-        //      if stmts was basically impossible to do w/out some really gross
-        //      things having to be done in order to avoid getting a register
-        //      coherence violation
-        //
-        //      the reason for the error has to do w/ the way if stmts work, taking
-        //      one of the two following forms:
-        //
-        //          (code gen for if stmt w/out else-part)
-        // 
-        //              ** cond expr populating R(A) w/ Bool **
-        //              jump_false R(A) exit
-        //              ** if true code **
-        //          exit:
-        //              ** code after if stmt **
-        //
-        //          (code gen for if stmt w/ else-part)
-        // 
-        //              ** cond expr populating R(A) w/ Bool **
-        //              jump_false R(A) else-part
-        //              ** if true code **
-        //              jump exit
-        //          else-part:
-        //              ** if false code **
-        //          exit:
-        //              ** code after if stmt **
-        //
-        //      the problem w/ the code gen above, specifically for the version
-        //      w/out an else-part, is that the initial register set of the block
-        //      starting at the exit label is GUARANTEED to contain Bool for the
-        //      register of the cond expr, as the jump_false instr will not (w/out
-        //      our special semantic) change it to None
-        //
-        //      the reason this register being Bool at the exit label is a problem
-        //      is that it forces the code of the if stmt's true code path to have
-        //      to guarantee the register is Bool at the end of it (which is gross),
-        //      or we'd need to perform two branches to/from a section of bcode which
-        //      reinitializes the register to None (which is also gross)
-        //
-        //      making it so jump_true and jump_false reinitialize R(A) to None nice
-        //      and cleanly solves the above problem, even if it's a bit of a hack
-        // 
-        //      the above *sorta* applies also to the version w/ an else-part, but
-        //      to a lesser degree, as both code paths can more cleanly deal w/ it,
-        //      since if they both can end w/ the register having been reinit to None,
-        //      or something else
+        // jump_true conditionally jumps, adding sBx to program counter if the Bool
+        // register R(top) is true, falling-through otherwise, and popping A registers
+        // from the local object stack (as though via a pop instr) in either case
 
-        // jump_true R(A) sBx
-
-        // jump_true conditionally jumps, adding sBx to program counter if 
-        // Bool in R(A) is true, falling-through otherwise, and reinitializing
-        // R(A) to None in either case
+        // jump_true pops A registers to better ensure register coherence while also
+        // playing nicely w/ common usage patterns where the register used to determine
+        // where to branch is on the top of the local object stack
 
         // jump_true operates on the program counter AFTER it's been incremented
         // from reading the instruction itself
-        //
-        // take note that this ONLY applies when considering sBx offsets,
-        // so for describing branches *from* an instr, *to* another, the 
-        // branched-from instr reported is expected to be the branching 
-        // instr itself (ie. NOT the instr *after* it)
+
+        // note that the above ONLY applies when considering sBx offsets, but
+        // when describing branches *from* an instr, *to* another, the branched-from
+        // instr is expected to be described as the origin point of the branch itself
+        // (ie. where the offset is relative to is just a formality)
 
         // panic conditions:
         //      n/a
 
         // static verif requires:
-        //      - R(A) must be in-bounds
-        //      - R(A) must be of type Bool
+        //      - R(top) must exist
+        //      - R(top) must be of type Bool
         //      - program counter must remain in-bounds after sBx offset
         //      - the branch must not violate register coherence
 
         jump_true,
 
-        // jump_false R(A) sBx
+        // jump_false A sBx
 
-        // jump_false conditionally jumps, adding sBx to program counter if 
-        // Bool in R(A) is false, falling-through otherwise, and reinitializing
-        // R(A) to None in either case
+        // jump_false conditionally jumps, adding sBx to program counter if the Bool
+        // register R(top) is false, falling-through otherwise, and popping A registers
+        // from the local object stack (as though via a pop instr) in either case
+
+        // jump_false pops A registers to better ensure register coherence while also
+        // playing nicely w/ common usage patterns where the register used to determine
+        // where to branch is on the top of the local object stack
 
         // jump_false operates on the program counter AFTER it's been incremented
         // from reading the instruction itself
-        //
-        // take note that this ONLY applies when considering sBx offsets,
-        // so for describing branches *from* an instr, *to* another, the 
-        // branched-from instr reported is expected to be the branching 
-        // instr itself (ie. NOT the instr *after* it)
+
+        // note that the above ONLY applies when considering sBx offsets, but
+        // when describing branches *from* an instr, *to* another, the branched-from
+        // instr is expected to be described as the origin point of the branch itself
+        // (ie. where the offset is relative to is just a formality)
 
         // panic conditions:
         //      n/a
 
         // static verif requires:
-        //      - R(A) must be in-bounds
-        //      - R(A) must be of type Bool
+        //      - R(top) must exist
+        //      - R(top) must be of type Bool
         //      - program counter must remain in-bounds after sBx offset
         //      - the branch must not violate register coherence
 
@@ -411,12 +368,13 @@ namespace yama::bc {
         std::string fmt_disassembly(const char* tab = "    ") const;
 
 
-        static_assert(opcodes == 11);
+        static_assert(opcodes == 12);
 
         code& add_noop();
-        code& add_load_none(uint8_t A, bool reinit = false);
-        code& add_load_const(uint8_t A, uint8_t B, bool reinit = false);
-        code& add_load_arg(uint8_t A, uint8_t B, bool reinit = false);
+        code& add_pop(uint8_t A);
+        code& add_put_none(uint8_t A, bool reinit = false);
+        code& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
+        code& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code& add_copy(uint8_t A, uint8_t B, bool reinit = false);
         code& add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit = false);
         code& add_call_nr(uint8_t A, uint8_t B);
@@ -475,12 +433,13 @@ namespace yama::bc {
         size_t count() const noexcept;
 
 
-        static_assert(opcodes == 11);
+        static_assert(opcodes == 12);
 
         code_writer& add_noop();
-        code_writer& add_load_none(uint8_t A, bool reinit = false);
-        code_writer& add_load_const(uint8_t A, uint8_t B, bool reinit = false);
-        code_writer& add_load_arg(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_pop(uint8_t A);
+        code_writer& add_put_none(uint8_t A, bool reinit = false);
+        code_writer& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_copy(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit = false);
         code_writer& add_call_nr(uint8_t A, uint8_t B);

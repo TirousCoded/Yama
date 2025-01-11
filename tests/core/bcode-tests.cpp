@@ -95,16 +95,16 @@ TEST(BCodeTests, ReinitFlag) {
 TEST(BCodeTests, Construction) {
     yama::bc::code a{};
 
-    static_assert(yama::bc::opcodes == 11);
+    static_assert(yama::bc::opcodes == 12);
 
     a
         .add_noop()
-        .add_load_none(10)
-        .add_load_none(10, true)
-        .add_load_const(10, 11)
-        .add_load_const(10, 11, true)
-        .add_load_arg(10, 11)
-        .add_load_arg(10, 11, true)
+        .add_put_none(10)
+        .add_put_none(10, true)
+        .add_put_const(10, 11)
+        .add_put_const(10, 11, true)
+        .add_put_arg(10, 11)
+        .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
         .add_call(10, 11, 12)
@@ -126,40 +126,40 @@ TEST(BCodeTests, Construction) {
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_none);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_none);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_FALSE(a.reinit_flag(i));
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_none);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_none);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_TRUE(a.reinit_flag(i));
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_const);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_const);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].B, 11);
     EXPECT_FALSE(a.reinit_flag(i));
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_const);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_const);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].B, 11);
     EXPECT_TRUE(a.reinit_flag(i));
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_arg);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_arg);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].B, 11);
     EXPECT_FALSE(a.reinit_flag(i));
 
     i++;
 
-    EXPECT_EQ(a[i].opc, yama::bc::opcode::load_arg);
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::put_arg);
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].B, 11);
     EXPECT_TRUE(a.reinit_flag(i));
@@ -231,34 +231,34 @@ TEST(BCodeTests, Construction) {
 TEST(BCodeTests, Append) {
     auto a =
         yama::bc::code()
-        .add_load_const(0, 10, true)
-        .add_load_const(1, 55)
-        .add_load_const(2, 4, true)
+        .add_put_const(0, 10, true)
+        .add_put_const(1, 55)
+        .add_put_const(2, 4, true)
         .add_call(0, 3, 139, true)
         .add_jump_false(0, -31);
 
     const auto b =
         yama::bc::code()
         .add_call(0, 0, 10)
-        .add_load_const(1, 55)
+        .add_put_const(1, 55)
         .add_call(0, 0, 10, true)
         .add_jump(4)
-        .add_load_const(2, 4, true);
+        .add_put_const(2, 4, true);
 
     a.append(b);
 
     const auto expected =
         yama::bc::code()
-        .add_load_const(0, 10, true)
-        .add_load_const(1, 55)
-        .add_load_const(2, 4, true)
+        .add_put_const(0, 10, true)
+        .add_put_const(1, 55)
+        .add_put_const(2, 4, true)
         .add_call(0, 3, 139, true)
         .add_jump_false(0, -31)
         .add_call(0, 0, 10)
-        .add_load_const(1, 55)
+        .add_put_const(1, 55)
         .add_call(0, 0, 10, true)
         .add_jump(4)
-        .add_load_const(2, 4, true);
+        .add_put_const(2, 4, true);
 
     EXPECT_EQ(expected.fmt_disassembly(), a.fmt_disassembly());
 
@@ -269,32 +269,32 @@ TEST(BCodeTests, Append) {
 TEST(BCodeTests, Concat) {
     const auto a =
         yama::bc::code()
-        .add_load_const(0, 10, true)
-        .add_load_const(1, 55)
-        .add_load_const(2, 4, true)
+        .add_put_const(0, 10, true)
+        .add_put_const(1, 55)
+        .add_put_const(2, 4, true)
         .add_call(0, 3, 139, true)
         .add_jump_false(0, -31);
 
     const auto b =
         yama::bc::code()
         .add_call(0, 0, 10)
-        .add_load_const(1, 55)
+        .add_put_const(1, 55)
         .add_call(0, 0, 10, true)
         .add_jump(4)
-        .add_load_const(2, 4, true);
+        .add_put_const(2, 4, true);
 
     const auto expected =
         yama::bc::code()
-        .add_load_const(0, 10, true)
-        .add_load_const(1, 55)
-        .add_load_const(2, 4, true)
+        .add_put_const(0, 10, true)
+        .add_put_const(1, 55)
+        .add_put_const(2, 4, true)
         .add_call(0, 3, 139, true)
         .add_jump_false(0, -31)
         .add_call(0, 0, 10)
-        .add_load_const(1, 55)
+        .add_put_const(1, 55)
         .add_call(0, 0, 10, true)
         .add_jump(4)
-        .add_load_const(2, 4, true);
+        .add_put_const(2, 4, true);
 
     const auto actual = yama::bc::code::concat(a, b);
 
@@ -314,17 +314,17 @@ TEST(BCodeTests, CodeWriter_DefaultInit) {
 
 TEST(BCodeTests, CodeWriter_Usage) {
 
-    static_assert(yama::bc::opcodes == 11);
+    static_assert(yama::bc::opcodes == 12);
 
     const auto expected =
         yama::bc::code()
         .add_noop()
-        .add_load_none(10)
-        .add_load_none(10, true)
-        .add_load_const(10, 11)
-        .add_load_const(10, 11, true)
-        .add_load_arg(10, 11)
-        .add_load_arg(10, 11, true)
+        .add_put_none(10)
+        .add_put_none(10, true)
+        .add_put_const(10, 11)
+        .add_put_const(10, 11, true)
+        .add_put_arg(10, 11)
+        .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
         .add_call(10, 11, 12)
@@ -342,12 +342,12 @@ TEST(BCodeTests, CodeWriter_Usage) {
 
     const auto actual = cw
         .add_noop()
-        .add_load_none(10)
-        .add_load_none(10, true)
-        .add_load_const(10, 11)
-        .add_load_const(10, 11, true)
-        .add_load_arg(10, 11)
-        .add_load_arg(10, 11, true)
+        .add_put_none(10)
+        .add_put_none(10, true)
+        .add_put_const(10, 11)
+        .add_put_const(10, 11, true)
+        .add_put_arg(10, 11)
+        .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
         .add_call(10, 11, 12)
@@ -377,19 +377,19 @@ TEST(BCodeTests, CodeWriter_AddLabelOverwriting) {
     
     const auto actual = cw
         .add_jump_true(10, 0) // <- jumps to label w/ ID 0
-        .add_load_const(0, 14)
+        .add_put_const(0, 14)
         .add_label(0) // <- will be overwritten
-        .add_load_const(1, 114)
-        .add_load_const(2, 41)
+        .add_put_const(1, 114)
+        .add_put_const(2, 41)
         .add_label(0) // <- overwrites above
         .done();
 
     const auto expected = cw
         .add_jump_true(10, 0) // <- jumps to label w/ ID 0
-        .add_load_const(0, 14)
+        .add_put_const(0, 14)
         //.add_label(0) // <- will be overwritten
-        .add_load_const(1, 114)
-        .add_load_const(2, 41)
+        .add_put_const(1, 114)
+        .add_put_const(2, 41)
         .add_label(0) // <- overwrites above
         .done();
 
@@ -408,9 +408,9 @@ TEST(BCodeTests, CodeWriter_ResetDueToDone) {
     // populate w/ old state, then reset it
     const auto old = cw
         .add_jump_true(10, 0) // <- jumps to label w/ ID 0
-        .add_load_const(0, 14)
-        .add_load_const(1, 114)
-        .add_load_const(2, 41)
+        .add_put_const(0, 14)
+        .add_put_const(1, 114)
+        .add_put_const(2, 41)
         .add_label(0) // <- old state has a valid label w/ ID 0
         .done();
 
