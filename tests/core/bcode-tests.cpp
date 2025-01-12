@@ -107,9 +107,9 @@ TEST(BCodeTests, Construction) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
-        .add_call(10, 11, 12)
-        .add_call(10, 11, 12, true)
-        .add_call_nr(10, 11)
+        .add_call(11, 12)
+        .add_call(11, 12, true)
+        .add_call_nr(11)
         .add_ret(10)
         .add_jump(-6)
         .add_jump_true(10, -6)
@@ -181,24 +181,21 @@ TEST(BCodeTests, Construction) {
     i++;
 
     EXPECT_EQ(a[i].opc, yama::bc::opcode::call);
-    EXPECT_EQ(a[i].A, 10);
-    EXPECT_EQ(a[i].B, 11);
-    EXPECT_EQ(a[i].C, 12);
+    EXPECT_EQ(a[i].A, 11);
+    EXPECT_EQ(a[i].B, 12);
     EXPECT_FALSE(a.reinit_flag(i));
 
     i++;
 
     EXPECT_EQ(a[i].opc, yama::bc::opcode::call);
-    EXPECT_EQ(a[i].A, 10);
-    EXPECT_EQ(a[i].B, 11);
-    EXPECT_EQ(a[i].C, 12);
+    EXPECT_EQ(a[i].A, 11);
+    EXPECT_EQ(a[i].B, 12);
     EXPECT_TRUE(a.reinit_flag(i));
 
     i++;
 
     EXPECT_EQ(a[i].opc, yama::bc::opcode::call_nr);
-    EXPECT_EQ(a[i].A, 10);
-    EXPECT_EQ(a[i].B, 11);
+    EXPECT_EQ(a[i].A, 11);
     EXPECT_FALSE(a.reinit_flag(i));
 
     i++;
@@ -234,14 +231,14 @@ TEST(BCodeTests, Append) {
         .add_put_const(0, 10, true)
         .add_put_const(1, 55)
         .add_put_const(2, 4, true)
-        .add_call(0, 3, 139, true)
+        .add_call(3, 139, true)
         .add_jump_false(0, -31);
 
     const auto b =
         yama::bc::code()
-        .add_call(0, 0, 10)
+        .add_call(0, 10)
         .add_put_const(1, 55)
-        .add_call(0, 0, 10, true)
+        .add_call(0, 10, true)
         .add_jump(4)
         .add_put_const(2, 4, true);
 
@@ -252,11 +249,11 @@ TEST(BCodeTests, Append) {
         .add_put_const(0, 10, true)
         .add_put_const(1, 55)
         .add_put_const(2, 4, true)
-        .add_call(0, 3, 139, true)
+        .add_call(3, 139, true)
         .add_jump_false(0, -31)
-        .add_call(0, 0, 10)
+        .add_call(0, 10)
         .add_put_const(1, 55)
-        .add_call(0, 0, 10, true)
+        .add_call(0, 10, true)
         .add_jump(4)
         .add_put_const(2, 4, true);
 
@@ -272,14 +269,14 @@ TEST(BCodeTests, Concat) {
         .add_put_const(0, 10, true)
         .add_put_const(1, 55)
         .add_put_const(2, 4, true)
-        .add_call(0, 3, 139, true)
+        .add_call(3, 139, true)
         .add_jump_false(0, -31);
 
     const auto b =
         yama::bc::code()
-        .add_call(0, 0, 10)
+        .add_call(0, 10)
         .add_put_const(1, 55)
-        .add_call(0, 0, 10, true)
+        .add_call(0, 10, true)
         .add_jump(4)
         .add_put_const(2, 4, true);
 
@@ -288,11 +285,11 @@ TEST(BCodeTests, Concat) {
         .add_put_const(0, 10, true)
         .add_put_const(1, 55)
         .add_put_const(2, 4, true)
-        .add_call(0, 3, 139, true)
+        .add_call(3, 139, true)
         .add_jump_false(0, -31)
-        .add_call(0, 0, 10)
+        .add_call(0, 10)
         .add_put_const(1, 55)
-        .add_call(0, 0, 10, true)
+        .add_call(0, 10, true)
         .add_jump(4)
         .add_put_const(2, 4, true);
 
@@ -327,9 +324,9 @@ TEST(BCodeTests, CodeWriter_Usage) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
-        .add_call(10, 11, 12)
-        .add_call(10, 11, 12, true)
-        .add_call_nr(10, 11)
+        .add_call(11, 12)
+        .add_call(11, 12, true)
+        .add_call_nr(11)
         .add_ret(10)
         .add_jump(-1)
         .add_jump(4)
@@ -350,9 +347,9 @@ TEST(BCodeTests, CodeWriter_Usage) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
-        .add_call(10, 11, 12)
-        .add_call(10, 11, 12, true)
-        .add_call_nr(10, 11)
+        .add_call(11, 12)
+        .add_call(11, 12, true)
+        .add_call_nr(11)
         .add_ret(10)
         .add_label(0) // label for backwards branching
         .add_jump(0)

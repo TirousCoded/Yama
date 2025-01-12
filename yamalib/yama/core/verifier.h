@@ -137,13 +137,11 @@ namespace yama {
         bool _verify_RA_is_type_none(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_none_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RA_is_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         // NOTE: 'this call' refers to the call the instruction is in, for verifying ret instrs
         bool _verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RC_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RC_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RB_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_KoB_is_object_const(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_ArgB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
@@ -153,8 +151,9 @@ namespace yama {
         bool _verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_arg_registers_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_ArgRs_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_ArgRs_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_param_arg_registers_are_correct_number_and_types(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_pushing_does_not_overflow(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
 

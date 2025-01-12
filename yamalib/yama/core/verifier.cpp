@@ -676,43 +676,34 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
     break;
     case bc::opcode::call:
     {
-        const bool valid0 =
-            _verify_arg_registers_in_bounds(subject, bcode, block, i) &&
-            _verify_arg_registers_have_at_least_one_object(subject, bcode, i) &&
-            _verify_RA_is_legal_call_object(subject, bcode, block, i) &&
-            _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i);
-        if (!valid0) {
+        const bool valid =
+            _verify_ArgRs_in_bounds(subject, bcode, block, i) &&
+            _verify_ArgRs_have_at_least_one_object(subject, bcode, i) &&
+            _verify_ArgRs_legal_call_object(subject, bcode, block, i) &&
+            _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i) &&
+            (_is_newtop(instr.B) ? true : _verify_RB_in_bounds(subject, bcode, block, i)) &&
+            (_is_newtop(instr.B) ? true : _verify_RB_is_return_type_of_call_object_skip_if_reinit(subject, bcode, block, i));
+        if (!valid) {
             return false;
         }
-        if (_is_newtop(instr.C)) {
-            const bool valid =
-                _verify_pushing_does_not_overflow(subject, bcode, block, i);
-            if (!valid) {
-                return false;
-            }
-            _push(_R_call_object_type_return_type(subject, block, instr.A), block);
-        }
-        else {
-            const bool valid =
-                _verify_RC_in_bounds(subject, bcode, block, i) &&
-                _verify_RC_is_return_type_of_call_object_skip_if_reinit(subject, bcode, block, i);
-            if (!valid) {
-                return false;
-            }
-            _put(_R_call_object_type_return_type(subject, block, instr.A), instr.C, block);
-        }
+        const size_t callobj_index = block.final_reg_set.size() - size_t(instr.A);
+        const str return_type = _R_call_object_type_return_type(subject, block, callobj_index);
+        _pop(instr.A, block);
+        if (_is_newtop(instr.B))    _push(return_type, block);
+        else                        _put(return_type, instr.B, block);
     }
     break;
     case bc::opcode::call_nr:
     {
         const bool valid =
-            _verify_arg_registers_in_bounds(subject, bcode, block, i) &&
-            _verify_arg_registers_have_at_least_one_object(subject, bcode, i) &&
-            _verify_RA_is_legal_call_object(subject, bcode, block, i) &&
+            _verify_ArgRs_in_bounds(subject, bcode, block, i) &&
+            _verify_ArgRs_have_at_least_one_object(subject, bcode, i) &&
+            _verify_ArgRs_legal_call_object(subject, bcode, block, i) &&
             _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i);
         if (!valid) {
             return false;
         }
+        _pop(instr.A, block);
     }
     break;
     case bc::opcode::ret:
@@ -841,22 +832,6 @@ bool yama::default_verifier::_verify_RA_is_type_bool(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_is_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    const auto _RA = _R_type(block, bcode[i].A);
-    const auto _RA_index = _find_type_const(subject, _RA).value();
-    const auto _RA_kind = subject.consts.kind(_RA_index).value();
-    const auto _RA_is_legal_call_object_type = is_callable(_RA_kind);
-    if (!_RA_is_legal_call_object_type) {
-        YAMA_RAISE(dbg(), dsignal::verif_RA_illegal_callobj);
-        YAMA_LOG(
-            dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) is type {}, which cannot be used as call object!",
-            subject.fullname, i, bcode[i].A, _RA);
-        return false;
-    }
-    return true;
-}
-
 bool yama::default_verifier::_verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto RA = _R_type(block, bcode[i].A);
     const auto this_return_type_index = deref_assert(subject.callsig()).ret;
@@ -873,7 +848,9 @@ bool yama::default_verifier::_verify_RA_is_return_type_of_this_call(const type_i
 }
 
 bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    if (bcode[i].B >= block.final_reg_set.size()) {
+    YAMA_ASSERT(bcode[i].A <= block.final_reg_set.size());
+    const size_t final_reg_set_size_after_popping_args = block.final_reg_set.size() - size_t(bcode[i].A);
+    if (bcode[i].B >= final_reg_set_size_after_popping_args) {
         YAMA_RAISE(dbg(), dsignal::verif_RB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -884,40 +861,29 @@ bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, cons
     return true;
 }
 
-bool yama::default_verifier::_verify_RC_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    if (bcode[i].C >= block.final_reg_set.size()) {
-        YAMA_RAISE(dbg(), dsignal::verif_RC_out_of_bounds);
+bool yama::default_verifier::_verify_RB_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
+    const auto callobj = _R_type(block, args_index);
+    const auto callobj_index = _find_type_const(subject, callobj).value();
+    const auto callobj_return_type_index = deref_assert(subject.consts.callsig(callobj_index)).ret;
+    const str callobj_return_type = subject.consts.fullname(callobj_return_type_index).value();
+    const auto RB = _R_type(block, bcode[i].B);
+    if (RB != callobj_return_type) {
+        YAMA_RAISE(dbg(), dsignal::verif_RB_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(C) (C == {}) out-of-bounds!",
-            subject.fullname, i, bcode[i].C);
+            "error: {} bcode instr {}: R(top-A) (top-A == {}) call object return type is {}, but return target R(B) (B == {}) is type {}!",
+            subject.fullname, i, args_index, callobj_return_type, bcode[i].B, RB);
         return false;
     }
     return true;
 }
 
-bool yama::default_verifier::_verify_RC_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    const auto RA = _R_type(block, bcode[i].A);
-    const auto RA_index = _find_type_const(subject, RA).value();
-    const auto RA_return_type_index = deref_assert(subject.consts.callsig(RA_index)).ret;
-    const str RA_return_type = subject.consts.fullname(RA_return_type_index).value();
-    const auto RC = _R_type(block, bcode[i].C);
-    if (RC != RA_return_type) {
-        YAMA_RAISE(dbg(), dsignal::verif_RC_wrong_type);
-        YAMA_LOG(
-            dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) call object return type is {}, but return target R(C) (C == {}) is type {}!",
-            subject.fullname, i, bcode[i].A, RA_return_type, bcode[i].C, RC);
-        return false;
-    }
-    return true;
-}
-
-bool yama::default_verifier::_verify_RC_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::default_verifier::_verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
-        : _verify_RC_is_return_type_of_call_object(subject, bcode, block, i);
+        : _verify_RB_is_return_type_of_call_object(subject, bcode, block, i);
 }
 
 bool yama::default_verifier::_verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
@@ -1022,26 +988,41 @@ bool yama::default_verifier::_verify_RA_and_ArgB_agree_on_type_skip_if_reinit(co
         : _verify_RA_and_ArgB_agree_on_type(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_arg_registers_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    const auto args_index = bcode[i].A;
-    const auto args_count = bcode[i].B;
-    if (!internal::range_contains<size_t>(0, block.final_reg_set.size(), size_t(args_index), size_t(args_index) + size_t(args_count))) {
-        YAMA_RAISE(dbg(), dsignal::verif_ArgRs_out_of_bounds);
+bool yama::default_verifier::_verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
+    const auto callobj_type = _R_type(block, args_index);
+    const auto callobj_type_index = _find_type_const(subject, callobj_type).value();
+    const auto callobj_type_kind = subject.consts.kind(callobj_type_index).value();
+    const auto callobj_is_legal_call_object_type = is_callable(callobj_type_kind);
+    if (!callobj_is_legal_call_object_type) {
+        YAMA_RAISE(dbg(), dsignal::verif_ArgRs_illegal_callobj);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: args registers [{}, {}) out-of-bounds!",
-            subject.fullname, i, args_index, args_index + args_count);
+            "error: {} bcode instr {}: R(top-A) (top-A == {}) is type {}, which cannot be used as call object!",
+            subject.fullname, i, args_index, callobj_type);
         return false;
     }
     return true;
 }
 
-bool yama::default_verifier::_verify_arg_registers_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].B == 0) {
+bool yama::default_verifier::_verify_ArgRs_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (size_t(bcode[i].A) > block.final_reg_set.size()) {
+        YAMA_RAISE(dbg(), dsignal::verif_ArgRs_out_of_bounds);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} bcode instr {}: more args registers than there are local object stack registers!",
+            subject.fullname, i);
+        return false;
+    }
+    return true;
+}
+
+bool yama::default_verifier::_verify_ArgRs_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i) {
+    if (bcode[i].A == 0) {
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_zero_objects);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: no args registers (ie. B == 0)!",
+            "error: {} bcode instr {}: no args registers (ie. A == 0)!",
             subject.fullname, i);
         return false;
     }
@@ -1049,8 +1030,8 @@ bool yama::default_verifier::_verify_arg_registers_have_at_least_one_object(cons
 }
 
 bool yama::default_verifier::_verify_param_arg_registers_are_correct_number_and_types(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
-    const auto args_index = bcode[i].A;
-    const auto args_count = bcode[i].B;
+    const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
+    const auto args_count = size_t(bcode[i].A);
     const auto callobj_type = _R_type(block, args_index);
     const auto callobj_index = _find_type_const(subject, callobj_type).value();
     const auto& callobj_params = deref_assert(subject.consts.callsig(callobj_index)).params;

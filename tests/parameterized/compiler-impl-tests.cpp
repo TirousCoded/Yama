@@ -100,7 +100,7 @@ yama::type_info observeNone_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 0 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_none(); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_none(); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -109,7 +109,7 @@ yama::type_info observeInt_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 1 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_int(ctx.ll_arg(1).value().as_int()); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_int(ctx.arg(1).value().as_int()); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -118,7 +118,7 @@ yama::type_info observeUInt_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 2 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_uint(ctx.ll_arg(1).value().as_uint()); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_uint(ctx.arg(1).value().as_uint()); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -127,7 +127,7 @@ yama::type_info observeFloat_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 3 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_float(ctx.ll_arg(1).value().as_float()); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_float(ctx.arg(1).value().as_float()); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -136,7 +136,7 @@ yama::type_info observeBool_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 4 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_bool(ctx.ll_arg(1).value().as_bool()); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_bool(ctx.arg(1).value().as_bool()); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -145,7 +145,7 @@ yama::type_info observeChar_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 5 }, 0),
-        .call_fn = [](yama::context& ctx) { sidefx.observe_char(ctx.ll_arg(1).value().as_char()); ctx.ll_push_none(); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { sidefx.observe_char(ctx.arg(1).value().as_char()); ctx.push_none(); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -154,7 +154,7 @@ yama::type_info doPanic_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({}, 0),
-        .call_fn = [](yama::context& ctx) { ctx.ll_panic(); },
+        .call_fn = [](yama::context& ctx) { ctx.panic(); },
         .max_locals = 0,
     },
 };
@@ -163,7 +163,7 @@ yama::type_info doIncr_info{
     .consts = consts,
     .info = yama::function_info{
         .callsig = yama::make_callsig_info({ 1 }, 1),
-        .call_fn = [](yama::context& ctx) { ctx.ll_push_int(ctx.ll_arg(1).value().as_int() + 1); ctx.ll_ret(0); },
+        .call_fn = [](yama::context& ctx) { ctx.push_int(ctx.arg(1).value().as_int() + 1); ctx.ret(0); },
         .max_locals = 1,
     },
 };
@@ -174,10 +174,10 @@ yama::type_info isEqInt_info{
         .callsig = yama::make_callsig_info({ 1, 1 }, 4),
         .call_fn =
             [](yama::context& ctx) {
-                const auto a = ctx.ll_arg(1).value().as_int();
-                const auto b = ctx.ll_arg(2).value().as_int();
-                ctx.ll_push_bool(a == b);
-                ctx.ll_ret(0);
+                const auto a = ctx.arg(1).value().as_int();
+                const auto b = ctx.arg(2).value().as_int();
+                ctx.push_bool(a == b);
+                ctx.ret(0);
             },
         .max_locals = 1,
     },
@@ -189,10 +189,10 @@ yama::type_info isEqChar_info{
         .callsig = yama::make_callsig_info({ 5, 5 }, 4),
         .call_fn =
             [](yama::context& ctx) {
-                const auto a = ctx.ll_arg(1).value().as_char();
-                const auto b = ctx.ll_arg(2).value().as_char();
-                ctx.ll_push_bool(a == b);
-                ctx.ll_ret(0);
+                const auto a = ctx.arg(1).value().as_char();
+                const auto b = ctx.arg(2).value().as_char();
+                ctx.push_bool(a == b);
+                ctx.ret(0);
             },
         .max_locals = 1,
     },
@@ -204,10 +204,10 @@ yama::type_info isNotEqInt_info{
         .callsig = yama::make_callsig_info({ 1, 1 }, 4),
         .call_fn =
             [](yama::context& ctx) {
-                const auto a = ctx.ll_arg(1).value().as_int();
-                const auto b = ctx.ll_arg(2).value().as_int();
-                ctx.ll_push_bool(a != b);
-                ctx.ll_ret(0);
+                const auto a = ctx.arg(1).value().as_int();
+                const auto b = ctx.arg(2).value().as_int();
+                ctx.push_bool(a != b);
+                ctx.ret(0);
             },
         .max_locals = 1,
     },
@@ -345,11 +345,11 @@ fn f() -> None {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -382,11 +382,11 @@ fn f() -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(0));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(0));
 
     // expected side effects
     sidefx_t expected{};
@@ -419,11 +419,11 @@ fn f() -> UInt {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> UInt");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_uint(0));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_uint(0));
 
     // expected side effects
     sidefx_t expected{};
@@ -456,11 +456,11 @@ fn f() -> Float {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_float(0.0));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_float(0.0));
 
     // expected side effects
     sidefx_t expected{};
@@ -493,11 +493,11 @@ fn f() -> Bool {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Bool");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_bool(false));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_bool(false));
 
     // expected side effects
     sidefx_t expected{};
@@ -530,11 +530,11 @@ fn f() -> Char {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Char");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_char('\0'));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_char('\0'));
 
     // expected side effects
     sidefx_t expected{};
@@ -573,11 +573,11 @@ fn f() -> g {
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_fn(*g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
     sidefx_t expected{};
@@ -733,11 +733,11 @@ fn f() {
     ASSERT_EQ(identity_int->callsig().value().fmt(), "fn(Int) -> Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -772,15 +772,15 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).bad()); // <- should panic
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // <- should panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     // expected return value
-    //EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none()); <- irrelevant due to panic
+    //EXPECT_EQ(ctx->local(0).value(), ctx->new_none()); <- irrelevant due to panic
 
     // expected side effects
     sidefx_t expected{};
@@ -861,11 +861,11 @@ fn f() {}
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -918,11 +918,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -987,11 +987,11 @@ fn f() {
     ASSERT_EQ(c->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1049,12 +1049,12 @@ fn f(a: Int) {
     ASSERT_EQ(a->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_push_int(21).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->push_int(21).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1278,11 +1278,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1321,11 +1321,11 @@ fn f() -> g {
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_fn(*g).value());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g).value());
 
     // expected side effects
     sidefx_t expected{};
@@ -1443,11 +1443,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1481,11 +1481,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1519,11 +1519,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1584,11 +1584,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1714,11 +1714,11 @@ fn f() -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(1));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(1));
 
     // expected side effects
     sidefx_t expected{};
@@ -1767,15 +1767,15 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    EXPECT_EQ(ctx->ll_panics(), 0);
+    EXPECT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).bad()); // <- should panic
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // <- should panic
 
     // expected return value
-    //EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(1)); <- n/a due to panic
+    //EXPECT_EQ(ctx->local(0).value(), ctx->new_int(1)); <- n/a due to panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     // expected side effects
     sidefx_t expected{};
@@ -1818,11 +1818,11 @@ fn f() -> None {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1864,11 +1864,11 @@ fn f() -> None {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1912,11 +1912,11 @@ fn f() { // <- implies return type is None
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -1958,11 +1958,11 @@ fn f() { // <- implies return type is None
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2001,16 +2001,16 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn(Int, Int, Int, Bool, Char) -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_push_int(11).good());
-    ASSERT_TRUE(ctx->ll_push_int(909).good());
-    ASSERT_TRUE(ctx->ll_push_int(-13).good());
-    ASSERT_TRUE(ctx->ll_push_bool(true).good());
-    ASSERT_TRUE(ctx->ll_push_char(U'y').good());
-    ASSERT_TRUE(ctx->ll_call(0, 6, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->push_int(11).good());
+    ASSERT_TRUE(ctx->push_int(909).good());
+    ASSERT_TRUE(ctx->push_int(-13).good());
+    ASSERT_TRUE(ctx->push_bool(true).good());
+    ASSERT_TRUE(ctx->push_char(U'y').good());
+    ASSERT_TRUE(ctx->call(6, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2070,35 +2070,35 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn(Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_push_int(24).good());
-    ASSERT_TRUE(ctx->ll_push_int(23).good());
-    ASSERT_TRUE(ctx->ll_push_int(22).good());
-    ASSERT_TRUE(ctx->ll_push_int(21).good());
-    ASSERT_TRUE(ctx->ll_push_int(20).good());
-    ASSERT_TRUE(ctx->ll_push_int(19).good());
-    ASSERT_TRUE(ctx->ll_push_int(18).good());
-    ASSERT_TRUE(ctx->ll_push_int(17).good());
-    ASSERT_TRUE(ctx->ll_push_int(16).good());
-    ASSERT_TRUE(ctx->ll_push_int(15).good());
-    ASSERT_TRUE(ctx->ll_push_int(14).good());
-    ASSERT_TRUE(ctx->ll_push_int(13).good());
-    ASSERT_TRUE(ctx->ll_push_int(12).good());
-    ASSERT_TRUE(ctx->ll_push_int(11).good());
-    ASSERT_TRUE(ctx->ll_push_int(10).good());
-    ASSERT_TRUE(ctx->ll_push_int(9).good());
-    ASSERT_TRUE(ctx->ll_push_int(8).good());
-    ASSERT_TRUE(ctx->ll_push_int(7).good());
-    ASSERT_TRUE(ctx->ll_push_int(6).good());
-    ASSERT_TRUE(ctx->ll_push_int(5).good());
-    ASSERT_TRUE(ctx->ll_push_int(4).good());
-    ASSERT_TRUE(ctx->ll_push_int(3).good());
-    ASSERT_TRUE(ctx->ll_push_int(2).good());
-    ASSERT_TRUE(ctx->ll_push_int(1).good());
-    ASSERT_TRUE(ctx->ll_call(0, 25, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->push_int(24).good());
+    ASSERT_TRUE(ctx->push_int(23).good());
+    ASSERT_TRUE(ctx->push_int(22).good());
+    ASSERT_TRUE(ctx->push_int(21).good());
+    ASSERT_TRUE(ctx->push_int(20).good());
+    ASSERT_TRUE(ctx->push_int(19).good());
+    ASSERT_TRUE(ctx->push_int(18).good());
+    ASSERT_TRUE(ctx->push_int(17).good());
+    ASSERT_TRUE(ctx->push_int(16).good());
+    ASSERT_TRUE(ctx->push_int(15).good());
+    ASSERT_TRUE(ctx->push_int(14).good());
+    ASSERT_TRUE(ctx->push_int(13).good());
+    ASSERT_TRUE(ctx->push_int(12).good());
+    ASSERT_TRUE(ctx->push_int(11).good());
+    ASSERT_TRUE(ctx->push_int(10).good());
+    ASSERT_TRUE(ctx->push_int(9).good());
+    ASSERT_TRUE(ctx->push_int(8).good());
+    ASSERT_TRUE(ctx->push_int(7).good());
+    ASSERT_TRUE(ctx->push_int(6).good());
+    ASSERT_TRUE(ctx->push_int(5).good());
+    ASSERT_TRUE(ctx->push_int(4).good());
+    ASSERT_TRUE(ctx->push_int(3).good());
+    ASSERT_TRUE(ctx->push_int(2).good());
+    ASSERT_TRUE(ctx->push_int(1).good());
+    ASSERT_TRUE(ctx->call(25, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2270,11 +2270,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2357,11 +2357,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2417,14 +2417,14 @@ fn f(a: Bool) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_bool(true).good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_bool(true).good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2436,14 +2436,14 @@ fn f(a: Bool) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_bool(false).good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_bool(false).good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2488,14 +2488,14 @@ fn f(a: Bool) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_bool(true).good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_bool(true).good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2507,14 +2507,14 @@ fn f(a: Bool) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_bool(false).good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_bool(false).good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2568,14 +2568,14 @@ fn f(a: Char) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_char(U'a').good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_char(U'a').good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2587,14 +2587,14 @@ fn f(a: Char) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_char(U'b').good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_char(U'b').good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2606,14 +2606,14 @@ fn f(a: Char) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_char(U'c').good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_char(U'c').good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2625,14 +2625,14 @@ fn f(a: Char) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_char(U'd').good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_char(U'd').good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2644,14 +2644,14 @@ fn f(a: Char) {
     {
         sidefx = sidefx_t{};
 
-        ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-        ASSERT_TRUE(ctx->ll_push_char(U'&').good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(*f).good());
+        ASSERT_TRUE(ctx->push_char(U'&').good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
         // expected return value
-        EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+        EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-        ASSERT_TRUE(ctx->ll_pop(2).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         sidefx_t expected{};
@@ -2722,11 +2722,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2773,11 +2773,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2834,11 +2834,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2890,11 +2890,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -2972,11 +2972,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3029,11 +3029,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3100,11 +3100,11 @@ fn f() -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(10));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
     sidefx_t expected{};
@@ -3137,11 +3137,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3180,11 +3180,11 @@ fn f() {
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3279,11 +3279,11 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_fn(*g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
     sidefx_t expected{};
@@ -3318,12 +3318,12 @@ fn f(a: Int) -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_push_int(-21).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->push_int(-21).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(-21));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-21));
 
     // expected side effects
     sidefx_t expected{};
@@ -3358,11 +3358,11 @@ fn f() -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(-21));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-21));
 
     // expected side effects
     sidefx_t expected{};
@@ -3401,12 +3401,12 @@ fn f(g: Int) {
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_push_int(-21).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->push_int(-21).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3446,11 +3446,11 @@ fn f() {
     ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3489,11 +3489,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3656,11 +3656,11 @@ fn f() -> Int {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(10));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
     sidefx_t expected{};
@@ -3722,11 +3722,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3855,11 +3855,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -3993,16 +3993,16 @@ fn f6() -> Float { return nan; }
         const auto& f = I.first;
         const yama::float_t v = I.second;
 
-        ASSERT_TRUE(ctx->ll_push_fn(f).good());
-        ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+        ASSERT_TRUE(ctx->push_fn(f).good());
+        ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
         // expected return value
-        const auto lhs = ctx->ll_local(0).value();
-        const auto rhs = ctx->ll_new_float(v);
+        const auto lhs = ctx->local(0).value();
+        const auto rhs = ctx->new_float(v);
         EXPECT_TRUE(lhs.t == ctx->load_float());
         if (lhs.t == ctx->load_float()) EXPECT_DOUBLE_EQ(lhs.as_float(), rhs.as_float());
 
-        ASSERT_TRUE(ctx->ll_pop(1).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         EXPECT_EQ(sidefx.fmt(), sidefx_t{}.fmt());
@@ -4011,15 +4011,15 @@ fn f6() -> Float { return nan; }
     {
         const auto& f = *f6;
 
-        ASSERT_TRUE(ctx->ll_push_fn(f).good());
-        ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+        ASSERT_TRUE(ctx->push_fn(f).good());
+        ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
         // expected return value
-        const auto lhs = ctx->ll_local(0).value();
+        const auto lhs = ctx->local(0).value();
         EXPECT_TRUE(lhs.t == dm->load_float());
         if (lhs.t == dm->load_float()) EXPECT_TRUE(std::isnan(lhs.as_float()));
 
-        ASSERT_TRUE(ctx->ll_pop(1).good()); // cleanup
+        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
         EXPECT_EQ(sidefx.fmt(), sidefx_t{}.fmt());
@@ -4049,11 +4049,11 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    const auto lhs = ctx->ll_local(0).value();
+    const auto lhs = ctx->local(0).value();
     EXPECT_TRUE(lhs.t == dm->load_float());
     if (lhs.t == dm->load_float()) {
         EXPECT_TRUE(std::isinf(lhs.as_float()));
@@ -4088,11 +4088,11 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    const auto lhs = ctx->ll_local(0).value();
+    const auto lhs = ctx->local(0).value();
     EXPECT_TRUE(lhs.t == dm->load_float());
     if (lhs.t == dm->load_float()) {
         EXPECT_TRUE(std::isinf(lhs.as_float()));
@@ -4156,11 +4156,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -4255,11 +4255,11 @@ fn f() {
     ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -4409,11 +4409,11 @@ fn f() {
     ASSERT_EQ(choose->callsig().value().fmt(), "fn(Bool, Int, Int) -> Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -4475,11 +4475,11 @@ fn f() {
     ASSERT_EQ(g->callsig().value().fmt(), "fn(Int, Int, Int) -> Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};
@@ -4523,11 +4523,11 @@ fn f() {
     ASSERT_EQ(foo->callsig().value().fmt(), "fn(Int) -> foo");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
 
-    ASSERT_TRUE(ctx->ll_push_fn(*f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
     sidefx_t expected{};

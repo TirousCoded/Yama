@@ -182,10 +182,8 @@ namespace yama {
         verif_RTop_wrong_type,
         verif_RA_out_of_bounds,
         verif_RA_wrong_type,
-        verif_RA_illegal_callobj,
         verif_RB_out_of_bounds,
-        verif_RC_out_of_bounds,
-        verif_RC_wrong_type,
+        verif_RB_wrong_type,
         verif_KoB_out_of_bounds,
         verif_KoB_not_object_const,
         verif_ArgB_out_of_bounds,
@@ -194,6 +192,7 @@ namespace yama {
         verif_RA_and_ArgB_types_differ,
         verif_ArgRs_out_of_bounds,
         verif_ArgRs_zero_objects,
+        verif_ArgRs_illegal_callobj,
         verif_ParamArgRs_wrong_number,
         verif_ParamArgRs_wrong_types,
         verif_puts_PC_out_of_bounds,
@@ -212,7 +211,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 53);
+        static_assert(dsignals == 52);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -250,10 +249,8 @@ namespace yama {
             _YAMA_ENTRY_(verif_RTop_wrong_type);
             _YAMA_ENTRY_(verif_RA_out_of_bounds);
             _YAMA_ENTRY_(verif_RA_wrong_type);
-            _YAMA_ENTRY_(verif_RA_illegal_callobj);
             _YAMA_ENTRY_(verif_RB_out_of_bounds);
-            _YAMA_ENTRY_(verif_RC_out_of_bounds);
-            _YAMA_ENTRY_(verif_RC_wrong_type);
+            _YAMA_ENTRY_(verif_RB_wrong_type);
             _YAMA_ENTRY_(verif_KoB_out_of_bounds);
             _YAMA_ENTRY_(verif_KoB_not_object_const);
             _YAMA_ENTRY_(verif_ArgB_out_of_bounds);
@@ -262,6 +259,7 @@ namespace yama {
             _YAMA_ENTRY_(verif_RA_and_ArgB_types_differ);
             _YAMA_ENTRY_(verif_ArgRs_out_of_bounds);
             _YAMA_ENTRY_(verif_ArgRs_zero_objects);
+            _YAMA_ENTRY_(verif_ArgRs_illegal_callobj);
             _YAMA_ENTRY_(verif_ParamArgRs_wrong_number);
             _YAMA_ENTRY_(verif_ParamArgRs_wrong_types);
             _YAMA_ENTRY_(verif_puts_PC_out_of_bounds);

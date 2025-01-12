@@ -183,44 +183,44 @@ namespace yama {
         //       to the MVP of Yama not providing enough nuances to really
         //       be able to do so yet
 
-        // TODO: if later on ll_remove_ref will fire destructors, what happens
-        //       if doing so causes ll_remove_ref to *panic*
+        // TODO: if later on remove_ref will fire destructors, what happens
+        //       if doing so causes remove_ref to *panic*
         //
-        //       should ll_remove_ref return cmd_status?
+        //       should remove_ref return cmd_status?
 
         // these perform ref count incr/decr for x, w/ associated cleanup 
         // of x in the event of it's ref count reaching 0
 
         // behaviour is undefined if x is used improperly w/ these methods
 
-        void ll_add_ref(const object_ref& x);
-        void ll_remove_ref(const object_ref& x);
+        void add_ref(const object_ref& x);
+        void remove_ref(const object_ref& x);
 
         // these methods are used to simplify the process of incr/decr of
         // object ref counts in common circumstances
 
-        // ll_drop_ref is for dissociating a object_ref from an object, 
+        // drop_ref is for dissociating a object_ref from an object, 
         // putting the object_ref in a semantically indeterminate state
         // (sorta like if you move-assigned its contents away)
 
-        // ll_copy_ref, ll_move_ref, and ll_swap_ref are for assisting
+        // copy_ref, move_ref, and swap_ref are for assisting
         // in copy/move assignment and swapping, respectively
 
-        // ll_clone_ref is for creating a object_ref which is a clone
+        // clone_ref is for creating a object_ref which is a clone
         // of another object_ref
 
-        // ll_clone_ref overload taking an std::optional is monadic,
+        // clone_ref overload taking an std::optional is monadic,
         // returning std::nullopt if argument was std::nullopt
 
         // behaviour is undefined if x is used improperly w/ these methods
 
-        void ll_drop_ref(object_ref& x);
-        void ll_copy_ref(const object_ref& src, object_ref& dest);
-        void ll_move_ref(object_ref& src, object_ref& dest);
-        void ll_swap_ref(object_ref& a, object_ref& b);
+        void drop_ref(object_ref& x);
+        void copy_ref(const object_ref& src, object_ref& dest);
+        void move_ref(object_ref& src, object_ref& dest);
+        void swap_ref(object_ref& a, object_ref& b);
 
-        object_ref ll_clone_ref(borrowed_ref x);
-        std::optional<object_ref> ll_clone_ref(std::optional<borrowed_ref> x);
+        object_ref clone_ref(borrowed_ref x);
+        std::optional<object_ref> clone_ref(std::optional<borrowed_ref> x);
 
         // IMPORTANT:
         //      for all 'll_#' methods below, all ref count incr/decr 
@@ -232,193 +232,194 @@ namespace yama {
         //      move-construct another object_ref variable, the variable's 
         //      object's ref count is guaranteed to be correct
 
-        // these ll_new_# methods are used for the quick creation of objects
+        // these new_# methods are used for the quick creation of objects
 
-        canonical_ref ll_new_none();
-        canonical_ref ll_new_int(int_t v);
-        canonical_ref ll_new_uint(uint_t v);
-        canonical_ref ll_new_float(float_t v);
-        canonical_ref ll_new_bool(bool_t v);
-        canonical_ref ll_new_char(char_t v);
+        canonical_ref new_none();
+        canonical_ref new_int(int_t v);
+        canonical_ref new_uint(uint_t v);
+        canonical_ref new_float(float_t v);
+        canonical_ref new_bool(bool_t v);
+        canonical_ref new_char(char_t v);
 
-        std::optional<canonical_ref> ll_new_fn(type f);     // ll_new_fn returns std::nullopt if f is not a function type
+        std::optional<canonical_ref> new_fn(type f);        // new_fn returns std::nullopt if f is not a function type
 
-        // it's okay to use ll_panicking and ll_panics while panicking,
+        // it's okay to use panicking and panics while panicking,
         // as the whole point of it is to detect it
 
-        size_t ll_panics() noexcept;                        // ll_panics returns the number of times the context has panicked
-        bool ll_panicking() noexcept;                       // ll_panicking queries if the context is panicking
-        bool ll_is_user() noexcept;                         // ll_is_user returns if the current call frame is the user call frame
-        size_t ll_call_frames() noexcept;                   // ll_call_frames returns the call stack height
-        size_t ll_max_call_frames() noexcept;               // ll_call_frames returns the max call stack height
+        size_t panics() noexcept;                           // panics returns the number of times the context has panicked
+        bool panicking() noexcept;                          // panicking queries if the context is panicking
+        bool is_user() noexcept;                            // is_user returns if the current call frame is the user call frame
+        size_t call_frames() noexcept;                      // call_frames returns the call stack height
+        size_t max_call_frames() noexcept;                  // call_frames returns the max call stack height
 
-        // ll_consts behaviour is undefined if in the user call frame
+        // consts behaviour is undefined if in the user call frame
 
-        const_table ll_consts() noexcept;                   // ll_consts returns the constant table of the current call
+        const_table consts() noexcept;                      // consts returns the constant table of the current call
 
-        size_t ll_args() noexcept;                          // ll_args returns the number of args available
-        size_t ll_locals() noexcept;                        // ll_locals returns the height of the current local object stack
-        size_t ll_max_locals() noexcept;                    // ll_max_locals returns the max height of the current local object stack
-        std::optional<object_ref> ll_arg(arg_t x);          // ll_args returns the object, if any, at x in the arg slice
-        std::optional<object_ref> ll_local(local_t x);      // ll_local returns the object, if any, at x in the local object stack
+        size_t args() noexcept;                             // args returns the number of args available
+        size_t locals() noexcept;                           // locals returns the height of the current local object stack
+        size_t max_locals() noexcept;                       // max_locals returns the max height of the current local object stack
+        std::optional<object_ref> arg(arg_t x);             // args returns the object, if any, at x in the arg slice
+        std::optional<object_ref> local(local_t x);         // local returns the object, if any, at x in the local object stack
 
-        void ll_panic();                                    // ll_panic induces a panic, failing quietly if already panicking
+        void panic();                                       // panic induces a panic, failing quietly if already panicking
 
-        // ll_pop pops the top n local object stack registers, stopping prematurely
+        // pop pops the top n local object stack registers, stopping prematurely
         // is the stack is emptied
 
-        cmd_status ll_pop(size_t n = 1);
+        cmd_status pop(size_t n = 1);
 
-        // ll_put loads v into the local object register at x (x may be newtop)
+        // put loads v into the local object register at x (x may be newtop)
 
-        // ll_put does not care what type the x object is, as it overwrites it
+        // put does not care what type the x object is, as it overwrites it
 
-        // ll_put panics if x is out-of-bounds (unless newtop)
+        // put panics if x is out-of-bounds (unless newtop)
 
-        // ll_put panics if (x == newtop, but) pushing would overflow
+        // put panics if (x == newtop, but) pushing would overflow
 
-        cmd_status ll_put(local_t x, borrowed_ref v);
+        cmd_status put(local_t x, borrowed_ref v);
 
-        inline cmd_status ll_push(borrowed_ref v) { return ll_put(newtop, v); }
+        inline cmd_status push(borrowed_ref v) { return put(newtop, v); }
 
-        // these methods wrap ll_put calls composed w/ ll_new_# method calls
+        // these methods wrap put calls composed w/ new_# method calls
 
-        cmd_status ll_put_none(local_t x);
-        cmd_status ll_put_int(local_t x, int_t v);
-        cmd_status ll_put_uint(local_t x, uint_t v);
-        cmd_status ll_put_float(local_t x, float_t v);
-        cmd_status ll_put_bool(local_t x, bool v);
-        cmd_status ll_put_char(local_t x, char_t v);
+        cmd_status put_none(local_t x);
+        cmd_status put_int(local_t x, int_t v);
+        cmd_status put_uint(local_t x, uint_t v);
+        cmd_status put_float(local_t x, float_t v);
+        cmd_status put_bool(local_t x, bool v);
+        cmd_status put_char(local_t x, char_t v);
 
-        inline cmd_status ll_push_none() { return ll_put_none(newtop); }
-        inline cmd_status ll_push_int(int_t v) { return ll_put_int(newtop, v); }
-        inline cmd_status ll_push_uint(uint_t v) { return ll_put_uint(newtop, v); }
-        inline cmd_status ll_push_float(float_t v) { return ll_put_float(newtop, v); }
-        inline cmd_status ll_push_bool(bool v) { return ll_put_bool(newtop, v); }
-        inline cmd_status ll_push_char(char_t v) { return ll_put_char(newtop, v); }
+        inline cmd_status push_none() { return put_none(newtop); }
+        inline cmd_status push_int(int_t v) { return put_int(newtop, v); }
+        inline cmd_status push_uint(uint_t v) { return put_uint(newtop, v); }
+        inline cmd_status push_float(float_t v) { return put_float(newtop, v); }
+        inline cmd_status push_bool(bool v) { return put_bool(newtop, v); }
+        inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
 
-        // ll_put_fn panics if f is not a function type
+        // put_fn panics if f is not a function type
 
-        cmd_status ll_put_fn(local_t x, type f);
+        cmd_status put_fn(local_t x, type f);
 
-        inline cmd_status ll_push_fn(type f) { return ll_put_fn(newtop, f); }
+        inline cmd_status push_fn(type f) { return put_fn(newtop, f); }
 
-        // ll_put_const loads the object constant at c, in the constant table
+        // put_const loads the object constant at c, in the constant table
         // of the current call, into the local object register at x (x may be newtop)
 
-        // ll_put_const does not care what type the x object is, as it overwrites it
+        // put_const does not care what type the x object is, as it overwrites it
 
-        // ll_put_const panics if in the user call frame
+        // put_const panics if in the user call frame
 
-        // ll_put_const panics if x is out-of-bounds (unless newtop)
+        // put_const panics if x is out-of-bounds (unless newtop)
 
-        // ll_put_const panics if (x == newtop, but) pushing would overflow
+        // put_const panics if (x == newtop, but) pushing would overflow
 
-        // ll_put_const panics if c is out-of-bounds
+        // put_const panics if c is out-of-bounds
 
-        // ll_put_const panics if the constant at c is not an object constant
+        // put_const panics if the constant at c is not an object constant
 
-        cmd_status ll_put_const(local_t x, const_t c);
+        cmd_status put_const(local_t x, const_t c);
 
-        inline cmd_status ll_push_const(const_t c) { return ll_put_const(newtop, c); }
+        inline cmd_status push_const(const_t c) { return put_const(newtop, c); }
 
-        // ll_put_arg loads the argument at index arg into the local object
+        // put_arg loads the argument at index arg into the local object
         // register at x (x may be newtop)
 
-        // ll_put_arg does not care what type the x object is, as it overwrites it
+        // put_arg does not care what type the x object is, as it overwrites it
 
-        // ll_put_arg panics if in the user call frame
+        // put_arg panics if in the user call frame
 
-        // ll_put_arg panics if x is out-of-bounds (unless newtop)
+        // put_arg panics if x is out-of-bounds (unless newtop)
 
-        // ll_put_arg panics if (x == newtop, but) pushing would overflow
+        // put_arg panics if (x == newtop, but) pushing would overflow
 
-        // ll_put_arg panics if arg is out-of-bounds
+        // put_arg panics if arg is out-of-bounds
 
-        cmd_status ll_put_arg(local_t x, arg_t arg);
+        cmd_status put_arg(local_t x, arg_t arg);
 
-        inline cmd_status ll_push_arg(arg_t arg) { return ll_put_arg(newtop, arg); }
+        inline cmd_status push_arg(arg_t arg) { return put_arg(newtop, arg); }
 
-        // ll_copy copies object at src onto object at dest (dest may be newtop)
+        // copy copies object at src onto object at dest (dest may be newtop)
 
-        // ll_copy does not care what type the dest object is, as it overwrites it
+        // copy does not care what type the dest object is, as it overwrites it
 
-        // ll_copy panics if src is out-of-bounds
+        // copy panics if src is out-of-bounds
 
-        // ll_copy panics if dest is out-of-bounds (unless newtop)
+        // copy panics if dest is out-of-bounds (unless newtop)
 
-        // ll_copy panics if (dest == newtop, but) pushing would overflow
+        // copy panics if (dest == newtop, but) pushing would overflow
 
-        cmd_status ll_copy(local_t src, local_t dest = newtop);
+        cmd_status copy(local_t src, local_t dest = newtop);
+
+        // NOTE: due to the existence of the callobj, plus the limit to only one return value
+        //       object, it's not possible for callobj to overflow when ret == newtop
 
         // below, let
-        //      - 'args' refer to the exclusive object range [args_start, args_start+args_n)
+        //      - 'args' refer to the inclusive object range [R(top-args_n), R(top)]
         //      - 'callobj' refer to the first object in args
         //      - 'param args' refer to args excluding callobj
 
-        // ll_call performs a Yama call of callobj using args, writing the
-        // return value object to object ret (ret may be newtop)
+        // call performs a Yama call of callobj using args, writing the return value
+        // object to object ret (ret may be newtop), then consuming args
 
-        // ll_call does not care what type the ret object is, as it overwrites it
+        // call does not care what type the ret object is, as it overwrites it
 
-        // ll_call does not check if args types are correct to use in a callobj call
+        // call does not check if args types are correct to use in a callobj call
 
-        // ll_call panics if args provides no callobj (ie. if args_n == 0)
+        // call panics if args provides no callobj (ie. if args_n == 0)
 
-        // ll_call panics if args index range is out-of-bounds
+        // call panics if args index range is out-of-bounds
 
-        // ll_call panics if ret is out-of-bounds (unless newtop)
+        // call panics if ret will be out-of-bounds after the call (unless newtop)
 
-        // ll_call panics if (ret == newtop, but) pushing would overflow
+        // call panics if callobj is not of a callable type
 
-        // ll_call panics if callobj is not of a callable type
-
-        // ll_call panics if args_n-1 is not equal to the argument count expected
+        // call panics if args_n-1 is not equal to the argument count expected
         // for a call to callobj (here, the -1 excludes callobj from argument count)
 
-        // ll_call panics if the call stack would overflow
+        // call panics if the call stack would overflow
 
-        // ll_call panics if, after call behaviour has completed execution, no 
-        // return value object has been provided
+        // call panics if, after call behaviour has completed execution, no return
+        // value object has been provided
 
-        cmd_status ll_call(local_t args_start, size_t args_n, local_t ret = newtop);
+        cmd_status call(size_t args_n, local_t ret);
 
-        // ll_call_nr performs a Yama call of callobj using args, discarding the
-        // return value object
+        // call_nr performs a Yama call of callobj using args, discarding the return
+        // value object, then consuming args
 
-        // the '_nr' in ll_call_nr stands for 'no result'
+        // the '_nr' in call_nr stands for 'no result'
 
-        // ll_call_nr does not check if args types are correct to use in a callobj call
+        // call_nr does not check if args types are correct to use in a callobj call
 
-        // ll_call_nr panics if args provides no callobj (ie. if args_n == 0)
+        // call_nr panics if args provides no callobj (ie. if args_n == 0)
 
-        // ll_call_nr panics if args index range is out-of-bounds
+        // call_nr panics if args index range is out-of-bounds
 
-        // ll_call_nr panics if callobj is not of a callable type
+        // call_nr panics if callobj is not of a callable type
 
-        // ll_call_nr panics if args_n-1 is not equal to the argument count expected
+        // call_nr panics if args_n-1 is not equal to the argument count expected
         // for a call to callobj (here, the -1 excludes callobj from argument count)
 
-        // ll_call_nr panics if the call stack would overflow
+        // call_nr panics if the call stack would overflow
 
-        // ll_call_nr panics if, after call behaviour has completed execution, no 
+        // call_nr panics if, after call behaviour has completed execution, no 
         // return value object has been provided
 
-        cmd_status ll_call_nr(local_t args_start, size_t args_n);
+        cmd_status call_nr(size_t args_n);
 
-        // ll_ret is used within calls to perform the act of returning object x
+        // ret is used within calls to perform the act of returning object x
         // as the return value object of the call
 
-        // ll_ret does not check if the type of the return value object returned
+        // ret does not check if the type of the return value object returned
         // is correct for a call to the call object in question
 
-        // ll_ret panics if in the user call frame
+        // ret panics if in the user call frame
 
-        // ll_ret panics if x is out-of-bounds
+        // ret panics if x is out-of-bounds
 
-        // ll_ret panics if called multiple times
+        // ret panics if called multiple times
 
-        cmd_status ll_ret(local_t x);
+        cmd_status ret(local_t x);
 
 
     private:
@@ -489,7 +490,7 @@ namespace yama {
         // _push_reg attempts to push a new register to the stack, initializing it
 
         // _pop_regs pops the first n registers from the stack, deinitializing each
-        // one via ll_drop_ref, w/ this being used to *unwind* the stack properly
+        // one via drop_ref, w/ this being used to *unwind* the stack properly
 
         // _pop_regs only affects registers of the current call frame
 
@@ -497,7 +498,7 @@ namespace yama {
         void _pop_regs(size_t n);
 
 
-        // this needs to be called in ll_panic and ll_call (after call 
+        // this needs to be called in panic and call (after call 
         // behaviour) in order to handle panic behaviour once call stack 
         // unwinding reaches the user call frame, which needs to be popped, 
         // and a new one pushed
@@ -542,26 +543,25 @@ namespace yama {
         bool _copy_err_src_out_of_bounds(local_t src);
 
 
-        std::optional<object_ref> _call(local_t args_start, size_t args_n);
+        std::optional<object_ref> _call(size_t args_n);
 
         cmd_status _call_ret_to_local(std::optional<stolen_ref> ret, local_t target);
         cmd_status _call_ret_to_no_result(std::optional<stolen_ref> ret);
 
-        // turns out the out-of-bounds/overflow checks for ll_call outputting to
+        // turns out the out-of-bounds/overflow checks for call outputting to
         // local need to occur BEFORE anything else, so we'll use these methods 
         // to check these as a dirty little exception to above pattern
 
-        bool _call_ret_to_local_prechecks(local_t target);
+        bool _call_ret_to_local_prechecks(size_t args_n, local_t target);
 
         bool _call_err_no_callobj(size_t args_n);
-        bool _call_err_args_out_of_bounds(local_t args_start, size_t args_n);
+        bool _call_err_args_out_of_bounds(size_t args_n);
         bool _call_err_callobj_not_callable_type(borrowed_ref callobj);
         bool _call_err_param_arg_count_mismatch(borrowed_ref callobj, size_t param_args);
         bool _call_err_push_cf_would_overflow(borrowed_ref callobj, bool push_cf_result);
         bool _call_err_no_return_value_object(borrowed_ref callobj);
 
-        bool _call_err_ret_pushing_overflows();
-        bool _call_err_ret_out_of_bounds(local_t ret);
+        bool _call_err_ret_out_of_bounds(size_t args_n, local_t ret);
 
 
         cmd_status _ret(local_t x);
@@ -593,7 +593,7 @@ namespace yama {
             dbg(), ctx_panic_c,
             msg, 
             std::forward<Args>(args)...);
-        ll_panic();
+        panic();
     }
 }
 

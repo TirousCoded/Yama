@@ -74,10 +74,10 @@ TEST_F(BCodeExecTests, Instr_Noop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 TEST_F(BCodeExecTests, Instr_Pop) {
@@ -108,10 +108,10 @@ TEST_F(BCodeExecTests, Instr_Pop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 TEST_F(BCodeExecTests, Instr_Pop_Zero) {
@@ -141,10 +141,10 @@ TEST_F(BCodeExecTests, Instr_Pop_Zero) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 TEST_F(BCodeExecTests, Instr_Pop_Many) {
@@ -178,10 +178,10 @@ TEST_F(BCodeExecTests, Instr_Pop_Many) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
@@ -212,10 +212,10 @@ TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 TEST_F(BCodeExecTests, Instr_PutNone) {
@@ -245,11 +245,10 @@ TEST_F(BCodeExecTests, Instr_PutNone) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_int(10).good()); // make type change visible
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
 TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
@@ -278,11 +277,10 @@ TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_int(10).good()); // make type change visible
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
 TEST_F(BCodeExecTests, Instr_PutConst) {
@@ -312,10 +310,10 @@ TEST_F(BCodeExecTests, Instr_PutConst) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_float(1.01));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_float(1.01));
 }
 
 TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
@@ -344,10 +342,10 @@ TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_float(1.01));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_float(1.01));
 }
 
 TEST_F(BCodeExecTests, Instr_PutArg) {
@@ -376,14 +374,16 @@ TEST_F(BCodeExecTests, Instr_PutArg) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_float(3.14159).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2).good());
-    ASSERT_TRUE(ctx->ll_put_float(1, -0.765).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_float(3.14159).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(2).value(), ctx->ll_new_float(3.14159));
-    EXPECT_EQ(ctx->ll_local(3).value(), ctx->ll_new_float(-0.765));
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_float(-0.765).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_float(3.14159));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_float(-0.765));
 }
 
 TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
@@ -411,14 +411,16 @@ TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_float(3.14159).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2).good());
-    ASSERT_TRUE(ctx->ll_put_float(1, -0.765).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_float(3.14159).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(2).value(), ctx->ll_new_float(3.14159));
-    EXPECT_EQ(ctx->ll_local(3).value(), ctx->ll_new_float(-0.765));
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_float(-0.765).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_float(3.14159));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_float(-0.765));
 }
 
 TEST_F(BCodeExecTests, Instr_Copy) {
@@ -450,10 +452,10 @@ TEST_F(BCodeExecTests, Instr_Copy) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(10));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 }
 
 TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
@@ -483,10 +485,10 @@ TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(0).value(), ctx->ll_new_int(101));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
 static bool was_called_0 = false;
@@ -497,11 +499,11 @@ TEST_F(BCodeExecTests, Instr_Call) {
         [](yama::context& ctx) {
         was_called_0 = true;
         yama::int_t result =
-            ctx.ll_arg(1).value().as_int() +
-            ctx.ll_arg(2).value().as_int() +
-            ctx.ll_arg(3).value().as_int();
-        if (ctx.ll_push_int(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+            ctx.arg(1).value().as_int() +
+            ctx.arg(2).value().as_int() +
+            ctx.arg(3).value().as_int();
+        if (ctx.push_int(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
         yama::const_table_info()
@@ -519,13 +521,13 @@ TEST_F(BCodeExecTests, Instr_Call) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
+        .add_put_none(yama::newtop)
         .add_put_const(yama::newtop, 1)
         .add_put_const(yama::newtop, 4)
         .add_put_const(yama::newtop, 3)
         .add_put_const(yama::newtop, 2)
-        .add_put_none(yama::newtop)
-        .add_call(0, 4, 4, true)
-        .add_ret(4);
+        .add_call(4, 0, true)
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -552,12 +554,12 @@ TEST_F(BCodeExecTests, Instr_Call) {
 
     was_called_0 = false;
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     EXPECT_TRUE(was_called_0);
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(149));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(149));
 }
 
 TEST_F(BCodeExecTests, Instr_Call_Newtop) {
@@ -565,11 +567,11 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
         [](yama::context& ctx) {
         was_called_0 = true;
         yama::int_t result =
-            ctx.ll_arg(1).value().as_int() +
-            ctx.ll_arg(2).value().as_int() +
-            ctx.ll_arg(3).value().as_int();
-        if (ctx.ll_push_int(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+            ctx.arg(1).value().as_int() +
+            ctx.arg(2).value().as_int() +
+            ctx.arg(3).value().as_int();
+        if (ctx.push_int(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
         yama::const_table_info()
@@ -591,8 +593,8 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
         .add_put_const(yama::newtop, 4)
         .add_put_const(yama::newtop, 3)
         .add_put_const(yama::newtop, 2)
-        .add_call(0, 4, yama::newtop)
-        .add_ret(4);
+        .add_call(4, yama::newtop)
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -619,19 +621,19 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
 
     was_called_0 = false;
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     EXPECT_TRUE(was_called_0);
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(149));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(149));
 }
 
 TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
     auto panic_fn = 
         [](yama::context& ctx) {
         was_called_0 = true;
-        ctx.ll_panic();
+        ctx.panic();
         };
     const auto panic_consts =
         yama::const_table_info()
@@ -649,8 +651,8 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
     auto never_reached_fn = 
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -669,9 +671,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 1) // panic
-        .add_call(0, 1, yama::newtop)
-        .add_put_const(0, 2, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_call(1, yama::newtop)
+        .add_put_const(yama::newtop, 2, true) // never_reached
+        .add_call(1, 0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -699,12 +701,12 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0);
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -725,15 +727,15 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = panic_fn,
-            .max_locals = 1,
+            .max_locals = 2,
         },
     };
 
     auto never_reached_fn = 
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -752,9 +754,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 1) // panic
-        .add_call(0, 1, 0, true) // just dump result into R(0)
-        .add_put_const(0, 2, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_call(1, yama::newtop, true) // just dump result into R(0)
+        .add_put_const(yama::newtop, 2, true) // never_reached
+        .add_call(1, 0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -768,7 +770,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .max_locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -782,12 +784,12 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0);
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -804,8 +806,8 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
     auto dummy_fn =
         [](yama::context& ctx) {
         was_called_0 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto dummy_consts =
         yama::const_table_info()
@@ -825,12 +827,12 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         // in the event of the impl actually allowing for infinite (or at least until
         // the VM breaks) number of calls, this *fail safe* function will cause it to 
         // stop after proving its point, so we can get useful testing data
-        const bool triggered = ctx.ll_call_frames() > ctx.ll_max_call_frames();
+        const bool triggered = ctx.call_frames() > ctx.max_call_frames();
         if (triggered) {
             YAMA_LOG(ctx.dbg(), yama::general_c, "** fail safe triggered! **");
         }
-        if (ctx.ll_push_bool(triggered).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_bool(triggered).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto fail_safe_consts =
         yama::const_table_info()
@@ -848,8 +850,8 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
     auto never_reached_fn = 
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -868,19 +870,19 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 5) // dummy
-        .add_call(0, 1, 0, true) // <- the call instr under test
-        .add_put_const(0, 2, true) // fail_safe
-        .add_call(0, 1, 0, true)
+        .add_call(1, yama::newtop, true) // <- the call instr under test
+        .add_put_const(yama::newtop, 2, true) // fail_safe
+        .add_call(1, 0, true)
         .add_jump_false(0, 2)
         // block #2
         .add_put_none(0, true)
         .add_ret(0)
         // block #3
-        .add_put_const(0, 4, true) // f (recurse)
-        .add_call(0, 1, 0, true)
+        .add_put_const(yama::newtop, 4, true) // f (recurse)
+        .add_call(1, 0, true)
         // infinite recursion should induce panic by this point
-        .add_put_const(0, 3, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_put_const(yama::newtop, 3, true) // never_reached
+        .add_call(1, 0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -897,7 +899,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .max_locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -912,12 +914,12 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0); // fail-safe to ensure that test didn't pass due to f failing to fire
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -928,11 +930,11 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         [](yama::context& ctx) {
         was_called_0 = true;
         yama::int_t result =
-            ctx.ll_arg(1).value().as_int() +
-            ctx.ll_arg(2).value().as_int() +
-            ctx.ll_arg(3).value().as_int();
-        if (ctx.ll_push_int(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+            ctx.arg(1).value().as_int() +
+            ctx.arg(2).value().as_int() +
+            ctx.arg(3).value().as_int();
+        if (ctx.push_int(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
         yama::const_table_info()
@@ -954,8 +956,7 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         .add_put_const(yama::newtop, 3)
         .add_put_const(yama::newtop, 4)
         .add_put_const(yama::newtop, 5)
-        .add_call_nr(0, 4)
-        .add_pop(4)
+        .add_call_nr(4)
         .add_put_none(yama::newtop)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -985,19 +986,19 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
 
     was_called_0 = false;
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     EXPECT_TRUE(was_called_0);
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
 TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
     auto panic_fn =
         [](yama::context& ctx) {
         was_called_0 = true;
-        ctx.ll_panic();
+        ctx.panic();
         };
     const auto panic_consts =
         yama::const_table_info()
@@ -1015,8 +1016,8 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
     auto never_reached_fn =
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -1035,9 +1036,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 1) // panic
-        .add_call_nr(0, 1)
-        .add_put_const(0, 2, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_call_nr(1)
+        .add_put_const(yama::newtop, 2) // never_reached
+        .add_call(1, yama::newtop)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1065,12 +1066,12 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0);
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -1098,8 +1099,8 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
     auto never_reached_fn =
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -1118,9 +1119,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 1) // panic
-        .add_call_nr(0, 1)
-        .add_put_const(0, 2, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_call_nr(1)
+        .add_put_const(yama::newtop, 2, true) // never_reached
+        .add_call(1, yama::newtop, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1148,12 +1149,12 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0);
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -1170,8 +1171,8 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
     auto dummy_fn =
         [](yama::context& ctx) {
         was_called_0 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto dummy_consts =
         yama::const_table_info()
@@ -1191,12 +1192,12 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         // in the event of the impl actually allowing for infinite (or at least until
         // the VM breaks) number of calls, this *fail safe* function will cause it to 
         // stop after proving its point, so we can get useful testing data
-        const bool triggered = ctx.ll_call_frames() > ctx.ll_max_call_frames();
+        const bool triggered = ctx.call_frames() > ctx.max_call_frames();
         if (triggered) {
             YAMA_LOG(ctx.dbg(), yama::general_c, "** fail safe triggered! **");
         }
-        if (ctx.ll_push_bool(triggered).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_bool(triggered).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto fail_safe_consts =
         yama::const_table_info()
@@ -1214,8 +1215,8 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
     auto never_reached_fn =
         [](yama::context& ctx) {
         was_called_1 = true;
-        if (ctx.ll_push_none().bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
         yama::const_table_info()
@@ -1234,19 +1235,19 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 5) // dummy
-        .add_call_nr(0, 1) // <- the call_nr instr under test
-        .add_put_const(0, 2, true) // fail_safe
-        .add_call(0, 1, 0, true)
+        .add_call_nr(1) // <- the call_nr instr under test
+        .add_put_const(yama::newtop, 2, true) // fail_safe
+        .add_call(1, yama::newtop, true)
         .add_jump_false(0, 2)
         // block #2
         .add_put_none(0, true)
         .add_ret(0)
         // block #3
-        .add_put_const(0, 4, true) // f (recurse)
-        .add_call(0, 1, 0, true)
+        .add_put_const(yama::newtop, 4, true) // f (recurse)
+        .add_call(1, 0, true)
         // infinite recursion should induce panic by this point
-        .add_put_const(0, 3, true) // never_reached
-        .add_call(0, 1, 0, true)
+        .add_put_const(yama::newtop, 3, true) // never_reached
+        .add_call(1, 0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -1263,7 +1264,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .max_locals = 1,
+            .max_locals = 2,
             .bcode = f_bcode,
         },
     };
@@ -1278,12 +1279,12 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
     was_called_0 = false;
     was_called_1 = false;
 
-    ASSERT_EQ(ctx->ll_panics(), 0);
+    ASSERT_EQ(ctx->panics(), 0);
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).bad()); // expect panic
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).bad()); // expect panic
 
-    EXPECT_EQ(ctx->ll_panics(), 1);
+    EXPECT_EQ(ctx->panics(), 1);
 
     EXPECT_TRUE(was_called_0); // fail-safe to ensure that test didn't pass due to f failing to fire
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
@@ -1319,10 +1320,10 @@ TEST_F(BCodeExecTests, Instr_Ret) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_uint(4));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_uint(4));
 }
 
 TEST_F(BCodeExecTests, Instr_Jump) {
@@ -1357,10 +1358,10 @@ TEST_F(BCodeExecTests, Instr_Jump) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_call(0, 1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(1).value(), ctx->ll_new_int(-7));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-7));
 }
 
 TEST_F(BCodeExecTests, Instr_JumpTrue) {
@@ -1397,14 +1398,16 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_bool(true).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, yama::newtop).good());
-    ASSERT_TRUE(ctx->ll_put_bool(1, false).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_bool(true).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(2).value(), ctx->ll_new_int(4));
-    EXPECT_EQ(ctx->ll_local(3).value(), ctx->ll_new_int(-10));
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_bool(false).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(4));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_int(-10));
 }
 
 TEST_F(BCodeExecTests, Instr_JumpFalse) {
@@ -1441,14 +1444,16 @@ TEST_F(BCodeExecTests, Instr_JumpFalse) {
 
     const auto f = ctx->load("f"_str).value();
 
-    ASSERT_TRUE(ctx->ll_push_fn(f).good());
-    ASSERT_TRUE(ctx->ll_push_bool(true).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, yama::newtop).good());
-    ASSERT_TRUE(ctx->ll_put_bool(1, false).good());
-    ASSERT_TRUE(ctx->ll_call(0, 2, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_bool(true).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-    EXPECT_EQ(ctx->ll_local(2).value(), ctx->ll_new_int(-10));
-    EXPECT_EQ(ctx->ll_local(3).value(), ctx->ll_new_int(4));
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->push_bool(false).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-10));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_int(4));
 }
 
 // EXAMPLE TESTS
@@ -1462,11 +1467,11 @@ TEST_F(BCodeExecTests, Example_Factorial) {
 
     const auto subtract_fn =
         [](yama::context& ctx) {
-        const auto a = ctx.ll_arg(1).value().as_uint();
-        const auto b = ctx.ll_arg(2).value().as_uint();
+        const auto a = ctx.arg(1).value().as_uint();
+        const auto b = ctx.arg(2).value().as_uint();
         const auto result = a - b;
-        if (ctx.ll_push_uint(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_uint(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto subtract_consts =
         yama::const_table_info()
@@ -1483,11 +1488,11 @@ TEST_F(BCodeExecTests, Example_Factorial) {
 
     const auto multiply_fn =
         [](yama::context& ctx) {
-        const auto a = ctx.ll_arg(1).value().as_uint();
-        const auto b = ctx.ll_arg(2).value().as_uint();
+        const auto a = ctx.arg(1).value().as_uint();
+        const auto b = ctx.arg(2).value().as_uint();
         const auto result = a * b;
-        if (ctx.ll_push_uint(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_uint(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto multiply_consts =
         yama::const_table_info()
@@ -1504,9 +1509,9 @@ TEST_F(BCodeExecTests, Example_Factorial) {
     
     const auto greaterThanZero_fn =
         [](yama::context& ctx) {
-        const auto success = ctx.ll_arg(1).value().as_uint() > 0;
-        if (ctx.ll_push_bool(success).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        const auto success = ctx.arg(1).value().as_uint() > 0;
+        if (ctx.push_bool(success).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto greaterThanZero_consts =
         yama::const_table_info()
@@ -1528,8 +1533,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         // block #1
         .add_put_const(yama::newtop, 4) // greaterThanZero
         .add_put_arg(yama::newtop, 1) // n
-        .add_call(0, 2, 0, true) // check if n > 0
-        .add_pop(1) // pop excess objs
+        .add_call(2, yama::newtop, true) // check if n > 0
         .add_jump_true(1, 2) // jump to block #3 if true, fallthrough to block #2 otherwise
         // block #2
         .add_put_const(yama::newtop, 6) // 1
@@ -1544,14 +1548,11 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .add_put_const(yama::newtop, 2) // subtract (index 3)
         .add_put_arg(yama::newtop, 1) // n (index 4)
         .add_put_const(yama::newtop, 6) // 1 (index 5)
-        .add_call(3, 3, 3, true) // n - 1 (index 3)
-        .add_pop(2) // pop excess objs
+        .add_call(3, yama::newtop, true) // n - 1 (index 3)
         // (end) eval n - 1
-        .add_call(2, 2, 2, true) // (n - 1)! (index 2)
-        .add_pop(1) // pop excess objs
+        .add_call(2, yama::newtop, true) // (n - 1)! (index 2)
         // (end) eval (n - 1)!
-        .add_call(0, 3, 0, true) // n * (n - 1)! (index 0)
-        .add_pop(2) // pop excess objs
+        .add_call(3, yama::newtop, true) // n * (n - 1)! (index 0)
         // (end) eval n * (n - 1)!
         .add_ret(0); // return n * (n - 1)! if n > 0
     std::cerr << factorial_bcode.fmt_disassembly() << "\n";
@@ -1587,17 +1588,17 @@ TEST_F(BCodeExecTests, Example_Factorial) {
 
         YAMA_LOG(dbg, yama::general_c, "{}! == {}", size_t(i), size_t(expected));
 
-        ASSERT_TRUE(ctx->ll_push_fn(factorial).good());
-        ASSERT_TRUE(ctx->ll_push_uint(i).good());
-        ASSERT_TRUE(ctx->ll_call(0, 2, 0).good());
+        ASSERT_TRUE(ctx->push_fn(factorial).good());
+        ASSERT_TRUE(ctx->push_uint(i).good());
+        ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-        const auto result = ctx->ll_local(0).value();
+        const auto result = ctx->local(0).value();
 
-        ASSERT_TRUE(ctx->ll_pop(2).good());
+        ASSERT_TRUE(ctx->pop(1).good());
 
         YAMA_LOG(dbg, yama::general_c, "bcode result: {}", result.fmt());
 
-        EXPECT_EQ(result, ctx->ll_new_uint(expected));
+        EXPECT_EQ(result, ctx->new_uint(expected));
     }
 }
 
@@ -1608,10 +1609,10 @@ TEST_F(BCodeExecTests, Example_Counter) {
 
     const auto addOne_fn =
         [](yama::context& ctx) {
-        const auto a = ctx.ll_arg(1).value().as_uint();
+        const auto a = ctx.arg(1).value().as_uint();
         const auto result = a + 1;
-        if (ctx.ll_push_uint(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_uint(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto addOne_consts =
         yama::const_table_info()
@@ -1628,11 +1629,11 @@ TEST_F(BCodeExecTests, Example_Counter) {
 
     const auto lessThan_fn =
         [](yama::context& ctx) {
-        const auto a = ctx.ll_arg(1).value().as_uint();
-        const auto b = ctx.ll_arg(2).value().as_uint();
+        const auto a = ctx.arg(1).value().as_uint();
+        const auto b = ctx.arg(2).value().as_uint();
         const auto result = a < b;
-        if (ctx.ll_push_bool(result).bad()) return;
-        if (ctx.ll_ret(0).bad()) return;
+        if (ctx.push_bool(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
     const auto lessThan_consts =
         yama::const_table_info()
@@ -1658,16 +1659,14 @@ TEST_F(BCodeExecTests, Example_Counter) {
         .add_put_const(yama::newtop, 3) // lessThan (index 1)
         .add_copy(0, yama::newtop) // counter (index 2)
         .add_put_arg(yama::newtop, 1) // n (index 3)
-        .add_call(1, 3, 1, true) // counter < n (index 1)
-        .add_pop(2) // pop excess objs
-        .add_jump_false(1, 5) // jump to return instr if counter >= n
+        .add_call(3, yama::newtop, true) // counter < n (index 1)
+        .add_jump_false(1, 4) // jump to return instr if counter >= n
         // block #3
         // eval counter = addOne(counter)
         .add_put_const(yama::newtop, 2) // addOne (index 1)
         .add_copy(0, yama::newtop) // counter (index 2)
-        .add_call(1, 2, 0) // counter = addOne(counter)
-        .add_pop(2) // ensure register coherence
-        .add_jump(-11) // jump back to block #2 to begin next iter of loop
+        .add_call(2, 0) // counter = addOne(counter)
+        .add_jump(-9) // jump back to block #2 to begin next iter of loop
         // block #4
         .add_ret(0); // return final value of counter
     std::cerr << counter_bcode.fmt_disassembly() << "\n";
@@ -1699,17 +1698,17 @@ TEST_F(BCodeExecTests, Example_Counter) {
 { \
     YAMA_LOG(dbg, yama::general_c, "counter({0}) == {0}", n); \
     \
-    ASSERT_TRUE(ctx->ll_push_fn(counter).good()); \
-    ASSERT_TRUE(ctx->ll_push_uint(n).good()); \
-    ASSERT_TRUE(ctx->ll_call(0, 2, 0).good()); \
+    ASSERT_TRUE(ctx->push_fn(counter).good()); \
+    ASSERT_TRUE(ctx->push_uint(n).good()); \
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good()); \
     \
-    const auto result = ctx->ll_local(0).value(); \
+    const auto result = ctx->local(0).value(); \
     \
-    ASSERT_TRUE(ctx->ll_pop(2).good()); \
+    ASSERT_TRUE(ctx->pop(1).good()); \
     \
     YAMA_LOG(dbg, yama::general_c, "bcode result: {}", result.fmt()); \
     \
-    EXPECT_EQ(result, ctx->ll_new_uint(n)); \
+    EXPECT_EQ(result, ctx->new_uint(n)); \
 } (void)0
 
     _EXAMPLE_TEST(0);

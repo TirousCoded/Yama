@@ -692,7 +692,7 @@ TEST_P(VerifierImplTests, Verify_BCode_PutNone) {
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 1) // helper
-        .add_call(0, 1, 0, true) // call helper, putting None into R(0)
+        .add_call(1, yama::newtop) // call helper, putting None into R(0)
         .add_put_none(0) // no reinit, so R(0) MUST be None already
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -1731,13 +1731,13 @@ TEST_P(VerifierImplTests, Verify_BCode_Call) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
-        .add_call(0, 4, 4) // no reinit, so R(4) MUST be Char already
-        .add_ret(4);
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0) // no reinit, so R(0) MUST be Char already
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1767,13 +1767,13 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Reinit) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_none(yama::newtop) // inits R(4) (to None)
-        .add_call(0, 4, 4, true) // reinits R(4) to return type Char
-        .add_ret(4);
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0, true) // reinits R(0) to return type Char
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1807,8 +1807,8 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Newtop) {
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_call(0, 4, yama::newtop) // inits R(4) to return type Char
-        .add_ret(4);
+        .add_call(4, yama::newtop) // inits R(0) to return type Char
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1842,8 +1842,8 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Newtop_MayBeMarkedReinit) {
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_call(0, 4, yama::newtop, true) // inits R(4) to return type Char
-        .add_ret(4);
+        .add_call(4, yama::newtop, true) // inits R(0) to return type Char
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1869,7 +1869,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Newtop_MayBeMarkedReinit) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRs_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -1879,8 +1879,8 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_pop(2) // pops R(2) and R(3)
-        .add_call(0, 4, yama::newtop) // [R(0), R(3)] out-of-bounds
-        .add_ret(1);
+        .add_call(4, yama::newtop) // [R(0), R(3)] out-of-bounds
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1908,15 +1908,15 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRs_ZeroObjects) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        // NOTE: R(A) being an otherwise valid call object ensures error couldn't be about R(A) not being one
-        .add_put_const(yama::newtop, 1) // inits R(0) to type of call object (though this will go unused)
-        .add_put_none(yama::newtop) // inits R(1) to type of return value
-        .add_call(0, 0, 1) // B == 0 means no call object specified
-        .add_ret(1);
+        .add_put_none(yama::newtop) // inits R(0) to type of return value
+        // NOTE: R(top-A) being an otherwise valid call object ensures error couldn't be about R(top-A) not being one
+        .add_put_const(yama::newtop, 1) // inits R(1) to type of call object (though this will go unused)
+        .add_call(0, 0) // A == 0 means no call object specified
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1938,17 +1938,17 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRegisters_ZeroObjects) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ArgRs_IllegalCallObject) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
-        .add_call(0, 4, 4) // R(0) cannot be used as call object
-        .add_ret(4);
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0) // R(1) cannot be used as call object
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -1973,21 +1973,21 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RA_IllegalToUseAsCallObject) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_illegal_callobj), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRs_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #4
-        .add_put_const(yama::newtop, 7) // inits R(5) to type of return value
-        .add_call(0, 5, 5) // 5 is too many args for call to g
-        .add_ret(5);
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_put_const(yama::newtop, 6) // inits R(5) to type of arg #4
+        .add_call(5, 0) // 5 is too many args for call to g
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -2015,16 +2015,16 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooMany) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRs_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 7) // inits R(3) to type of return value
-        .add_call(0, 3, 3) // 3 is too few args for call to g
-        .add_ret(3);
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_call(3, 0) // 3 is too few args for call to g
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -2052,17 +2052,17 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_TooFew) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRs_WrongTypes) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
-        .add_call(0, 4, 4) // arg #2 is UInt, but a Float was expected
-        .add_ret(4);
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0) // arg #2 is UInt, but a Float was expected
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -2090,7 +2090,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_ParamArgRegisters_WrongTypes) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_types), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RB_OutOfBounds_AfterTheCall) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2098,12 +2098,8 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 7) // inits R(4) to type of return value
-        // push then pop R(5) to better test impl robustness
-        .add_put_none(yama::newtop) // inits R(5) (to None)
-        .add_pop(1) // pops R(5)
-        .add_call(0, 4, 5, true) // R(5) out-of-bounds
-        .add_ret(4);
+        .add_call(4, 0, true) // R(0) out-of-bounds after the call
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -2128,54 +2124,20 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_OutOfBounds) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_out_of_bounds), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_IsNewtopButPushingOverflows) {
+TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RB_WrongType) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_call(0, 1, yama::newtop) // overflow!
-        .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
-    const auto f_consts =
-        yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({}, 2)) // fn() -> Char
-        .add_int(10)
-        .add_float(0.05)
-        .add_int(-4)
-        .add_char(U'y');
-    yama::type_info f{
-        .fullname = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 2),
-            .call_fn = yama::bcode_call_fn,
-            .max_locals = 1,
-            .bcode = f_bcode,
-        },
-    };
-
-    EXPECT_FALSE(verif->verify(f));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
-}
-
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
-    const auto f_bcode =
-        yama::bc::code()
-        // block #1
-        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
-        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
-        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_put_const(yama::newtop, 7) // inits R(4) to NOT type of return value
-        .add_call(0, 4, 4) // R(4) not type Char
-        .add_ret(4);
+        .add_put_const(yama::newtop, 7) // inits R(0) to NOT type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0) // R(0) not type Char
+        .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
@@ -2200,36 +2162,7 @@ TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_RC_WrongType) {
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RC_wrong_type), 1);
-}
-
-TEST_P(VerifierImplTests, Verify_BCode_Call_Fail_PushingMustNotOverflow) {
-    const auto f_bcode =
-        yama::bc::code()
-        // block #1
-        .add_put_const(yama::newtop, 1) // inits R(0) to type of call object
-        .add_call(0, 1, yama::newtop) // overflow!
-        .add_ret(2);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
-    const auto f_consts =
-        yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({}, 0)) // fn() -> Int
-        .add_int(10);
-    yama::type_info f{
-        .fullname = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
-            .call_fn = yama::bcode_call_fn,
-            .max_locals = 1,
-            .bcode = f_bcode,
-        },
-    };
-
-    EXPECT_FALSE(verif->verify(f));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_wrong_type), 1);
 }
 
 TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
@@ -2240,8 +2173,8 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_call_nr(0, 4)
-        .add_put_none(0, true)
+        .add_call_nr(4)
+        .add_put_none(yama::newtop)
         .add_ret(0); // return the None object from R(0)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
@@ -2268,7 +2201,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR) {
     EXPECT_TRUE(verif->verify(f));
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2278,7 +2211,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_pop(2) // pops R(2) and R(3)
-        .add_call_nr(0, 4) // [R(0), R(3)] out-of-bounds
+        .add_call_nr(4) // [R(0), R(3)] out-of-bounds
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -2308,13 +2241,13 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_OutOfBounds) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRs_ZeroObjects) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        // NOTE: R(A) being a valid call object ensures error couldn't be about R(A) not being one
+        // NOTE: R(top-A) being a valid call object ensures error couldn't be about R(top-A) not being one
         .add_put_const(yama::newtop, 1) // inits R(0) to type of call object (though this will go unused)
-        .add_call_nr(0, 0) // B == 0 means no call object specified
+        .add_call_nr(0) // A == 0 means no call object specified
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -2338,7 +2271,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRegisters_ZeroObjects) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ArgRs_IllegalCallObject) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2346,7 +2279,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) 
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_call_nr(0, 4) // R(0) cannot be used as call object
+        .add_call_nr(4) // R(0) cannot be used as call object
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -2373,10 +2306,10 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_RA_IllegalToUseAsCallObject) 
 
     EXPECT_FALSE(verif->verify(f));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_illegal_callobj), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRs_TooMany) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2385,7 +2318,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #4
-        .add_call_nr(0, 5) // 5 is too many args for call to g
+        .add_call_nr(5) // 5 is too many args for call to g
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -2415,14 +2348,14 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooMany) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRs_TooFew) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
         .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
-        .add_call_nr(0, 3) // 3 is too few args for call to g
+        .add_call_nr(3) // 3 is too few args for call to g
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
@@ -2452,7 +2385,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_TooFew) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
 
-TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes) {
+TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRs_WrongTypes) {
     const auto f_bcode =
         yama::bc::code()
         // block #1
@@ -2460,7 +2393,7 @@ TEST_P(VerifierImplTests, Verify_BCode_CallNR_Fail_ParamArgRegisters_WrongTypes)
         .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
         .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
-        .add_call_nr(0, 4) // arg #2 is UInt, but a Float was expected
+        .add_call_nr(4) // arg #2 is UInt, but a Float was expected
         .add_put_none(0, true)
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";

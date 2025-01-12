@@ -92,7 +92,7 @@ namespace yama::bc {
 
         // pop A
 
-        // pop performs ll_pop(A)
+        // pop performs pop(A)
 
         // panic conditions:
         //      n/a
@@ -104,7 +104,7 @@ namespace yama::bc {
 
         // put_none R(A)
 
-        // put_none performs ll_put_none(R(A))
+        // put_none performs put_none(R(A))
 
         // panic conditions:
         //      n/a
@@ -118,7 +118,7 @@ namespace yama::bc {
 
         // put_const R(A) Ko(B)
 
-        // put_const performs ll_put_const(R(A), Ko(B))
+        // put_const performs put_const(R(A), Ko(B))
 
         // panic conditions:
         //      n/a
@@ -134,7 +134,7 @@ namespace yama::bc {
 
         // put_arg R(A) Arg(B)
 
-        // put_arg performs ll_put_arg(R(A), Arg(B))
+        // put_arg performs put_arg(R(A), Arg(B))
 
         // panic conditions:
         //      n/a
@@ -149,7 +149,7 @@ namespace yama::bc {
 
         // copy R(A) R(B)
 
-        // copy performs ll_copy(R(A), R(B))
+        // copy performs copy(R(A), R(B))
 
         // panic conditions:
         //      n/a
@@ -162,13 +162,13 @@ namespace yama::bc {
 
         copy,
 
-        // call R(A) B R(C)
+        // call A R(B)
 
-        // call performs ll_call(R(A), B, R(C))
+        // call performs call(A, R(B))
 
-        // R(A) defines the 'call object'
-        // [R(A), R(A+B-1)] defines the 'arg registers' of the call
-        // [R(A+1), R(A+B-1)] defines the 'param arg registers' of the call
+        // R(top-A) defines the 'call object'
+        // [R(top-A), R(top)] defines the 'args' of the call
+        // [R(top-A+1), R(top)] defines the 'param args' of the call
 
         // panic conditions:
         //      - if call behaviour panics
@@ -177,22 +177,22 @@ namespace yama::bc {
 
         // static verif requires:
         //      - arg registers must be in-bounds
-        //      - arg registers must include at least one object (ie. B must be >=1)
-        //      - R(A) must be legal to use as call object
+        //      - arg registers must include at least one object (ie. A must be >=1)
+        //      - R(top-A) must be legal to use as call object
         //      - param arg registers, if any, must be of number and param types expected by call object
-        //      - R(C) must be in-bounds (unless newtop)
-        //      - R(C) must be of return type expected by call object (unless reinit) (unless newtop)
+        //      - R(B) must be in-bounds (after args are popped) (unless newtop)
+        //      - R(B) must be of return type expected by call object (unless reinit) (unless newtop)
         //      - pushing must not overflow (unless not newtop)
 
         call,
 
-        // call_nr R(A) B
+        // call_nr A
 
-        // call_nr performs ll_call_nr(R(A), B)
+        // call_nr performs call_nr(A)
 
-        // R(A) defines the 'call object'
-        // [R(A), R(A+B-1)] defines the 'args' of the call
-        // [R(A+1), R(A+B-1)] defines the 'param args' of the call
+        // R(top-A) defines the 'call object'
+        // [R(top-A), R(top)] defines the 'args' of the call
+        // [R(top-A+1), R(top)] defines the 'param args' of the call
 
         // panic conditions:
         //      - if call behaviour panics
@@ -201,15 +201,15 @@ namespace yama::bc {
 
         // static verif requires:
         //      - arg registers must be in-bounds
-        //      - arg registers must include at least one object (ie. B must be >=1)
-        //      - R(A) must be legal to use as call object
+        //      - arg registers must include at least one object (ie. A must be >=1)
+        //      - R(top-A) must be legal to use as call object
         //      - param arg registers, if any, must be of number and param types expected by call object
 
         call_nr,
 
         // ret R(A)
 
-        // ret performs ll_ret(R(A)), then instructs the interpreter to halt
+        // ret performs ret(R(A)), then instructs the interpreter to halt
 
         // panic conditions:
         //      n/a
@@ -376,8 +376,8 @@ namespace yama::bc {
         code& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
         code& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code& add_copy(uint8_t A, uint8_t B, bool reinit = false);
-        code& add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit = false);
-        code& add_call_nr(uint8_t A, uint8_t B);
+        code& add_call(uint8_t A, uint8_t B, bool reinit = false);
+        code& add_call_nr(uint8_t A);
         code& add_ret(uint8_t A);
         code& add_jump(int16_t sBx);
         code& add_jump_true(uint8_t A, int16_t sBx);
@@ -441,8 +441,8 @@ namespace yama::bc {
         code_writer& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_copy(uint8_t A, uint8_t B, bool reinit = false);
-        code_writer& add_call(uint8_t A, uint8_t B, uint8_t C, bool reinit = false);
-        code_writer& add_call_nr(uint8_t A, uint8_t B);
+        code_writer& add_call(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_call_nr(uint8_t A);
         code_writer& add_ret(uint8_t A);
         code_writer& add_jump(label_id_t label_id); // label_id may specify labels added later
         code_writer& add_jump_true(uint8_t A, label_id_t label_id); // label_id may specify labels added later

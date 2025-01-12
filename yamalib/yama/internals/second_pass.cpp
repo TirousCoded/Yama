@@ -590,13 +590,13 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         // return value should overwrite callobj
         const size_t return_value_reg_index = callobj_reg_index;
         // write the call instr
-        cw.add_call(uint8_t(callobj_reg_index), uint8_t(arg_count + 1), uint8_t(return_value_reg_index), true);
+        cw.add_call(uint8_t(arg_count + 1), yama::newtop);
         _add_sym(expr_pos);
         // reinit our return value (formerly callobj) register to the correct type
         const auto return_type = info.return_type.value_or("None"_str);
         _reinit_temp(return_value_reg_index, return_type);
         // pop args, but NOT callobj, as that register is reused for our return value
-        _pop_temp(arg_count, true, expr_pos);
+        _pop_temp(arg_count, false);
     }
     else YAMA_DEADEND;
 }

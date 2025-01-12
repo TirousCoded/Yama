@@ -763,11 +763,11 @@ fn pi() -> Float {
 
     yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
-    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx.push_fn(dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.call(1, yama::newtop).good());
 
-    EXPECT_TRUE(ctx.ll_local(0));
-    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+    EXPECT_TRUE(ctx.local(0));
+    if (const auto x = ctx.local(0); x->t == dm->load_float()) {
         EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
     }
 }
@@ -794,11 +794,11 @@ fn pi() -> Float {
 
     yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
-    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx.push_fn(dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.call(1, yama::newtop).good());
 
-    EXPECT_TRUE(ctx.ll_local(0));
-    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+    EXPECT_TRUE(ctx.local(0));
+    if (const auto x = ctx.local(0); x->t == dm->load_float()) {
         EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
     }
 }
@@ -814,11 +814,11 @@ TEST_P(DomainImplTests, Upload_FilePath) {
 
     yama::context ctx(dm, dbg);
 
-    ASSERT_TRUE(ctx.ll_push_fn(dm->load("pi"_str).value()).good());
-    ASSERT_TRUE(ctx.ll_call(0, 1, 0).good());
+    ASSERT_TRUE(ctx.push_fn(dm->load("pi"_str).value()).good());
+    ASSERT_TRUE(ctx.call(1, yama::newtop).good());
 
-    EXPECT_TRUE(ctx.ll_local(0));
-    if (const auto x = ctx.ll_local(0); x->t == dm->load_float()) {
+    EXPECT_TRUE(ctx.local(0));
+    if (const auto x = ctx.local(0); x->t == dm->load_float()) {
         EXPECT_DOUBLE_EQ(x->as_float(), 3.14159);
     }
 }
