@@ -16,7 +16,7 @@ yama::default_compiler::default_compiler(std::shared_ptr<debug> dbg)
     : compiler(dbg),
     _dm_ptr(nullptr) {}
 
-std::optional<std::vector<yama::type_info>> yama::default_compiler::compile(
+std::optional<yama::module_info> yama::default_compiler::compile(
     res<domain> dm,
     const taul::source_code& src) {
     _dm_ptr = dm.get();
@@ -41,7 +41,7 @@ std::optional<std::vector<yama::type_info>> yama::default_compiler::compile(
     if (!sp.good()) {
         return std::nullopt;
     }
-    return sp.results;
+    return sp.results.done();
 }
 
 yama::domain& yama::default_compiler::_dm() const noexcept {

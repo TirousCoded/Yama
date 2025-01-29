@@ -27,6 +27,8 @@ namespace yama {
         ptype                           ptype;          // the type of primitive this is
 
 
+        bool operator==(const primitive_info&) const noexcept = default;
+
         std::string fmt(const char* tab = "    ") const;
     };
 
@@ -37,6 +39,8 @@ namespace yama {
         bc::code                        bcode;          // the bytecode (no static verif check if call_fn != bcode_call_fn)
         bc::syms                        bcodesyms;      // the bytecode symbol info
 
+
+        bool operator==(const function_info&) const noexcept = default;
 
         std::string fmt(const const_table_info& consts, const char* tab = "    ") const;
     };
@@ -62,6 +66,8 @@ namespace yama {
         size_t max_locals() const noexcept; // returns 0 if the type is not callable
         const bc::code* bcode() const noexcept;
         const bc::syms* bcodesyms() const noexcept;
+
+        bool operator==(const type_info&) const noexcept = default;
 
         std::string fmt(const char* tab = "    ") const;
     };

@@ -139,10 +139,10 @@ TEST_P(DomainImplTests, Builtins) {
 TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
 
-    ASSERT_TRUE(dm->upload(f_info));
-    ASSERT_TRUE(dm->upload(a_info));
-    ASSERT_TRUE(dm->upload(b_info));
-    ASSERT_TRUE(dm->upload(c_info));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(a_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(b_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(c_info)));
 
 
     const auto result_f = dm->load("f"_str);
@@ -201,10 +201,10 @@ TEST_P(DomainImplTests, Load_FailDueToInstantiationError) {
 
     // f will fail instantiation due to type b not being available
 
-    ASSERT_TRUE(dm->upload(f_info));
-    ASSERT_TRUE(dm->upload(a_info));
-    //ASSERT_TRUE(dm->upload(b_info));
-    ASSERT_TRUE(dm->upload(c_info));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(a_info)));
+    //ASSERT_TRUE(dm->upload(yama::type_info(b_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(c_info)));
 
 
     const auto result_f = dm->load("f"_str);
@@ -272,10 +272,10 @@ TEST_P(DomainImplTests, Upload_One) {
 
     // upload types f, a, b, and c, to test that upload works broadly
 
-    ASSERT_TRUE(dm->upload(f_info));
-    ASSERT_TRUE(dm->upload(a_info));
-    ASSERT_TRUE(dm->upload(b_info));
-    ASSERT_TRUE(dm->upload(c_info));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(a_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(b_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(c_info)));
 
     // test that uploaded types are acknowledged by the domain impl correctly
 
@@ -324,7 +324,7 @@ TEST_P(DomainImplTests, Upload_One) {
 TEST_P(DomainImplTests, Upload_One_FailDueToStaticVerificationError) {
     const auto dm = GetParam().factory(dbg);
 
-    EXPECT_FALSE(dm->upload(bad_info));
+    EXPECT_FALSE(dm->upload(yama::type_info(bad_info)));
 
     // test that no new type was made available
 
@@ -556,6 +556,86 @@ TEST_P(DomainImplTests, Upload_MultiViaInitList_FailDueToStaticVerificationError
     };
 
     EXPECT_FALSE(dm->upload(group));
+
+    // test that no new types were made available
+
+    EXPECT_FALSE(dm->load("f"_str));
+    EXPECT_FALSE(dm->load("a"_str));
+    EXPECT_FALSE(dm->load("bad"_str));
+    EXPECT_FALSE(dm->load("c"_str));
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaModule) {
+    const auto dm = GetParam().factory(dbg);
+
+    // upload types f, a, b, and c, to test that upload works broadly
+
+    yama::module_info m =
+        yama::module_factory()
+        .add_type(yama::type_info(f_info))
+        .add_type(yama::type_info(a_info))
+        .add_type(yama::type_info(b_info))
+        .add_type(yama::type_info(c_info))
+        .done();
+
+    ASSERT_TRUE(dm->upload(yama::module_info(m)));
+
+    // test that uploaded types are acknowledged by the domain impl correctly
+
+    const auto ff = dm->load("f"_str);
+    const auto aa = dm->load("a"_str);
+    const auto bb = dm->load("b"_str);
+    const auto cc = dm->load("c"_str);
+    ASSERT_TRUE(ff);
+    ASSERT_TRUE(aa);
+    ASSERT_TRUE(bb);
+    ASSERT_TRUE(cc);
+
+    // quickly sample state of types f, a, b, and c, to see that they uploaded correctly
+
+    EXPECT_TRUE(ff->complete());
+    EXPECT_EQ(ff->fullname(), "f"_str);
+    EXPECT_EQ(ff->kind(), yama::kind::function);
+
+    ASSERT_TRUE(ff->callsig());
+    EXPECT_EQ(ff->callsig().value(), yama::callsig(f_callsig, ff->consts()));
+    
+    ASSERT_EQ(ff->consts().size(), 3);
+    EXPECT_EQ(ff->consts().type(0), aa);
+    EXPECT_EQ(ff->consts().type(1), bb);
+    EXPECT_EQ(ff->consts().type(2), cc);
+
+    EXPECT_TRUE(aa->complete());
+    EXPECT_EQ(aa->fullname(), "a"_str);
+    EXPECT_EQ(aa->kind(), yama::kind::primitive);
+    EXPECT_FALSE(aa->callsig());
+    EXPECT_EQ(aa->consts().size(), 0);
+
+    EXPECT_TRUE(bb->complete());
+    EXPECT_EQ(bb->fullname(), "b"_str);
+    EXPECT_EQ(bb->kind(), yama::kind::primitive);
+    EXPECT_FALSE(bb->callsig());
+    EXPECT_EQ(bb->consts().size(), 0);
+
+    EXPECT_TRUE(cc->complete());
+    EXPECT_EQ(cc->fullname(), "c"_str);
+    EXPECT_EQ(cc->kind(), yama::kind::primitive);
+    EXPECT_FALSE(cc->callsig());
+    EXPECT_EQ(cc->consts().size(), 0);
+}
+
+TEST_P(DomainImplTests, Upload_MultiViaModule_FailDueToStaticVerificationError) {
+    const auto dm = GetParam().factory(dbg);
+
+    yama::module_info m =
+        yama::module_factory()
+        .add_type(yama::type_info(f_info))
+        .add_type(yama::type_info(a_info))
+        .add_type(yama::type_info(bad_info)) // <- should cause whole group to fail upload
+        .add_type(yama::type_info(c_info))
+        .done();
+
+    ASSERT_FALSE(dm->upload(yama::module_info(m)));
 
     // test that no new types were made available
 

@@ -384,3 +384,13 @@ bool yama::bc::code_writer::_resolve(bool* label_not_found) {
     return true;
 }
 
+bool yama::bc::instr::operator==(const instr& other) const noexcept {
+    // TODO: it's UB to access union components that are not formally *initialized*
+    //       at the point of access... so I'm not sure exactly what to do about that...
+    return
+        opc == other.opc &&
+        A == other.A &&
+        B == other.B &&
+        C == other.C;
+}
+

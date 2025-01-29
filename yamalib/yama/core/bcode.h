@@ -327,6 +327,13 @@ namespace yama::bc {
             };
             int16_t sBx;
         };
+
+
+        // TODO: operator== has not been unit tested
+
+        // NOTE: operator== can't be '= default' due to nested union
+
+        bool operator==(const instr& other) const noexcept;
     };
 
     static_assert(sizeof(instr) == sizeof(int32_t));
@@ -337,7 +344,6 @@ namespace yama::bc {
 
     class code final {
     public:
-
         code() = default;
         code(const code&) = default;
         code(code&&) noexcept = default;
@@ -362,6 +368,9 @@ namespace yama::bc {
         // behaviour is undefined if x is out-of-bounds
 
         bool reinit_flag(size_t x) const noexcept;
+
+
+        bool operator==(const code&) const noexcept = default;
 
 
         std::string fmt_instr(size_t x, const char* tab = "    ") const;
@@ -414,7 +423,6 @@ namespace yama::bc {
 
     class code_writer final {
     public:
-
         using label_id_t = uint32_t;
 
 
@@ -518,7 +526,6 @@ namespace yama::bc {
 
     class syms final {
     public:
-
         syms() = default;
         syms(const syms&) = default;
         syms(syms&&) noexcept = default;
@@ -531,6 +538,9 @@ namespace yama::bc {
 
         std::optional<sym> fetch(size_t index) const noexcept;
         std::optional<sym> operator[](size_t index) const noexcept;
+
+
+        bool operator==(const syms&) const noexcept = default;
 
 
         // add adds a new symbol for the instr at index, overwriting
@@ -550,7 +560,6 @@ namespace yama::bc {
 
 
     private:
-
         std::unordered_map<size_t, sym> _syms;
     };
 }

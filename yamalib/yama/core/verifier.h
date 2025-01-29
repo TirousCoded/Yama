@@ -7,6 +7,7 @@
 
 #include "api_component.h"
 #include "type_info.h"
+#include "module_info.h"
 
 
 namespace yama {
@@ -29,7 +30,11 @@ namespace yama {
 
         // verify returns if subject passes static verification
 
+        // the module_info overload checks that all type_info in subject pass
+        // static verification
+
         virtual bool verify(const type_info& subject) = 0;
+        virtual bool verify(const module_info& subject) = 0;
     };
 
 
@@ -39,9 +44,8 @@ namespace yama {
         default_verifier(std::shared_ptr<debug> dbg = nullptr);
 
 
-        // verify returns if subject passes static verification
-
-        bool verify(const type_info& subject);
+        bool verify(const type_info& subject) override final;
+        bool verify(const module_info& subject) override final;
 
 
     private:

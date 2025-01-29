@@ -265,7 +265,7 @@ namespace yama {
         void panic();                                       // panic induces a panic, failing quietly if already panicking
 
         // pop pops the top n local object stack registers, stopping prematurely
-        // is the stack is emptied
+        // if the stack is emptied
 
         cmd_status pop(size_t n = 1);
 

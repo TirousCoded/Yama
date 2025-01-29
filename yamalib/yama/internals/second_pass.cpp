@@ -23,7 +23,7 @@ void yama::internal::second_pass::visit_begin(res<ast_FnDecl> x) {
     if (err) {
         return;
     }
-    _push_target(x->name.str(_get_src())); // push new fn type for code gen
+    _begin_target(x->name.str(_get_src())); // begin new fn type for code gen
     _mark_as_fn_body_block(*x->block);
 }
 
@@ -336,6 +336,7 @@ void yama::internal::second_pass::visit_end(res<ast_FnDecl> x) {
         return;
     }
     _apply_bcode_to_target(*x);
+    _end_target();
 }
 
 void yama::internal::second_pass::visit_end(res<ast_Block> x) {
@@ -614,12 +615,13 @@ yama::internal::csymtab_group_ctti& yama::internal::second_pass::_get_csymtabs()
 }
 
 yama::type_info& yama::internal::second_pass::_target() noexcept {
-    YAMA_ASSERT(!results.empty());
-    return results.back();
+    YAMA_ASSERT(_current_target);
+    return *_current_target;
 }
 
-void yama::internal::second_pass::_push_target(str fullname) {
-    // push bare-bones new_type to results
+void yama::internal::second_pass::_begin_target(str fullname) {
+    YAMA_ASSERT(!_current_target);
+    // bind bare-bones new_type to _current_target
     yama::type_info new_type{
         .fullname = fullname,
         .info = yama::function_info{
@@ -628,18 +630,24 @@ void yama::internal::second_pass::_push_target(str fullname) {
             .max_locals = 0,
         },
     };
-    results.push_back(std::move(new_type));
-    auto& our_type = results.back(); // <- replaces new_type
-    // build callsig of our_type (which has to be done after pushing it as
+    _current_target = std::move(new_type);
+    auto& our_type = _target(); // <- replaces new_type (which we moved from)
+    // build callsig of our_type (which has to be done after binding it as
     // we need to populate its constant table)
     auto new_callsig = _build_callsig_for_fn_type(fullname);
     // patch new_callsig onto our_type
     std::get<function_info>(our_type.info).callsig = std::move(new_callsig);
 }
 
+void yama::internal::second_pass::_end_target() {
+    YAMA_ASSERT(_current_target);
+    results.add_type(std::move(_target()));
+    _current_target.reset();
+}
+
 void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
-    if (std::holds_alternative<function_info>(results.back().info)) {
-        auto& info = std::get<function_info>(results.back().info);
+    if (std::holds_alternative<function_info>(_target().info)) {
+        auto& info = std::get<function_info>(_target().info);
         bool label_not_found{};
         if (auto fn_bcode = cw.done(&label_not_found)) {
             info.bcode = fn_bcode.value();
@@ -657,7 +665,7 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
                     x,
                     dsignal::compile_impl_limits,
                     "fn {} contains branch which exceeds max branch offset limits!",
-                    results.back().fullname);
+                    _target().fullname);
             }
         }
     }
@@ -838,7 +846,7 @@ void yama::internal::second_pass::_push_temp(const ast_node& x, str type) {
             x,
             dsignal::compile_impl_limits,
             "fn {} contains parts requiring >{} registers to store all temporaries and local vars, exceeding limit!",
-            results.back().fullname, _reg_limit);
+            _target().fullname, _reg_limit);
         return;
     }
     const auto ind = _regs();

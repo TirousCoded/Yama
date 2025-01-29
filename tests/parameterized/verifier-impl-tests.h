@@ -10,6 +10,7 @@
 #include <yama/core/general.h>
 #include <yama/core/res.h>
 #include <yama/core/type_info.h>
+#include <yama/core/module_info.h>
 #include <yama/core/verifier.h>
 
 

@@ -27,6 +27,14 @@ bool yama::default_verifier::verify(const type_info& subject) {
     return success;
 }
 
+bool yama::default_verifier::verify(const module_info& subject) {
+    YAMA_LOG(dbg(), verif_c, "verifying module ({} types)...", subject.size());
+    for (const auto& I : subject) {
+        if (!verify(I.second)) return false;
+    }
+    return true;
+}
+
 std::string yama::default_verifier::_cfg_block::fmt() const {
     return std::format("{{block [{}, {})}}", first, last);
 }

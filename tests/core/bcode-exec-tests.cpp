@@ -70,7 +70,7 @@ TEST_F(BCodeExecTests, Instr_Noop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -104,7 +104,7 @@ TEST_F(BCodeExecTests, Instr_Pop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -137,7 +137,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Zero) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -174,7 +174,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Many) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -208,7 +208,7 @@ TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -241,7 +241,7 @@ TEST_F(BCodeExecTests, Instr_PutNone) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -273,7 +273,7 @@ TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -306,7 +306,7 @@ TEST_F(BCodeExecTests, Instr_PutConst) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -338,7 +338,7 @@ TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -370,7 +370,7 @@ TEST_F(BCodeExecTests, Instr_PutArg) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -407,7 +407,7 @@ TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -448,7 +448,7 @@ TEST_F(BCodeExecTests, Instr_Copy) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -481,7 +481,7 @@ TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -547,8 +547,8 @@ TEST_F(BCodeExecTests, Instr_Call) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(plus_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(plus_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -614,8 +614,8 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(plus_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(plus_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -692,9 +692,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(panic_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(panic_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -775,9 +775,9 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(panic_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(panic_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -904,10 +904,10 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(dummy_info));
-    ASSERT_TRUE(ctx->dm().upload(fail_safe_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(dummy_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(fail_safe_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -979,8 +979,8 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(plus_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(plus_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1057,9 +1057,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(panic_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(panic_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1140,9 +1140,9 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(panic_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(panic_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1269,10 +1269,10 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(dummy_info));
-    ASSERT_TRUE(ctx->dm().upload(fail_safe_info));
-    ASSERT_TRUE(ctx->dm().upload(never_reached_info));
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(dummy_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(fail_safe_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(never_reached_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1316,7 +1316,7 @@ TEST_F(BCodeExecTests, Instr_Ret) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1354,7 +1354,7 @@ TEST_F(BCodeExecTests, Instr_Jump) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1394,7 +1394,7 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1440,7 +1440,7 @@ TEST_F(BCodeExecTests, Instr_JumpFalse) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(f_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(f_info)));
 
     const auto f = ctx->load("f"_str).value();
 
@@ -1576,10 +1576,10 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(subtract_info));
-    ASSERT_TRUE(ctx->dm().upload(multiply_info));
-    ASSERT_TRUE(ctx->dm().upload(greaterThanZero_info));
-    ASSERT_TRUE(ctx->dm().upload(factorial_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(subtract_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(multiply_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(greaterThanZero_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(factorial_info)));
 
     const auto factorial = ctx->load("factorial"_str).value();
 
@@ -1688,9 +1688,9 @@ TEST_F(BCodeExecTests, Example_Counter) {
         },
     };
 
-    ASSERT_TRUE(ctx->dm().upload(addOne_info));
-    ASSERT_TRUE(ctx->dm().upload(lessThan_info));
-    ASSERT_TRUE(ctx->dm().upload(counter_info));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(addOne_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(lessThan_info)));
+    ASSERT_TRUE(ctx->dm().upload(yama::type_info(counter_info)));
 
     const auto counter = ctx->dm().load("counter"_str).value();
 

@@ -36,6 +36,8 @@
 #include "type_info.h"
 #include "type.h"
 
+#include "module_info.h"
+
 #include "object_ref.h"
 
 #include "verifier.h"

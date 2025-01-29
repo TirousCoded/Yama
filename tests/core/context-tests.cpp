@@ -321,7 +321,7 @@ TEST_F(ContextTests, InitialState_NonUserCall) {
             .max_locals = 13,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // f
@@ -444,7 +444,7 @@ TEST_F(ContextTests, Arg_NonUserCall) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -500,7 +500,7 @@ TEST_F(ContextTests, Local_NonUserCall) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // f
@@ -541,7 +541,7 @@ TEST_F(ContextTests, Panic) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -644,8 +644,8 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(fa_info));
-    ASSERT_TRUE(dm->upload(fb_info));
+    ASSERT_TRUE(dm->upload(yama::type_info(fa_info)));
+    ASSERT_TRUE(dm->upload(yama::type_info(fb_info)));
     ASSERT_TRUE(dm->load("fa"_str));
     ASSERT_TRUE(dm->load("fb"_str));
 
@@ -733,7 +733,7 @@ TEST_F(ContextTests, Pop_NonUserCall) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -792,7 +792,7 @@ TEST_F(ContextTests, Put_NonUserCall) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->put_fn(yama::newtop, f).good()); // call object
@@ -984,7 +984,7 @@ TEST_F(ContextTests, PutConst) {
             .max_locals = yama::const_types * 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -1045,7 +1045,7 @@ TEST_F(ContextTests, PutConst_PanicIfXIsOutOfBounds) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1078,7 +1078,7 @@ TEST_F(ContextTests, PutConst_PanicIfPushingOverflows) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1109,7 +1109,7 @@ TEST_F(ContextTests, PutConst_PanicIfCIsOutOfBounds) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1142,7 +1142,7 @@ TEST_F(ContextTests, PutConst_PanicIfCIsNotIndexOfAnObjectConstant) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1178,7 +1178,7 @@ TEST_F(ContextTests, PutArg) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -1227,7 +1227,7 @@ TEST_F(ContextTests, PutArg_PanicIfXIsOutOfBounds) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1259,7 +1259,7 @@ TEST_F(ContextTests, PutArg_PanicIfPushingOverflows) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1291,7 +1291,7 @@ TEST_F(ContextTests, PutArg_PanicIfArgIsOutOfBounds) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1339,7 +1339,7 @@ TEST_F(ContextTests, Copy_NonUserCall) {
             .max_locals = 4,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -1421,7 +1421,7 @@ bool ContextTests::build_push_and_load_f_type_for_call_tests() {
         },
     };
     return
-        dm->upload(f_info) &&
+        dm->upload(yama::type_info(f_info)) &&
         dm->load("f"_str); // <- skip tests if we can't even load f properly
 }
 
@@ -1447,7 +1447,7 @@ bool ContextTests::build_push_and_load_g_type_for_call_tests() {
         },
     };
     return
-        dm->upload(g_info) &&
+        dm->upload(yama::type_info(g_info)) &&
         dm->load("g"_str); // <- skip tests if we can't even load g properly
 }
 
@@ -1475,7 +1475,7 @@ bool ContextTests::build_push_and_load_h_type_for_call_tests() {
         },
     };
     return
-        dm->upload(h_info) &&
+        dm->upload(yama::type_info(h_info)) &&
         dm->load("h"_str); // <- skip tests if we can't even load h properly
 }
 
@@ -1684,7 +1684,7 @@ TEST_F(ContextTests, Call_PanicIfArgsProvidesNoCallObj) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -1802,7 +1802,7 @@ TEST_F(ContextTests, Call_PanicIfCallStackOverflow) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_none().good()); // result
@@ -1834,7 +1834,7 @@ TEST_F(ContextTests, Call_PanicIfNoReturnValueObjectProvided) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_none().good()); // result
@@ -1988,7 +1988,7 @@ TEST_F(ContextTests, CallNR_PanicIfArgsProvidesNoCallObj) {
             .max_locals = 2,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     EXPECT_EQ(ctx->panics(), 0);
@@ -2085,7 +2085,7 @@ TEST_F(ContextTests, CallNR_PanicIfCallStackOverflow) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -2116,7 +2116,7 @@ TEST_F(ContextTests, CallNR_PanicIfNoReturnValueObjectProvided) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_fn(f).good()); // call object
@@ -2159,7 +2159,7 @@ TEST_F(ContextTests, Ret_AllowsReturningWrongTypedObject) {
             .max_locals = 3,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_int(0).good()); // result
@@ -2201,7 +2201,7 @@ TEST_F(ContextTests, Ret_PanicIfXIsOutOfBounds) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_none().good()); // result
@@ -2235,7 +2235,7 @@ TEST_F(ContextTests, Ret_PanicIfCalledMultipleTimesInOneCall) {
             .max_locals = 1,
         },
     };
-    ASSERT_TRUE(dm->upload(f_info) && dm->load("f"_str));
+    ASSERT_TRUE(dm->upload(yama::type_info(f_info)) && dm->load("f"_str));
     const yama::type f = dm->load("f"_str).value();
 
     ASSERT_TRUE(ctx->push_none().good()); // result

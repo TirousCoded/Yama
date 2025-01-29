@@ -13,6 +13,7 @@
 // NOTE: this is so things like yama::primitive_info are available to end-user
 //       w/out forcing them to include type_info.h first
 #include "type_info.h"
+#include "module_info.h"
 #include "verifier.h"
 #include "compiler.h"
 
@@ -84,10 +85,11 @@ namespace yama {
         // upload will fail if uploaded type_info(s) use names already
         // taken by already uploaded type_info(s), or one another
 
-        bool upload(type_info x);
+        bool upload(type_info&& x);
         bool upload(std::span<const type_info> x);
         bool upload(const std::vector<type_info>& x);
         bool upload(std::initializer_list<type_info> x);
+        bool upload(module_info&& x);
 
         // these overloads upload source code which gets compiled
 
@@ -119,9 +121,10 @@ namespace yama {
 
 
         virtual quick_access do_preload_builtins() = 0;
-        virtual std::optional<std::vector<type_info>> do_compile(const taul::source_code& src) = 0;
-        virtual bool do_upload(type_info x) = 0;
+        virtual std::optional<module_info> do_compile(const taul::source_code& src) = 0;
+        virtual bool do_upload(type_info&& x) = 0;
         virtual bool do_upload(std::span<const type_info> x) = 0;
+        virtual bool do_upload(module_info&& x) = 0;
 
 
     private:
@@ -144,9 +147,10 @@ namespace yama {
     protected:
 
         quick_access do_preload_builtins() override final;
-        std::optional<std::vector<type_info>> do_compile(const taul::source_code& src) override final;
-        bool do_upload(type_info x) override final;
+        std::optional<module_info> do_compile(const taul::source_code& src) override final;
+        bool do_upload(type_info&& x) override final;
         bool do_upload(std::span<const type_info> x) override final;
+        bool do_upload(module_info&& x) override final;
 
 
     private:
@@ -186,9 +190,11 @@ namespace yama {
 
         bool _verify(const type_info& x);
         bool _verify(std::span<const type_info> x);
+        bool _verify(const module_info& x);
 
         void _upload(type_info&& x);
         void _upload(std::span<const type_info> x);
+        void _upload(module_info&& x);
 
 
         class _compiler_services_t final : public domain {
@@ -205,9 +211,10 @@ namespace yama {
         protected:
 
             quick_access do_preload_builtins() override final;
-            std::optional<std::vector<type_info>> do_compile(const taul::source_code& src) override final;
-            bool do_upload(type_info x) override final;
+            std::optional<module_info> do_compile(const taul::source_code& src) override final;
+            bool do_upload(type_info&& x) override final;
             bool do_upload(std::span<const type_info> x) override final;
+            bool do_upload(module_info&& x) override final;
 
 
         private:
@@ -220,9 +227,11 @@ namespace yama {
 
             bool _verify(const type_info& x);
             bool _verify(std::span<const type_info> x);
+            bool _verify(const module_info& x);
 
             void _upload(type_info&& x);
             void _upload(std::span<const type_info> x);
+            void _upload(module_info&& x);
         };
     };
 }

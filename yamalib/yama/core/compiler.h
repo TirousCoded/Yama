@@ -10,7 +10,7 @@
 
 #include "res.h"
 #include "api_component.h"
-#include "type_info.h"
+#include "module_info.h"
 
 
 namespace yama {
@@ -41,12 +41,11 @@ namespace yama {
         //            object for longer than the execution of compile, as compiler is used
         //            within domain impls, so it's best to avoid potential ref cycles
 
-        // compile takes in a taul::source_code, and compiles it into a vector
-        // of type_info ready for upload, if any
+        // compile takes in a taul::source_code and compiles it into a module
 
         // dm exposes compile to existing type information
 
-        virtual std::optional<std::vector<type_info>> compile(
+        virtual std::optional<module_info> compile(
             res<domain> dm,
             const taul::source_code& src) = 0;
     };
@@ -58,7 +57,7 @@ namespace yama {
         default_compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
-        std::optional<std::vector<type_info>> compile(
+        std::optional<module_info> compile(
             res<domain> dm,
             const taul::source_code& src) override final;
 

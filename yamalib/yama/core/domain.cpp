@@ -35,8 +35,8 @@ yama::type yama::domain::load_char() {
     return deref_assert(_quick_access).char0;
 }
 
-bool yama::domain::upload(type_info x) {
-    return do_upload(std::move(x));
+bool yama::domain::upload(type_info&& x) {
+    return do_upload(std::forward<type_info>(x));
 }
 
 bool yama::domain::upload(std::span<const type_info> x) {
@@ -51,9 +51,13 @@ bool yama::domain::upload(std::initializer_list<type_info> x) {
     return upload(std::span(x.begin(), x.end()));
 }
 
+bool yama::domain::upload(module_info&& x) {
+    return do_upload(std::forward<module_info>(x));
+}
+
 bool yama::domain::upload(const taul::source_code& src) {
-    if (const auto result = do_compile(src)) {
-        return upload(*result);
+    if (auto result = do_compile(src)) {
+        return upload(std::move(*result));
     }
     return false;
 }
@@ -104,16 +108,7 @@ std::optional<yama::type> yama::default_domain::load(const str& fullname) {
 }
 
 yama::domain::quick_access yama::default_domain::do_preload_builtins() {
-    const auto builtins = internal::get_builtin_type_info();
-    if (!upload(
-        {
-        builtins.None_info,
-        builtins.Int_info,
-        builtins.UInt_info,
-        builtins.Float_info,
-        builtins.Bool_info,
-        builtins.Char_info,
-        })) {
+    if (!upload(internal::get_builtin_type_info())) {
         YAMA_DEADEND;
         abort(); // for release builds
     }
@@ -127,17 +122,18 @@ yama::domain::quick_access yama::default_domain::do_preload_builtins() {
     };
 }
 
-std::optional<std::vector<yama::type_info>> yama::default_domain::do_compile(const taul::source_code& src) {
+std::optional<yama::module_info> yama::default_domain::do_compile(const taul::source_code& src) {
     const auto result = _state.compiler.compile(_get_compiler_services(), src);
     if (result) _state.commit_proxy();
     else        _state.discard_proxy();
     return result;
 }
 
-bool yama::default_domain::do_upload(type_info x) {
+bool yama::default_domain::do_upload(type_info&& x) {
+    type_info temp(std::forward<type_info>(x));
     return
-        _verify(x)
-        ? (_upload(std::move(x)), true)
+        _verify(temp)
+        ? (_upload(std::move(temp)), true)
         : false;
 }
 
@@ -145,6 +141,14 @@ bool yama::default_domain::do_upload(std::span<const type_info> x) {
     return
         _verify(x)
         ? (_upload(std::move(x)), true)
+        : false;
+}
+
+bool yama::default_domain::do_upload(module_info&& x) {
+    module_info temp(std::forward<module_info>(x));
+    return
+        _verify(temp)
+        ? (_upload(std::move(temp)), true)
         : false;
 }
 
@@ -191,12 +195,21 @@ bool yama::default_domain::_verify(std::span<const type_info> x) {
     return true;
 }
 
+bool yama::default_domain::_verify(const module_info& x) {
+    return _state.verif.verify(x);
+}
+
 void yama::default_domain::_upload(type_info&& x) {
     _state.type_info_db.push(make_res<type_info>(std::forward<type_info>(x)));
 }
 
 void yama::default_domain::_upload(std::span<const type_info> x) {
     for (const auto& I : x) _upload(type_info(I));
+}
+
+void yama::default_domain::_upload(module_info&& x) {
+    module_info temp(std::forward<module_info>(x));
+    for (const auto& I : temp) _upload(type_info(I.second));
 }
 
 yama::default_domain::_compiler_services_t::_compiler_services_t(default_domain& upstream)
@@ -226,16 +239,17 @@ yama::domain::quick_access yama::default_domain::_compiler_services_t::do_preloa
     };
 }
 
-std::optional<std::vector<yama::type_info>> yama::default_domain::_compiler_services_t::do_compile(const taul::source_code& src) {
+std::optional<yama::module_info> yama::default_domain::_compiler_services_t::do_compile(const taul::source_code& src) {
     // TODO: we'll need to revise how compiling works if in the future compilation is
     //       able to recursively depend upon *upstream* compilation
     return std::nullopt;
 }
 
-bool yama::default_domain::_compiler_services_t::do_upload(type_info x) {
+bool yama::default_domain::_compiler_services_t::do_upload(type_info&& x) {
+    type_info temp(std::forward<type_info>(x));
     return
-        _verify(x)
-        ? (_upload(std::move(x)), true)
+        _verify(temp)
+        ? (_upload(std::move(temp)), true)
         : false;
 }
 
@@ -243,6 +257,14 @@ bool yama::default_domain::_compiler_services_t::do_upload(std::span<const type_
     return
         _verify(x)
         ? (_upload(std::move(x)), true)
+        : false;
+}
+
+bool yama::default_domain::_compiler_services_t::do_upload(module_info&& x) {
+    module_info temp(std::forward<module_info>(x));
+    return
+        _verify(temp)
+        ? (_upload(std::move(temp)), true)
         : false;
 }
 
@@ -257,11 +279,20 @@ bool yama::default_domain::_compiler_services_t::_verify(std::span<const type_in
     return true;
 }
 
+bool yama::default_domain::_compiler_services_t::_verify(const module_info& x) {
+    return _get_state().verif.verify(x);
+}
+
 void yama::default_domain::_compiler_services_t::_upload(type_info&& x) {
     _get_state().type_info_db_proxy.push(make_res<type_info>(std::forward<type_info>(x)));
 }
 
 void yama::default_domain::_compiler_services_t::_upload(std::span<const type_info> x) {
     for (const auto& I : x) _upload(type_info(I));
+}
+
+void yama::default_domain::_compiler_services_t::_upload(module_info&& x) {
+    module_info temp(std::forward<module_info>(x));
+    for (const auto& I : temp) _upload(type_info(I.second));
 }
 

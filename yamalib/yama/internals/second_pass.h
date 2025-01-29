@@ -32,7 +32,7 @@ namespace yama::internal {
     class second_pass final : public ast_visitor {
     public:
 
-        std::vector<type_info> results; // result of code gen
+        module_factory results; // result of code gen
 
 
         second_pass(
@@ -136,12 +136,17 @@ namespace yama::internal {
 
 
         // TODO: at present, ALL custom types are fn types
+        
+        // _current_target gets set by _begin_target at start of type def, and then after
+        // fully defined gets consumed by _end_target, which uploads it to results
 
-        // _push_target pushes a new type_info to results, becoming the target of code gen
+        std::optional<yama::type_info> _current_target = std::nullopt;
 
         yama::type_info& _target() noexcept;
 
-        void _push_target(str fullname);
+        void _begin_target(str fullname);
+        void _end_target();
+
         void _apply_bcode_to_target(const ast_FnDecl& x);
         void _update_target_locals();
 
