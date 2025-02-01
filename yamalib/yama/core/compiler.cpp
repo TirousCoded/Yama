@@ -14,12 +14,12 @@ yama::compiler::compiler(std::shared_ptr<debug> dbg)
 
 yama::default_compiler::default_compiler(std::shared_ptr<debug> dbg)
     : compiler(dbg),
-    _dm_ptr(nullptr) {}
+    _services_ptr(nullptr) {}
 
 std::optional<yama::module_info> yama::default_compiler::compile(
     res<domain> dm,
     const taul::source_code& src) {
-    _dm_ptr = dm.get();
+    _services_ptr = dm.get();
     const auto ast = yama::internal::ast_parser().parse(src);
     if (const auto syntax_error = ast.syntax_error) {
         YAMA_RAISE(dbg(), dsignal::compile_syntax_error);
@@ -30,8 +30,8 @@ std::optional<yama::module_info> yama::default_compiler::compile(
         return std::nullopt;
     }
     internal::csymtab_group csymtabs{};
-    internal::csymtab_group_ctti csymtabs_ctti(_dm(), *ast.root, csymtabs);
-    internal::first_pass fp(dbg(), _dm(), *ast.root, src, csymtabs_ctti);
+    internal::csymtab_group_ctti csymtabs_ctti(_services(), *ast.root, csymtabs);
+    internal::first_pass fp(dbg(), _services(), *ast.root, src, csymtabs_ctti);
     ast.root->accept(fp);
     if (!fp.good()) {
         return std::nullopt;
@@ -44,7 +44,7 @@ std::optional<yama::module_info> yama::default_compiler::compile(
     return sp.results.done();
 }
 
-yama::domain& yama::default_compiler::_dm() const noexcept {
-    return deref_assert(_dm_ptr);
+yama::domain& yama::default_compiler::_services() const noexcept {
+    return deref_assert(_services_ptr);
 }
 

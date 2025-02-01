@@ -42,19 +42,28 @@ namespace yama {
         verif               = 1 << 4,           // static verification behaviour trace
         verif_error         = 1 << 5,           // static verification error
         verif_warning       = 1 << 6,           // static verification warning
-        instant             = 1 << 7,           // type instantiation behaviour trace
-        instant_error       = 1 << 8,           // type instantiation error
-        ctx_panic           = 1 << 9,           // context panic
-        ctx_llcmd           = 1 << 10,          // low-level command behaviour trace
-        bcode_exec          = 1 << 11,          // bcode execution trace
+        install             = 1 << 7,           // install behaviour trace
+        install_error       = 1 << 8,           // install error
+        instant             = 1 << 9,           // type instantiation behaviour trace
+        instant_error       = 1 << 10,          // type instantiation error
+        ctx_panic           = 1 << 11,          // context panic
+        ctx_llcmd           = 1 << 12,          // low-level command behaviour trace
+        bcode_exec          = 1 << 13,          // bcode execution trace
 
         none                = 0,
         all                 = uint32_t(-1),
-        defaults            = general
-                            | compile_error
+
+        errors              = compile_error
                             | verif_error
-                            | verif_warning
+                            | install_error
                             | instant_error
+                            | ctx_panic,
+
+        warnings            = verif_warning,
+
+        defaults            = general
+                            | errors
+                            | warnings
                             | ctx_panic,
     };
 
@@ -68,6 +77,8 @@ namespace yama {
     constexpr auto verif_c              = dcat::verif;
     constexpr auto verif_error_c        = dcat::verif_error;
     constexpr auto verif_warning_c      = dcat::verif_warning;
+    constexpr auto install_c            = dcat::install;
+    constexpr auto install_error_c      = dcat::install_error;
     constexpr auto instant_c            = dcat::instant;
     constexpr auto instant_error_c      = dcat::instant_error;
     constexpr auto ctx_panic_c          = dcat::ctx_panic;
@@ -76,6 +87,8 @@ namespace yama {
 
     constexpr auto none_c               = dcat::none;
     constexpr auto all_c                = dcat::all;
+    constexpr auto errors_c             = dcat::errors;
+    constexpr auto warnings_c           = dcat::warnings;
     constexpr auto defaults_c           = dcat::defaults;
 }
 
@@ -148,7 +161,7 @@ namespace yama {
 
     enum class dsignal : uint32_t {
         // all dsignal values should be prefixed by the name of the dcat they belong to
-        
+
         compile_file_not_found,
         compile_impl_internal, // internal error
         compile_impl_limits, // impl-defined limits exceeded
@@ -200,6 +213,11 @@ namespace yama {
         verif_pushing_overflows,
         verif_violates_register_coherence,
 
+        install_install_name_conflict,
+        install_missing_dep_mapping,
+        install_invalid_dep_mapping,
+        install_dep_graph_cycle,
+
         instant_type_not_found,
         instant_kind_mismatch,
         instant_callsig_mismatch,
@@ -211,7 +229,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 52);
+        static_assert(dsignals == 56);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -266,6 +284,11 @@ namespace yama {
             _YAMA_ENTRY_(verif_fallthrough_puts_PC_out_of_bounds);
             _YAMA_ENTRY_(verif_pushing_overflows);
             _YAMA_ENTRY_(verif_violates_register_coherence);
+
+            _YAMA_ENTRY_(install_install_name_conflict);
+            _YAMA_ENTRY_(install_missing_dep_mapping);
+            _YAMA_ENTRY_(install_invalid_dep_mapping);
+            _YAMA_ENTRY_(install_dep_graph_cycle);
 
             _YAMA_ENTRY_(instant_type_not_found);
             _YAMA_ENTRY_(instant_kind_mismatch);

@@ -136,6 +136,288 @@ TEST_P(DomainImplTests, Builtins) {
     EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
 }
 
+
+class test_parcel final : public yama::parcel {
+public:
+    yama::dep_reqs deps_v;
+
+
+    test_parcel() = default;
+
+
+    const yama::dep_reqs& deps() const override final { return deps_v; }
+};
+
+TEST_P(DomainImplTests, Install_PriorToFirstInstall) {
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_EQ(dm->install_count(), 0);
+}
+
+TEST_P(DomainImplTests, Install_EmptyBatch) {
+    const auto dm = GetParam().factory(dbg);
+
+    ASSERT_TRUE(dm->install(yama::install_batch{}));
+
+    ASSERT_EQ(dm->install_count(), 0);
+
+    ASSERT_TRUE(dm->install(yama::install_batch{})); // works w/ multiple installs
+
+    ASSERT_EQ(dm->install_count(), 0);
+}
+
+TEST_P(DomainImplTests, Install_NoDeps) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    auto bb = yama::make_res<test_parcel>();
+    auto cc = yama::make_res<test_parcel>();
+    auto dd = yama::make_res<test_parcel>();
+
+    {
+        yama::install_batch b{};
+        b
+            .install("a"_str, aa)
+            .install("b"_str, bb);
+
+        ASSERT_TRUE(dm->install(std::move(b))); // w/out existing installs
+
+        ASSERT_EQ(dm->install_count(), 2);
+        ASSERT_TRUE(dm->is_installed("a"_str));
+        ASSERT_TRUE(dm->is_installed("b"_str));
+        ASSERT_FALSE(dm->is_installed("c"_str));
+        ASSERT_FALSE(dm->is_installed("d"_str));
+    }
+    {
+        yama::install_batch b{};
+        b
+            .install("c"_str, cc)
+            .install("d"_str, dd);
+
+        ASSERT_TRUE(dm->install(std::move(b))); // w/ existing installs
+
+        ASSERT_EQ(dm->install_count(), 4);
+        ASSERT_TRUE(dm->is_installed("a"_str));
+        ASSERT_TRUE(dm->is_installed("b"_str));
+        ASSERT_TRUE(dm->is_installed("c"_str));
+        ASSERT_TRUE(dm->is_installed("d"_str));
+    }
+}
+
+TEST_P(DomainImplTests, Install_Deps) {
+    const auto dm = GetParam().factory(dbg);
+
+    // this unit test covers both deps between parcels in same install batch, and
+    // deps between parcels where one is in batch, and the other is fully installed
+
+    auto aa = yama::make_res<test_parcel>();
+    auto bb = yama::make_res<test_parcel>();
+    bb->deps_v.add("A"_str);
+    auto cc = yama::make_res<test_parcel>();
+    cc->deps_v.add("A"_str);
+    cc->deps_v.add("B"_str);
+    auto dd = yama::make_res<test_parcel>();
+    dd->deps_v.add("A"_str);
+    dd->deps_v.add("B"_str);
+    dd->deps_v.add("C"_str);
+
+    {
+        yama::install_batch b{};
+        b
+            .install("a"_str, aa)
+            .install("b"_str, bb)
+            .map_dep("b"_str, "A"_str, "a"_str);
+
+        ASSERT_TRUE(dm->install(std::move(b))); // w/out existing installs
+
+        ASSERT_EQ(dm->install_count(), 2);
+        ASSERT_TRUE(dm->is_installed("a"_str));
+        ASSERT_TRUE(dm->is_installed("b"_str));
+        ASSERT_FALSE(dm->is_installed("c"_str));
+        ASSERT_FALSE(dm->is_installed("d"_str));
+    }
+    {
+        yama::install_batch b{};
+        b
+            .install("c"_str, cc)
+            .map_dep("c"_str, "A"_str, "a"_str)
+            .map_dep("c"_str, "B"_str, "b"_str)
+            .install("d"_str, dd)
+            .map_dep("d"_str, "A"_str, "a"_str)
+            .map_dep("d"_str, "B"_str, "b"_str)
+            .map_dep("d"_str, "C"_str, "c"_str);
+
+        ASSERT_TRUE(dm->install(std::move(b))); // w/ existing installs
+
+        ASSERT_EQ(dm->install_count(), 4);
+        ASSERT_TRUE(dm->is_installed("a"_str));
+        ASSERT_TRUE(dm->is_installed("b"_str));
+        ASSERT_TRUE(dm->is_installed("c"_str));
+        ASSERT_TRUE(dm->is_installed("d"_str));
+    }
+}
+
+TEST_P(DomainImplTests, Install_Fail_InstallNameConflict) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    auto bb = yama::make_res<test_parcel>();
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa);
+
+    ASSERT_TRUE(dm->install(std::move(b0)));
+
+    ASSERT_EQ(dm->install_count(), 1);
+    ASSERT_TRUE(dm->is_installed("a"_str));
+    ASSERT_FALSE(dm->is_installed("b"_str));
+
+    yama::install_batch b1{};
+    b1
+        .install("a"_str, bb);
+
+    ASSERT_FALSE(dm->install(std::move(b1))); // error
+
+    ASSERT_EQ(dm->install_count(), 1);
+    ASSERT_TRUE(dm->is_installed("a"_str));
+    ASSERT_FALSE(dm->is_installed("b"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_install_name_conflict), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_MissingDepMapping) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    aa->deps_v.add("other"_str);
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa); // no dep mapping for other
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_missing_dep_mapping), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa)
+        .map_dep("b"_str, "A"_str, "a"_str); // b is unknown
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName_InstallNameRefersToAlreadyInstalledParcel) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    auto bb = yama::make_res<test_parcel>();
+
+    yama::install_batch b0{};
+    b0
+        .install("b"_str, bb);
+
+    ASSERT_TRUE(dm->install(std::move(b0)));
+
+    yama::install_batch b1{};
+    b1
+        .install("a"_str, aa)
+        .map_dep("b"_str, "A"_str, "a"_str); // b is valid install name, but NOT to anything in the batch
+
+    ASSERT_FALSE(dm->install(std::move(b1))); // error
+
+    ASSERT_EQ(dm->install_count(), 1);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+    ASSERT_TRUE(dm->is_installed("b"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_DepName) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    auto bb = yama::make_res<test_parcel>();
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa)
+        .install("b"_str, bb)
+        .map_dep("b"_str, "A"_str, "a"_str); // A is unknown
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+    ASSERT_FALSE(dm->is_installed("b"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_MappedTo) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    aa->deps_v.add("B"_str);
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa)
+        .map_dep("a"_str, "B"_str, "b"_str); // b is unknown
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
+}
+
+TEST_P(DomainImplTests, Install_Fail_DepGraphCycle) {
+    const auto dm = GetParam().factory(dbg);
+
+    auto aa = yama::make_res<test_parcel>();
+    aa->deps_v.add("other"_str);
+    auto bb = yama::make_res<test_parcel>();
+    bb->deps_v.add("other"_str);
+    auto cc = yama::make_res<test_parcel>();
+    cc->deps_v.add("other"_str);
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa)
+        .install("b"_str, bb)
+        .install("c"_str, cc)
+        .map_dep("a"_str, "other"_str, "b"_str)
+        .map_dep("b"_str, "other"_str, "c"_str)
+        .map_dep("c"_str, "other"_str, "a"_str);
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+    ASSERT_FALSE(dm->is_installed("b"_str));
+    ASSERT_FALSE(dm->is_installed("c"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_dep_graph_cycle), 1);
+}
+
+
 TEST_P(DomainImplTests, Load) {
     const auto dm = GetParam().factory(dbg);
 

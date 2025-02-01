@@ -33,44 +33,46 @@ namespace yama {
 
     class compiler : public api_component {
     public:
+        using services = domain;
+
 
         compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
-        // IMPORTANT: it's important for compiler impls to avoid taking ownership of dm's
+        // IMPORTANT: it's important for compiler impls to avoid taking ownership of services's
         //            object for longer than the execution of compile, as compiler is used
         //            within domain impls, so it's best to avoid potential ref cycles
 
+        // IMPORTANT: the services object injected need-not allow compiler to install parcels
+
         // compile takes in a taul::source_code and compiles it into a module
 
-        // dm exposes compile to existing type information
+        // services exposes compile to existing type information
 
         virtual std::optional<module_info> compile(
-            res<domain> dm,
+            res<services> services,
             const taul::source_code& src) = 0;
     };
 
 
     class default_compiler final : public compiler {
     public:
-
         default_compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
         std::optional<module_info> compile(
-            res<domain> dm,
+            res<services> services,
             const taul::source_code& src) override final;
 
 
     private:
+        // we use the services param in compile to keep domain alive during compilation,
+        // and then we'll assign this ptr services.get() to access it
 
-        // we use the dm param in compile to keep domain alive during compilation,
-        // and then we'll assign this ptr dm.get() to access it
-
-        domain* _dm_ptr;
+        services* _services_ptr;
 
 
-        domain& _dm() const noexcept;
+        services& _services() const noexcept;
     };
 }
 
