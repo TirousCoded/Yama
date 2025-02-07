@@ -5,6 +5,7 @@
 #include <taul/hashing.h>
 
 #include "../internals/builtin_type_info.h"
+#include "../internals/util.h"
 
 
 using namespace yama::string_literals;
@@ -15,7 +16,7 @@ size_t yama::dep_mapping_name::hash() const noexcept {
 }
 
 std::string yama::dep_mapping_name::fmt() const {
-    return std::format("{}.{}", install_name, dep_name);
+    return std::format("{}/{}", install_name, dep_name);
 }
 
 yama::install_batch& yama::install_batch::install(str install_name, res<parcel> x) {
@@ -71,13 +72,13 @@ bool yama::domain::upload(std::initializer_list<type_info> x) {
     return upload(std::span(x.begin(), x.end()));
 }
 
-bool yama::domain::upload(module_info&& x) {
-    return do_upload(std::forward<module_info>(x));
+bool yama::domain::upload(res<const module_info> x) {
+    return do_upload(std::move(x));
 }
 
 bool yama::domain::upload(const taul::source_code& src) {
     if (auto result = do_compile(src)) {
-        return upload(std::move(*result));
+        return upload(res(std::move(result)));
     }
     return false;
 }
@@ -111,7 +112,7 @@ yama::default_domain::default_domain(std::shared_ptr<debug> dbg)
     // messages which will arise during successful compilation
     _state(proxy_dbg(dbg, ~instant_error_c)) {
     finish_setup();
-    _setup_compiler_services(); // only call after finish_setup
+    _setup_services(); // only call after finish_setup
 }
 
 bool yama::default_domain::install(install_batch&& x) {
@@ -125,6 +126,16 @@ size_t yama::default_domain::install_count() const noexcept {
 
 bool yama::default_domain::is_installed(const str& install_name) const noexcept {
     return _installs.contains(install_name);
+}
+
+std::shared_ptr<const yama::module_info> yama::default_domain::import(const str& import_path, std::optional<str> parcel) {
+    if (!_check_parcel_env_parcel_is_okay(parcel)) return nullptr;
+    const auto resolved = _resolve_import_path(import_path, parcel); // translates from parcel to domain env
+    if (!resolved) return nullptr;
+    if (const auto memoized = _query_already_memoized_parcel(resolved->import_path)) return memoized;
+    const auto our_parcel = _query_installed_parcel(resolved->head);
+    if (!our_parcel) return nullptr;
+    return _handle_fresh_import_and_memoize(*resolved, *our_parcel);
 }
 
 std::optional<yama::type> yama::default_domain::load(const str& fullname) {
@@ -141,7 +152,7 @@ std::optional<yama::type> yama::default_domain::load(const str& fullname) {
 }
 
 yama::domain::quick_access yama::default_domain::do_preload_builtins() {
-    if (!upload(internal::get_builtin_type_info())) {
+    if (!upload(make_res<module_info>(internal::get_builtin_type_info()))) {
         YAMA_DEADEND;
         abort(); // for release builds
     }
@@ -155,7 +166,7 @@ yama::domain::quick_access yama::default_domain::do_preload_builtins() {
     };
 }
 
-std::optional<yama::module_info> yama::default_domain::do_compile(const taul::source_code& src) {
+std::shared_ptr<const yama::module_info> yama::default_domain::do_compile(const taul::source_code& src) {
     const auto result = _state.compiler.compile(_get_compiler_services(), src);
     if (result) _state.commit_proxy();
     else        _state.discard_proxy();
@@ -177,11 +188,10 @@ bool yama::default_domain::do_upload(std::span<const type_info> x) {
         : false;
 }
 
-bool yama::default_domain::do_upload(module_info&& x) {
-    module_info temp(std::forward<module_info>(x));
+bool yama::default_domain::do_upload(res<const module_info> x) {
     return
-        _verify(temp)
-        ? (_upload(std::move(temp)), true)
+        _verify(*x)
+        ? (_upload(std::move(x)), true)
         : false;
 }
 
@@ -209,12 +219,17 @@ void yama::default_domain::_state_t::discard_proxy() {
     type_db_proxy.reset();
 }
 
-void yama::default_domain::_setup_compiler_services() {
+void yama::default_domain::_setup_services() {
     _compiler_services = std::make_shared<_compiler_services_t>(*this);
+    _parcel_services = std::make_shared<_parcel_services_t>(*this);
 }
 
 yama::res<yama::domain> yama::default_domain::_get_compiler_services() {
     return res(_compiler_services);
+}
+
+yama::res<yama::parcel::services> yama::default_domain::_get_parcel_services() {
+    return res(_parcel_services);
 }
 
 bool yama::default_domain::_try_install(install_batch& batch) {
@@ -280,7 +295,7 @@ bool yama::default_domain::_check_no_invalid_dep_mappings(const install_batch& b
                 YAMA_RAISE(dbg(), dsignal::install_invalid_dep_mapping);
                 YAMA_LOG(
                     dbg(), install_error_c,
-                    "error: invalid dep mapping {}; {} has not dep named {}!",
+                    "error: invalid dep mapping {}; {} has no dep named {}!",
                     dmn, dmn.install_name, dmn.dep_name);
                 success = false;
             }
@@ -289,7 +304,7 @@ bool yama::default_domain::_check_no_invalid_dep_mappings(const install_batch& b
             YAMA_RAISE(dbg(), dsignal::install_invalid_dep_mapping);
             YAMA_LOG(
                 dbg(), install_error_c,
-                "error: invalid dep mapping {}; mapped-to {} not found (in installed parcels or batch)!",
+                "error: invalid dep mapping {}; parcel {} mapped-to not found (in installed parcels or batch)!",
                 dmn, mapped_to);
             success = false;
         }
@@ -382,7 +397,7 @@ bool yama::default_domain::_dep_graph_detect_and_report_cycle(const str& install
         // detected dep graph cycle, so report it and return true
         YAMA_RAISE(dbg(), dsignal::install_dep_graph_cycle);
         YAMA_LOG(dbg(), install_error_c, "error: dep graph cycle!");
-        YAMA_LOG(dbg(), install_error_c, "logging dep graph cycle...");
+        YAMA_LOG(dbg(), install_error_c, "logging cycle...");
         for (size_t j = i; j < _node_stk.size(); j++) {
             YAMA_LOG(dbg(), install_error_c, "    > {}", _node_stk[j]);
         }
@@ -403,6 +418,79 @@ void yama::default_domain::_dep_graph_node_stk_push(const str& install_name) {
 
 void yama::default_domain::_dep_graph_node_stk_pop() {
     _node_stk.pop_back();
+}
+
+bool yama::default_domain::_check_parcel_env_parcel_is_okay(const std::optional<str>& parcel) {
+    if (!parcel) return true;
+    if (_installs.contains(parcel.value())) return true;
+    YAMA_RAISE(dbg(), dsignal::import_invalid_parcel_env);
+    YAMA_LOG(
+        dbg(), import_error_c,
+        "error: import failed; invalid parcel env parcel {}!",
+        parcel.value());
+    return false;
+}
+
+std::optional<yama::default_domain::_resolved_import_path_t> yama::default_domain::_resolve_import_path(const str& import_path, const std::optional<str>& parcel) {
+    const auto [head, relative_path] = internal::split(import_path, '.');
+    if (!parcel) { // domain env
+        return _resolved_import_path_t{
+            .import_path = import_path,
+            .head = head,
+            .relative_path = relative_path,
+        };
+    }
+    else { // parcel env
+        dep_mapping_name dmn{ .install_name = parcel.value(), .dep_name = head };
+        const auto found = _dep_mappings.find(dmn);
+        if (found == _dep_mappings.end()) {
+            YAMA_RAISE(dbg(), dsignal::import_module_not_found);
+            YAMA_LOG(
+                dbg(), import_error_c,
+                "error: import failed; dep mapping {} not found!",
+                dmn);
+            return std::nullopt;
+        }
+        const auto& resolved_head = found->second;
+        return _resolved_import_path_t{
+            .import_path = resolved_head + relative_path,
+            .head = resolved_head,
+            .relative_path = relative_path,
+        };
+    }
+}
+
+std::shared_ptr<const yama::module_info> yama::default_domain::_query_already_memoized_parcel(const str& import_path) {
+    const auto found = _state.modules.find(import_path);
+    return
+        found != _state.modules.end()
+        ? found->second.base()
+        : nullptr;
+}
+
+std::shared_ptr<yama::parcel> yama::default_domain::_query_installed_parcel(const str& install_name) {
+    const auto found = _installs.find(install_name);
+    if (found != _installs.end()) return found->second;
+    YAMA_RAISE(dbg(), dsignal::import_module_not_found);
+    YAMA_LOG(
+        dbg(), import_error_c,
+        "error: import failed; parcel {} not found!",
+        install_name);
+    return nullptr;
+}
+
+std::shared_ptr<const yama::module_info> yama::default_domain::_handle_fresh_import_and_memoize(const _resolved_import_path_t& rip, parcel& p) {
+    const auto imported = p.import(_get_parcel_services(), rip.relative_path);
+    if (!imported) {
+        YAMA_RAISE(dbg(), dsignal::import_module_not_found);
+        YAMA_LOG(
+            dbg(), import_error_c,
+            "error: import failed; module {} not found!",
+            rip.import_path);
+        return nullptr;
+    }
+    _state.modules.insert({ rip.import_path, res(imported) }); // memoize
+    return imported;
 }
 
 bool yama::default_domain::_verify(const type_info& x) {
@@ -428,13 +516,21 @@ void yama::default_domain::_upload(std::span<const type_info> x) {
     for (const auto& I : x) _upload(type_info(I));
 }
 
-void yama::default_domain::_upload(module_info&& x) {
-    module_info temp(std::forward<module_info>(x));
-    for (const auto& I : temp) _upload(type_info(I.second));
+void yama::default_domain::_upload(res<const module_info> x) {
+    for (const auto& I : *x) _upload(type_info(I.second));
+}
+
+yama::default_domain::_parcel_services_t::_parcel_services_t(default_domain& upstream)
+    : services(upstream.dbg()),
+    _upstream_ptr(&upstream) {}
+
+std::shared_ptr<const yama::module_info> yama::default_domain::_parcel_services_t::compile(const taul::source_code& src) {
+    return _get_upstream().do_compile(src);
 }
 
 yama::default_domain::_compiler_services_t::_compiler_services_t(default_domain& upstream)
-    : _upstream_ptr(&upstream) {}
+    : domain(upstream.dbg()),
+    _upstream_ptr(&upstream) {}
 
 bool yama::default_domain::_compiler_services_t::install(install_batch&& x) {
     return false; // installing is disallowed
@@ -446,6 +542,11 @@ size_t yama::default_domain::_compiler_services_t::install_count() const noexcep
 
 bool yama::default_domain::_compiler_services_t::is_installed(const str& install_name) const noexcept {
     return _get_upstream().is_installed(install_name);
+}
+
+std::shared_ptr<const yama::module_info> yama::default_domain::_compiler_services_t::import(const str& import_path, std::optional<str> parcel) {
+    //
+    return nullptr;
 }
 
 std::optional<yama::type> yama::default_domain::_compiler_services_t::load(const str& fullname) {
@@ -472,10 +573,10 @@ yama::domain::quick_access yama::default_domain::_compiler_services_t::do_preloa
     };
 }
 
-std::optional<yama::module_info> yama::default_domain::_compiler_services_t::do_compile(const taul::source_code& src) {
+std::shared_ptr<const yama::module_info> yama::default_domain::_compiler_services_t::do_compile(const taul::source_code& src) {
     // TODO: we'll need to revise how compiling works if in the future compilation is
     //       able to recursively depend upon *upstream* compilation
-    return std::nullopt;
+    return nullptr;
 }
 
 bool yama::default_domain::_compiler_services_t::do_upload(type_info&& x) {
@@ -493,11 +594,10 @@ bool yama::default_domain::_compiler_services_t::do_upload(std::span<const type_
         : false;
 }
 
-bool yama::default_domain::_compiler_services_t::do_upload(module_info&& x) {
-    module_info temp(std::forward<module_info>(x));
+bool yama::default_domain::_compiler_services_t::do_upload(res<const module_info> x) {
     return
-        _verify(temp)
-        ? (_upload(std::move(temp)), true)
+        _verify(*x)
+        ? (_upload(std::move(x)), true)
         : false;
 }
 
@@ -524,8 +624,7 @@ void yama::default_domain::_compiler_services_t::_upload(std::span<const type_in
     for (const auto& I : x) _upload(type_info(I));
 }
 
-void yama::default_domain::_compiler_services_t::_upload(module_info&& x) {
-    module_info temp(std::forward<module_info>(x));
-    for (const auto& I : temp) _upload(type_info(I.second));
+void yama::default_domain::_compiler_services_t::_upload(res<const module_info> x) {
+    for (const auto& I : *x) _upload(type_info(I.second));
 }
 

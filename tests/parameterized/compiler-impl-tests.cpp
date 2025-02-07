@@ -277,7 +277,7 @@ void CompilerImplTests::SetUp() {
 
     sidefx = sidefx_t{}; // can't forget to reset this each time
 
-    ready = dm->upload(make_fns());
+    ready = dm->upload(yama::make_res<yama::module_info>(make_fns()));
 }
 
 
@@ -377,7 +377,7 @@ fn f() -> None {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -414,7 +414,7 @@ fn f() -> Int {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -451,7 +451,7 @@ fn f() -> UInt {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -488,7 +488,7 @@ fn f() -> Float {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -525,7 +525,7 @@ fn f() -> Bool {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -562,7 +562,7 @@ fn f() -> Char {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -601,7 +601,7 @@ fn f() -> g {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -761,7 +761,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto identity_int = dm->load("identity_int"_str);
     const auto f = dm->load("f"_str);
@@ -804,7 +804,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -893,7 +893,7 @@ fn f() {}
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -950,7 +950,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1007,7 +1007,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto a = dm->load("a"_str);
     const auto b = dm->load("b"_str);
@@ -1077,7 +1077,7 @@ fn f(a: Int) {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
     
     const auto a = dm->load("a"_str);
     const auto f = dm->load("f"_str);
@@ -1310,7 +1310,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1349,7 +1349,7 @@ fn f() -> g {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -1475,7 +1475,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1513,7 +1513,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1551,7 +1551,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1616,7 +1616,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1746,7 +1746,7 @@ fn f() -> Int {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1799,7 +1799,7 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1850,7 +1850,7 @@ fn f() -> None {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1896,7 +1896,7 @@ fn f() -> None {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1944,7 +1944,7 @@ fn f() { // <- implies return type is None
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1990,7 +1990,7 @@ fn f() { // <- implies return type is None
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2033,7 +2033,7 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2102,7 +2102,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2302,7 +2302,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2389,7 +2389,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2446,7 +2446,7 @@ fn f(a: Bool) {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2517,7 +2517,7 @@ fn f(a: Bool) {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2597,7 +2597,7 @@ fn f(a: Char) {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2754,7 +2754,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2805,7 +2805,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2866,7 +2866,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2922,7 +2922,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3004,7 +3004,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3061,7 +3061,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3132,7 +3132,7 @@ fn f() -> Int {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3169,7 +3169,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3208,7 +3208,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3307,7 +3307,7 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3350,7 +3350,7 @@ fn f(a: Int) -> Int {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3390,7 +3390,7 @@ fn f() -> Int {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3429,7 +3429,7 @@ fn f(g: Int) {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3474,7 +3474,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3521,7 +3521,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3688,7 +3688,7 @@ fn f() -> Int {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3754,7 +3754,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3887,7 +3887,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3986,7 +3986,7 @@ fn f6() -> Float { return nan; }
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f0 = dm->load("f0"_str);
     const auto f1 = dm->load("f1"_str);
@@ -4081,7 +4081,7 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4120,7 +4120,7 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4188,7 +4188,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4287,7 +4287,7 @@ fn f() {
 
     //std::cerr << std::format("{}\n", result->back());
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4437,7 +4437,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto choose = dm->load("choose"_str);
     const auto f = dm->load("f"_str);
@@ -4487,7 +4487,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto get_callobj = dm->load("get_callobj"_str);
     const auto foo = dm->load("foo"_str);
@@ -4551,7 +4551,7 @@ fn f() {
     const auto result = comp->compile(yama::res(dm), src);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::module_info(*result)));
+    ASSERT_TRUE(dm->upload(yama::res(result)));
 
     const auto foo = dm->load("foo"_str);
     const auto f = dm->load("f"_str);

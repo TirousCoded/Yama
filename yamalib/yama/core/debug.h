@@ -44,11 +44,13 @@ namespace yama {
         verif_warning       = 1 << 6,           // static verification warning
         install             = 1 << 7,           // install behaviour trace
         install_error       = 1 << 8,           // install error
-        instant             = 1 << 9,           // type instantiation behaviour trace
-        instant_error       = 1 << 10,          // type instantiation error
-        ctx_panic           = 1 << 11,          // context panic
-        ctx_llcmd           = 1 << 12,          // low-level command behaviour trace
-        bcode_exec          = 1 << 13,          // bcode execution trace
+        import              = 1 << 9,           // import behaviour trace
+        import_error        = 1 << 10,          // import error
+        instant             = 1 << 11,          // type instantiation behaviour trace
+        instant_error       = 1 << 12,          // type instantiation error
+        ctx_panic           = 1 << 13,          // context panic
+        ctx_llcmd           = 1 << 14,          // low-level command behaviour trace
+        bcode_exec          = 1 << 15,          // bcode execution trace
 
         none                = 0,
         all                 = uint32_t(-1),
@@ -56,6 +58,7 @@ namespace yama {
         errors              = compile_error
                             | verif_error
                             | install_error
+                            | import_error
                             | instant_error
                             | ctx_panic,
 
@@ -79,6 +82,8 @@ namespace yama {
     constexpr auto verif_warning_c      = dcat::verif_warning;
     constexpr auto install_c            = dcat::install;
     constexpr auto install_error_c      = dcat::install_error;
+    constexpr auto import_c             = dcat::import;
+    constexpr auto import_error_c       = dcat::import_error;
     constexpr auto instant_c            = dcat::instant;
     constexpr auto instant_error_c      = dcat::instant_error;
     constexpr auto ctx_panic_c          = dcat::ctx_panic;
@@ -218,6 +223,9 @@ namespace yama {
         install_invalid_dep_mapping,
         install_dep_graph_cycle,
 
+        import_module_not_found,
+        import_invalid_parcel_env,
+
         instant_type_not_found,
         instant_kind_mismatch,
         instant_callsig_mismatch,
@@ -229,7 +237,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 56);
+        static_assert(dsignals == 58);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -289,6 +297,9 @@ namespace yama {
             _YAMA_ENTRY_(install_missing_dep_mapping);
             _YAMA_ENTRY_(install_invalid_dep_mapping);
             _YAMA_ENTRY_(install_dep_graph_cycle);
+
+            _YAMA_ENTRY_(import_module_not_found);
+            _YAMA_ENTRY_(import_invalid_parcel_env);
 
             _YAMA_ENTRY_(instant_type_not_found);
             _YAMA_ENTRY_(instant_kind_mismatch);

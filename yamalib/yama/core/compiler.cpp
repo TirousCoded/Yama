@@ -16,7 +16,7 @@ yama::default_compiler::default_compiler(std::shared_ptr<debug> dbg)
     : compiler(dbg),
     _services_ptr(nullptr) {}
 
-std::optional<yama::module_info> yama::default_compiler::compile(
+std::shared_ptr<const yama::module_info> yama::default_compiler::compile(
     res<domain> dm,
     const taul::source_code& src) {
     _services_ptr = dm.get();
@@ -27,21 +27,21 @@ std::optional<yama::module_info> yama::default_compiler::compile(
             dbg(), compile_error_c,
             "error: {0} syntax error!",
             src.location_at(*syntax_error));
-        return std::nullopt;
+        return nullptr;
     }
     internal::csymtab_group csymtabs{};
     internal::csymtab_group_ctti csymtabs_ctti(_services(), *ast.root, csymtabs);
     internal::first_pass fp(dbg(), _services(), *ast.root, src, csymtabs_ctti);
     ast.root->accept(fp);
     if (!fp.good()) {
-        return std::nullopt;
+        return nullptr;
     }
     internal::second_pass sp(dbg(), *ast.root, src, csymtabs_ctti);
     ast.root->accept(sp);
     if (!sp.good()) {
-        return std::nullopt;
+        return nullptr;
     }
-    return sp.results.done();
+    return std::make_shared<module_info>(std::move(sp.results.done()));
 }
 
 yama::domain& yama::default_compiler::_services() const noexcept {

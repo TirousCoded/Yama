@@ -3,6 +3,9 @@
 #include "parcel.h"
 
 
+yama::parcel::services::services(std::shared_ptr<debug> dbg)
+    : api_component(dbg) {}
+
 yama::parcel::parcel(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
 

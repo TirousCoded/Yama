@@ -49,7 +49,7 @@ namespace yama {
 
         // services exposes compile to existing type information
 
-        virtual std::optional<module_info> compile(
+        virtual std::shared_ptr<const module_info> compile(
             res<services> services,
             const taul::source_code& src) = 0;
     };
@@ -60,7 +60,7 @@ namespace yama {
         default_compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
-        std::optional<module_info> compile(
+        std::shared_ptr<const module_info> compile(
             res<services> services,
             const taul::source_code& src) override final;
 

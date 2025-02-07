@@ -44,16 +44,17 @@ namespace yama {
 
     class parcel : public api_component {
     public:
-        // TODO: add later
-        //class services : public api_component {
-        //public:
-        //    services(std::shared_ptr<debug> dbg = nullptr);
-        //
-        //    virtual ~services() noexcept = default;
-        //
-        //
-        //    virtual std::optional<module_info> compile(const taul::source_code& src) = 0;
-        //};
+        // NOTE: services classes are unit tested as part of domain impl unit tests
+
+        class services : public api_component {
+        public:
+            services(std::shared_ptr<debug> dbg = nullptr);
+
+            virtual ~services() noexcept = default;
+
+
+            virtual std::shared_ptr<const module_info> compile(const taul::source_code& src) = 0;
+        };
 
 
         parcel(std::shared_ptr<debug> dbg = nullptr);
@@ -63,14 +64,13 @@ namespace yama {
 
         // deps returns the dependency requirements of the parcel
 
-        virtual const dep_reqs& deps() const = 0;
+        virtual const dep_reqs& deps() = 0;
 
-        // TODO: add later
-        //// import imports the module at relative_path in the parcel, if any
-        //
-        //virtual std::shared_ptr<module_info> import(
-        //    res<services> services,
-        //    str relative_path) = 0;
+        // import imports the module at relative_path in the parcel, if any
+        
+        virtual std::shared_ptr<const module_info> import(
+            res<services> services,
+            str relative_path) = 0;
     };
 
 
@@ -79,8 +79,8 @@ namespace yama {
         null_parcel() = default;
 
 
-        inline const dep_reqs& deps() const override final { return dep_reqs{}; }
-        //inline std::shared_ptr<module_info> import(res<services>, str) override final { return nullptr; }
+        inline const dep_reqs& deps() override final { return dep_reqs{}; }
+        inline std::shared_ptr<const module_info> import(res<services>, str) override final { return nullptr; }
     };
 }
 

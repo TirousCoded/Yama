@@ -108,6 +108,46 @@ namespace yama {
         virtual bool is_installed(const str& install_name) const noexcept = 0;
 
 
+        // IMPORTANT: import paths are period-seperated lists of identifiers specifying
+        //            where a module is found, and what it's called, w/ each module having
+        //            a unique import path
+        //
+        //            the first identifier in this list is called the 'head', and specifies
+        //            the parcel from which the module is imported
+        //
+        //            the meaning of the head identifier depends upon the 'environment', or
+        //            'env', in which importing is occurring
+        // 
+        //            two types of environments exist:
+        //                  1) 'domain envs' identify parcels by their install names
+        //                  2) 'parcel envs' identify parcels by their dep names (in the
+        //                     context of a particular parcel and its deps)
+        //
+        //            removing the head identifier from the import path yields the 'relative
+        //            path' of the import path, which is used within parcels to specify
+        //            modules w/out exposing info about said parcel existing within the
+        //            context of a broader environment of parcels
+        // 
+        //            this lack of broader context is important as parcels are not supposed
+        //            to be coupled to domains
+        // 
+        //            a relative path which is an empty string refers to the 'root' module
+        //            of a parcel, w/ root modules having the notable characteristic that
+        //            import paths to them only contain a head identifier
+        //
+        //            given an import path 'std.io.net.http', 'std' is the head, and
+        //            '.io.net.http' is the relative path
+
+        // import attempts to import a module at import_path
+
+        // parcel specifies the environment of the import: domain env if std::nullopt, and
+        // parcel env otherwise, its string specifying the parcel of the env
+
+        virtual std::shared_ptr<const module_info> import(
+            const str& import_path,
+            std::optional<str> parcel = std::nullopt) = 0;
+
+
         // load returns the type under fullname, if any
 
         virtual std::optional<type> load(const str& fullname) = 0;
@@ -137,7 +177,7 @@ namespace yama {
         bool upload(std::span<const type_info> x);
         bool upload(const std::vector<type_info>& x);
         bool upload(std::initializer_list<type_info> x);
-        bool upload(module_info&& x);
+        bool upload(res<const module_info> x);
 
         // these overloads upload source code which gets compiled
 
@@ -168,10 +208,10 @@ namespace yama {
 
 
         virtual quick_access do_preload_builtins() = 0;
-        virtual std::optional<module_info> do_compile(const taul::source_code& src) = 0;
+        virtual std::shared_ptr<const module_info> do_compile(const taul::source_code& src) = 0;
         virtual bool do_upload(type_info&& x) = 0;
         virtual bool do_upload(std::span<const type_info> x) = 0;
-        virtual bool do_upload(module_info&& x) = 0;
+        virtual bool do_upload(res<const module_info> x) = 0;
 
 
     private:
@@ -189,15 +229,16 @@ namespace yama {
         bool install(install_batch&& x) override final;
         size_t install_count() const noexcept override final;
         bool is_installed(const str& install_name) const noexcept override final;
+        std::shared_ptr<const module_info> import(const str& import_path, std::optional<str> parcel) override final;
         std::optional<type> load(const str& fullname) override final;
 
 
     protected:
         quick_access do_preload_builtins() override final;
-        std::optional<module_info> do_compile(const taul::source_code& src) override final;
+        std::shared_ptr<const module_info> do_compile(const taul::source_code& src) override final;
         bool do_upload(type_info&& x) override final;
         bool do_upload(std::span<const type_info> x) override final;
-        bool do_upload(module_info&& x) override final;
+        bool do_upload(res<const module_info> x) override final;
 
 
     private:
@@ -211,13 +252,11 @@ namespace yama {
             // if compilation succeeds, we *commit* the contents of our proxy to the domain proper,
             // w/ us otherwise *discarding* said contents instead
 
-            internal::res_db<res<type_info>> type_info_db;
-            internal::res_db<res<type_info>> type_info_db_proxy;
-            internal::res_db<res<internal::type_instance<std::allocator<void>>>> type_db;
-            internal::res_db<res<internal::type_instance<std::allocator<void>>>> type_db_proxy;
-            internal::res_db<res<internal::type_instance<std::allocator<void>>>> type_batch_db;
-            internal::type_instantiator<std::allocator<void>> instant;
-            internal::type_instantiator<std::allocator<void>> instant_proxy;
+            internal::res_db<res<type_info>> type_info_db, type_info_db_proxy;
+            internal::res_db<res<internal::type_instance<std::allocator<void>>>> type_db, type_db_proxy, type_batch_db;
+            internal::type_instantiator<std::allocator<void>> instant, instant_proxy;
+
+            std::unordered_map<str, res<const module_info>> modules, modules_proxy;
 
 
             _state_t(std::shared_ptr<debug> dbg);
@@ -228,10 +267,12 @@ namespace yama {
         } _state;
 
 
-        std::shared_ptr<domain> _compiler_services; // the proxy we send to our compiler
+        std::shared_ptr<domain> _compiler_services;
+        std::shared_ptr<parcel::services> _parcel_services;
 
-        void _setup_compiler_services();
+        void _setup_services();
         res<domain> _get_compiler_services();
+        res<parcel::services> _get_parcel_services();
 
 
         // the below record the installed parcels of the domain, and record the established
@@ -304,14 +345,42 @@ namespace yama {
         void _dep_graph_node_stk_pop();
 
 
+        struct _resolved_import_path_t final {
+            str import_path, head, relative_path;
+        };
+
+        bool _check_parcel_env_parcel_is_okay(const std::optional<str>& parcel);
+        std::optional<_resolved_import_path_t> _resolve_import_path(const str& import_path, const std::optional<str>& parcel);
+        std::shared_ptr<const module_info> _query_already_memoized_parcel(const str& import_path);
+        std::shared_ptr<parcel> _query_installed_parcel(const str& install_name);
+        std::shared_ptr<const module_info> _handle_fresh_import_and_memoize(const _resolved_import_path_t& rip, parcel& p);
+
+
         bool _verify(const type_info& x);
         bool _verify(std::span<const type_info> x);
         bool _verify(const module_info& x);
 
         void _upload(type_info&& x);
         void _upload(std::span<const type_info> x);
-        void _upload(module_info&& x);
+        void _upload(res<const module_info> x);
 
+
+        class _parcel_services_t : public parcel::services {
+        public:
+            _parcel_services_t(default_domain& upstream);
+
+            virtual ~_parcel_services_t() noexcept = default;
+
+
+            std::shared_ptr<const module_info> compile(const taul::source_code& src) override final;
+
+
+        private:
+            default_domain* _upstream_ptr = nullptr;
+
+            inline default_domain& _get_upstream() const noexcept { return deref_assert(_upstream_ptr); }
+            inline _state_t& _get_state() const noexcept { return _get_upstream()._state; }
+        };
 
         class _compiler_services_t final : public domain {
         public:
@@ -326,15 +395,16 @@ namespace yama {
             bool install(install_batch&&) override final; // installing is disallowed for compiler services
             size_t install_count() const noexcept override final;
             bool is_installed(const str& install_name) const noexcept override final;
+            std::shared_ptr<const module_info> import(const str& import_path, std::optional<str> parcel) override final;
             std::optional<type> load(const str& fullname) override final;
 
 
         protected:
             quick_access do_preload_builtins() override final;
-            std::optional<module_info> do_compile(const taul::source_code& src) override final;
+            std::shared_ptr<const module_info> do_compile(const taul::source_code& src) override final;
             bool do_upload(type_info&& x) override final;
             bool do_upload(std::span<const type_info> x) override final;
-            bool do_upload(module_info&& x) override final;
+            bool do_upload(res<const module_info> x) override final;
 
 
         private:
@@ -350,7 +420,7 @@ namespace yama {
 
             void _upload(type_info&& x);
             void _upload(std::span<const type_info> x);
-            void _upload(module_info&& x);
+            void _upload(res<const module_info> x);
         };
     };
 }

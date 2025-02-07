@@ -3,10 +3,32 @@
 #pragma once
 
 
+#include <string_view>
+
 #include "../core/asserts.h"
+#include "../core/general.h"
 
 
 namespace yama::internal {
+
+
+    template<typename Char>
+    inline std::pair<std::basic_string_view<Char>, std::basic_string_view<Char>> split(std::basic_string_view<Char> x, Char divider) noexcept {
+        size_t i = 0;
+        for (; i < x.length(); i++) {
+            if (x[i] == divider) break;
+        }
+        return { x.substr(0, i), i < x.length() ? x.substr(i) : std::basic_string_view<Char>{} };
+    }
+
+    template<typename Char>
+    inline std::pair<taul::basic_str<Char>, taul::basic_str<Char>> split(taul::basic_str<Char> x, Char divider) noexcept {
+        size_t i = 0;
+        for (; i < x.length(); i++) {
+            if (x[i] == divider) break;
+        }
+        return { x.substr(0, i), i < x.length() ? x.substr(i) : taul::basic_str<Char>{} };
+    }
 
 
     // NOTE: copied range_overlap from TAUL
