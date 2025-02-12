@@ -224,7 +224,6 @@ namespace yama {
         install_dep_graph_cycle,
 
         import_module_not_found,
-        import_invalid_parcel_env,
 
         instant_type_not_found,
         instant_kind_mismatch,
@@ -237,7 +236,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 58);
+        static_assert(dsignals == 57);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -299,7 +298,6 @@ namespace yama {
             _YAMA_ENTRY_(install_dep_graph_cycle);
 
             _YAMA_ENTRY_(import_module_not_found);
-            _YAMA_ENTRY_(import_invalid_parcel_env);
 
             _YAMA_ENTRY_(instant_type_not_found);
             _YAMA_ENTRY_(instant_kind_mismatch);

@@ -5,8 +5,8 @@
 #include "../core/callsig.h"
 
 
-yama::internal::csymtab_group_ctti::csymtab_group_ctti(domain& dm, ast_Chunk& root, csymtab_group& csymtabs)
-    : _dm(&dm),
+yama::internal::csymtab_group_ctti::csymtab_group_ctti(compiler_services services, ast_Chunk& root, csymtab_group& csymtabs)
+    : _services(services),
     _root(&root),
     _csymtabs(&csymtabs) {}
 
@@ -23,7 +23,7 @@ std::shared_ptr<yama::internal::csymtab::entry> yama::internal::csymtab_group_ct
     if (!result) {
         // if couldn't find, then try loading a type from domain, and if successful,
         // add that to the root of the csymtabs
-        if (const auto t = _get_dm().load(name)) {
+        if (const auto t = _services.load(name)) {
             static_assert(kinds == 2);
             if (t->kind() == kind::primitive) {
                 _insert_predeclared_prim(res(x.shared_from_this()), *t);
@@ -40,10 +40,6 @@ std::shared_ptr<yama::internal::csymtab::entry> yama::internal::csymtab_group_ct
 
 std::string yama::internal::csymtab_group_ctti::fmt(size_t tabs, const char* tab) {
     return _get_csymtabs().fmt(tabs, tab);
-}
-
-yama::domain& yama::internal::csymtab_group_ctti::_get_dm() const noexcept {
-    return deref_assert(_dm);
 }
 
 yama::internal::ast_Chunk& yama::internal::csymtab_group_ctti::_get_root() const noexcept {

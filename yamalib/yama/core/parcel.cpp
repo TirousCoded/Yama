@@ -2,12 +2,8 @@
 
 #include "parcel.h"
 
+#include "domain.h"
 
-yama::parcel::services::services(std::shared_ptr<debug> dbg)
-    : api_component(dbg) {}
-
-yama::parcel::parcel(std::shared_ptr<debug> dbg)
-    : api_component(dbg) {}
 
 bool yama::dep_reqs::exists(const str& dep_name) const noexcept {
     return reqs.contains(dep_name);
@@ -23,4 +19,19 @@ yama::dep_reqs& yama::dep_reqs::add(str dep_name) {
     reqs.insert({ dep_name, metadata{} });
     return *this;
 }
+
+const yama::str& yama::parcel_services::install_name() const noexcept {
+    return _install_name;
+}
+
+std::shared_ptr<const yama::module_info> yama::parcel_services::compile(const taul::source_code& src) {
+    return deref_assert(_client).do_ps_compile(src, install_name());
+}
+
+yama::parcel_services::parcel_services(domain& client, const str& install_name)
+    : _client(&client),
+    _install_name(install_name) {}
+
+yama::parcel::parcel(std::shared_ptr<debug> dbg)
+    : api_component(dbg) {}
 

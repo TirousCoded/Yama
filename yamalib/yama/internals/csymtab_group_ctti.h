@@ -21,7 +21,7 @@ namespace yama::internal {
     public:
 
         csymtab_group_ctti(
-            domain& dm,
+            compiler_services services,
             ast_Chunk& root,
             csymtab_group& csymtabs);
 
@@ -38,12 +38,11 @@ namespace yama::internal {
 
 
     private:
-        domain* _dm;
+        compiler_services _services;
         ast_Chunk* _root;
         csymtab_group* _csymtabs;
 
 
-        domain& _get_dm() const noexcept;
         ast_Chunk& _get_root() const noexcept;
         csymtab_group& _get_csymtabs() const noexcept;
 
@@ -56,7 +55,7 @@ namespace yama::internal {
     template<typename Info>
     inline bool csymtab_group_ctti::insert(ast_node& x, const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info, bool* no_table_found) {
         // if inserting into root, check that there's no predeclared type that should block insert
-        if (&x == &_get_root() && _get_dm().load(name).has_value()) {
+        if (&x == &_get_root() && _services.load(name).has_value()) {
             return false;
         }
         return _get_csymtabs().insert(x, name, node, starts, std::forward<Info>(info), no_table_found);

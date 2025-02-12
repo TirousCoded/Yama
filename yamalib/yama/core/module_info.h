@@ -18,14 +18,12 @@ namespace yama {
 
 
         size_t size() const noexcept;
-        inline bool empty() const noexcept { return size() == 0; }
+        bool contains(const str& name) const noexcept;
 
-        bool exists(const str& name) const noexcept;
+        // type behaviour is undefined if no type exists under name
 
-        // get behaviour is undefined if no type exists under name
-
-        const yama::type_info& get(const str& name) const noexcept;
-        inline const yama::type_info& operator[](const str& name) const noexcept { return get(name); }
+        const yama::type_info& type(const str& name) const noexcept;
+        inline const yama::type_info& operator[](const str& name) const noexcept { return type(name); }
 
         inline auto cbegin() const noexcept { return types.begin(); }
         inline auto begin() const noexcept { return cbegin(); }

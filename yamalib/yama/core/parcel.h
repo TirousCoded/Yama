@@ -14,6 +14,9 @@
 namespace yama {
 
 
+    class domain;
+
+
     // TODO: dep_reqs has not been unit tested
 
     // dep_reqs defines a set of dependency requirements of a parcel,
@@ -42,21 +45,31 @@ namespace yama {
     };
 
 
+    // NOTE: services classes are unit tested as part of domain impl unit tests
+
+    class parcel_services final {
+    public:
+        parcel_services() = delete;
+
+
+        const str& install_name() const noexcept;
+        std::shared_ptr<const module_info> compile(const taul::source_code& src);
+
+
+    private:
+        friend class domain;
+
+
+        parcel_services(domain& client, const str& install_name); // for use in domain
+
+
+        domain* _client;
+        str _install_name;
+    };
+
+
     class parcel : public api_component {
     public:
-        // NOTE: services classes are unit tested as part of domain impl unit tests
-
-        class services : public api_component {
-        public:
-            services(std::shared_ptr<debug> dbg = nullptr);
-
-            virtual ~services() noexcept = default;
-
-
-            virtual std::shared_ptr<const module_info> compile(const taul::source_code& src) = 0;
-        };
-
-
         parcel(std::shared_ptr<debug> dbg = nullptr);
 
         virtual ~parcel() noexcept = default;
@@ -68,9 +81,7 @@ namespace yama {
 
         // import imports the module at relative_path in the parcel, if any
         
-        virtual std::shared_ptr<const module_info> import(
-            res<services> services,
-            str relative_path) = 0;
+        virtual std::shared_ptr<const module_info> import(parcel_services services, str relative_path) = 0;
     };
 
 
@@ -80,7 +91,7 @@ namespace yama {
 
 
         inline const dep_reqs& deps() override final { return dep_reqs{}; }
-        inline std::shared_ptr<const module_info> import(res<services>, str) override final { return nullptr; }
+        inline std::shared_ptr<const module_info> import(parcel_services, str) override final { return nullptr; }
     };
 }
 

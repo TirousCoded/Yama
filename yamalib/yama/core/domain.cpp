@@ -106,14 +106,31 @@ void yama::domain::finish_setup() {
     _quick_access = do_preload_builtins();
 }
 
-yama::default_domain::default_domain(std::shared_ptr<debug> dbg)
-    : domain(dbg),
-    // we're using a proxy for dbg to cut out annoying internal instantiation error
-    // messages which will arise during successful compilation
-    _state(proxy_dbg(dbg, ~instant_error_c)) {
-    finish_setup();
-    _setup_services(); // only call after finish_setup
+yama::parcel_services yama::domain::create_parcel_services(const str& install_name) {
+    return parcel_services(*this, install_name);
 }
+
+yama::compiler_services yama::domain::create_compiler_services(const str& parcel_env) {
+    return compiler_services(*this, parcel_env);
+}
+
+yama::default_domain::default_domain(const domain_config& config, std::shared_ptr<debug> dbg)
+    : domain(dbg),
+    _other_dbg(proxy_dbg(dbg, ~instant_error_c)),
+    _verif(config.verifier ? res(config.verifier) : (res<verifier>)make_res<default_verifier>(_other_dbg)),
+    _compiler(config.compiler ? res(config.compiler) : (res<yama::compiler>)make_res<default_compiler>(_other_dbg)),
+    _type_info_db(),
+    _type_info_db_batch(_type_info_db),
+    _type_db(),
+    _type_db_batch(_type_db),
+    _type_batch_db(),
+    _instant(_type_info_db, _type_db, _type_batch_db, std::allocator<void>{}, _other_dbg),
+    _instant_batch(_type_info_db_batch, _type_db_batch, _type_batch_db, std::allocator<void>{}, _other_dbg) {
+    finish_setup();
+}
+
+yama::default_domain::default_domain(std::shared_ptr<debug> dbg)
+    : default_domain(domain_config{}, dbg) {}
 
 bool yama::default_domain::install(install_batch&& x) {
     install_batch temp(std::forward<install_batch>(x));
@@ -128,24 +145,20 @@ bool yama::default_domain::is_installed(const str& install_name) const noexcept 
     return _installs.contains(install_name);
 }
 
-std::shared_ptr<const yama::module_info> yama::default_domain::import(const str& import_path, std::optional<str> parcel) {
-    if (!_check_parcel_env_parcel_is_okay(parcel)) return nullptr;
-    const auto resolved = _resolve_import_path(import_path, parcel); // translates from parcel to domain env
-    if (!resolved) return nullptr;
-    if (const auto memoized = _query_already_memoized_parcel(resolved->import_path)) return memoized;
-    const auto our_parcel = _query_installed_parcel(resolved->head);
-    if (!our_parcel) return nullptr;
-    return _handle_fresh_import_and_memoize(*resolved, *our_parcel);
+std::optional<yama::module> yama::default_domain::import(const str& import_path) {
+    const auto result = _import(import_path, std::nullopt);
+    _commit_or_discard_batch((bool)result);
+    return result;
 }
 
 std::optional<yama::type> yama::default_domain::load(const str& fullname) {
-    if (const auto first_attempt = _state.type_db.pull(fullname)) {
+    if (const auto first_attempt = _type_db.pull(fullname)) {
         return type(**first_attempt);
     }
-    if (const size_t number = _state.instant.instantiate(fullname); number == 0) {
+    if (const size_t number = _instant.instantiate(fullname); number == 0) {
         return std::nullopt;
     }
-    if (const auto second_attempt = _state.type_db.pull(fullname)) {
+    if (const auto second_attempt = _type_db.pull(fullname)) {
         return type(**second_attempt);
     }
     return std::nullopt;
@@ -167,9 +180,8 @@ yama::domain::quick_access yama::default_domain::do_preload_builtins() {
 }
 
 std::shared_ptr<const yama::module_info> yama::default_domain::do_compile(const taul::source_code& src) {
-    const auto result = _state.compiler.compile(_get_compiler_services(), src);
-    if (result) _state.commit_proxy();
-    else        _state.discard_proxy();
+    const auto result = _compiler->compile(create_compiler_services("TODO"_str), src);
+    _commit_or_discard_batch((bool)result);
     return result;
 }
 
@@ -195,41 +207,47 @@ bool yama::default_domain::do_upload(res<const module_info> x) {
         : false;
 }
 
-yama::default_domain::_state_t::_state_t(std::shared_ptr<debug> dbg)
-    : verif(dbg),
-    compiler(dbg),
-    type_info_db(),
-    type_info_db_proxy(type_info_db),
-    type_db(),
-    type_db_proxy(type_db),
-    type_batch_db(),
-    instant(type_info_db, type_db, type_batch_db, std::allocator<void>{}, dbg),
-    instant_proxy(type_info_db_proxy, type_db_proxy, type_batch_db, std::allocator<void>{}, dbg) {}
+std::shared_ptr<const yama::module_info> yama::default_domain::do_ps_compile(const taul::source_code& src, const str& parcel_env) {
+    const auto result = _compiler->compile(create_compiler_services(parcel_env), src);
+    _commit_or_discard_batch((bool)result);
+    return result;
+}
 
-void yama::default_domain::_state_t::commit_proxy() {
+std::optional<yama::module> yama::default_domain::do_cs_import(const str& import_path, const str& parcel_env) {
+    return _import(import_path, parcel_env);
+}
+
+std::optional<yama::type> yama::default_domain::do_cs_load(const str& fullname, const str& parcel_env) {
+    if (const auto first_attempt = _type_db_batch.pull(fullname)) {
+        return type(**first_attempt);
+    }
+    if (const size_t number = _instant_batch.instantiate(fullname); number == 0) {
+        return std::nullopt;
+    }
+    if (const auto second_attempt = _type_db_batch.pull(fullname)) {
+        return type(**second_attempt);
+    }
+    return std::nullopt;
+}
+
+void yama::default_domain::_commit_batch() {
     // these commit calls will reset our proxy for us
     const bool result =
-        type_info_db_proxy.commit() &&
-        type_db_proxy.commit();
+        _type_info_db_batch.commit() &&
+        _type_db_batch.commit();
+    _modules.merge(_modules_batch);
     YAMA_ASSERT(result);
 }
 
-void yama::default_domain::_state_t::discard_proxy() {
-    type_info_db_proxy.reset();
-    type_db_proxy.reset();
+void yama::default_domain::_discard_batch() {
+    _type_info_db_batch.reset();
+    _type_db_batch.reset();
+    _modules_batch.clear();
 }
 
-void yama::default_domain::_setup_services() {
-    _compiler_services = std::make_shared<_compiler_services_t>(*this);
-    _parcel_services = std::make_shared<_parcel_services_t>(*this);
-}
-
-yama::res<yama::domain> yama::default_domain::_get_compiler_services() {
-    return res(_compiler_services);
-}
-
-yama::res<yama::parcel::services> yama::default_domain::_get_parcel_services() {
-    return res(_parcel_services);
+void yama::default_domain::_commit_or_discard_batch(bool commit) {
+    if (commit) _commit_batch();
+    else        _discard_batch();
 }
 
 bool yama::default_domain::_try_install(install_batch& batch) {
@@ -420,15 +438,9 @@ void yama::default_domain::_dep_graph_node_stk_pop() {
     _node_stk.pop_back();
 }
 
-bool yama::default_domain::_check_parcel_env_parcel_is_okay(const std::optional<str>& parcel) {
-    if (!parcel) return true;
-    if (_installs.contains(parcel.value())) return true;
-    YAMA_RAISE(dbg(), dsignal::import_invalid_parcel_env);
-    YAMA_LOG(
-        dbg(), import_error_c,
-        "error: import failed; invalid parcel env parcel {}!",
-        parcel.value());
-    return false;
+void yama::default_domain::_assert_parcel_env_parcel_is_okay(const std::optional<str>& parcel) {
+    if (!parcel) return;
+    YAMA_ASSERT(_installs.contains(parcel.value()));
 }
 
 std::optional<yama::default_domain::_resolved_import_path_t> yama::default_domain::_resolve_import_path(const str& import_path, const std::optional<str>& parcel) {
@@ -460,12 +472,12 @@ std::optional<yama::default_domain::_resolved_import_path_t> yama::default_domai
     }
 }
 
-std::shared_ptr<const yama::module_info> yama::default_domain::_query_already_memoized_parcel(const str& import_path) {
-    const auto found = _state.modules.find(import_path);
+std::optional<yama::module> yama::default_domain::_query_already_memoized_parcel(const str& import_path) {
+    const auto found = _modules.find(import_path);
     return
-        found != _state.modules.end()
-        ? found->second.base()
-        : nullptr;
+        found != _modules.end()
+        ? std::make_optional(yama::module(found->second.get()))
+        : std::nullopt;
 }
 
 std::shared_ptr<yama::parcel> yama::default_domain::_query_installed_parcel(const str& install_name) {
@@ -479,37 +491,47 @@ std::shared_ptr<yama::parcel> yama::default_domain::_query_installed_parcel(cons
     return nullptr;
 }
 
-std::shared_ptr<const yama::module_info> yama::default_domain::_handle_fresh_import_and_memoize(const _resolved_import_path_t& rip, parcel& p) {
-    const auto imported = p.import(_get_parcel_services(), rip.relative_path);
+std::optional<yama::module> yama::default_domain::_handle_fresh_import_and_memoize(const _resolved_import_path_t& rip, parcel& p) {
+    const auto imported = p.import(create_parcel_services(rip.head), rip.relative_path);
     if (!imported) {
         YAMA_RAISE(dbg(), dsignal::import_module_not_found);
         YAMA_LOG(
             dbg(), import_error_c,
             "error: import failed; module {} not found!",
             rip.import_path);
-        return nullptr;
+        return std::nullopt;
     }
-    _state.modules.insert({ rip.import_path, res(imported) }); // memoize
-    return imported;
+    _modules.insert({ rip.import_path, res(imported) }); // memoize
+    return yama::module(imported.get());
+}
+
+std::optional<yama::module> yama::default_domain::_import(const str& import_path, std::optional<str> parcel) {
+    _assert_parcel_env_parcel_is_okay(parcel);
+    const auto resolved = _resolve_import_path(import_path, parcel); // translates from parcel to domain env
+    if (!resolved) return std::nullopt;
+    if (const auto memoized = _query_already_memoized_parcel(resolved->import_path)) return memoized;
+    const auto our_parcel = _query_installed_parcel(resolved->head);
+    if (!our_parcel) return std::nullopt;
+    return _handle_fresh_import_and_memoize(*resolved, *our_parcel);
 }
 
 bool yama::default_domain::_verify(const type_info& x) {
-    return _state.verif.verify(x);
+    return _verif->verify(x);
 }
 
 bool yama::default_domain::_verify(std::span<const type_info> x) {
     for (const auto& I : x) {
-        if (!_state.verif.verify(I)) return false;
+        if (!_verif->verify(I)) return false;
     }
     return true;
 }
 
 bool yama::default_domain::_verify(const module_info& x) {
-    return _state.verif.verify(x);
+    return _verif->verify(x);
 }
 
 void yama::default_domain::_upload(type_info&& x) {
-    _state.type_info_db.push(make_res<type_info>(std::forward<type_info>(x)));
+    _type_info_db.push(make_res<type_info>(std::forward<type_info>(x)));
 }
 
 void yama::default_domain::_upload(std::span<const type_info> x) {
@@ -517,114 +539,6 @@ void yama::default_domain::_upload(std::span<const type_info> x) {
 }
 
 void yama::default_domain::_upload(res<const module_info> x) {
-    for (const auto& I : *x) _upload(type_info(I.second));
-}
-
-yama::default_domain::_parcel_services_t::_parcel_services_t(default_domain& upstream)
-    : services(upstream.dbg()),
-    _upstream_ptr(&upstream) {}
-
-std::shared_ptr<const yama::module_info> yama::default_domain::_parcel_services_t::compile(const taul::source_code& src) {
-    return _get_upstream().do_compile(src);
-}
-
-yama::default_domain::_compiler_services_t::_compiler_services_t(default_domain& upstream)
-    : domain(upstream.dbg()),
-    _upstream_ptr(&upstream) {}
-
-bool yama::default_domain::_compiler_services_t::install(install_batch&& x) {
-    return false; // installing is disallowed
-}
-
-size_t yama::default_domain::_compiler_services_t::install_count() const noexcept {
-    return _get_upstream().install_count();
-}
-
-bool yama::default_domain::_compiler_services_t::is_installed(const str& install_name) const noexcept {
-    return _get_upstream().is_installed(install_name);
-}
-
-std::shared_ptr<const yama::module_info> yama::default_domain::_compiler_services_t::import(const str& import_path, std::optional<str> parcel) {
-    //
-    return nullptr;
-}
-
-std::optional<yama::type> yama::default_domain::_compiler_services_t::load(const str& fullname) {
-    if (const auto first_attempt = _get_state().type_db_proxy.pull(fullname)) {
-        return type(**first_attempt);
-    }
-    if (const size_t number = _get_state().instant_proxy.instantiate(fullname); number == 0) {
-        return std::nullopt;
-    }
-    if (const auto second_attempt = _get_state().type_db_proxy.pull(fullname)) {
-        return type(**second_attempt);
-    }
-    return std::nullopt;
-}
-
-yama::domain::quick_access yama::default_domain::_compiler_services_t::do_preload_builtins() {
-    return quick_access{
-        .none = _get_upstream().load_none(),
-        .int0 = _get_upstream().load_int(),
-        .uint = _get_upstream().load_uint(),
-        .float0 = _get_upstream().load_float(),
-        .bool0 = _get_upstream().load_bool(),
-        .char0 = _get_upstream().load_char(),
-    };
-}
-
-std::shared_ptr<const yama::module_info> yama::default_domain::_compiler_services_t::do_compile(const taul::source_code& src) {
-    // TODO: we'll need to revise how compiling works if in the future compilation is
-    //       able to recursively depend upon *upstream* compilation
-    return nullptr;
-}
-
-bool yama::default_domain::_compiler_services_t::do_upload(type_info&& x) {
-    type_info temp(std::forward<type_info>(x));
-    return
-        _verify(temp)
-        ? (_upload(std::move(temp)), true)
-        : false;
-}
-
-bool yama::default_domain::_compiler_services_t::do_upload(std::span<const type_info> x) {
-    return
-        _verify(x)
-        ? (_upload(std::move(x)), true)
-        : false;
-}
-
-bool yama::default_domain::_compiler_services_t::do_upload(res<const module_info> x) {
-    return
-        _verify(*x)
-        ? (_upload(std::move(x)), true)
-        : false;
-}
-
-bool yama::default_domain::_compiler_services_t::_verify(const type_info& x) {
-    return _get_state().verif.verify(x);
-}
-
-bool yama::default_domain::_compiler_services_t::_verify(std::span<const type_info> x) {
-    for (const auto& I : x) {
-        if (!_get_state().verif.verify(I)) return false;
-    }
-    return true;
-}
-
-bool yama::default_domain::_compiler_services_t::_verify(const module_info& x) {
-    return _get_state().verif.verify(x);
-}
-
-void yama::default_domain::_compiler_services_t::_upload(type_info&& x) {
-    _get_state().type_info_db_proxy.push(make_res<type_info>(std::forward<type_info>(x)));
-}
-
-void yama::default_domain::_compiler_services_t::_upload(std::span<const type_info> x) {
-    for (const auto& I : x) _upload(type_info(I));
-}
-
-void yama::default_domain::_compiler_services_t::_upload(res<const module_info> x) {
     for (const auto& I : *x) _upload(type_info(I.second));
 }
 

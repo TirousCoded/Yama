@@ -11,47 +11,54 @@
 #include "res.h"
 #include "api_component.h"
 #include "module_info.h"
+#include "module.h"
 
 
 namespace yama {
 
 
-    // TODO: right now we're just gonna expose ALL types in the domain to
-    //       the compiler to use
-    //
-    //       later on, however, we're gonna need to revise it to instead take
-    //       in some kind of 'environment' object which mediates access to
-    //       some namespace of types
-    //
-    //       this system will need to be able to handle both compiling modules
-    //       which see only a limited set of named dependencies, and scripts
-    //       which might be allowed to see EVERYTHING
-
-
     class domain;
+
+
+    // NOTE: services classes are unit tested as part of domain impl unit tests
+
+    class compiler_services final {
+    public:
+        compiler_services() = delete;
+
+
+        // importing/loading occur in parcel env of parcel performing the compilation
+
+        std::optional<yama::module> import(const str& import_path);
+        std::optional<type> load(const str& fullname);
+        type load_none();
+        type load_int();
+        type load_uint();
+        type load_float();
+        type load_bool();
+        type load_char();
+
+
+    private:
+        friend class domain;
+
+
+        compiler_services(domain& client, const str& parcel_env); // for use in domain
+
+
+        domain* _client;
+        str _parcel_env;
+    };
 
 
     class compiler : public api_component {
     public:
-        using services = domain;
-
-
         compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
-        // IMPORTANT: it's important for compiler impls to avoid taking ownership of services's
-        //            object for longer than the execution of compile, as compiler is used
-        //            within domain impls, so it's best to avoid potential ref cycles
+        // compile attempts to compile src into a module
 
-        // IMPORTANT: the services object injected need-not allow compiler to install parcels
-
-        // compile takes in a taul::source_code and compiles it into a module
-
-        // services exposes compile to existing type information
-
-        virtual std::shared_ptr<const module_info> compile(
-            res<services> services,
-            const taul::source_code& src) = 0;
+        virtual std::shared_ptr<const module_info> compile(compiler_services services, const taul::source_code& src) = 0;
     };
 
 
@@ -60,19 +67,7 @@ namespace yama {
         default_compiler(std::shared_ptr<debug> dbg = nullptr);
 
 
-        std::shared_ptr<const module_info> compile(
-            res<services> services,
-            const taul::source_code& src) override final;
-
-
-    private:
-        // we use the services param in compile to keep domain alive during compilation,
-        // and then we'll assign this ptr services.get() to access it
-
-        services* _services_ptr;
-
-
-        services& _services() const noexcept;
+        std::shared_ptr<const module_info> compile(compiler_services services, const taul::source_code& src) override final;
     };
 }
 

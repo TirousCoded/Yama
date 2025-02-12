@@ -268,36 +268,77 @@ yama::module_info make_fns() {
 }
 
 
+// test_parcel exists to invoke our compiler
+
+class test_parcel final : public yama::parcel {
+public:
+    yama::dep_reqs deps_v = {};
+
+
+    taul::source_code our_src;
+
+
+    test_parcel() = default;
+
+
+    const yama::dep_reqs& deps() override final {
+        return deps_v;
+    }
+
+    std::shared_ptr<const yama::module_info> import(yama::parcel_services services, yama::str relative_path) override final {
+        return services.compile(our_src);
+    }
+};
+
+// quick-n'-dirty global var test_parcel for us to be able to rebind our_src of for each test
+
+yama::res<test_parcel> our_test_parcel = yama::make_res<test_parcel>();
+
+
 void CompilerImplTests::SetUp() {
     dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
-    dm = std::make_shared<yama::default_domain>(dbg);
-    ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
-
     comp = GetParam().factory(dbg);
+    dm = std::make_shared<yama::default_domain>(yama::domain_config{ .compiler = comp }, dbg);
+    ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
 
     sidefx = sidefx_t{}; // can't forget to reset this each time
 
-    ready = dm->upload(yama::make_res<yama::module_info>(make_fns()));
+    yama::install_batch ib{};
+    ib
+        .install("a"_str, our_test_parcel);
+
+    ready =
+        dm->install(std::move(ib)) &&
+        dm->upload(yama::make_res<yama::module_info>(make_fns()));
+}
+
+
+std::optional<yama::module> _perform_compile(CompilerImplTests& self, const std::string& txt) {
+    taul::source_code src{};
+    src.add_str("src"_str, yama::str(txt));
+    our_test_parcel->our_src = std::move(src); // bind src
+    return self.dm->import("a"_str); // pull on parcel to compile
 }
 
 
 TEST_P(CompilerImplTests, Empty) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 // empty
 
 )";
-
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result->empty()); // can't really test w/ dm if *result is empty
+    ASSERT_EQ(result->size(), 0); // can't really test w/ dm if *result is empty
 }
 
 TEST_P(CompilerImplTests, Fail_LexicalError) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -306,10 +347,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    ASSERT_FALSE(comp->compile(yama::res(dm), src));
+    ASSERT_FALSE(_perform_compile(*this, txt));
 
     // IMPORTANT: I originally tried having seperate lexical/syntactic dsignal values,
     //            but I found that it's actually pretty hard to reliably differentiate
@@ -319,6 +357,8 @@ fn f() {
 }
 
 TEST_P(CompilerImplTests, Fail_SyntaxError) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -327,10 +367,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    ASSERT_FALSE(comp->compile(yama::res(dm), src));
+    ASSERT_FALSE(_perform_compile(*this, txt));
 
     ASSERT_EQ(dbg->count(yama::dsignal::compile_syntax_error), 1);
 }
@@ -362,6 +399,8 @@ fn f() {
 // default init None
 
 TEST_P(CompilerImplTests, General_DefaultInit_None) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> None {
@@ -371,13 +410,10 @@ fn f() -> None {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -399,6 +435,8 @@ fn f() -> None {
 // default init Int
 
 TEST_P(CompilerImplTests, General_DefaultInit_Int) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -408,13 +446,10 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -436,6 +471,8 @@ fn f() -> Int {
 // default init UInt
 
 TEST_P(CompilerImplTests, General_DefaultInit_UInt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> UInt {
@@ -445,13 +482,10 @@ fn f() -> UInt {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -473,6 +507,8 @@ fn f() -> UInt {
 // default init Float
 
 TEST_P(CompilerImplTests, General_DefaultInit_Float) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Float {
@@ -482,13 +518,10 @@ fn f() -> Float {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -510,6 +543,8 @@ fn f() -> Float {
 // default init Bool
 
 TEST_P(CompilerImplTests, General_DefaultInit_Bool) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Bool {
@@ -519,13 +554,10 @@ fn f() -> Bool {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -547,6 +579,8 @@ fn f() -> Bool {
 // default init Char
 
 TEST_P(CompilerImplTests, General_DefaultInit_Char) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Char {
@@ -556,13 +590,10 @@ fn f() -> Char {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -584,6 +615,8 @@ fn f() -> Char {
 // default init function
 
 TEST_P(CompilerImplTests, General_DefaultInit_Fn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {}
@@ -595,13 +628,10 @@ fn f() -> g {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -627,6 +657,8 @@ fn f() -> g {
 // None is non-callable
 
 TEST_P(CompilerImplTests, General_None_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn get_none() {}
@@ -637,10 +669,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -648,6 +677,8 @@ fn f() {
 // Int is non-callable
 
 TEST_P(CompilerImplTests, General_Int_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -656,10 +687,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -667,6 +695,8 @@ fn f() {
 // UInt is non-callable
 
 TEST_P(CompilerImplTests, General_UInt_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -675,10 +705,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -686,6 +713,8 @@ fn f() {
 // Float is non-callable
 
 TEST_P(CompilerImplTests, General_Float_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -694,10 +723,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -705,6 +731,8 @@ fn f() {
 // Bool is non-callable
 
 TEST_P(CompilerImplTests, General_Bool_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -713,10 +741,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -724,6 +749,8 @@ fn f() {
 // Char is non-callable
 
 TEST_P(CompilerImplTests, General_Char_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -732,10 +759,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -743,6 +767,8 @@ fn f() {
 // functions are callable
 
 TEST_P(CompilerImplTests, General_Fns_AreCallable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn identity_int(x: Int) -> Int {
@@ -755,13 +781,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto identity_int = dm->load("identity_int"_str);
     const auto f = dm->load("f"_str);
@@ -788,6 +811,8 @@ fn f() {
 // panic behaviour
 
 TEST_P(CompilerImplTests, General_PanicBehaviour) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -798,13 +823,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -881,19 +903,18 @@ fn f() {
 // made available to the domain upon upload
 
 TEST_P(CompilerImplTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponUpload) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -917,6 +938,8 @@ fn f() {}
 // Bool, and Char
 
 TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedPriorToCompilation_MayBeUsedByYamaCode) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -944,13 +967,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -979,6 +999,8 @@ fn f() {
 // Yama code
 
 TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedInYamaCode_MayBeUsedByYamaCode) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn a() {
@@ -1001,13 +1023,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto a = dm->load("a"_str);
     const auto b = dm->load("b"_str);
@@ -1049,6 +1068,8 @@ fn f() {
 // long as they're in different blocks
 
 TEST_P(CompilerImplTests, DeclAndScope_DeclShadowingBehaviour) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn a() {} // fn a will be shadowed by 'a's below, w/ this test covering coexistence mainly
@@ -1069,15 +1090,10 @@ fn f(a: Int) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
     
     const auto a = dm->load("a"_str);
     const auto f = dm->load("f"_str);
@@ -1111,6 +1127,8 @@ fn f(a: Int) {
 // reference itself
 
 TEST_P(CompilerImplTests, DeclAndScope_LocalVarScopeBeginsWhenExpected) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1119,10 +1137,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -1132,31 +1147,29 @@ fn f() {
 // Int, UInt, Float, Bool, and Char
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByBuiltInType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn Int() {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByNonBuiltInType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn observeInt() {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1164,6 +1177,8 @@ fn observeInt() {}
 // illegal to declare a two or more types in global scope w/ a common name
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByAnotherTypeInYamaCode) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {}
@@ -1172,10 +1187,7 @@ fn f(a: Int) {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1184,16 +1196,15 @@ fn f(a: Int) {}
 // in the same parameter list
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfTwoParamsShareName) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a, a: Int) {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1202,6 +1213,8 @@ fn f(a, a: Int) {}
 // of a parameter
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfParam) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Int) {
@@ -1210,10 +1223,7 @@ fn f(a: Int) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1222,6 +1232,8 @@ fn f(a: Int) {
 // of another local var in that block
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInFnBodyBlock) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1231,10 +1243,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1243,6 +1252,8 @@ fn f() {
 // of another local var in that block
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInNestedBlock) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1254,10 +1265,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1265,6 +1273,8 @@ fn f() {
 // dead code is still subject to error checking
 
 TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeadCodeIsInError) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1276,10 +1286,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
@@ -1295,6 +1302,8 @@ fn f() {
 // specify built-in type
 
 TEST_P(CompilerImplTests, TypeSpecifier_SpecifyBuiltInType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1304,13 +1313,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1333,6 +1339,8 @@ fn f() {
 // specify type in Yama code
 
 TEST_P(CompilerImplTests, TypeSpecifier_SpecifyTypeInYamaCode) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {}
@@ -1343,13 +1351,10 @@ fn f() -> g {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -1375,6 +1380,8 @@ fn f() -> g {
 // illegal for type spec to specify non-type
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1383,10 +1390,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -1394,6 +1398,8 @@ fn f() {
 // cannot reference type which has been shadowed by parameter
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(Int: Float) { // <- shadows Int type
@@ -1402,10 +1408,7 @@ fn f(Int: Float) { // <- shadows Int type
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
@@ -1413,6 +1416,8 @@ fn f(Int: Float) { // <- shadows Int type
 // cannot reference type which has been shadowed by local var
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1422,10 +1427,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
@@ -1460,6 +1462,8 @@ fn f() {
 // local var w/ just <type-annot>
 
 TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_NoInitAssign) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1469,13 +1473,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1498,6 +1499,8 @@ fn f() {
 // local var w/ just <init-assign>
 
 TEST_P(CompilerImplTests, VariableDecl_NoTypeAnnot_InitAssign) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1507,13 +1510,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1536,6 +1536,8 @@ fn f() {
 // local var w/ <type-annot> and <init-assign>
 
 TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_InitAssign) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1545,13 +1547,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1574,6 +1573,8 @@ fn f() {
 // illegal local var w/out <type-annot> nor <init-assign>
 
 TEST_P(CompilerImplTests, VariableDecl_Fail_If_NoTypeAnnot_NoInitAssign) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1582,10 +1583,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_local_var), 1);
 }
@@ -1593,6 +1591,8 @@ fn f() {
 // local var initialization and mutability
 
 TEST_P(CompilerImplTests, VariableDecl_InitializationAndMutability) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1610,13 +1610,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1643,16 +1640,15 @@ fn f() {
 // illegal to declare non-local var
 
 TEST_P(CompilerImplTests, VariableDecl_Fail_IfNonLocalVar) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 var a = 10;
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonlocal_var), 1);
 }
@@ -1660,6 +1656,8 @@ var a = 10;
 // illegal to initialize local var w/ wrong typed expr
 
 TEST_P(CompilerImplTests, VariableDecl_Fail_InitExprIsWrongType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -1668,10 +1666,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -1723,6 +1718,8 @@ fn f() {
 // via return stmt
 
 TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_AllControlPathsExitViaReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -1740,13 +1737,10 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1770,6 +1764,8 @@ fn f() -> Int {
 // control paths, instead entering an infinite loop, exiting via panicking
 
 TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_NoReturnStmtOnAnyControlPath_InsteadEnterInfiniteLoop_ExitViaPanic) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int { // <- non-None return type, so normally would need explicit return stmt on each control path
@@ -1791,15 +1787,10 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1827,6 +1818,8 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
 // via return stmt (of form 'return;')
 
 TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> None {
@@ -1844,13 +1837,10 @@ fn f() -> None {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1874,6 +1864,8 @@ fn f() -> None {
 // via (explicit) return stmt
 
 TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> None {
@@ -1890,13 +1882,10 @@ fn f() -> None {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1921,6 +1910,8 @@ fn f() -> None {
 // paths exiting via return stmt (of form 'return;')
 
 TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() { // <- implies return type is None
@@ -1938,13 +1929,10 @@ fn f() { // <- implies return type is None
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -1968,6 +1956,8 @@ fn f() { // <- implies return type is None
 // paths NOT exiting via (explicit) return stmt
 
 TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() { // <- implies return type is None
@@ -1984,13 +1974,10 @@ fn f() { // <- implies return type is None
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2015,6 +2002,8 @@ fn f() { // <- implies return type is None
 // which a valid param list needs to be able to handle, and params are actually usable
 
 TEST_P(CompilerImplTests, FunctionDecl_ParamList) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a, b, c: Int, d: Bool, e: Char) {
@@ -2027,13 +2016,10 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2065,6 +2051,8 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
 // function w/ 24 parameters, and params are actually usable
 
 TEST_P(CompilerImplTests, FunctionDecl_ParamList_WithMaxParams) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23: Int) {
@@ -2096,13 +2084,10 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2172,6 +2157,8 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
 // illegal to declare local fn
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfLocalFn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2180,10 +2167,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_local_fn), 1);
 }
@@ -2192,6 +2176,8 @@ fn f() {
 // does not end w/ a return stmt
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfNonNoneReturnType_AndControlPathFromEntrypointNotEndingInReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -2215,10 +2201,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_no_return_stmt), 1);
 }
@@ -2226,16 +2209,15 @@ fn f() -> Int {
 // illegal function w/ param list '(a, b: Int, c)'
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfInvalidParamList) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a, b: Int, c) {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_param_list), 1);
 }
@@ -2243,16 +2225,15 @@ fn f(a, b: Int, c) {}
 // illegal function w/ >24 parameters
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfInvalidParamList_MoreThanTwentyFourParams) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24: Int) {}
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_param_list), 1);
 }
@@ -2260,12 +2241,16 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
 // illegal function w/ params of non-object types
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfParamTypesAreNotObjectTypes) {
+    ASSERT_TRUE(ready);
+
     // TODO: stub until we add non-object types
 }
 
 // illegal function w/ return type of non-object type
 
 TEST_P(CompilerImplTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
+    ASSERT_TRUE(ready);
+
     // TODO: stub until we add non-object types
 }
 
@@ -2285,6 +2270,8 @@ TEST_P(CompilerImplTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 // basic usage
 
 TEST_P(CompilerImplTests, AssignmentStmt_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2296,13 +2283,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2326,6 +2310,8 @@ fn f() {
 // illegal assignment of non-assignable expr
 
 TEST_P(CompilerImplTests, AssignmentStmt_Fail_IfAssignNonAssignableExpr) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2334,10 +2320,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -2345,6 +2328,8 @@ fn f() {
 // illegal assignment type mismatch
 
 TEST_P(CompilerImplTests, AssignmentStmt_Fail_IfTypeMismatch) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2354,10 +2339,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -2374,6 +2356,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, ExprStmt_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2383,13 +2367,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2428,6 +2409,8 @@ fn f() {
 // w/ no else
 
 TEST_P(CompilerImplTests, IfStmt_NoElse) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Bool) {
@@ -2440,13 +2423,10 @@ fn f(a: Bool) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2496,6 +2476,8 @@ fn f(a: Bool) {
 // w/ else
 
 TEST_P(CompilerImplTests, IfStmt_Else) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Bool) {
@@ -2511,13 +2493,10 @@ fn f(a: Bool) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2568,6 +2547,8 @@ fn f(a: Bool) {
 // w/ else-if chain
 
 TEST_P(CompilerImplTests, IfStmt_ElseIfChain) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Char) {
@@ -2589,15 +2570,10 @@ fn f(a: Char) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2705,6 +2681,8 @@ fn f(a: Char) {
 // illegal if stmt w/ expr not type Bool
 
 TEST_P(CompilerImplTests, IfStmt_Fail_IfTypeMismatch) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2713,10 +2691,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -2731,6 +2706,8 @@ fn f() {
 // basic usage, exit via break
 
 TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaBreak) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2748,13 +2725,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2782,6 +2756,8 @@ fn f() {
 // basic usage, exit via return
 
 TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaReturn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2799,13 +2775,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2841,6 +2814,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, BreakStmt_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2858,15 +2833,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2895,6 +2865,8 @@ fn f() {
 // avoids issues we were having w/ it not being able to handle this
 
 TEST_P(CompilerImplTests, BreakStmt_LocalVarInLoopBody) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2914,15 +2886,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -2950,6 +2917,8 @@ fn f() {
 // illegal use outside loop stmt
 
 TEST_P(CompilerImplTests, BreakStmt_Fail_IfUsedOutsideLoopStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2958,10 +2927,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_in_loop), 1);
 }
@@ -2978,6 +2944,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, ContinueStmt_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -2996,15 +2964,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3033,6 +2996,8 @@ fn f() {
 // avoids issues we were having w/ it not being able to handle this
 
 TEST_P(CompilerImplTests, ContinueStmt_LocalVarInLoopBody) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3053,15 +3018,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3089,6 +3049,8 @@ fn f() {
 // illegal use outside loop stmt
 
 TEST_P(CompilerImplTests, ContinueStmt_Fail_IfUsedOutsideLoopStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3097,10 +3059,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_in_loop), 1);
 }
@@ -3117,6 +3076,8 @@ fn f() {
 // basic usage, w/ non-None return type
 
 TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NonNoneReturnType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3126,13 +3087,10 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3154,6 +3112,8 @@ fn f() -> Int {
 // basic usage, w/ None return type, w/ None return stmt
 
 TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3163,13 +3123,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3191,6 +3148,8 @@ fn f() {
 // basic usage, w/ None return type, w/ None return stmt
 
 TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NonNoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {} // <- to get None object (as Yama currently lacks another way to get it)
@@ -3202,13 +3161,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3234,6 +3190,8 @@ fn f() {
 // illegal return stmt due to type mismatch, non-None return stmt
 
 TEST_P(CompilerImplTests, ReturnStmt_Fail_TypeMismatch_NonNoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3242,10 +3200,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -3253,6 +3208,8 @@ fn f() -> Int {
 // illegal return stmt due to type mismatch, None return stmt
 
 TEST_P(CompilerImplTests, ReturnStmt_Fail_TypeMismatch_NoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3261,10 +3218,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -3291,6 +3245,8 @@ fn f() -> Int {
 // access value of function reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_Fn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> g {
@@ -3301,13 +3257,10 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3333,6 +3286,8 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
 // access value of parameter reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_Param) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Int) -> Int {
@@ -3342,15 +3297,10 @@ fn f(a: Int) -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3374,6 +3324,8 @@ fn f(a: Int) -> Int {
 // access value of local var reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_LocalVar) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3384,13 +3336,10 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3413,6 +3362,8 @@ fn f() -> Int {
 // function shadowed by parameter
 
 TEST_P(CompilerImplTests, IdentifierExpr_ParamShadowsFn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {}
@@ -3423,13 +3374,10 @@ fn f(g: Int) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3457,6 +3405,8 @@ fn f(g: Int) {
 // function shadowed by local var
 
 TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsFn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {}
@@ -3468,13 +3418,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto g = dm->load("g"_str);
     const auto f = dm->load("f"_str);
@@ -3501,6 +3448,8 @@ fn f() {
 // local var shadowed by another local var
 
 TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsAnotherLocalVar) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3515,13 +3464,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3546,6 +3492,8 @@ fn f() {
 // illegal reference to non-function type
 
 TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToNonFnType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3554,10 +3502,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
 }
@@ -3565,6 +3510,8 @@ fn f() {
 // illegal reference to undeclared name
 
 TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToUndeclaredName) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3573,10 +3520,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -3585,6 +3529,8 @@ fn f() {
 // in the same block as the local var, but the local var isn't in scope yet)
 
 TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToLocalVarNotYetInScope) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3594,10 +3540,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -3605,6 +3548,8 @@ fn f() {
 // illegal reference to local var which has gone out-of-scope
 
 TEST_P(CompilerImplTests, IdentifierExpr_Fail_IfRefersToLocalVarWhichIsOutOfScope) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3616,10 +3561,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
@@ -3627,6 +3569,8 @@ fn f() {
 // identifier expr is non-assignable, if function reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_NonAssignable_IfFn) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g() {}
@@ -3641,10 +3585,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3652,6 +3593,8 @@ fn f() {
 // identifier expr is non-assignable, if parameter reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_NonAssignable_IfParam) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f(a: Int) {
@@ -3660,10 +3603,7 @@ fn f(a: Int) {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3671,6 +3611,8 @@ fn f(a: Int) {
 // identifier expr is assignable, if local var reference
 
 TEST_P(CompilerImplTests, IdentifierExpr_Assignable_IfLocalVar) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3682,13 +3624,10 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3721,6 +3660,8 @@ fn f() -> Int {
 // basic usage
 
 TEST_P(CompilerImplTests, IntLiteralExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3748,13 +3689,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3796,6 +3734,8 @@ fn f() {
 // illegal if Int literal overflows
 
 TEST_P(CompilerImplTests, IntLiteralExpr_Fail_IfNumericOverflow) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3804,10 +3744,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_overflow), 1);
 }
@@ -3815,6 +3752,8 @@ fn f() -> Int {
 // illegal if Int literal underflows
 
 TEST_P(CompilerImplTests, IntLiteralExpr_Fail_IfNumericUnderflow) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3823,10 +3762,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_underflow), 1);
 }
@@ -3834,6 +3770,8 @@ fn f() -> Int {
 // Int literal is non-assignable
 
 TEST_P(CompilerImplTests, IntLiteralExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3842,10 +3780,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3862,6 +3797,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, UIntLiteralExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3879,15 +3816,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -3919,6 +3851,8 @@ fn f() {
 // illegal if UInt literal overflows
 
 TEST_P(CompilerImplTests, UIntLiteralExpr_Fail_IfNumericOverflow) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Int {
@@ -3927,10 +3861,7 @@ fn f() -> Int {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_numeric_overflow), 1);
 }
@@ -3938,6 +3869,8 @@ fn f() -> Int {
 // UInt literal is non-assignable
 
 TEST_P(CompilerImplTests, UIntLiteralExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -3946,10 +3879,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -3966,6 +3896,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, FloatLiteralExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f0() -> Float { return 0.0; }
@@ -3978,15 +3910,10 @@ fn f6() -> Float { return nan; }
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f0 = dm->load("f0"_str);
     const auto f1 = dm->load("f1"_str);
@@ -4069,19 +3996,18 @@ fn f6() -> Float { return nan; }
 // inf if overflows
 
 TEST_P(CompilerImplTests, FloatLiteralExpr_InfIfOverflows) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4108,19 +4034,18 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 // -inf if underflows
 
 TEST_P(CompilerImplTests, FloatLiteralExpr_NegativeInfIfUnderflows) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4147,6 +4072,8 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 // Float literal is non-assignable
 
 TEST_P(CompilerImplTests, FloatLiteralExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4155,10 +4082,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4173,6 +4097,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, BoolLiteralExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4182,13 +4108,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4212,6 +4135,8 @@ fn f() {
 // Bool literal is non-assignable
 
 TEST_P(CompilerImplTests, BoolLiteralExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4220,10 +4145,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4238,8 +4160,10 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, CharLiteralExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     // IMPORTANT: for Unicode input to work, we gotta use a UTF-8 string literal
-    std::u8string txt = u8R"(
+    std::u8string txt0 = u8R"(
 
 fn f() {
     observeChar('a');
@@ -4278,16 +4202,12 @@ fn f() {
 }
 
 )";
+    std::string txt = taul::utf8_s(txt0);
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(taul::utf8_s(txt)));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    //std::cerr << std::format("{}\n", result->back());
-
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto f = dm->load("f"_str);
     ASSERT_TRUE(f);
@@ -4338,6 +4258,8 @@ fn f() {
 // illegal Unicode, UTF-16 surrogate
 
 TEST_P(CompilerImplTests, CharLiteralExpr_Fail_IllegalUnicode_UTF16Surrogate) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4346,10 +4268,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_illegal_unicode), 1);
 }
@@ -4357,6 +4276,8 @@ fn f() {
 // illegal Unicode, out-of-bounds
 
 TEST_P(CompilerImplTests, CharLiteralExpr_Fail_IllegalUnicode_OutOfBounds) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4365,10 +4286,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_illegal_unicode), 1);
 }
@@ -4376,6 +4294,8 @@ fn f() {
 // Char literal is non-assignable
 
 TEST_P(CompilerImplTests, CharLiteralExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4384,10 +4304,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
@@ -4413,6 +4330,8 @@ fn f() {
 // basic usage
 
 TEST_P(CompilerImplTests, CallExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn choose(which: Bool, a, b: Int) -> Int {
@@ -4431,13 +4350,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto choose = dm->load("choose"_str);
     const auto f = dm->load("f"_str);
@@ -4465,6 +4381,8 @@ fn f() {
 // callobj/params evaluation order
 
 TEST_P(CompilerImplTests, CallExpr_EvalOrder) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn get_callobj() -> g { observeChar('c'); return g; }
@@ -4481,13 +4399,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto get_callobj = dm->load("get_callobj"_str);
     const auto foo = dm->load("foo"_str);
@@ -4535,6 +4450,8 @@ fn f() {
 // call expr nesting
 
 TEST_P(CompilerImplTests, CallExpr_Nesting) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn foo(x: Int) -> foo { observeInt(x); return foo; }
@@ -4545,13 +4462,10 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    const auto result = comp->compile(yama::res(dm), src);
+    const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::res(result)));
+    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
 
     const auto foo = dm->load("foo"_str);
     const auto f = dm->load("f"_str);
@@ -4583,6 +4497,8 @@ fn f() {
 // illegal call due to call object is non-callable type
 
 TEST_P(CompilerImplTests, CallExpr_Fail_CallObjIsNonCallableType) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn f() {
@@ -4591,10 +4507,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
@@ -4602,6 +4515,8 @@ fn f() {
 // illegal call due to too many args
 
 TEST_P(CompilerImplTests, CallExpr_Fail_Args_TooMany) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4612,10 +4527,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
@@ -4623,6 +4535,8 @@ fn f() {
 // illegal call due to too few args
 
 TEST_P(CompilerImplTests, CallExpr_Fail_Args_TooFew) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4633,10 +4547,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
@@ -4644,6 +4555,8 @@ fn f() {
 // illegal call due to incorrect arg type(s) (ie. type mismatch)
 
 TEST_P(CompilerImplTests, CallExpr_Fail_Args_TypeMismatch) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g(a: Int) {}
@@ -4654,10 +4567,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
@@ -4665,6 +4575,8 @@ fn f() {
 // call expr is non-assignable
 
 TEST_P(CompilerImplTests, CallExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
     std::string txt = R"(
 
 fn g(a, b: Int) -> Int { return 0; }
@@ -4675,10 +4587,7 @@ fn f() {
 
 )";
 
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-
-    EXPECT_FALSE(comp->compile(yama::res(dm), src));
+    EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }

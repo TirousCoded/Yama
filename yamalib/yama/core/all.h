@@ -37,6 +37,8 @@
 #include "type.h"
 
 #include "module_info.h"
+#include "module.h"
+
 #include "parcel.h"
 
 #include "object_ref.h"

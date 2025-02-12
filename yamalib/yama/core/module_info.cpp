@@ -7,12 +7,12 @@ size_t yama::module_info::size() const noexcept {
     return types.size();
 }
 
-bool yama::module_info::exists(const str& name) const noexcept {
+bool yama::module_info::contains(const str& name) const noexcept {
     return types.contains(name);
 }
 
-const yama::type_info& yama::module_info::get(const str& name) const noexcept {
-    YAMA_ASSERT(exists(name));
+const yama::type_info& yama::module_info::type(const str& name) const noexcept {
+    YAMA_ASSERT(contains(name));
     return types.at(name);
 }
 
@@ -34,7 +34,7 @@ yama::module_info yama::module_factory::done() noexcept {
 
 yama::module_factory& yama::module_factory::add_type(type_info&& x) {
     type_info temp(std::forward<type_info>(x));
-    YAMA_ASSERT(!_result.exists(temp.fullname));
+    YAMA_ASSERT(!_result.contains(temp.fullname));
     _result.types[temp.fullname] = std::move(temp);
     return *this;
 }

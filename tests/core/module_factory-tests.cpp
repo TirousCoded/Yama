@@ -104,9 +104,9 @@ TEST(ModuleFactoryTests, PopulatedModule) {
 
     ASSERT_EQ(m.size(), 3);
 
-    ASSERT_TRUE(m.exists("A"_str));
-    ASSERT_TRUE(m.exists("B"_str));
-    ASSERT_TRUE(m.exists("C"_str));
+    ASSERT_TRUE(m.contains("A"_str));
+    ASSERT_TRUE(m.contains("B"_str));
+    ASSERT_TRUE(m.contains("C"_str));
 
     yama::type_info A_expected{
         .fullname = "A"_str,

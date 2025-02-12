@@ -15,8 +15,8 @@ using namespace yama::string_literals;
 
 static DomainImplTestsParam _make_param_1() {
     auto factory =
-        [](std::shared_ptr<yama::debug> dbg) -> yama::res<yama::domain> {
-        return yama::make_res<yama::default_domain>(dbg);
+        [](yama::domain_config config, std::shared_ptr<yama::debug> dbg) -> yama::res<yama::domain> {
+        return yama::make_res<yama::default_domain>(config, dbg);
         };
     return DomainImplTestsParam{ factory };
 }

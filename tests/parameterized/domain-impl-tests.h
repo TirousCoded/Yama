@@ -10,7 +10,7 @@
 
 
 struct DomainImplTestsParam final {
-    std::function<yama::res<yama::domain>(std::shared_ptr<yama::debug> dbg)> factory;
+    std::function<yama::res<yama::domain>(yama::domain_config config, std::shared_ptr<yama::debug> dbg)> factory;
 };
 
 class DomainImplTests : public testing::TestWithParam<DomainImplTestsParam> {

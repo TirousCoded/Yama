@@ -8,12 +8,12 @@ using namespace yama::string_literals;
 
 yama::internal::first_pass::first_pass(
     std::shared_ptr<debug> dbg,
-    domain& dm,
+    compiler_services services,
     ast_Chunk& root,
     const taul::source_code& src,
     csymtab_group_ctti& csymtabs)
     : _dbg(dbg),
-    _dm(&dm),
+    _services(services),
     _root(&root),
     _src(&src),
     _csymtabs(&csymtabs) {}
@@ -139,10 +139,6 @@ void yama::internal::first_pass::visit_end(res<ast_IfStmt> x) {
 void yama::internal::first_pass::visit_end(res<ast_LoopStmt> x) {
     _cfg_loop_stmt_end();
     _exit_loop_ctx();
-}
-
-yama::domain& yama::internal::first_pass::_get_dm() const noexcept {
-    return deref_assert(_dm);
 }
 
 yama::internal::ast_Chunk& yama::internal::first_pass::_get_root() const noexcept {
@@ -300,7 +296,7 @@ bool yama::internal::first_pass::_check_predeclared_type_name_conflict(res<ast_n
     if (&*table_nd != &_get_root()) {
         return false;
     }
-    const bool result = _get_dm().load(name).has_value();
+    const bool result = _services.load(name).has_value();
     if (result) {
         _compile_error(
             *x,

@@ -43,7 +43,7 @@ namespace yama::internal {
 
         first_pass(
             std::shared_ptr<debug> dbg,
-            domain& dm,
+            compiler_services services,
             ast_Chunk& root,
             const taul::source_code& src,
             csymtab_group_ctti& csymtabs);
@@ -112,7 +112,7 @@ namespace yama::internal {
 
     private:
         std::shared_ptr<debug> _dbg;
-        domain* _dm;
+        compiler_services _services;
         ast_Chunk* _root;
         const taul::source_code* _src;
         csymtab_group_ctti* _csymtabs;
@@ -125,7 +125,6 @@ namespace yama::internal {
         size_t _param_index = size_t(-1);
 
 
-        domain& _get_dm() const noexcept;
         ast_Chunk& _get_root() const noexcept;
         const taul::source_code& _get_src() const noexcept;
         csymtab_group_ctti& _get_csymtabs() const noexcept;
