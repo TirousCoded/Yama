@@ -315,10 +315,11 @@ namespace yama {
         // dep mappings between them, using their install names
 
         std::unordered_map<str, res<parcel>> _installs;
-        std::unordered_map<dep_mapping_name, str> _dep_mappings;
+        std::unordered_map<dep_mapping_name, str> _dep_mappings; // includes special self-name mappings
 
         bool _try_install(install_batch& batch);
         bool _check_no_install_batch_errors(const install_batch& batch);
+        bool _check_no_invalid_parcel_errors(const install_batch& batch);
         bool _check_no_install_name_conflicts(const install_batch& batch);
         bool _check_no_missing_dep_mappings(const install_batch& batch);
         bool _check_no_invalid_dep_mappings(const install_batch& batch);
@@ -326,7 +327,8 @@ namespace yama {
         bool _install_name_refs_main(str install_name) const noexcept;
         bool _install_name_refs_batch(str install_name, const install_batch& batch) const noexcept;
         bool _install_name_refs_batch_or_main(str install_name, const install_batch& batch) const noexcept;
-        void _commit_batch_to_main(install_batch& batch);
+        void _add_self_name_mappings(install_batch& batch);
+        void _commit_batch_to_main_and_add_self_name_mappings(install_batch& batch);
 
         // below are used to impl _check_no_dep_graph_cycles
 

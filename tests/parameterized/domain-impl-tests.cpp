@@ -145,7 +145,28 @@ public:
     test_parcel() = default;
 
 
+
+    yama::str self_name() const noexcept override final { return "self"_str; }
     const yama::dep_reqs& deps() override final { return deps_v; }
+    std::shared_ptr<const yama::module_info> import(yama::parcel_services, yama::str) override final { return nullptr; }
+};
+
+class test_invalid_parcel final : public yama::parcel {
+public:
+    std::optional<yama::dep_reqs> deps_v;
+
+
+    test_invalid_parcel() = default;
+
+
+    yama::str self_name() const noexcept override final { return "self"_str; }
+    const yama::dep_reqs& deps() override final {
+        if (!deps_v) {
+            deps_v = yama::dep_reqs{};
+            deps_v->add("self"_str);
+        }
+        return deps_v.value();
+    }
     std::shared_ptr<const yama::module_info> import(yama::parcel_services, yama::str) override final { return nullptr; }
 };
 
@@ -256,6 +277,23 @@ TEST_P(DomainImplTests, Install_Deps) {
         ASSERT_TRUE(dm->is_installed("c"_str));
         ASSERT_TRUE(dm->is_installed("d"_str));
     }
+}
+
+TEST_P(DomainImplTests, Install_Fail_InvalidParcel_DueToSelfNameDepNameConflict) {
+    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
+
+    auto aa = yama::make_res<test_invalid_parcel>();
+
+    yama::install_batch b0{};
+    b0
+        .install("a"_str, aa);
+
+    ASSERT_FALSE(dm->install(std::move(b0))); // error
+
+    ASSERT_EQ(dm->install_count(), 0);
+    ASSERT_FALSE(dm->is_installed("a"_str));
+
+    ASSERT_GE(dbg->count(yama::dsignal::install_invalid_parcel), 1);
 }
 
 TEST_P(DomainImplTests, Install_Fail_InstallNameConflict) {
@@ -429,6 +467,10 @@ public:
 
     test_parcel1() = default;
 
+
+    yama::str self_name() const noexcept override final {
+        return "self"_str;
+    }
 
     const yama::dep_reqs& deps() override final {
         if (!dr) {
@@ -1227,6 +1269,10 @@ public:
         dsignal_dbg(dsignal_dbg) {}
 
 
+    yama::str self_name() const noexcept override final {
+        return "self"_str;
+    }
+
     const yama::dep_reqs& deps() override final { return dr; }
 
     std::shared_ptr<const yama::module_info> import(yama::parcel_services services, yama::str relative_path) override final {
@@ -1304,7 +1350,7 @@ public:
 
     yama::res<test_parcel1> parcel1;
 
-    std::optional<yama::module> result_abc_1, result_def_1, result_root_1;
+    std::optional<yama::module> result_abc_1, result_def_1, result_root_1, result_selfstuff_1;
 
 
     test_compiler0(run_test_asserts_fn_t run_test_asserts_fn, std::shared_ptr<yama::dsignal_debug> dsignal_dbg, yama::res<test_parcel1> parcel1)
@@ -1323,9 +1369,15 @@ class test_parcel2 final : public yama::parcel {
 public:
     std::optional<yama::dep_reqs> dr = {};
 
+    std::shared_ptr<const yama::module_info> selfstuff_m;
+
 
     test_parcel2() = default;
 
+
+    yama::str self_name() const noexcept override final {
+        return "self"_str;
+    }
 
     const yama::dep_reqs& deps() override final {
         if (!dr) {
@@ -1336,9 +1388,16 @@ public:
     }
 
     std::shared_ptr<const yama::module_info> import(yama::parcel_services services, yama::str relative_path) override final {
-        // this parcel exists solely to trigger our compiler, and carry an 'other' dep mapping
-        (void)services.compile(taul::source_code{});
-        return nullptr;
+        // root module exists to trigger our compiler, define self.selfstuff, and carry an 'other' dep mapping
+        if (relative_path == ""_str) {
+            (void)services.compile(taul::source_code{});
+            return nullptr;
+        }
+        else if (relative_path == ".selfstuff"_str) {
+            selfstuff_m = std::make_shared<yama::module_info>(yama::module_factory().done());
+            return selfstuff_m;
+        }
+        else return nullptr;
     }
 };
 
@@ -1360,6 +1419,11 @@ TEST_P(DomainImplTests, CompilerServices_Import) {
         ASSERT_TRUE(host.parcel1->last_relative_path);
         ASSERT_EQ(*host.parcel1->last_relative_path, ""_str);
 
+        const auto selfstuff_1 = services.import("self.selfstuff"_str); // via self-name, not from other
+
+        ASSERT_TRUE(host.parcel1->last_relative_path);
+        ASSERT_EQ(*host.parcel1->last_relative_path, ""_str); // <- accessed self-name, not other
+
         // lookup of memoized will NOT result in parcel import method call
         host.parcel1->last_relative_path.reset();
 
@@ -1375,27 +1439,38 @@ TEST_P(DomainImplTests, CompilerServices_Import) {
 
         ASSERT_FALSE(host.parcel1->last_relative_path);
 
+        const auto selfstuff_2 = services.import("self.selfstuff"_str); // test imports memoize
+
+        ASSERT_FALSE(host.parcel1->last_relative_path); // should never even have accessed other
+
 
         ASSERT_TRUE(abc_1);
         ASSERT_TRUE(def_1);
         ASSERT_TRUE(root_1);
+        ASSERT_TRUE(selfstuff_1);
         ASSERT_TRUE(abc_2);
         ASSERT_TRUE(def_2);
         ASSERT_TRUE(root_2);
+        ASSERT_TRUE(selfstuff_2);
 
         ASSERT_EQ(abc_1, abc_2);
         ASSERT_EQ(def_1, def_2);
         ASSERT_EQ(root_1, root_2);
+        ASSERT_EQ(selfstuff_1, selfstuff_2);
 
         ASSERT_NE(abc_1, def_1);
         ASSERT_NE(abc_1, root_1);
+        ASSERT_NE(abc_1, selfstuff_2);
         ASSERT_NE(def_1, root_1);
+        ASSERT_NE(def_1, selfstuff_2);
+        ASSERT_NE(root_1, selfstuff_2);
 
         // launder these to main test body so we can safely use dm->import
         // to compare against them
         host.result_abc_1 = abc_1;
         host.result_def_1 = def_1;
         host.result_root_1 = root_1;
+        host.result_selfstuff_1 = selfstuff_1;
         };
 
     const auto parcel1 = yama::make_res<test_parcel1>();
@@ -1426,6 +1501,7 @@ TEST_P(DomainImplTests, CompilerServices_Import) {
     ASSERT_EQ(our_compiler->result_abc_1, dm->import("parcel1.a.b.c"_str));
     ASSERT_EQ(our_compiler->result_def_1, dm->import("parcel1.d.e.f"_str));
     ASSERT_EQ(our_compiler->result_root_1, dm->import("parcel1"_str));
+    ASSERT_EQ(our_compiler->result_selfstuff_1, dm->import("parcel2.selfstuff"_str));
 }
 
 TEST_P(DomainImplTests, CompilerServices_Import_Fail_ModuleNotFound_NoHead_WithNoRelativePath) {

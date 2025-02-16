@@ -252,16 +252,31 @@ void yama::default_domain::_commit_or_discard_batch(bool commit) {
 
 bool yama::default_domain::_try_install(install_batch& batch) {
     if (!_check_no_install_batch_errors(batch)) return false;
-    _commit_batch_to_main(batch);
+    _commit_batch_to_main_and_add_self_name_mappings(batch);
     return true;
 }
 
 bool yama::default_domain::_check_no_install_batch_errors(const install_batch& batch) {
     return
+        _check_no_invalid_parcel_errors(batch) &&
         _check_no_install_name_conflicts(batch) &&
         _check_no_missing_dep_mappings(batch) &&
         _check_no_invalid_dep_mappings(batch) &&
         _check_no_dep_graph_cycles(batch);
+}
+
+bool yama::default_domain::_check_no_invalid_parcel_errors(const install_batch& batch) {
+    bool success = true;
+    for (const auto& [install_name, parcel] : batch.installs) {
+        if (!parcel->deps().exists(parcel->self_name())) continue;
+        YAMA_RAISE(dbg(), dsignal::install_invalid_parcel);
+        YAMA_LOG(
+            dbg(), install_error_c,
+            "error: cannot install invalid parcel {}!",
+            install_name);
+        success = false;
+    }
+    return success;
 }
 
 bool yama::default_domain::_check_no_install_name_conflicts(const install_batch& batch) {
@@ -348,7 +363,15 @@ bool yama::default_domain::_install_name_refs_batch_or_main(str install_name, co
         _install_name_refs_batch(install_name, batch);
 }
 
-void yama::default_domain::_commit_batch_to_main(install_batch& batch) {
+void yama::default_domain::_add_self_name_mappings(install_batch& batch) {
+    for (const auto& [install_name, parcel] : batch.installs) {
+        dep_mapping_name dmn{ .install_name = install_name, .dep_name = parcel->self_name() };
+        _dep_mappings.insert({ dmn, install_name });
+    }
+}
+
+void yama::default_domain::_commit_batch_to_main_and_add_self_name_mappings(install_batch& batch) {
+    _add_self_name_mappings(batch);
     _installs.merge(batch.installs);
     _dep_mappings.merge(batch.dep_mappings);
 }

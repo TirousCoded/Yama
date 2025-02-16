@@ -67,28 +67,26 @@
 lexer section:
 
 
-    # TODO: not 100% sure on what this should be called
-
-    # END_OF_WORD is used to specify that no further letters/digits/underscores
+    # EOW ('End Of Word') is used to specify that no further letters/digits/underscores
     # may appear following a given token
 
-    support END_OF_WORD             : -[0-9a-zA-Z_] | end ;
+    support EOW                     : -[0-9a-zA-Z_] | end ;
 
 
     # Keywords
 
-    TRUE                            : 'true' END_OF_WORD ;
-    FALSE                           : 'false' END_OF_WORD ;
-    INF                             : 'inf' END_OF_WORD ;
-    NAN                             : 'nan' END_OF_WORD ;
-    VAR                             : 'var' END_OF_WORD ;
-    FN                              : 'fn' END_OF_WORD ;
-    IF                              : 'if' END_OF_WORD ;
-    ELSE                            : 'else' END_OF_WORD ;
-    LOOP                            : 'loop' END_OF_WORD ;
-    BREAK                           : 'break' END_OF_WORD ;
-    CONTINUE                        : 'continue' END_OF_WORD ;
-    RETURN                          : 'return' END_OF_WORD ;
+    TRUE                            : 'true' EOW ;
+    FALSE                           : 'false' EOW ;
+    INF                             : 'inf' EOW ;
+    NAN                             : 'nan' EOW ;
+    VAR                             : 'var' EOW ;
+    FN                              : 'fn' EOW ;
+    IF                              : 'if' EOW ;
+    ELSE                            : 'else' EOW ;
+    LOOP                            : 'loop' EOW ;
+    BREAK                           : 'break' EOW ;
+    CONTINUE                        : 'continue' EOW ;
+    RETURN                          : 'return' EOW ;
 
 
     # General
@@ -107,13 +105,13 @@ lexer section:
 
     support EXPONENT                : 'e' [+\-]? DIGITS_DEC ;
 
-    FLOAT                           : '-'? ( DIGITS_DEC ( '.' DIGITS_DEC EXPONENT? | EXPONENT ) | '.' DIGITS_DEC EXPONENT? ) END_OF_WORD ;
-    INT_DEC                         : '-'? DIGITS_DEC END_OF_WORD ;
-    INT_HEX                         : '-'? '0x' DIGITS_HEX END_OF_WORD ;
-    INT_BIN                         : '-'? '0b' DIGITS_BIN END_OF_WORD ;
-    UINT_DEC                        : DIGITS_DEC 'u' END_OF_WORD ;
-    UINT_HEX                        : '0x' DIGITS_HEX 'u' END_OF_WORD ;
-    UINT_BIN                        : '0b' DIGITS_BIN 'u' END_OF_WORD ;
+    FLOAT                           : '-'? ( DIGITS_DEC ( '.' DIGITS_DEC EXPONENT? | EXPONENT ) | '.' DIGITS_DEC EXPONENT? ) EOW ;
+    INT_DEC                         : '-'? DIGITS_DEC EOW ;
+    INT_HEX                         : '-'? '0x' DIGITS_HEX EOW ;
+    INT_BIN                         : '-'? '0b' DIGITS_BIN EOW ;
+    UINT_DEC                        : DIGITS_DEC 'u' EOW ;
+    UINT_HEX                        : '0x' DIGITS_HEX 'u' EOW ;
+    UINT_BIN                        : '0b' DIGITS_BIN 'u' EOW ;
     CHAR                            : '\'' ( '\\' any | ~[\'\\] )* '\'' ;
     
 
@@ -135,7 +133,7 @@ lexer section:
     SEMI                            : ';' ;
 
 
-    # whitespace & comments
+    # Whitespace & Comments
 
     skip WHITESPACE                 : [ \t]+ ;
     skip NEWLINE                    : '\n' | '\r' '\n'? ;

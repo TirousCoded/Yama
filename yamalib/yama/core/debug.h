@@ -218,6 +218,7 @@ namespace yama {
         verif_pushing_overflows,
         verif_violates_register_coherence,
 
+        install_invalid_parcel,
         install_install_name_conflict,
         install_missing_dep_mapping,
         install_invalid_dep_mapping,
@@ -236,7 +237,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 57);
+        static_assert(dsignals == 58);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -292,6 +293,7 @@ namespace yama {
             _YAMA_ENTRY_(verif_pushing_overflows);
             _YAMA_ENTRY_(verif_violates_register_coherence);
 
+            _YAMA_ENTRY_(install_invalid_parcel);
             _YAMA_ENTRY_(install_install_name_conflict);
             _YAMA_ENTRY_(install_missing_dep_mapping);
             _YAMA_ENTRY_(install_invalid_dep_mapping);

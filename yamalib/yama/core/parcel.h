@@ -75,6 +75,14 @@ namespace yama {
         virtual ~parcel() noexcept = default;
 
 
+        // NOTE: self-name mappings are considered a special form of dep mapping
+
+        // self_name returns the self-name of the parcel
+
+        // the self-name of a parcel is a dependency-like name the parcel uses internally to refer to itself
+
+        virtual str self_name() const noexcept = 0;
+
         // deps returns the dependency requirements of the parcel
 
         virtual const dep_reqs& deps() = 0;
@@ -90,6 +98,7 @@ namespace yama {
         null_parcel() = default;
 
 
+        inline str self_name() const noexcept { return str::lit("self"); }
         inline const dep_reqs& deps() override final { return dep_reqs{}; }
         inline std::shared_ptr<const module_info> import(parcel_services, str) override final { return nullptr; }
     };

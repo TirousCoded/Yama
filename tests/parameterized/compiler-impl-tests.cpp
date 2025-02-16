@@ -281,6 +281,10 @@ public:
     test_parcel() = default;
 
 
+    yama::str self_name() const noexcept override final {
+        return "self"_str;
+    }
+
     const yama::dep_reqs& deps() override final {
         return deps_v;
     }
