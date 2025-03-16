@@ -3,6 +3,9 @@
 #pragma once
 
 
+#include <unordered_set>
+#include <atomic>
+
 #include <taul/source_code.h>
 
 #include "general.h"
@@ -14,58 +17,72 @@
 namespace yama {
 
 
-    class domain;
+    // IMPORTANT:
+    //      self-names are dependency-like name parcel uses (internally) to refer to itself
+    //
+    //      regarding things like import paths, qualified names, fullnames, etc. self-names
+    //      are treated as special dep-names
 
 
-    // TODO: dep_reqs has not been unit tested
+    // TODO: parcel_metadata has not been unit tested
 
-    // dep_reqs defines a set of dependency requirements of a parcel,
-    // organizing said details as a set (for O(1) lookup time) of dep
-    // names, alongside dep_info metadata
-
-    struct dep_reqs final {
-        struct metadata final {
-            //
-        };
+    struct parcel_metadata final {
+        str                     self_name;
+        std::unordered_set<str> dep_names;
 
 
-        std::unordered_map<str, const metadata> reqs;
+        bool is_dep_name(const str& name) const noexcept;
+        bool is_self_or_dep_name(const str& name) const noexcept;
 
 
-        bool exists(const str& dep_name) const noexcept;
-        const metadata& lookup(const str& dep_name) const noexcept;
-
-        inline auto cbegin() const noexcept { return reqs.cbegin(); }
-        inline auto begin() const noexcept { return cbegin(); }
-        inline auto cend() const noexcept { return reqs.cend(); }
-        inline auto end() const noexcept { return cend(); }
-
-
-        dep_reqs& add(str dep_name);
+        void add_dep_name(const str& name);
     };
 
 
-    // NOTE: services classes are unit tested as part of domain impl unit tests
+    // TODO: import_result has not been unit tested
 
-    class parcel_services final {
+    class import_result final {
     public:
-        parcel_services() = delete;
+        import_result(module_info&& x);
+        import_result(res<module_info>&& x);
+        import_result(taul::source_code&& x);
+
+        import_result() = delete;
+        import_result(const import_result&) = default;
+        import_result(import_result&&) noexcept = default;
+
+        ~import_result() noexcept = default;
+        
+        import_result& operator=(const import_result&) = default;
+        import_result& operator=(import_result&&) noexcept = default;
 
 
-        const str& install_name() const noexcept;
-        std::shared_ptr<const module_info> compile(const taul::source_code& src);
+        bool holds_module() const noexcept;
+        bool holds_source() const noexcept;
+
+        // behaviour is undefined if import_result doesn't hold module/source
+
+        res<module_info>& get_module();
+        const res<module_info>& get_module() const;
+
+        taul::source_code& get_source();
+        const taul::source_code& get_source() const;
 
 
     private:
-        friend class domain;
-
-
-        parcel_services(domain& client, const str& install_name); // for use in domain
-
-
-        domain* _client;
-        str _install_name;
+        std::variant<res<module_info>, taul::source_code> _data;
     };
+
+
+    // TODO: one potential issue w/ parcel_id is if we want to install a parcel object multiple
+    //       times on a domain, just w/ different linkage
+    //
+    //       this shouldn't really be an issue, as we can just *disallow* this, but I'm making
+    //       a note here as I don't think our impl currently does
+
+    // parcels (non-portable) process-wide IDs upon initialization
+
+    using parcel_id = uint64_t;
 
 
     class parcel : public api_component {
@@ -75,32 +92,35 @@ namespace yama {
         virtual ~parcel() noexcept = default;
 
 
-        // NOTE: self-name mappings are considered a special form of dep mapping
+        parcel_id id() const noexcept;
 
-        // self_name returns the self-name of the parcel
 
-        // the self-name of a parcel is a dependency-like name the parcel uses internally to refer to itself
+        virtual const parcel_metadata& metadata() = 0;
+        virtual std::optional<import_result> import(const str& relative_path) = 0;
 
-        virtual str self_name() const noexcept = 0;
 
-        // deps returns the dependency requirements of the parcel
+    private:
+        parcel_id _id;
 
-        virtual const dep_reqs& deps() = 0;
 
-        // import imports the module at relative_path in the parcel, if any
-        
-        virtual std::shared_ptr<const module_info> import(parcel_services services, str relative_path) = 0;
+        static std::atomic<parcel_id> _next_id; // incr ID counter
+
+        static parcel_id _acquire_id() noexcept;
     };
 
 
     class null_parcel final : public parcel {
     public:
-        null_parcel() = default;
+        null_parcel();
 
 
-        inline str self_name() const noexcept { return str::lit("self"); }
-        inline const dep_reqs& deps() override final { return dep_reqs{}; }
-        inline std::shared_ptr<const module_info> import(parcel_services, str) override final { return nullptr; }
+        inline const parcel_metadata& metadata() override final {
+            static const parcel_metadata m{ str::lit("self"), {} };
+            return m;
+        }
+        inline std::optional<import_result> import(const str&) override final {
+            return std::nullopt;
+        }
     };
 }
 

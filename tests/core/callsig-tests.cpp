@@ -21,27 +21,25 @@
 using namespace yama::string_literals;
 
 
-yama::internal::type_instance<std::allocator<void>> make_type_inst_1(
-    yama::str fullname,
+yama::internal::type_instance make_type_inst_1(
+    yama::str unqualified_name,
     yama::const_table_info consts) {
     yama::type_info info{
-        .fullname = fullname,
+        .unqualified_name = unqualified_name,
         .consts = std::move(consts),
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
     };
-    return
-        yama::internal::type_instance<std::allocator<void>>(
-            std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
+    return yama::internal::type_instance(unqualified_name, yama::make_res<yama::type_info>(info));
 }
 
-yama::internal::type_instance<std::allocator<void>> make_type_inst_2(
-    yama::str fullname,
+yama::internal::type_instance make_type_inst_2(
+    yama::str unqualified_name,
     yama::callsig_info callsig,
     yama::const_table_info consts) {
     yama::type_info info{
-        .fullname = fullname,
+        .unqualified_name = unqualified_name,
         .consts = std::move(consts),
         .info = yama::function_info{
             .callsig = callsig,
@@ -49,9 +47,7 @@ yama::internal::type_instance<std::allocator<void>> make_type_inst_2(
             .max_locals = 10,
         },
     };
-    return
-        yama::internal::type_instance<std::allocator<void>>(
-            std::allocator<void>{}, fullname, yama::make_res<yama::type_info>(info));
+    return yama::internal::type_instance(unqualified_name, yama::make_res<yama::type_info>(info));
 }
 
 
@@ -67,7 +63,7 @@ TEST(CallSigTests, Usage_CompleteType) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -106,7 +102,7 @@ TEST(CallSigTests, Usage_IncompleteType_OutOfBoundsParamTypeConstIndex) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -144,7 +140,7 @@ TEST(CallSigTests, Usage_IncompleteType_OutOfBoundsReturnTypeConstIndex) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -181,7 +177,7 @@ TEST(CallSigTests, Usage_IncompleteType_ParamTypeIsStub) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -219,7 +215,7 @@ TEST(CallSigTests, Usage_IncompleteType_ReturnTypeIsStub) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -254,7 +250,7 @@ TEST(CallSigTests, Usage_IncompleteType_ParamTypeIsNotATypeConstant) {
     const yama::type a(a_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_int(31)
@@ -290,7 +286,7 @@ TEST(CallSigTests, Usage_IncompleteType_ReturnTypeIsNotATypeConstant) {
     const yama::type a(a_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_int(31)
@@ -328,7 +324,7 @@ TEST(CallSigTests, Equality) {
     const yama::type c(c_inst);
 
     // x1_callsig
-    const auto x1_consts =
+    auto x1_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -341,7 +337,7 @@ TEST(CallSigTests, Equality) {
     const yama::type x1(x1_inst);
 
     // x2_callsig
-    const auto x2_consts =
+    auto x2_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)
@@ -354,7 +350,7 @@ TEST(CallSigTests, Equality) {
     const yama::type x2(x2_inst);
 
     // y_callsig
-    const auto y_consts =
+    auto y_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str);
     const auto y_callsig_info = yama::make_callsig_info({}, 0);
@@ -363,7 +359,7 @@ TEST(CallSigTests, Equality) {
     const yama::type y(y_inst);
 
     // z1_callsig
-    const auto z1_consts =
+    auto z1_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str);
     const auto z1_callsig_info = yama::make_callsig_info({ 1 }, 1); // <- param/return type indices out-of-bounds!
@@ -372,7 +368,7 @@ TEST(CallSigTests, Equality) {
     const yama::type z1(z1_inst);
 
     // z2_callsig
-    const auto z2_consts =
+    auto z2_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str);
     const auto z2_callsig_info = yama::make_callsig_info({ 0 }, 0);
@@ -420,7 +416,7 @@ TEST(CallSigTests, Fmt) {
     const yama::type b(b_inst);
     const yama::type c(c_inst);
 
-    const auto x_consts =
+    auto x_consts =
         yama::const_table_info()
         .add_primitive_type("a"_str)
         .add_primitive_type("b"_str)

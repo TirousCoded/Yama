@@ -87,6 +87,7 @@ lexer section:
     BREAK                           : 'break' EOW ;
     CONTINUE                        : 'continue' EOW ;
     RETURN                          : 'return' EOW ;
+    IMPORT                          : 'import' EOW ;
 
 
     # General
@@ -128,6 +129,7 @@ lexer section:
     L_CURLY                         : '{' ;
     R_CURLY                         : '}' ;
 
+    DOT                             : '.' ;
     COMMA                           : ',' ;
     COLON                           : ':' ;
     SEMI                            : ';' ;
@@ -144,12 +146,17 @@ lexer section:
 parser section:
 
 
-    Chunk                           : Decl* end ;
+    Chunk                           : DeclOrDir* end ;
 
-    # NOTE: Decl excludes ParamDecl as it is introduced in a unique way
+    # NOTE: DeclOrDir excludes ParamDecl as it is introduced in a unique way
 
-    Decl                            : VarDecl
+    DeclOrDir                       : ImportDir
+                                    | VarDecl
                                     | FnDecl ;
+
+    ImportDir                       : IMPORT ImportPath SEMI ;
+
+    ImportPath                      : IDENTIFIER ( DOT IDENTIFIER )* ;
 
     # NOTE: VarDecl is for specifying local and non-local variables
 
@@ -165,7 +172,7 @@ parser section:
     # NOTE: certain statements (ie. assignment) are parsed as exprs, due to
     #       how their syntax would otherwise be ambiguous w/ them
 
-    Stmt                            : Decl
+    Stmt                            : DeclOrDir
                                     | ExprStmt
                                     | IfStmt
                                     | LoopStmt

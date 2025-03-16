@@ -22,11 +22,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo) {
 
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_function_type("c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
-        .add_primitive_type("d"_str);
+        .add_primitive_type("abc:b"_str)
+        .add_function_type("abc:c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
+        .add_primitive_type("abc:d"_str);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 0),
@@ -35,15 +35,53 @@ TEST_P(VerifierImplTests, Verify_TypeInfo) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(a));
+    EXPECT_TRUE(verif->verify(a, get_md(), "abc"_str));
+}
+
+TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_InvalidQualifiedName_Malformed) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("b"_str); // <- invalid! malformed qualified name
+    yama::type_info a{
+        .unqualified_name = "a"_str,
+        .consts = a_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 4,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_qualified_name_invalid), 1);
+}
+
+TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_InvalidQualifiedName_HeadNamesParcelNotSelfOrDepName) {
+    const auto a_consts =
+        yama::const_table_info()
+        .add_primitive_type("missing:b"_str); // <- invalid! no parcel named 'missing' in self/dep names
+    yama::type_info a{
+        .unqualified_name = "a"_str,
+        .consts = a_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::noop_call_fn,
+            .max_locals = 4,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_qualified_name_invalid), 1);
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_ParamType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str);
+        .add_primitive_type("abc:b"_str);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
             // illegal out-of-bounds constant index (for param type of a)
@@ -53,7 +91,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Para
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_out_of_bounds), 1);
@@ -63,17 +101,17 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Para
     const auto a_consts =
         yama::const_table_info()
         // illegal out-of-bounds constant index (for param type of b)
-        .add_function_type("b"_str, yama::make_callsig_info({ 2 }, 1))
-        .add_primitive_type("c"_str);
+        .add_function_type("abc:b"_str, yama::make_callsig_info({ 2 }, 1))
+        .add_primitive_type("abc:c"_str);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_out_of_bounds), 1);
@@ -82,9 +120,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Para
 TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_ReturnType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str);
+        .add_primitive_type("abc:b"_str);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
             // illegal out-of-bounds constant index (for return type of a)
@@ -94,7 +132,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Retu
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_out_of_bounds), 1);
@@ -104,17 +142,17 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Retu
     const auto a_consts =
         yama::const_table_info()
         // illegal out-of-bounds constant index (for return type of b)
-        .add_function_type("b"_str, yama::make_callsig_info({}, 2))
-        .add_primitive_type("c"_str);
+        .add_function_type("abc:b"_str, yama::make_callsig_info({}, 2))
+        .add_primitive_type("abc:c"_str);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_out_of_bounds), 1);
@@ -123,10 +161,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_Retu
 TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ParamType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
+        .add_primitive_type("abc:b"_str)
         .add_int(10);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
             // illegal use of non-type constant index (for param type of a)
@@ -136,7 +174,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ParamTy
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_not_type_const), 1);
@@ -146,18 +184,18 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ParamTy
     const auto a_consts =
         yama::const_table_info()
         // illegal use of non-type constant index (for param type of b)
-        .add_function_type("b"_str, yama::make_callsig_info({ 2 }, 1))
-        .add_primitive_type("c"_str)
+        .add_function_type("abc:b"_str, yama::make_callsig_info({ 2 }, 1))
+        .add_primitive_type("abc:c"_str)
         .add_int(10);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_param_type_not_type_const), 1);
@@ -166,10 +204,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ParamTy
 TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ReturnType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
+        .add_primitive_type("abc:b"_str)
         .add_int(10);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
             // illegal use of non-type constant index (for return type of a)
@@ -179,7 +217,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ReturnT
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_type_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_not_type_const), 1);
@@ -189,18 +227,18 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ReturnT
     const auto a_consts =
         yama::const_table_info()
         // illegal use of non-type constant index (for return type of b)
-        .add_function_type("b"_str, yama::make_callsig_info({}, 2))
-        .add_primitive_type("c"_str)
+        .add_function_type("abc:b"_str, yama::make_callsig_info({}, 2))
+        .add_primitive_type("abc:c"_str)
         .add_int(10);
     yama::type_info a{
-        .fullname = "a"_str,
+        .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
         },
     };
 
-    EXPECT_FALSE(verif->verify(a));
+    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_callsig_invalid), 1);
     EXPECT_EQ(dbg->count(yama::dsignal::verif_callsig_return_type_not_type_const), 1);
@@ -212,9 +250,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_DisregardBCodeIfCallFnIsNotBCode
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -224,7 +262,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_DisregardBCodeIfCallFnIsNotBCode
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateDeadCode) {
@@ -245,9 +283,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateDeadCode) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -257,7 +295,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateDeadCode) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateAllControlPathsBeingCyclicalAndThusNoExitpoints) {
@@ -271,9 +309,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateAllControlPathsBeingCycl
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -283,7 +321,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_TolerateAllControlPathsBeingCycl
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_RegisterReinitsOverwriteOneAnother) {
@@ -298,12 +336,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_RegisterReinitsOverwriteOneAnoth
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(-4)
         .add_char(U'y')
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -313,7 +351,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_RegisterReinitsOverwriteOneAnoth
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 // IMPORTANT: these Verify_BCode_[No]Branch[_#] tests must be sure to also test that
@@ -332,10 +370,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_NoBranch) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(3.14159);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -345,7 +383,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_NoBranch) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_MultipleExitpoints) {
@@ -363,12 +401,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_MultipleExitpoints) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(3.14159)
         .add_float(0.05)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -378,7 +416,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_MultipleExitpoints) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_ControlPathsMerge) {
@@ -398,12 +436,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_ControlPathsMerge) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(3.14159)
         .add_float(0.05)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -413,7 +451,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_ControlPathsMerge) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_CyclicalControlPath) {
@@ -434,14 +472,14 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_CyclicalControlPath) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(10)
         .add_int(-4)
         .add_float(0.05)
         .add_bool(true)
         .add_int(100);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -451,7 +489,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_CyclicalControlPath) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstrOfBlockNotBeingBranchOrExitpoint) {
@@ -477,9 +515,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstr
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -489,7 +527,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstr
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Fail_BinaryIsEmpty) {
@@ -498,9 +536,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Fail_BinaryIsEmpty) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str);
+        .add_primitive_type("yama:Float"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -510,7 +548,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Fail_BinaryIsEmpty) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_binary_is_empty), 1);
 }
@@ -528,10 +566,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Fail_FinalBlockFallthroughToOutO
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
+        .add_primitive_type("yama:Bool"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -541,7 +579,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Fail_FinalBlockFallthroughToOutO
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_fallthrough_puts_PC_out_of_bounds), 1);
 }
@@ -560,9 +598,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Noop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -572,7 +610,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Noop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop) {
@@ -586,10 +624,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(31);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -599,7 +637,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Zero) {
@@ -612,10 +650,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Zero) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(31);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -625,7 +663,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Zero) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Many) {
@@ -643,10 +681,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Many) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(31);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -656,7 +694,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_Many) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_MoreThanAreOnStack) {
@@ -670,10 +708,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_MoreThanAreOnStack) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(31);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -683,7 +721,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Pop_MoreThanAreOnStack) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone) {
@@ -698,11 +736,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         // quick-n'-dirty fn to let us push None w/out put_none
-        .add_function_type("helper"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("abc:helper"_str, yama::make_callsig_info({}, 0));
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -712,7 +750,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Reinit) {
@@ -725,10 +763,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Reinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -738,7 +776,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Reinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop) {
@@ -750,10 +788,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -763,7 +801,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop_MayBeMarkedReinit) {
@@ -775,10 +813,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop_MayBeMarkedReinit
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -788,7 +826,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Newtop_MayBeMarkedReinit
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_OutOfBounds) {
@@ -804,9 +842,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -816,7 +854,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
@@ -831,9 +869,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_IsNewtopButPushi
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -843,7 +881,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_IsNewtopButPushi
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -858,10 +896,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_WrongType_AndNot
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -871,7 +909,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_WrongType_AndNot
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
@@ -886,10 +924,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_PushingMustNotOverf
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -899,7 +937,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutNone_Fail_PushingMustNotOverf
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -914,11 +952,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10)
         .add_int(-4);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -928,7 +966,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Reinit) {
@@ -941,10 +979,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Reinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -954,7 +992,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Reinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop) {
@@ -966,10 +1004,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -979,7 +1017,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop_MayBeMarkedReinit) {
@@ -991,10 +1029,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop_MayBeMarkedReini
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1004,7 +1042,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Newtop_MayBeMarkedReini
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_OutOfBounds) {
@@ -1020,10 +1058,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1033,7 +1071,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
@@ -1048,10 +1086,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_IsNewtopButPush
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1061,7 +1099,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_IsNewtopButPush
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1076,10 +1114,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1089,7 +1127,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_out_of_bounds), 1);
 }
@@ -1104,10 +1142,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_NotAnObjectCon
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1117,7 +1155,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_NotAnObjectCon
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_KoB_not_object_const), 1);
 }
@@ -1132,11 +1170,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_And_KoB_TypesDi
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1146,7 +1184,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_And_KoB_TypesDi
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_KoB_types_differ), 1);
 }
@@ -1161,11 +1199,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_PushingMustNotOver
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1175,7 +1213,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutConst_Fail_PushingMustNotOver
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1194,13 +1232,13 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
-        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_function_type("abc:f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1210,7 +1248,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Reinit) {
@@ -1230,13 +1268,13 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Reinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
-        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_function_type("abc:f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1246,7 +1284,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Reinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop) {
@@ -1263,13 +1301,13 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
-        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_function_type("abc:f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1279,7 +1317,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop_MayBeMarkedReinit) {
@@ -1296,13 +1334,13 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop_MayBeMarkedReinit)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
-        .add_function_type("f"_str, yama::make_callsig_info({ 0, 1 }, 1))
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_function_type("abc:f"_str, yama::make_callsig_info({ 0, 1 }, 1))
         .add_bool(true)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1312,7 +1350,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Newtop_MayBeMarkedReinit)
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_OutOfBounds) {
@@ -1328,11 +1366,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1342,7 +1380,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
@@ -1357,11 +1395,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_IsNewtopButPushin
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1371,7 +1409,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_IsNewtopButPushin
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1386,11 +1424,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_ArgB_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1400,7 +1438,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_ArgB_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgB_out_of_bounds), 1);
 }
@@ -1415,11 +1453,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_And_ArgB_TypesDif
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1429,7 +1467,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_And_ArgB_TypesDif
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_ArgB_types_differ), 1);
 }
@@ -1444,11 +1482,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_PushingMustNotOverfl
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
@@ -1458,7 +1496,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_PutArg_Fail_PushingMustNotOverfl
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1474,11 +1512,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1488,7 +1526,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Reinit) {
@@ -1502,11 +1540,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Reinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1516,7 +1554,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Reinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop) {
@@ -1529,11 +1567,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1543,7 +1581,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop_MayBeMarkedReinit) {
@@ -1556,11 +1594,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop_MayBeMarkedReinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1570,7 +1608,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Newtop_MayBeMarkedReinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RA_OutOfBounds) {
@@ -1587,11 +1625,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RA_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1601,7 +1639,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RA_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
@@ -1620,11 +1658,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RB_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1634,7 +1672,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RB_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
 }
@@ -1649,11 +1687,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RB_IsNewtopButPushingO
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1663,7 +1701,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RB_IsNewtopButPushingO
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1679,11 +1717,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RA_And_RB_TypesDiffer)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1693,7 +1731,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_RA_And_RB_TypesDiffer)
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_and_RB_types_differ), 1);
 }
@@ -1708,11 +1746,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_PushingMustNotOverflow
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1722,7 +1760,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Copy_Fail_PushingMustNotOverflow
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
 }
@@ -1741,16 +1779,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1760,7 +1798,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Reinit) {
@@ -1777,16 +1815,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Reinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1796,7 +1834,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Reinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop) {
@@ -1812,16 +1850,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1831,7 +1869,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop_MayBeMarkedReinit) {
@@ -1847,16 +1885,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop_MayBeMarkedReinit) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1866,7 +1904,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Newtop_MayBeMarkedReinit) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_OutOfBounds) {
@@ -1884,16 +1922,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1903,7 +1941,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
@@ -1920,10 +1958,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_ZeroObjects) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({}, 0)); // fn() -> None
+        .add_primitive_type("yama:None"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({}, 0)); // fn() -> None
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -1933,7 +1971,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_ZeroObjects) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
@@ -1952,16 +1990,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObjec
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
         .add_int(50) // <- cannot be used as call object
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -1971,7 +2009,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObjec
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
 }
@@ -1991,16 +2029,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooMany) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2010,7 +2048,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooMany) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
@@ -2028,16 +2066,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooFew) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2047,7 +2085,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooFew) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
@@ -2066,16 +2104,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_WrongTypes)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_uint(1000) // <- wrong type for arg #2 for call to g
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2085,7 +2123,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_WrongTypes)
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_types), 1);
 }
@@ -2103,16 +2141,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_RB_OutOfBounds_AfterTh
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2122,7 +2160,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_RB_OutOfBounds_AfterTh
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
 }
@@ -2141,16 +2179,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_RB_WrongType) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_uint(1000); // <- return type of g is Char, not UInt
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2160,7 +2198,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Call_Fail_RB_WrongType) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_wrong_type), 1);
 }
@@ -2179,16 +2217,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 7)) // fn(Int, Float, Int) -> None
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 7)) // fn(Int, Float, Int) -> None
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 7),
@@ -2198,7 +2236,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
@@ -2217,16 +2255,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2236,7 +2274,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_out_of_bounds), 1);
 }
@@ -2253,10 +2291,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_ZeroObjects) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({}, 0)); // fn() -> None
+        .add_primitive_type("yama:None"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({}, 0)); // fn() -> None
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2266,7 +2304,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_ZeroObjects) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_zero_objects), 1);
 }
@@ -2285,16 +2323,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObj
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
         .add_int(50) // <- cannot be used as call object
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2304,7 +2342,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObj
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
 }
@@ -2324,16 +2362,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooMany) 
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2343,7 +2381,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooMany) 
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
@@ -2361,16 +2399,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooFew) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2380,7 +2418,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooFew) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_number), 1);
 }
@@ -2399,16 +2437,16 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_WrongType
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Int"_str)
-        .add_primitive_type("Float"_str)
-        .add_primitive_type("Char"_str)
-        .add_function_type("g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_function_type("abc:g"_str, yama::make_callsig_info({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_uint(1000) // <- wrong type for arg #2 for call to g
         .add_int(-4)
         .add_char(U'y');
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 2),
@@ -2418,7 +2456,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_WrongType
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ParamArgRs_wrong_types), 1);
 }
@@ -2432,10 +2470,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2445,7 +2483,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret_Fail_RA_OutOfBounds) {
@@ -2459,9 +2497,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret_Fail_RA_OutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2471,7 +2509,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret_Fail_RA_OutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
 }
@@ -2485,10 +2523,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret_Fail_RA_WrongType) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(10);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2498,7 +2536,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Ret_Fail_RA_WrongType) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
 }
@@ -2518,11 +2556,11 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2532,7 +2570,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump_Fail_PutsPCOutOfBounds) {
@@ -2543,9 +2581,9 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump_Fail_PutsPCOutOfBounds) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str);
+        .add_primitive_type("yama:None"_str);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2555,7 +2593,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump_Fail_PutsPCOutOfBounds) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
@@ -2578,12 +2616,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump_Fail_ViolatesRegisterCohere
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true)
         .add_float(3.14159)
         .add_int(100);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2593,7 +2631,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_Jump_Fail_ViolatesRegisterCohere
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
@@ -2614,10 +2652,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopOne) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2627,7 +2665,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopOne) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopZero) {
@@ -2645,10 +2683,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopZero) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
+        .add_primitive_type("yama:Bool"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2658,7 +2696,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopZero) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMany) {
@@ -2682,10 +2720,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMany) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2695,7 +2733,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMany) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMoreThanAreOnStack) {
@@ -2719,10 +2757,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMoreThanAreOnStack) 
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2732,7 +2770,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_PopMoreThanAreOnStack) 
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_DoesNotExist) {
@@ -2752,12 +2790,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_DoesNotExist)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_bool(true)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2767,7 +2805,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_DoesNotExist)
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_does_not_exist), 1);
 }
@@ -2787,12 +2825,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_WrongType) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(-4)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2802,7 +2840,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_WrongType) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_wrong_type), 1);
 }
@@ -2822,12 +2860,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_PutsPCOutOfBounds)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_bool(true)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2837,7 +2875,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_PutsPCOutOfBounds)
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
@@ -2873,12 +2911,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_ViolatesRegisterCo
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true)
         .add_float(3.14159)
         .add_int(100);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2888,7 +2926,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpTrue_Fail_ViolatesRegisterCo
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
@@ -2909,10 +2947,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopOne) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2922,7 +2960,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopOne) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopZero) {
@@ -2940,10 +2978,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopZero) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Bool"_str)
+        .add_primitive_type("yama:Bool"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2953,7 +2991,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopZero) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMany) {
@@ -2977,10 +3015,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMany) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -2990,7 +3028,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMany) {
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMoreThanAreOnStack) {
@@ -3014,10 +3052,10 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMoreThanAreOnStack)
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -3027,7 +3065,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_PopMoreThanAreOnStack)
         },
     };
 
-    EXPECT_TRUE(verif->verify(f));
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_DoesNotExist) {
@@ -3047,12 +3085,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_DoesNotExist
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_bool(true)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -3062,7 +3100,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_DoesNotExist
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_does_not_exist), 1);
 }
@@ -3082,12 +3120,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_WrongType) {
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_int(-4)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -3097,7 +3135,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_WrongType) {
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_RTop_wrong_type), 1);
 }
@@ -3117,12 +3155,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_PutsPCOutOfBounds
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_bool(true)
         .add_int(10)
         .add_float(0.05);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -3132,7 +3170,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_PutsPCOutOfBounds
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_puts_PC_out_of_bounds), 1);
 }
@@ -3168,12 +3206,12 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_ViolatesRegisterC
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("None"_str)
+        .add_primitive_type("yama:None"_str)
         .add_bool(true)
         .add_float(3.14159)
         .add_int(100);
     yama::type_info f{
-        .fullname = "f"_str,
+        .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
@@ -3183,7 +3221,7 @@ TEST_P(VerifierImplTests, Verify_TypeInfo_BCode_JumpFalse_Fail_ViolatesRegisterC
         },
     };
 
-    EXPECT_FALSE(verif->verify(f));
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_violates_register_coherence), 1);
 }
@@ -3195,7 +3233,7 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Empty) {
     
     auto m = mf.done();
 
-    EXPECT_TRUE(verif->verify(m));
+    EXPECT_TRUE(verif->verify(m, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated) {
@@ -3213,9 +3251,9 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated) {
 
     auto B_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_function_type("c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
-        .add_primitive_type("d"_str);
+        .add_primitive_type("abc:b"_str)
+        .add_function_type("abc:c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
+        .add_primitive_type("abc:d"_str);
 
     mf.add_function_type(
         "B"_str,
@@ -3233,7 +3271,7 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated) {
         .add_ret(1);
     auto C_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
 
@@ -3246,7 +3284,7 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated) {
 
     auto m = mf.done();
 
-    EXPECT_TRUE(verif->verify(m));
+    EXPECT_TRUE(verif->verify(m, get_md(), "abc"_str));
 }
 
 TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFailedVerify) {
@@ -3261,8 +3299,8 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFail
     auto A_consts =
         yama::const_table_info()
         // illegal out-of-bounds constant index (for param type of b)
-        .add_function_type("b"_str, yama::make_callsig_info({ 2 }, 1)) // <- ERROR!!!
-        .add_primitive_type("c"_str);
+        .add_function_type("abc:b"_str, yama::make_callsig_info({ 2 }, 1)) // <- ERROR!!!
+        .add_primitive_type("abc:c"_str);
 
     mf.add_primitive_type(
         "A"_str,
@@ -3271,9 +3309,9 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFail
 
     auto B_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_function_type("c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
-        .add_primitive_type("d"_str);
+        .add_primitive_type("abc:b"_str)
+        .add_function_type("abc:c"_str, yama::make_callsig_info({ 0 }, 1)) // ie. 'fn(b) -> c'
+        .add_primitive_type("abc:d"_str);
 
     mf.add_function_type(
         "B"_str,
@@ -3291,7 +3329,7 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFail
         .add_ret(200); // <- ERROR!!! R(200) is out-of-bounds!
     auto C_consts =
         yama::const_table_info()
-        .add_primitive_type("Float"_str)
+        .add_primitive_type("yama:Float"_str)
         .add_float(0.05)
         .add_float(3.14159);
 
@@ -3304,6 +3342,6 @@ TEST_P(VerifierImplTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFail
 
     auto m = mf.done();
 
-    EXPECT_FALSE(verif->verify(m)); // <- we don't care what exactly the error is reported to be
+    EXPECT_FALSE(verif->verify(m, get_md(), "abc"_str)); // <- we don't care what exactly the error is reported to be
 }
 

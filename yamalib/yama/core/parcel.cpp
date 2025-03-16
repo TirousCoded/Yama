@@ -2,36 +2,71 @@
 
 #include "parcel.h"
 
-#include "domain.h"
 
-
-bool yama::dep_reqs::exists(const str& dep_name) const noexcept {
-    return reqs.contains(dep_name);
+bool yama::parcel_metadata::is_dep_name(const str& name) const noexcept {
+    return dep_names.contains(name);
 }
 
-const yama::dep_reqs::metadata& yama::dep_reqs::lookup(const str& dep_name) const noexcept {
-    YAMA_ASSERT(exists(dep_name));
-    return reqs.at(dep_name);
+bool yama::parcel_metadata::is_self_or_dep_name(const str& name) const noexcept {
+    return name == self_name || is_dep_name(name);
 }
 
-yama::dep_reqs& yama::dep_reqs::add(str dep_name) {
-    YAMA_ASSERT(!exists(dep_name));
-    reqs.insert({ dep_name, metadata{} });
-    return *this;
+void yama::parcel_metadata::add_dep_name(const str& name) {
+    if (is_self_or_dep_name(name)) return;
+    dep_names.insert(name);
 }
 
-const yama::str& yama::parcel_services::install_name() const noexcept {
-    return _install_name;
+yama::import_result::import_result(module_info&& x)
+    : import_result(make_res<module_info>(std::forward<module_info>(x))) {}
+
+yama::import_result::import_result(res<module_info>&& x)
+    : _data(std::in_place_type<res<module_info>>, std::forward<res<module_info>>(x)) {}
+
+yama::import_result::import_result(taul::source_code&& x)
+    : _data(std::in_place_type<taul::source_code>, std::forward<taul::source_code>(x)) {}
+
+bool yama::import_result::holds_module() const noexcept {
+    return std::holds_alternative<res<module_info>>(_data);
 }
 
-std::shared_ptr<const yama::module_info> yama::parcel_services::compile(const taul::source_code& src) {
-    return deref_assert(_client).do_ps_compile(src, install_name());
+bool yama::import_result::holds_source() const noexcept {
+    return std::holds_alternative<taul::source_code>(_data);
 }
 
-yama::parcel_services::parcel_services(domain& client, const str& install_name)
-    : _client(&client),
-    _install_name(install_name) {}
+yama::res<yama::module_info>& yama::import_result::get_module() {
+    YAMA_ASSERT(holds_module());
+    return std::get<res<module_info>>(_data);
+}
+
+const yama::res<yama::module_info>& yama::import_result::get_module() const {
+    YAMA_ASSERT(holds_module());
+    return std::get<res<module_info>>(_data);
+}
+
+taul::source_code& yama::import_result::get_source() {
+    YAMA_ASSERT(holds_source());
+    return std::get<taul::source_code>(_data);
+}
+
+const taul::source_code& yama::import_result::get_source() const {
+    YAMA_ASSERT(holds_source());
+    return std::get<taul::source_code>(_data);
+}
 
 yama::parcel::parcel(std::shared_ptr<debug> dbg)
-    : api_component(dbg) {}
+    : api_component(dbg),
+    _id(_acquire_id()) {}
+
+yama::parcel_id yama::parcel::id() const noexcept {
+    return _id;
+}
+
+std::atomic<yama::parcel_id> yama::parcel::_next_id = 0;
+
+yama::parcel_id yama::parcel::_acquire_id() noexcept {
+    return _next_id.fetch_add(1);
+}
+
+yama::null_parcel::null_parcel()
+    : parcel() {}
 

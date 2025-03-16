@@ -16,7 +16,6 @@ namespace yama {
 
 
     namespace internal {
-        template<typename Allocator>
         class type_instance;
     }
 
@@ -31,8 +30,7 @@ namespace yama {
 
         // ctor for init via type_instance
 
-        template<typename Allocator>
-        inline explicit const_table(const internal::type_instance<Allocator>& instance) noexcept;
+        explicit const_table(const internal::type_instance& instance) noexcept;
 
         const_table() = delete;
         const_table(const const_table&) = default;
@@ -114,10 +112,6 @@ namespace yama {
 
 YAMA_SETUP_FORMAT(yama::const_table, x.fmt());
 
-
-template<typename Allocator>
-inline yama::const_table::const_table(const internal::type_instance<Allocator>& instance) noexcept
-    : _mem(instance._mem) {}
 
 template<yama::const_type C>
 inline std::optional<yama::const_data_of_t<C>> yama::const_table::get(const_t x) const noexcept {

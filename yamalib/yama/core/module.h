@@ -9,6 +9,14 @@
 namespace yama {
 
 
+    class module;
+
+
+    namespace internal {
+        yama::module create_module(const module_info* ptr);
+    }
+
+
     // TODO: module has not been unit tested
 
     class module final {
@@ -41,7 +49,7 @@ namespace yama {
 
 
     private:
-        friend class default_domain;
+        friend yama::module yama::internal::create_module(const module_info* ptr);
 
 
         const module_info* _ptr;

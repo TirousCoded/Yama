@@ -8,7 +8,7 @@ using namespace yama::string_literals;
 
 yama::internal::first_pass::first_pass(
     std::shared_ptr<debug> dbg,
-    compiler_services services,
+    res<compiler_services> services,
     ast_Chunk& root,
     const taul::source_code& src,
     csymtab_group_ctti& csymtabs)
@@ -20,6 +20,44 @@ yama::internal::first_pass::first_pass(
 
 void yama::internal::first_pass::visit_begin(res<ast_Chunk> x) {
     _add_csymtab(x);
+    _implicitly_import_yama_module();
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_ImportDir> x) {
+    if (_import_dirs_are_legal()) {
+        const str import_path_s = str(x->path(_get_src()).value());
+        const auto import_path = import_path::parse(_services->env(), import_path_s);
+        if (!import_path) {
+            _compile_error(
+                *x,
+                dsignal::compile_invalid_import,
+                "cannot import {}!",
+                import_path_s);
+            return; // abort
+        }
+        const bool valid_import = _get_csymtabs().add_import(deref_assert(import_path));
+        if (!valid_import) {
+            _compile_error(
+                *x,
+                dsignal::compile_invalid_import,
+                "cannot import {}!",
+                import_path_s);
+        }
+    }
+    else {
+        if (_in_fn_ctx()) {
+            _compile_error(
+                *x,
+                dsignal::compile_misplaced_import,
+                "illegal local import!");
+        }
+        else {
+            _compile_error(
+                *x,
+                dsignal::compile_misplaced_import,
+                "illegal import appearing after first type decl!");
+        }
+    }
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_VarDecl> x) {
@@ -31,6 +69,7 @@ void yama::internal::first_pass::visit_begin(res<ast_VarDecl> x) {
             "illegal non-local var {}!",
             name);
     }
+    _acknowledge_type_decl();
     _insert_vardecl(x);
 }
 
@@ -50,6 +89,7 @@ void yama::internal::first_pass::visit_begin(res<ast_FnDecl> x) {
             "illegal fn {} with >24 params!",
             name);
     }
+    _acknowledge_type_decl();
     _mark_as_fn_body_block(*x->block);
     _enter_fn_ctx();
     _insert_fndecl(x);
@@ -157,16 +197,31 @@ void yama::internal::first_pass::_add_csymtab(res<ast_node> x) {
     _get_csymtabs().acquire(x->id); // begin new block
 }
 
+void yama::internal::first_pass::_implicitly_import_yama_module() {
+    const auto import_path = import_path::parse(_services->env(), "yama"_str);
+    if (!import_path) {
+        _compile_error(
+            _get_root(),
+            dsignal::compile_invalid_env,
+            "compilation env has no available 'yama' module!");
+        return; // abort
+    }
+    const bool valid_import = _get_csymtabs().add_import(deref_assert(import_path));
+    if (!valid_import) {
+        _compile_error(
+            _get_root(),
+            dsignal::compile_invalid_env,
+            "compilation env has no available 'yama' module!");
+    }
+}
+
 void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
     const auto name = x->name.str(_get_src());
-    // check if name conflict w/ predeclared type
-    if (_check_predeclared_type_name_conflict(x, name)) {
-        return;
-    }
     // prepare symbol
     var_csym sym{};
     if (x->type) { // get annotated type, if any
-        sym.type = x->type->type->type.str(_get_src());
+        const auto unqualified_name = x->type->type->type.str(_get_src());
+        sym.type = _get_csymtabs().ensure_qualified(unqualified_name);
     }
     // insert symbol
     bool no_table_found = false;
@@ -188,17 +243,14 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
 }
 
 void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
-    const auto name = x->name.str(_get_src());
+    const auto unqualified_name = x->name.str(_get_src());
     // disable relevant param decl behaviour if we never setup the fn decl properly
     _has_last_fn_decl = false;
-    // check if name conflict w/ predeclared type
-    if (_check_predeclared_type_name_conflict(x, name)) {
-        return;
-    }
     // prepare symbol
     fn_csym sym{};
     if (x->callsig->result) {
-        sym.return_type = x->callsig->result->type->type.str(_get_src());
+        const auto return_type_unqualified_name = x->callsig->result->type->type.str(_get_src());
+        sym.return_type = _get_csymtabs().ensure_qualified(return_type_unqualified_name);
     }
     for (const auto& I : x->callsig->params) {
         sym.params.push_back(fn_csym::param{
@@ -215,21 +267,22 @@ void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
     const auto& params_in = x->callsig->params;
     auto& params_out = sym.params;
     for (size_t i = 0; i < params_in.size(); i++) {
-        const size_t index = params_in.size() - 1 - i;
+        const size_t index = params_in.size() - 1 - i; // <- iterate backwards
         const auto& in = params_in[index];
         auto& out = params_out[index];
         if (in->type) {
             annot = in->type; // encountered new type annot
         }
         if (annot) { // output type info from last encountered type annot
-            out.type = annot->type->type.str(_get_src());
+            const auto param_type_unqualified_name = annot->type->type.str(_get_src());
+            out.type = _get_csymtabs().ensure_qualified(param_type_unqualified_name);
         }
     }
     // insert symbol
     bool no_table_found = false;
     const bool success = _get_csymtabs().insert(
         *x,
-        name,
+        unqualified_name,
         x,
         0, // TODO: if we ever add local fns, this'll need to conditionally be either '0' or 'x->high_pos()'
         sym,
@@ -240,12 +293,12 @@ void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
-            name);
+            unqualified_name);
         return; // abort
     }
     // update _last_fn_decl, and reset _param_index, for reasons explained
     _has_last_fn_decl = true;
-    _last_fn_decl = name;
+    _last_fn_decl = unqualified_name;
     _param_index = 0;
 }
 
@@ -290,21 +343,12 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     _param_index++;
 }
 
-bool yama::internal::first_pass::_check_predeclared_type_name_conflict(res<ast_node> x, str name) {
-    const auto table_nd = _get_csymtabs().node_of_inner_most(*x);
-    YAMA_ASSERT(table_nd);
-    if (&*table_nd != &_get_root()) {
-        return false;
-    }
-    const bool result = _services.load(name).has_value();
-    if (result) {
-        _compile_error(
-            *x,
-            dsignal::compile_name_conflict,
-            "name {} already in use by another decl!",
-            name);
-    }
-    return result;
+void yama::internal::first_pass::_acknowledge_type_decl() {
+    _reached_first_type_decl = true;
+}
+
+bool yama::internal::first_pass::_import_dirs_are_legal() const noexcept {
+    return !_reached_first_type_decl;
 }
 
 void yama::internal::first_pass::_mark_as_fn_body_block(const ast_Block& x) {

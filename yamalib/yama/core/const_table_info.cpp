@@ -28,7 +28,7 @@ yama::kind yama::primitive_type_const_info::kind() const noexcept {
 }
 
 std::string yama::primitive_type_const_info::fmt(const const_table_info&) const {
-    return std::format("({}) {}", primitive_type_const, fullname);
+    return std::format("({}) {}", primitive_type_const, qualified_name);
 }
 
 yama::kind yama::function_type_const_info::kind() const noexcept {
@@ -36,7 +36,7 @@ yama::kind yama::function_type_const_info::kind() const noexcept {
 }
 
 std::string yama::function_type_const_info::fmt(const const_table_info& consts) const {
-    return std::format("({}) {} [{}]", function_type_const, fullname, callsig.fmt(consts));
+    return std::format("({}) {} [{}]", function_type_const, qualified_name, callsig.fmt(consts));
 }
 
 std::string yama::const_table_info::fmt_info(const info& x, const const_table_info& consts) {
@@ -70,11 +70,11 @@ std::optional<yama::kind> yama::const_table_info::kind(const_t x) const noexcept
     else                                return std::nullopt;
 }
 
-std::optional<yama::str> yama::const_table_info::fullname(const_t x) const noexcept {
+std::optional<yama::str> yama::const_table_info::qualified_name(const_t x) const noexcept {
     static_assert(const_types == 7);
     const auto t = const_type(x);
-    if (t == primitive_type_const)      return std::make_optional(get<primitive_type_const>(x)->fullname);
-    else if (t == function_type_const)  return std::make_optional(get<function_type_const>(x)->fullname);
+    if (t == primitive_type_const)      return std::make_optional(get<primitive_type_const>(x)->qualified_name);
+    else if (t == function_type_const)  return std::make_optional(get<function_type_const>(x)->qualified_name);
     else                                return std::nullopt;
 }
 
@@ -93,10 +93,10 @@ std::string yama::const_table_info::fmt_const(const_t x) const {
 }
 
 std::string yama::const_table_info::fmt_type_const(const_t x) const {
-    const auto fullname = this->fullname(x);
-    if (!fullname)                              return std::format("<illegal({})>", x);
+    const auto qualified_name = this->qualified_name(x);
+    if (!qualified_name)                        return std::format("<illegal({})>", x);
     else if (!is_type_const(*const_type(x)))    return std::format("<illegal({})>", x);
-    else                                        return fullname->fmt();
+    else                                        return qualified_name->fmt();
 }
 
 std::string yama::const_table_info::fmt(const char* tab) const {
@@ -149,17 +149,17 @@ yama::const_table_info& yama::const_table_info::add_char(char_t v) {
     return *this;
 }
 
-yama::const_table_info& yama::const_table_info::add_primitive_type(str fullname) {
+yama::const_table_info& yama::const_table_info::add_primitive_type(const str& qualified_name) {
     primitive_type_const_info a{
-        .fullname = fullname,
+        .qualified_name = qualified_name,
     };
     consts.push_back(a);
     return *this;
 }
 
-yama::const_table_info& yama::const_table_info::add_function_type(str fullname, callsig_info callsig) {
+yama::const_table_info& yama::const_table_info::add_function_type(const str& qualified_name, callsig_info callsig) {
     function_type_const_info a{
-        .fullname = fullname,
+        .qualified_name = qualified_name,
         .callsig = std::move(callsig),
     };
     consts.push_back(a);

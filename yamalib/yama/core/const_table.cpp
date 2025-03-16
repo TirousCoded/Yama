@@ -5,6 +5,9 @@
 #include "type.h"
 
 
+yama::const_table::const_table(const internal::type_instance& instance) noexcept
+    : _mem(instance._mem) {}
+
 bool yama::const_table::complete() const noexcept {
     return _mem->stubs == 0;
 }

@@ -21,6 +21,7 @@ namespace yama {
 
 
     struct const_table_info;
+    class const_table;
 
 
     // yama::callsig_info encapsulates a 'call signature' of a function-like type
@@ -46,10 +47,13 @@ namespace yama {
 
         // callsig_info is compared by value, comparing raw constant index values
 
-        bool operator==(const callsig_info& other) const noexcept;
+        bool operator==(const callsig_info&) const noexcept = default;
 
+
+        // behaviour is undefined if consts provided is inappropriate to use w/ *this
 
         std::string fmt(const const_table_info& consts) const;
+        std::string fmt(const const_table& consts) const;
     };
 
 

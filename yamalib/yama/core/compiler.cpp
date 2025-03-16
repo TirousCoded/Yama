@@ -9,41 +9,15 @@
 #include "../internals/second_pass.h"
 
 
-std::optional<yama::module> yama::compiler_services::import(const str & import_path) {
-    return deref_assert(_client).do_cs_import(import_path, _parcel_env);
-}
+#define _DUMP_LOG 0
 
-std::optional<yama::type> yama::compiler_services::load(const str& fullname) {
-    return deref_assert(_client).do_cs_load(fullname, _parcel_env);
-}
 
-yama::type yama::compiler_services::load_none() {
-    return deref_assert(_client).load_none();
-}
+yama::compiler_services::compiler_services(std::shared_ptr<debug> dbg)
+    : api_component(dbg) {}
 
-yama::type yama::compiler_services::load_int() {
-    return deref_assert(_client).load_int();
+void yama::compile_result::add(const import_path& path, module_info&& x) {
+    results.insert({ path, std::forward<module_info>(x) });
 }
-
-yama::type yama::compiler_services::load_uint() {
-    return deref_assert(_client).load_uint();
-}
-
-yama::type yama::compiler_services::load_float() {
-    return deref_assert(_client).load_float();
-}
-
-yama::type yama::compiler_services::load_bool() {
-    return deref_assert(_client).load_bool();
-}
-
-yama::type yama::compiler_services::load_char() {
-    return deref_assert(_client).load_char();
-}
-
-yama::compiler_services::compiler_services(domain& client, const str& parcel_env)
-    : _client(&client),
-    _parcel_env(parcel_env) {}
 
 yama::compiler::compiler(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
@@ -51,9 +25,10 @@ yama::compiler::compiler(std::shared_ptr<debug> dbg)
 yama::default_compiler::default_compiler(std::shared_ptr<debug> dbg)
     : compiler(dbg) {}
 
-std::shared_ptr<const yama::module_info> yama::default_compiler::compile(
-    compiler_services services,
-    const taul::source_code& src) {
+std::optional<yama::compile_result> yama::default_compiler::compile(
+    res<compiler_services> services,
+    const taul::source_code& src,
+    const import_path& src_import_path) {
     const auto ast = yama::internal::ast_parser().parse(src);
     if (const auto syntax_error = ast.syntax_error) {
         YAMA_RAISE(dbg(), dsignal::compile_syntax_error);
@@ -61,20 +36,29 @@ std::shared_ptr<const yama::module_info> yama::default_compiler::compile(
             dbg(), compile_error_c,
             "error: {0} syntax error!",
             src.location_at(*syntax_error));
-        return nullptr;
+        return std::nullopt;
     }
     internal::csymtab_group csymtabs{};
-    internal::csymtab_group_ctti csymtabs_ctti(services, *ast.root, csymtabs);
+    internal::csymtab_group_ctti csymtabs_ctti(services, src_import_path, *ast.root, csymtabs);
+#if _DUMP_LOG
+    std::cerr << "-- first pass!\n";
+#endif
     internal::first_pass fp(dbg(), services, *ast.root, src, csymtabs_ctti);
     ast.root->accept(fp);
     if (!fp.good()) {
-        return nullptr;
+        return std::nullopt;
     }
-    internal::second_pass sp(dbg(), *ast.root, src, csymtabs_ctti);
+#if _DUMP_LOG
+    std::cerr << "-- second pass!\n";
+#endif
+    internal::second_pass sp(dbg(), services, src_import_path, *ast.root, src, csymtabs_ctti);
     ast.root->accept(sp);
     if (!sp.good()) {
-        return nullptr;
+        return std::nullopt;
     }
-    return std::make_shared<module_info>(std::move(sp.results.done()));
+    // TODO: replace w/ proper compile_result gen later
+    compile_result results{};
+    results.add(src_import_path, std::move(sp.results.done()));
+    return results;
 }
 

@@ -152,7 +152,7 @@ TEST(ConstTableInfoTests, Kind_OutOfBounds) {
     EXPECT_EQ(a.kind(3), std::nullopt); // out-of-bounds
 }
 
-TEST(ConstTableInfoTests, Fullname) {
+TEST(ConstTableInfoTests, QualifiedName) {
     static_assert(yama::const_types == 7);
     const auto a =
         yama::const_table_info()
@@ -164,23 +164,23 @@ TEST(ConstTableInfoTests, Fullname) {
         .add_primitive_type("abc"_str)
         .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5));
 
-    EXPECT_EQ(a.fullname(0), std::nullopt);
-    EXPECT_EQ(a.fullname(1), std::nullopt);
-    EXPECT_EQ(a.fullname(2), std::nullopt);
-    EXPECT_EQ(a.fullname(3), std::nullopt);
-    EXPECT_EQ(a.fullname(4), std::nullopt);
-    EXPECT_EQ(a.fullname(5), std::make_optional("abc"_str));
-    EXPECT_EQ(a.fullname(6), std::make_optional("def"_str));
+    EXPECT_EQ(a.qualified_name(0), std::nullopt);
+    EXPECT_EQ(a.qualified_name(1), std::nullopt);
+    EXPECT_EQ(a.qualified_name(2), std::nullopt);
+    EXPECT_EQ(a.qualified_name(3), std::nullopt);
+    EXPECT_EQ(a.qualified_name(4), std::nullopt);
+    EXPECT_EQ(a.qualified_name(5), std::make_optional("abc"_str));
+    EXPECT_EQ(a.qualified_name(6), std::make_optional("def"_str));
 }
 
-TEST(ConstTableInfoTests, Fullname_OutOfBounds) {
+TEST(ConstTableInfoTests, QualifiedName_OutOfBounds) {
     const auto a =
         yama::const_table_info()
         .add_int(-4)
         .add_uint(301)
         .add_float(3.14159);
 
-    EXPECT_EQ(a.fullname(3), std::nullopt); // out-of-bounds
+    EXPECT_EQ(a.qualified_name(3), std::nullopt); // out-of-bounds
 }
 
 TEST(ConstTableInfoTests, CallSig) {

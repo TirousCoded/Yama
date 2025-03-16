@@ -14,7 +14,7 @@ static_assert(yama::kinds == 2);
 
 TEST(TypeInfoTests, PrimitiveType) {
     yama::type_info abc{
-        .fullname = "abc"_str,
+        .unqualified_name = "abc"_str,
         .consts = {},
         .info = yama::primitive_info{
             .ptype = yama::ptype::bool0,
@@ -34,7 +34,7 @@ TEST(TypeInfoTests, FunctionType) {
     auto cf = [](yama::context&) {};
 
     yama::type_info abc{
-        .fullname = "abc"_str,
+        .unqualified_name = "abc"_str,
         .consts = {},
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 1),

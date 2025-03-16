@@ -8,6 +8,7 @@
 #include "api_component.h"
 #include "type_info.h"
 #include "module_info.h"
+#include "parcel.h"
 
 
 namespace yama {
@@ -24,37 +25,32 @@ namespace yama {
 
     class verifier : public api_component {
     public:
-
         verifier(std::shared_ptr<debug> dbg = nullptr);
 
 
-        // verify returns if subject passes static verification
+        // module_path specifies the module inside which verification occurs
 
-        // the module_info overload checks that all type_info in subject pass
-        // static verification
-
-        virtual bool verify(const type_info& subject) = 0;
-        virtual bool verify(const module_info& subject) = 0;
+        virtual bool verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) = 0;
+        virtual bool verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) = 0;
     };
 
 
     class default_verifier final : public verifier {
     public:
-
         default_verifier(std::shared_ptr<debug> dbg = nullptr);
 
 
-        bool verify(const type_info& subject) override final;
-        bool verify(const module_info& subject) override final;
+        bool verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) override final;
+        bool verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) override final;
 
 
     private:
 
         struct _callsig_report final {
-            bool param_type_indices_are_in_bounds        = true;
-            bool param_type_indices_specify_type_consts  = true;
-            bool return_type_indices_are_in_bounds        = true;
-            bool return_type_indices_specify_type_consts  = true;
+            bool param_type_indices_are_in_bounds           = true;
+            bool param_type_indices_specify_type_consts     = true;
+            bool return_type_indices_are_in_bounds          = true;
+            bool return_type_indices_specify_type_consts    = true;
         };
 
         // we'll use a vector of type ref names to encapsulate the initial/final
@@ -94,7 +90,13 @@ namespace yama {
         void _dump_cfg(const type_info& subject, const bc::code& bcode);
 
 
-        bool _verify(const type_info& subject);
+        std::optional<str> _current_module_path;
+
+        const str& _module_path() const;
+        void _bind_module_path(const str& module_path);
+
+
+        bool _verify(const type_info& subject, const str& module_path, const parcel_metadata& metadata);
         void _begin_verify(const type_info& subject);
         void _end_verify(bool success);
         void _post_verify_cleanup();
@@ -102,8 +104,9 @@ namespace yama {
         bool _verify_type(const type_info& subject);
         bool _verify_type_callsig(const type_info& subject);
 
-        bool _verify_constant_symbols(const type_info& subject);
-        bool _verify_constant_symbol(const type_info& subject, const_t index);
+        bool _verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata);
+        bool _verify_constant_symbol(const type_info& subject, const_t index, const parcel_metadata& metadata);
+        bool _verify_constant_symbol_qualified_name(const type_info& subject, const_t index, const parcel_metadata& metadata);
         bool _verify_constant_symbol_callsig(const type_info& subject, const_t index);
 
         _callsig_report gen_callsig_report(const type_info& subject, const callsig_info* callsig);

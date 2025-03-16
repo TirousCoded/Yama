@@ -18,7 +18,7 @@
 namespace yama {
     
 
-    // type_info encapsulates details defining a Yama type (pre-instantiation)
+    // type_info encapsulates details defining a (non-loaded) Yama type
     
     // these are meant to be really clean and nice to use, so as to be put in
     // the Yama API frontend for end-users thereof to use to define types
@@ -53,9 +53,9 @@ namespace yama {
         static_assert(std::variant_size_v<info_t> == kinds);
 
 
-        str                             fullname;       // the fullname of the type
-        const_table_info                consts;         // the constant table symbols
-        info_t                          info;           // the kind-specific details of the type
+        str                             unqualified_name;   // the unqualified name of the type
+        const_table_info                consts;             // the constant table symbols
+        info_t                          info;               // the kind-specific details of the type
 
 
         kind kind() const noexcept;

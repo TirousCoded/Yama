@@ -76,7 +76,7 @@ namespace yama {
     };
 
     struct primitive_type_const_info final {
-        str             fullname;
+        str             qualified_name;
 
 
         kind kind() const noexcept;
@@ -86,7 +86,7 @@ namespace yama {
     };
 
     struct function_type_const_info final {
-        str             fullname;
+        str             qualified_name;
         callsig_info    callsig;
 
 
@@ -184,9 +184,9 @@ namespace yama {
 
         std::optional<kind> kind(const_t x) const noexcept;
 
-        // fullname returns the fullname of the constant at x, if any
+        // qualified_name returns the qualified name of the constant at x, if any
 
-        std::optional<str> fullname(const_t x) const noexcept;
+        std::optional<str> qualified_name(const_t x) const noexcept;
 
         // callsig returns the call signature of the constant at x, if any
 
@@ -210,8 +210,8 @@ namespace yama {
         const_table_info& add_float(float_t v);
         const_table_info& add_bool(bool_t v);
         const_table_info& add_char(char_t v);
-        const_table_info& add_primitive_type(str fullname);
-        const_table_info& add_function_type(str fullname, callsig_info callsig);
+        const_table_info& add_primitive_type(const str& qualified_name);
+        const_table_info& add_function_type(const str& qualified_name, callsig_info callsig);
 
 
     private:

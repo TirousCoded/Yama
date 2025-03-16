@@ -12,22 +12,31 @@
 namespace yama::internal {
 
 
+    // TODO: but what if nothing after divider? maybe return empty optional instead of having
+    //       failure be indicated by empty second string, which I worry may cause issues
+
+    // if no divider could be found, second string of pair will be empty
+
     template<typename Char>
-    inline std::pair<std::basic_string_view<Char>, std::basic_string_view<Char>> split(std::basic_string_view<Char> x, Char divider) noexcept {
+    inline std::pair<std::basic_string_view<Char>, std::basic_string_view<Char>> split(std::basic_string_view<Char> x, Char divider, bool include_divider_in_second = false) noexcept {
         size_t i = 0;
         for (; i < x.length(); i++) {
             if (x[i] == divider) break;
         }
-        return { x.substr(0, i), i < x.length() ? x.substr(i) : std::basic_string_view<Char>{} };
+        return std::make_pair(
+            x.substr(0, i),
+            i < x.length() ? x.substr(include_divider_in_second ? i : i + 1) : std::basic_string_view<Char>{});
     }
 
     template<typename Char>
-    inline std::pair<taul::basic_str<Char>, taul::basic_str<Char>> split(taul::basic_str<Char> x, Char divider) noexcept {
+    inline std::pair<taul::basic_str<Char>, taul::basic_str<Char>> split(taul::basic_str<Char> x, Char divider, bool include_divider_in_second = false) noexcept {
         size_t i = 0;
         for (; i < x.length(); i++) {
             if (x[i] == divider) break;
         }
-        return { x.substr(0, i), i < x.length() ? x.substr(i) : taul::basic_str<Char>{} };
+        return std::make_pair(
+            x.substr(0, i),
+            i < x.length() ? x.substr(include_divider_in_second ? i : i + 1) : taul::basic_str<Char>{});
     }
 
 

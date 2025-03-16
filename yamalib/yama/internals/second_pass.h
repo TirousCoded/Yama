@@ -37,6 +37,8 @@ namespace yama::internal {
 
         second_pass(
             std::shared_ptr<debug> dbg,
+            res<compiler_services> services,
+            const import_path& src_import_path,
             ast_Chunk& root,
             const taul::source_code& src,
             csymtab_group_ctti& csymtabs);
@@ -47,7 +49,9 @@ namespace yama::internal {
 
 
         //void visit_begin(res<ast_Chunk> x) override final;
-        //void visit_begin(res<ast_Decl> x) override final;
+        //void visit_begin(res<ast_DeclOrDir> x) override final;
+        //void visit_begin(res<ast_ImportDir> x) override final;
+        //void visit_begin(res<ast_ImportPath> x) override final;
         //void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
@@ -75,7 +79,9 @@ namespace yama::internal {
         //void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
-        //void visit_end(res<ast_Decl> x) override final;
+        //void visit_end(res<ast_DeclOrDir> x) override final;
+        //void visit_end(res<ast_ImportDir> x) override final;
+        //void visit_end(res<ast_ImportPath> x) override final;
         void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;
@@ -105,6 +111,8 @@ namespace yama::internal {
 
     private:
         std::shared_ptr<debug> _dbg;
+        res<compiler_services> _services;
+        const import_path _src_import_path;
         ast_Chunk* _root;
         const taul::source_code* _src;
         csymtab_group_ctti* _csymtabs;
@@ -144,7 +152,7 @@ namespace yama::internal {
 
         yama::type_info& _target() noexcept;
 
-        void _begin_target(str fullname);
+        void _begin_target(const str& unqualified_name);
         void _end_target();
 
         void _apply_bcode_to_target(const ast_FnDecl& x);
@@ -152,28 +160,33 @@ namespace yama::internal {
 
         const fn_csym& _target_csym();
 
-        std::optional<size_t> _target_param_index(str name);
+        std::optional<size_t> _target_param_index(const str& name);
 
 
-        // these methods populate the current code gen target w/ constants, populating
-        // it in a pull-based manner, w/ these methods also doing things like trying
-        // to avoid having duplicates
+        // IMPORTANT: when refactoring/revising, remember that this constant table exists in
+        //            the same parcel env as the compilation, so it's super straightforward
+        //            to keep names correct
 
-        // the method for type constants DO NOT check if said types actually exist
+        // these methods populate the current code gen target w/ constants, populating it in a
+        // pull-based manner, w/ these methods also doing things like trying to avoid having
+        // duplicates
+
+        // the method for type constants DO NOT check if said types actually exist (except for
+        // maybe asserts)
 
         const_t _pull_int_c(int_t x);
         const_t _pull_uint_c(uint_t x);
         const_t _pull_float_c(float_t x); // not gonna try to avoid duplicates for floats, to avoid potential issues
         const_t _pull_bool_c(bool_t x);
         const_t _pull_char_c(char_t x);
-        const_t _pull_type_c(str fullname);
+        const_t _pull_type_c(const str& name);
 
-        const_t _pull_prim_type_c(str fullname);
-        const_t _pull_fn_type_c(str fullname);
+        const_t _pull_prim_type_c(const str& name);
+        const_t _pull_fn_type_c(const str& name);
 
         template<const_type C>
         inline std::optional<const_t> _find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept;
-        callsig_info _build_callsig_for_fn_type(str fullname);
+        callsig_info _build_callsig_for_fn_type(const str& name);
 
 
         // when writing bcode, the below is used to gen code_writer label IDs

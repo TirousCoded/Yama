@@ -80,7 +80,7 @@ std::string yama::type_info::fmt(const char* tab) const {
     YAMA_ASSERT(tab);
     std::string result{};
     result += "type_info";
-    result += std::format("\n{}fullname: {}", tab, fullname);
+    result += std::format("\n{}unqualified-name: {}", tab, unqualified_name);
     if (kind() == kind::primitive) {
         result += std::format("\n{}", std::get<primitive_info>(info).fmt(tab));
     }

@@ -11,10 +11,14 @@ using namespace yama::string_literals;
 
 yama::internal::second_pass::second_pass(
     std::shared_ptr<debug> dbg,
+    res<compiler_services> services,
+    const import_path& src_import_path,
     ast_Chunk& root,
     const taul::source_code& src,
     csymtab_group_ctti& csymtabs)
     : _dbg(dbg),
+    _services(services),
+    _src_import_path(src_import_path),
     _root(&root),
     _src(&src),
     _csymtabs(&csymtabs) {}
@@ -33,12 +37,12 @@ void yama::internal::second_pass::visit_begin(res<ast_Block> x) {
     }
     if (_is_if_stmt_body(*x)) { // if we're the if stmt's body block
         _mark_as_if_stmt_cond_reg(-1); // mark as if stmt's cond expr reg
-        if (!_reg_type_check(-1, "Bool"_str)) { // if stmt cond expr
+        if (!_reg_type_check(-1, "yama:Bool"_str)) { // if stmt cond expr
             _compile_error(
                 *x,
                 dsignal::compile_type_mismatch,
                 "if stmt condition expr is type {0}, but expected {1}!",
-                _top_reg().type, "Bool"_str);
+                _top_reg().type, "yama:Bool"_str);
             return; // abort
         }
         // write branch to else-part or exit if cond is false
@@ -109,7 +113,8 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
     if (x->primary->name) {
         const auto name = x->primary->name->str(_get_src());
         // param, local var, or fn
-        if (const auto& symbol = _get_csymtabs().lookup(*x, name, x->low_pos())) {
+        bool ambiguous{};
+        if (const auto& symbol = _get_csymtabs().lookup(*x, name, x->low_pos(), ambiguous)) {
             if (symbol->is<param_csym>()) {
                 _push_temp(*x, symbol->as<param_csym>().type.value());
                 // IMPORTANT: remember that the indices of the args of an ll_call include the callobj,
@@ -138,7 +143,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 }
             }
             else if (symbol->is<fn_csym>()) {
-                _push_temp(*x, name);
+                _push_temp(*x, _get_csymtabs().ensure_qualified(name));
                 // write put_const loading fn object into temporary
                 cw.add_put_const(yama::newtop, uint8_t(_pull_fn_type_c(name)));
                 _add_sym(x->primary->name->low_pos());
@@ -152,12 +157,21 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 return; // abort
             }
         }
-        else { // nothing found
-            _compile_error(
-                *x,
-                dsignal::compile_undeclared_name,
-                "undeclared name {}!",
-                name);
+        else {
+            if (ambiguous) { // ambiguous
+                _compile_error(
+                    *x,
+                    dsignal::compile_ambiguous_name,
+                    "ambiguous name {}!",
+                    name);
+            }
+            else { // nothing found
+                _compile_error(
+                    *x,
+                    dsignal::compile_undeclared_name,
+                    "undeclared name {}!",
+                    name);
+            }
             return; // abort
         }
     }
@@ -182,7 +196,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 return; // abort
             }
             else { // valid
-                _push_temp(*x, "Int"_str);
+                _push_temp(*x, "yama:Int"_str);
                 cw.add_put_const(yama::newtop, uint8_t(_pull_int_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
@@ -199,7 +213,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 return; // abort
             }
             else { // valid
-                _push_temp(*x, "UInt"_str);
+                _push_temp(*x, "yama:UInt"_str);
                 cw.add_put_const(yama::newtop, uint8_t(_pull_uint_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
@@ -208,14 +222,14 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const auto lit_nd = res(x->primary->lit->as_float());
             const parsed_float v = parse_float(lit_nd->lit.str(_get_src())).value();
             // below can handle cases of overflow/underflow
-            _push_temp(*x, "Float"_str);
+            _push_temp(*x, "yama:Float"_str);
             cw.add_put_const(yama::newtop, uint8_t(_pull_float_c(v.v)));
             _add_sym(x->primary->lit->low_pos());
         }
         else if (x->primary->lit->is_bool()) {
             const auto lit_nd = res(x->primary->lit->as_bool());
             const parsed_bool v = parse_bool(lit_nd->lit.str(_get_src())).value();
-            _push_temp(*x, "Bool"_str);
+            _push_temp(*x, "yama:Bool"_str);
             cw.add_put_const(yama::newtop, uint8_t(_pull_bool_c(v.v)));
             _add_sym(x->primary->lit->low_pos());
         }
@@ -233,7 +247,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 return; // abort
             }
             else { // valid
-                _push_temp(*x, "Char"_str);
+                _push_temp(*x, "yama:Char"_str);
                 cw.add_put_const(yama::newtop, uint8_t(_pull_char_c(v.v)));
                 _add_sym(x->primary->lit->low_pos());
             }
@@ -249,7 +263,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
     }
     if (x->assign) {
         if (x->type) {
-            const auto type = x->type->type->type.str(_get_src());
+            const auto type = _get_csymtabs().ensure_qualified(x->type->type->type.str(_get_src()));
             // if explicit type annot, type check it against temporary of the var decl
             if (!_reg_type_check(-1, type)) {
                 _compile_error(
@@ -270,7 +284,8 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
             _push_temp(*x, type);
             _promote_to_localvar(*x);
             // lookup type we're initializing w/
-            if (const auto symbol = _get_csymtabs().lookup(*x, type, x->low_pos())) {
+            bool ambiguous{};
+            if (const auto symbol = _get_csymtabs().lookup(*x, type, x->low_pos(), ambiguous)) {
                 if (symbol->is<prim_csym>()) { // primitive type
                     // write bcode which inits our local var w/ default value
                     if (type == "None"_str) {
@@ -312,12 +327,21 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
                     return; // abort
                 }
             }
-            else { // nothing found
-                _compile_error(
-                    *x,
-                    dsignal::compile_undeclared_name,
-                    "undeclared name {}!",
-                    type);
+            else {
+                if (ambiguous) { // ambiguous
+                    _compile_error(
+                        *x,
+                        dsignal::compile_ambiguous_name,
+                        "ambiguous name {}!",
+                        type);
+                }
+                else { // nothing found
+                    _compile_error(
+                        *x,
+                        dsignal::compile_undeclared_name,
+                        "undeclared name {}!",
+                        type);
+                }
                 return; // abort
             }
         }
@@ -347,10 +371,10 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
     if (this_is_fn_body_block) {
         // if we're None returning, and not all control paths have an explicit return
         // stmt or enter infinite loops, write a ret instr
-        const bool is_none_returning = _target_csym().return_type.value_or("None"_str) == "None";
+        const bool is_none_returning = _target_csym().return_type.value_or("yama:None"_str) == "yama:None"_str;
         const bool not_all_paths_return_or_loop = !_target_csym().all_paths_return_or_loop.value();
         if (is_none_returning && not_all_paths_return_or_loop) {
-            _push_temp(*x, "None"_str);
+            _push_temp(*x, "yama:None"_str);
             cw.add_put_none(yama::newtop);
             _add_sym(x->high_pos());
             cw.add_ret(uint8_t(_top_reg().index));
@@ -497,12 +521,12 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
     }
     if (x->expr) { // form 'return x;'
         // type check return value expr, w/ return type None if no explicit return type
-        if (!_reg_type_check(-1, _target_csym().return_type.value_or("None"_str))) {
+        if (!_reg_type_check(-1, _target_csym().return_type.value_or("yama:None"_str))) {
             _compile_error(
                 *x,
                 dsignal::compile_type_mismatch,
                 "return stmt expr is type {0}, but expected {1}!",
-                _top_reg().type, _target_csym().return_type.value_or("None"_str));
+                _top_reg().type, _target_csym().return_type.value_or("yama:None"_str));
             return; // abort
         }
         cw.add_ret(uint8_t(_top_reg().index));
@@ -511,15 +535,17 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
     }
     else { // form 'return;'
         // this form may not be used if return type isn't None
-        if (_target_csym().return_type.value_or("None"_str) != "None"_str) {
+        const str expected_return_type = "yama:None"_str;
+        if (_target_csym().return_type.value_or("yama:None"_str) != expected_return_type) {
             _compile_error(
                 *x,
                 dsignal::compile_type_mismatch,
-                "return stmt returns None object but return type is {}!",
-                _target_csym().return_type.value_or("None"_str));
+                "return stmt returns {} object but return type is {}!",
+                expected_return_type,
+                _target_csym().return_type.value_or("yama:None"_str));
             return; // abort
         }
-        _push_temp(*x, "None"_str);
+        _push_temp(*x, expected_return_type);
         cw.add_put_none(yama::newtop);
         _add_sym(x->low_pos());
         cw.add_ret(uint8_t(_top_reg().index));
@@ -594,7 +620,7 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         cw.add_call(uint8_t(arg_count + 1), yama::newtop);
         _add_sym(expr_pos);
         // reinit our return value (formerly callobj) register to the correct type
-        const auto return_type = info.return_type.value_or("None"_str);
+        const auto return_type = info.return_type.value_or("yama:None"_str);
         _reinit_temp(return_value_reg_index, return_type);
         // pop args, but NOT callobj, as that register is reused for our return value
         _pop_temp(arg_count, false);
@@ -619,11 +645,11 @@ yama::type_info& yama::internal::second_pass::_target() noexcept {
     return *_current_target;
 }
 
-void yama::internal::second_pass::_begin_target(str fullname) {
+void yama::internal::second_pass::_begin_target(const str& unqualified_name) {
     YAMA_ASSERT(!_current_target);
     // bind bare-bones new_type to _current_target
     yama::type_info new_type{
-        .fullname = fullname,
+        .unqualified_name = unqualified_name,
         .info = yama::function_info{
             .callsig = callsig_info{}, // stub
             .call_fn = yama::bcode_call_fn,
@@ -634,7 +660,7 @@ void yama::internal::second_pass::_begin_target(str fullname) {
     auto& our_type = _target(); // <- replaces new_type (which we moved from)
     // build callsig of our_type (which has to be done after binding it as
     // we need to populate its constant table)
-    auto new_callsig = _build_callsig_for_fn_type(fullname);
+    auto new_callsig = _build_callsig_for_fn_type(unqualified_name);
     // patch new_callsig onto our_type
     std::get<function_info>(our_type.info).callsig = std::move(new_callsig);
 }
@@ -665,7 +691,7 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
                     x,
                     dsignal::compile_impl_limits,
                     "fn {} contains branch which exceeds max branch offset limits!",
-                    _target().fullname);
+                    _target().unqualified_name);
             }
         }
     }
@@ -678,12 +704,12 @@ void yama::internal::second_pass::_update_target_locals() {
 }
 
 const yama::internal::fn_csym& yama::internal::second_pass::_target_csym() {
-    const auto& symbol = _get_csymtabs().lookup(_get_root(), _target().fullname, 0);
+    const auto& symbol = _get_csymtabs().lookup(_get_root(), _target().unqualified_name, 0);
     YAMA_ASSERT(symbol);
     return symbol->as<fn_csym>();
 }
 
-std::optional<size_t> yama::internal::second_pass::_target_param_index(str name) {
+std::optional<size_t> yama::internal::second_pass::_target_param_index(const str& name) {
     const auto& params = _target_csym().params;
     for (size_t i = 0; i < params.size(); i++) {
         if (params[i].name == name) {
@@ -746,37 +772,39 @@ yama::const_t yama::internal::second_pass::_pull_char_c(char_t x) {
     return _consts.consts.size() - 1;
 }
 
-yama::const_t yama::internal::second_pass::_pull_type_c(str fullname) {
+yama::const_t yama::internal::second_pass::_pull_type_c(const str& name) {
     // lookup symbol for this type (which should exist)
-    const auto symbol = _get_csymtabs().lookup(_get_root(), fullname, 0);
-    YAMA_ASSERT(symbol);
+    const auto symbol = _get_csymtabs().lookup(_get_root(), name, 0);
+    YAMA_ASSERT(symbol); // <- expect exists
     // resolve based on what we found
-    if (symbol->is<prim_csym>())    return _pull_prim_type_c(fullname);
-    else if (symbol->is<fn_csym>()) return _pull_fn_type_c(fullname);
+    if (symbol->is<prim_csym>())    return _pull_prim_type_c(name);
+    else if (symbol->is<fn_csym>()) return _pull_fn_type_c(name);
     else                            YAMA_DEADEND;
     return const_t{};
 }
 
-yama::const_t yama::internal::second_pass::_pull_prim_type_c(str fullname) {
+yama::const_t yama::internal::second_pass::_pull_prim_type_c(const str& name) {
+    const str qualified_name = _get_csymtabs().ensure_qualified(name);
     auto& _consts = _target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
         if (const auto ptr = _consts.get<yama::primitive_type_const>(i)) {
-            if (deref_assert(ptr).fullname != fullname) continue;
+            if (deref_assert(ptr).qualified_name != qualified_name) continue;
             return i;
         }
     }
     // add new constant and return it
-    _consts.add_primitive_type(fullname);
+    _consts.add_primitive_type(qualified_name);
     return _consts.consts.size() - 1;
 }
 
-yama::const_t yama::internal::second_pass::_pull_fn_type_c(str fullname) {
+yama::const_t yama::internal::second_pass::_pull_fn_type_c(const str& name) {
+    const str qualified_name = _get_csymtabs().ensure_qualified(name);
     auto& _consts = _target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
         if (const auto ptr = _consts.get<yama::function_type_const>(i)) {
-            if (deref_assert(ptr).fullname != fullname) continue;
+            if (deref_assert(ptr).qualified_name != qualified_name) continue;
             return i;
         }
     }
@@ -785,18 +813,18 @@ yama::const_t yama::internal::second_pass::_pull_fn_type_c(str fullname) {
     //            we're gonna build its proper callsig (recursively pulling on other constants),
     //            and then we're gonna *patch* our type constant w/ this new callsig
     // add new constant
-    _consts.add_function_type(fullname, callsig_info{}); // <- now available for reference
+    _consts.add_function_type(qualified_name, callsig_info{}); // <- now available for reference
     // get index of our type constant
     const const_t our_index = _consts.consts.size() - 1;
     // build our proper callsig
-    callsig_info proper_callsig = _build_callsig_for_fn_type(fullname);
+    callsig_info proper_callsig = _build_callsig_for_fn_type(qualified_name);
     // patch proper_callsig onto our type constant
     _consts._patch_function_type(our_index, std::move(proper_callsig));
     return our_index; // return index of our type constant
 }
 
-yama::callsig_info yama::internal::second_pass::_build_callsig_for_fn_type(str fullname) {
-    const auto& symbol = _get_csymtabs().lookup(_get_root(), fullname, 0);
+yama::callsig_info yama::internal::second_pass::_build_callsig_for_fn_type(const str& name) {
+    const auto& symbol = _get_csymtabs().lookup(_get_root(), name, 0);
     YAMA_ASSERT(symbol);
     YAMA_ASSERT(symbol->is<fn_csym>());
     const auto& info = symbol->as<fn_csym>();
@@ -807,7 +835,7 @@ yama::callsig_info yama::internal::second_pass::_build_callsig_for_fn_type(str f
         result.params.push_back(_pull_type_c(I.type.value()));
     }
     // resolve return type
-    result.ret = _pull_type_c(info.return_type.value_or("None"_str));
+    result.ret = _pull_type_c(info.return_type.value_or("yama:None"_str));
     return result;
 }
 
@@ -846,7 +874,7 @@ void yama::internal::second_pass::_push_temp(const ast_node& x, str type) {
             x,
             dsignal::compile_impl_limits,
             "fn {} contains parts requiring >{} registers to store all temporaries and local vars, exceeding limit!",
-            _target().fullname, _reg_limit);
+            _target().unqualified_name, _reg_limit);
         return;
     }
     const auto ind = _regs();

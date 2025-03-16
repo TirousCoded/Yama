@@ -15,6 +15,28 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CompilerImplTests);
 
 
 // IMPORTANT:
+//      herein we use a vary specific format when writing our unit tests, in order to
+//      ensure consistency and comprehensiveness:
+//          - we split up our tests into sections, each of which starts w/ a large
+//            'header' comment block at the top, which names the section, and gives a
+//            description of the semantics expected of the impl which the tests of the
+//            section are checking for
+// 
+//          - each test in a section has a little preamble comment above it which describes
+//            the behaviour covered by the test, followed by the unit test itself
+//              * these preamble comments, and their corresponding unit tests, need not be 1-to-1
+//                w/ the exact wording of the header, just so long as the overall section test is
+//                properly comprehensive
+// 
+//              * a bit redundant, but I like how these preamble comments make our unit tests
+//                more readable, rather than us having to stuff everything in the cramped name
+//                identifier of the unit test
+//
+//              * I like writing our the preamble comments and header comment block fully before
+//                even starting to write the unit tests themselves
+
+
+// IMPORTANT:
 //      our policy is gonna be to only testing a single error per unit test, not testing
 //      multiple different errors arising in one unit test
 //
@@ -27,25 +49,23 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CompilerImplTests);
 
 // IMPORTANT:
 //      our policy is gonna be to allow for the impl to define implementation-defined
-//      limits on things like the max number of allowed local vars, temporaries, branch
-//      jump distance, etc.
+//      limits on things like the max values for allowed local vars, temporaries, branch
+//      jump distances, etc.
 
 
 // IMPORTANT:
 //      in order to unit test yama::compiler impls in a way that ensures we don't
 //      couple our tests to impl details, we're gonna assert the following:
 // 
-//          1) if the code compiles
+//          1) if the code compiles + survives static verif
+//              * compilation is performed by importing from a special module which
+//                in turn pulls on the compiler impl which we inject into the domain
 // 
-//          2) if, once uploaded to a domain, the domain is then populated w/
-//             the expected compiled types, w/ the expected frontend details
-// 
-//              * we're NOT gonna be asserting anything in regards to the vector
-//                of type_info returned by compile, as I don't want our tests to
-//                be coupled to this info, as we may change type_info later
-// 
-//              * this will also check whether or not output type_info vector
-//                even survives static verification
+//          2) if once imported into domain the types of the compiled module then
+//             become available
+//              * we're NOT gonna be asserting anything in regards to the module
+//                returned by compile, as I don't want our tests to be coupled to
+//                this info
 // 
 //          3) if executing compiled functions produces the expected return value
 // 
@@ -55,273 +75,338 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CompilerImplTests);
 //      the above are in regards to tests of successful compilation, w/ failure
 //      tests simply asserting failed compilation and expected debug signals
 
-
-// for checking side-effects, we'll define a datastructure for recording a sequence
-// of side effect outputs, and comparing sequences, and then we'll define some
-// special Yama functions which then produce these observable side-effects
-
-struct sidefx_t final {
-    std::string seq;
+// IMPORTANT:
+//      the term 'extern type' refers to types which have been loaded from modules
+//      imported into the compilation
 
 
-    // in our tests, compare by fmt() return value, as googletest will produce a
-    // really nice diff for us to debug w/
+namespace {
+    // for checking side-effects, we'll define a datastructure for recording a sequence
+    // of side effect outputs, and comparing sequences, and then we'll define some
+    // special Yama functions which then produce these observable side-effects
 
-    std::string fmt() const { return seq; }
-
-
-    // gonna exclude observing Float side-effect details as I worry asserting those
-    // details could lead to issues
-
-    void observe_none() { seq += std::format("none n/a\n"); }
-    void observe_int(yama::int_t x) { seq += std::format("int {}\n", yama::fmt_int(x)); }
-    void observe_uint(yama::uint_t x) { seq += std::format("uint {}\n", yama::fmt_uint(x)); }
-    void observe_float(yama::float_t) { seq += std::format("float n/a\n"); }
-    void observe_bool(yama::bool_t x) { seq += std::format("bool {}\n", yama::fmt_bool(x)); }
-    void observe_char(yama::char_t x) { seq += std::format("char {}\n", yama::fmt_char(x)); }
-};
-
-sidefx_t sidefx; // global so our Yama functions can reference it
+    struct sidefx_t final {
+        std::string seq;
 
 
-// our Yama functions for side-effects + misc
+        // in our tests, compare by fmt() return value, as googletest will produce a
+        // really nice diff for us to debug w/
 
-const auto consts =
-yama::const_table_info()
-.add_primitive_type("None"_str)
-.add_primitive_type("Int"_str)
-.add_primitive_type("UInt"_str)
-.add_primitive_type("Float"_str)
-.add_primitive_type("Bool"_str)
-.add_primitive_type("Char"_str);
+        std::string fmt() const { return seq; }
 
-yama::type_info observeNone_info{
-    .fullname = "observeNone"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 0 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_none();
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info observeInt_info{
-    .fullname = "observeInt"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 1 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_int(ctx.arg(1).value().as_int());
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info observeUInt_info{
-    .fullname = "observeUInt"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 2 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_uint(ctx.arg(1).value().as_uint());
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info observeFloat_info{
-    .fullname = "observeFloat"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 3 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_float(ctx.arg(1).value().as_float());
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info observeBool_info{
-    .fullname = "observeBool"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 4 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_bool(ctx.arg(1).value().as_bool());
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info observeChar_info{
-    .fullname = "observeChar"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 5 }, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                sidefx.observe_char(ctx.arg(1).value().as_char());
-                if (ctx.push_none().bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info doPanic_info{
-    .fullname = "doPanic"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({}, 0),
-        .call_fn =
-            [](yama::context& ctx) {
-                ctx.panic();
-            },
-        .max_locals = 0,
-    },
-};
-yama::type_info doIncr_info{
-    .fullname = "doIncr"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 1 }, 1),
-        .call_fn =
-            [](yama::context& ctx) {
-                if (ctx.push_int(ctx.arg(1).value().as_int() + 1).bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info isEqInt_info{
-    .fullname = "isEqInt"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 1, 1 }, 4),
-        .call_fn =
-            [](yama::context& ctx) {
-                const auto a = ctx.arg(1).value().as_int();
-                const auto b = ctx.arg(2).value().as_int();
-                if (ctx.push_bool(a == b).bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info isEqChar_info{
-    .fullname = "isEqChar"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 5, 5 }, 4),
-        .call_fn =
-            [](yama::context& ctx) {
-                const auto a = ctx.arg(1).value().as_char();
-                const auto b = ctx.arg(2).value().as_char();
-                if (ctx.push_bool(a == b).bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
-yama::type_info isNotEqInt_info{
-    .fullname = "isNotEqInt"_str,
-    .consts = consts,
-    .info = yama::function_info{
-        .callsig = yama::make_callsig_info({ 1, 1 }, 4),
-        .call_fn =
-            [](yama::context& ctx) {
-                const auto a = ctx.arg(1).value().as_int();
-                const auto b = ctx.arg(2).value().as_int();
-                if (ctx.push_bool(a != b).bad()) return;
-                if (ctx.ret(0).bad()) return;
-            },
-        .max_locals = 1,
-    },
-};
 
-yama::module_info make_fns() {
-    return
-        yama::module_factory()
-        .add_type(yama::type_info(observeNone_info))
-        .add_type(yama::type_info(observeInt_info))
-        .add_type(yama::type_info(observeUInt_info))
-        .add_type(yama::type_info(observeFloat_info))
-        .add_type(yama::type_info(observeBool_info))
-        .add_type(yama::type_info(observeChar_info))
-        .add_type(yama::type_info(doPanic_info))
-        .add_type(yama::type_info(doIncr_info))
-        .add_type(yama::type_info(isEqInt_info))
-        .add_type(yama::type_info(isEqChar_info))
-        .add_type(yama::type_info(isNotEqInt_info))
-        .done();
+        // gonna exclude observing Float side-effect details as I worry asserting those
+        // details could lead to issues
+
+        void observe_none() { seq += std::format("none n/a\n"); }
+        void observe_int(yama::int_t x) { seq += std::format("int {}\n", yama::fmt_int(x)); }
+        void observe_uint(yama::uint_t x) { seq += std::format("uint {}\n", yama::fmt_uint(x)); }
+        void observe_float(yama::float_t) { seq += std::format("float n/a\n"); }
+        void observe_bool(yama::bool_t x) { seq += std::format("bool {}\n", yama::fmt_bool(x)); }
+        void observe_char(yama::char_t x) { seq += std::format("char {}\n", yama::fmt_char(x)); }
+    };
+
+    sidefx_t sidefx; // global so our Yama functions can reference it
+
+
+    // our Yama functions for side-effects + misc
+
+    auto consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:None"_str)
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:UInt"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Char"_str);
+
+    yama::type_info observeNone_info{
+        .unqualified_name = "observeNone"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_none();
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info observeInt_info{
+        .unqualified_name = "observeInt"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 1 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_int(ctx.arg(1).value().as_int());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info observeUInt_info{
+        .unqualified_name = "observeUInt"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 2 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_uint(ctx.arg(1).value().as_uint());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info observeFloat_info{
+        .unqualified_name = "observeFloat"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 3 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_float(ctx.arg(1).value().as_float());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info observeBool_info{
+        .unqualified_name = "observeBool"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 4 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_bool(ctx.arg(1).value().as_bool());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info observeChar_info{
+        .unqualified_name = "observeChar"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 5 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_char(ctx.arg(1).value().as_char());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info doPanic_info{
+        .unqualified_name = "doPanic"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    ctx.panic();
+                },
+            .max_locals = 0,
+        },
+    };
+    yama::type_info doIncr_info{
+        .unqualified_name = "doIncr"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 1 }, 1),
+            .call_fn =
+                [](yama::context& ctx) {
+                    if (ctx.push_int(ctx.arg(1).value().as_int() + 1).bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info isEqInt_info{
+        .unqualified_name = "isEqInt"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 1, 1 }, 4),
+            .call_fn =
+                [](yama::context& ctx) {
+                    const auto a = ctx.arg(1).value().as_int();
+                    const auto b = ctx.arg(2).value().as_int();
+                    if (ctx.push_bool(a == b).bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info isEqChar_info{
+        .unqualified_name = "isEqChar"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 5, 5 }, 4),
+            .call_fn =
+                [](yama::context& ctx) {
+                    const auto a = ctx.arg(1).value().as_char();
+                    const auto b = ctx.arg(2).value().as_char();
+                    if (ctx.push_bool(a == b).bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+    yama::type_info isNotEqInt_info{
+        .unqualified_name = "isNotEqInt"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 1, 1 }, 4),
+            .call_fn =
+                [](yama::context& ctx) {
+                    const auto a = ctx.arg(1).value().as_int();
+                    const auto b = ctx.arg(2).value().as_int();
+                    if (ctx.push_bool(a != b).bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
+
+    yama::module_info make_fns() {
+        return
+            yama::module_factory()
+            .add_type(yama::type_info(observeNone_info))
+            .add_type(yama::type_info(observeInt_info))
+            .add_type(yama::type_info(observeUInt_info))
+            .add_type(yama::type_info(observeFloat_info))
+            .add_type(yama::type_info(observeBool_info))
+            .add_type(yama::type_info(observeChar_info))
+            .add_type(yama::type_info(doPanic_info))
+            .add_type(yama::type_info(doIncr_info))
+            .add_type(yama::type_info(isEqInt_info))
+            .add_type(yama::type_info(isEqChar_info))
+            .add_type(yama::type_info(isNotEqInt_info))
+            .done();
+    }
+
+    class fns_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::shared_ptr<const yama::module_info> mi;
+
+
+        fns_parcel() = default;
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str } };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& import_path) override final {
+            if (import_path != ".abc"_str) return std::nullopt;
+            return yama::make_res<yama::module_info>(make_fns());
+        }
+    };
+
+
+    // test_parcel exists to establish the environment inside of which compilation is going
+    // to be occurring (ie. defined via self-name and dep-names of the parcel)
+
+    // test_parcel is also used to invoke the compiler
+
+    class test_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::string our_src;
+
+
+        test_parcel() = default;
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str, "fns"_str, "fns2"_str } };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& relative_path) override final {
+            if (relative_path != ""_str) return std::nullopt;
+            // return source code, invoking compiler
+            taul::source_code src{};
+            src.add_str("src"_str, yama::str(our_src));
+            return yama::import_result(std::move(src));
+        }
+    };
+
+
+    // this parcel is equiv to test_parcel, existing for a specific test case where the parcel itself
+    // is invalid, causing compilation to fail
+
+    // the failure will be due to this parcel lacking a 'yama' dep
+
+    class test_invalid_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::string our_src;
+
+
+        test_invalid_parcel() = default;
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, {} };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& relative_path) override final {
+            if (relative_path != ""_str) return std::nullopt;
+            // return source code, invoking compiler
+            taul::source_code src{};
+            src.add_str("src"_str, yama::str(our_src));
+            return yama::import_result(std::move(src));
+        }
+    };
+
+
+    // quick-n'-dirty global var test_parcel for us to be able to rebind our_src of for each test
+
+    yama::res<fns_parcel> our_fns_parcel = yama::make_res<fns_parcel>();
+    yama::res<fns_parcel> our_fns2_parcel = yama::make_res<fns_parcel>();
+    yama::res<test_parcel> our_test_parcel = yama::make_res<test_parcel>();
 }
-
-
-// test_parcel exists to invoke our compiler
-
-class test_parcel final : public yama::parcel {
-public:
-    yama::dep_reqs deps_v = {};
-
-
-    taul::source_code our_src;
-
-
-    test_parcel() = default;
-
-
-    yama::str self_name() const noexcept override final {
-        return "self"_str;
-    }
-
-    const yama::dep_reqs& deps() override final {
-        return deps_v;
-    }
-
-    std::shared_ptr<const yama::module_info> import(yama::parcel_services services, yama::str relative_path) override final {
-        return services.compile(our_src);
-    }
-};
-
-// quick-n'-dirty global var test_parcel for us to be able to rebind our_src of for each test
-
-yama::res<test_parcel> our_test_parcel = yama::make_res<test_parcel>();
 
 
 void CompilerImplTests::SetUp() {
     dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
     comp = GetParam().factory(dbg);
-    dm = std::make_shared<yama::default_domain>(yama::domain_config{ .compiler = comp }, dbg);
+    yama::domain_config config{
+        .compiler = comp,
+    };
+    dm = std::make_shared<yama::default_domain>(config, dbg);
     ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
 
     sidefx = sidefx_t{}; // can't forget to reset this each time
 
     yama::install_batch ib{};
     ib
-        .install("a"_str, our_test_parcel);
+        .install("fns"_str, our_fns_parcel)
+        .map_dep("fns"_str, "yama"_str, "yama"_str)
+        .install("fns2"_str, our_fns2_parcel)
+        .map_dep("fns2"_str, "yama"_str, "yama"_str)
+        .install("a"_str, our_test_parcel)
+        .map_dep("a"_str, "yama"_str, "yama"_str)
+        .map_dep("a"_str, "fns"_str, "fns"_str)
+        .map_dep("a"_str, "fns2"_str, "fns2"_str);
 
-    ready =
-        dm->install(std::move(ib)) &&
-        dm->upload(yama::make_res<yama::module_info>(make_fns()));
+    ready = dm->install(std::move(ib));
 }
 
 
-std::optional<yama::module> _perform_compile(CompilerImplTests& self, const std::string& txt) {
-    taul::source_code src{};
-    src.add_str("src"_str, yama::str(txt));
-    our_test_parcel->our_src = std::move(src); // bind src
-    return self.dm->import("a"_str); // pull on parcel to compile
+namespace {
+    std::optional<yama::module> _perform_compile(CompilerImplTests& self, const std::string& txt) {
+        our_test_parcel->our_src = txt;
+        return self.dm->import("a"_str);
+    }
 }
 
 
@@ -378,6 +463,21 @@ fn f() {
 
 
 // general
+// 
+//      - there will exist a 'yama' module available for import (otherwise
+//        compilation fails)
+// 
+//      - the 'yama' module is guaranteed to be the root of the 'yama' parcel
+//        auto-installed by the domain compilation is being performed in
+//        relation to (otherwise compilation fails)
+// 
+//      - 'yama' module makes builtin types available
+//          - None
+//          - Int
+//          - UInt
+//          - Float
+//          - Bool
+//          - Char
 //
 //      - None default initializes to the stateless None object
 //      - Int default initializes to 0
@@ -395,10 +495,50 @@ fn f() {
 //      - Bool is non-callable
 //      - Char is non-callable
 // 
-//      - function are callable (obviously)
+//      - functions are callable (obviously)
 //
 //      - when a panic occurs, the system is to act as expected (halting
 //        program behaviour and unwinding the call stack)
+
+// builtin types
+
+TEST_P(CompilerImplTests, General_BuiltIns) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // implicit yama import makes expected builtins available
+
+    var a1: None;
+    var a2: Int;
+    var a3: UInt;
+    var a4: Float;
+    var a5: Bool;
+    var a6: Char;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
 
 // default init None
 
@@ -417,13 +557,11 @@ fn f() -> None {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -453,13 +591,11 @@ fn f() -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -489,13 +625,11 @@ fn f() -> UInt {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> UInt");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:UInt");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -525,13 +659,11 @@ fn f() -> Float {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Float");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -561,13 +693,11 @@ fn f() -> Bool {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Bool");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Bool");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -597,13 +727,11 @@ fn f() -> Char {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Char");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Char");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -635,17 +763,15 @@ fn f() -> g {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -775,6 +901,8 @@ TEST_P(CompilerImplTests, General_Fns_AreCallable) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn identity_int(x: Int) -> Int {
     return x;
 }
@@ -788,17 +916,15 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto identity_int = dm->load("identity_int"_str);
-    const auto f = dm->load("f"_str);
+    const auto identity_int = dm->load("a:identity_int"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(identity_int);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(identity_int->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(identity_int->callsig().value().fmt(), "fn(Int) -> Int");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(identity_int->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -819,6 +945,8 @@ TEST_P(CompilerImplTests, General_PanicBehaviour) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(0);
     doPanic(); // <- panics
@@ -830,13 +958,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_EQ(ctx->panics(), 0);
 
@@ -854,10 +980,397 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// illegal to compile w/out a 'yama' module being available
+
+TEST_P(CompilerImplTests, General_Fail_InvalidParcelEnv_NoYamaModuleAvailable) {
+    ASSERT_TRUE(ready);
+
+    // IMPORTANT: note how this test forgoes using our helpers like _perform_compile,
+    //            and instead do everything *manually*
+    
+    auto our_invalid_parcel = yama::make_res<test_invalid_parcel>();
+    
+    yama::install_batch ib{};
+    ib
+        .install("bad"_str, our_invalid_parcel);
+    ASSERT_TRUE(dm->install(std::move(ib)));
+
+    // perfectly valid Yama code, but should fail compile up-front due to
+    // no 'yama' dep to use for implicit import dir
+
+    std::string txt = R"(
+
+fn f() {}
+
+)";
+
+    our_invalid_parcel->our_src = txt;
+    ASSERT_FALSE(dm->import("bad"_str).has_value());
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_env), 1);
+}
+
+// illegal to compile w/ a 'yama' module from a 'yama' parcel which is not
+// the auto-installed yama parcel of the domain
+
+TEST_P(CompilerImplTests, General_Fail_InvalidParcelEnv_YamaModuleIsNotFromYamaParcelAutoInstalledIntoDomain) {
+    ASSERT_TRUE(ready);
+
+    // IMPORTANT: note how this test forgoes using our helpers like _perform_compile,
+    //            and instead do everything *manually*
+
+    auto our_parcel = yama::make_res<test_parcel>();
+
+    // we *incorrectly* map 'yama' dep to 'helper', rather than 'yama'
+
+    yama::install_batch ib{};
+    ib
+        .install("bad"_str, our_parcel)
+        .install("helper"_str, yama::make_res<fns_parcel>())
+        .map_dep("bad"_str, "yama"_str, "helper"_str) // <- wrong!
+        .map_dep("bad"_str, "fns"_str, "fns"_str)
+        .map_dep("bad"_str, "fns2"_str, "fns2"_str)
+        .map_dep("helper"_str, "yama"_str, "yama"_str);
+    ASSERT_TRUE(dm->install(std::move(ib)));
+
+    // perfectly valid Yama code, but should fail compile up-front due to
+    // 'yama' dep to use for implicit import dir being *wrong*
+
+    std::string txt = R"(
+
+fn f() {}
+
+)";
+
+    our_parcel->our_src = txt;
+    ASSERT_FALSE(dm->import("bad"_str).has_value());
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_env), 1);
+}
+
+
+// IMPORTANT: 'dir' is short for 'directive'
+
+// import dir
+//
+//      - the compilation defines an 'import set' of modules which have been
+//        imported such that their contents are made available
+// 
+//          - if two imported modules have similarly named types, no issue arises
+//            from them coexisting (just so long as they're not referenced unqualified)
+// 
+//      - import dirs add new modules to the import set
+// 
+//          - the 'import path specifiers' used in import dirs specify the module
+//            imported
+// 
+//              - import path specifiers are relative to the parcel env of the parcel
+//                of the compiling module
+// 
+//          - compilation must be able to succeed at importing a module via an import
+//            dir's import path specifier to add to the import set
+// 
+//              - if compilation succeeds, the modules imported during compilation
+//                become part of the module import state observable by end-user
+// 
+//          - redundant import dirs are tolerated
+// 
+//          - import dirs importing the compiling module itself are tolerated
+// 
+//      - compilation defines an implicit import dir which imports the 'yama' module
+//
+//          - this module is the root of the 'yama' dep of the compiling module's
+//            parcel, which is expected to map to the special parcel defining
+//            builtin Yama types
+//
+//          - due to rules defined above in 'general', this module is guaranteed to
+//            be available, and its contents should be as expected
+//
+//      - import dirs may exist only in the global block
+//
+//      - import dirs may exist only prior to the first type decl
+
+// explicit import dir
+
+TEST_P(CompilerImplTests, ImportDir_ExplicitImportDir) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    observeInt(10); // observeInt is in fns.abc
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// explicit import dir, imported modules share types w/ common unqualified name
+
+TEST_P(CompilerImplTests, ImportDir_ExplicitImportDir_ImportedModulesShareTypesWithCommonUnqualifiedName) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+import fns2.abc; // <- won't conflict
+
+fn f() {}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// implicit yama import dir
+
+TEST_P(CompilerImplTests, ImportDir_ImplicitYamaImportDir) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() -> Int { // Int exposed by implicit yama import
+    return 10;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// redundant import dirs are tolerated
+
+TEST_P(CompilerImplTests, ImportDir_RedundantImportDirsAreTolerated) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+
+fn f() {
+    observeInt(10); // observeInt is in fns.abc
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// redundant import dirs are tolerated, for implicit yama import dir
+
+TEST_P(CompilerImplTests, ImportDir_RedundantImportDirsAreTolerated_ForImplicitYamaImportDir) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import yama;
+import yama;
+import yama;
+import yama;
+
+fn f() -> Int { // Int exposed by implicit yama import
+    return 10;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// import dirs importing the compiling module itself are tolerated
+
+TEST_P(CompilerImplTests, ImportDir_ImportDirsImportingTheCompilingModuleItselfAreTolerated) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self;
+import self;
+import self;
+import self;
+import self;
+
+fn f() -> Int {
+    return 10;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal to import nonexistent module
+
+TEST_P(CompilerImplTests, ImportDir_Fail_ImportNonExistentModule) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns; // error! fns parcel has no root module!
+
+fn f() -> Int {
+    return 10;
+}
+
+)";
+
+    ASSERT_FALSE(_perform_compile(*this, txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_import), 1);
+}
+
+// illegal for import dir to exist in local scope
+
+TEST_P(CompilerImplTests, ImportDir_Fail_ImportDirExistsInLocalScope) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    import fns.abc; // error! illegal in local scope!
+}
+
+)";
+
+    ASSERT_FALSE(_perform_compile(*this, txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
+}
+
+TEST_P(CompilerImplTests, ImportDir_Fail_ImportDirExistsAfterFirstTypeDecl) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    //...
+}
+
+import fns.abc; // error! illegal after first type decl
+
+)";
+
+    ASSERT_FALSE(_perform_compile(*this, txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
+}
+
 
 // decl & scope
 // 
-//      - 'decls' bind name identifiers to types, parameters, and local vars
+//      - 'decls' bind name identifiers to types, parameters and local vars
 //      - decls have 'scopes' which define when that binding is valid
 //
 //      - decl scope is dictated by what 'block' they were declared in,
@@ -874,17 +1387,27 @@ fn f() {
 //        of the block hierarchy
 // 
 //      - decls in the same block may not share names
-//      - decls in child blocks may 'shadow' ones in ancestoral blocks by
-//        using the same name as them
 // 
-//      - within the global block, built-in Yama types (ie. None, Int, UInt,
-//        Float, Bool, and Char), and other types defined prior to compilation
-//        are declared implicitly
+//      - within the global block are contained all types loaded from modules imported
+//        via import dirs
+//      - within the global block, types are differentiated by parcel env 'fullname'
+//          * this means that it's allowed for types defined in the Yama code to share
+//            unqualified names w/ extern types (as they shouldn't conflict)
+//          * unqualified name conflicts should only arise on reference
+// 
+//      - decls may 'shadow' one another
+// 
+//          - decls in child blocks may 'shadow' ones in ancestoral blocks by
+//            using the same name as them
+// 
+//          - given an extern type and a type defined in Yama code w/ the same
+//            unqualified name, unqualified name access of this name will select the
+//            type defined in Yama code, shadowing the extern type
 // 
 //      - the different scopes decls have are as follows:
 // 
-//          - decls for types defined prior to compilation exist in the global
-//            block, w/ their scope beginning/ending at the start/end of this block
+//          - type decls for extern types exist in the global block, w/ their scope
+//            beginning/ending at the start/end of this block
 //              * these are in scope at all points in the Yama code
 // 
 //          - type decls exist in the global block, w/ their scope beginning/ending
@@ -900,13 +1423,13 @@ fn f() {
 //            at the end of their block
 //              * this means local var's init expr cannot reference the local var
 // 
-//      - dead code (ie. code not reachable from entrypoint) is still subject
-//        to error checking
+//      - dead code (ie. code not reachable from entrypoint) is still subject to
+//        error checking
 
-// declaring types in global scope will result in new types being
-// made available to the domain upon upload
+// declaring types in global scope will result in new types being made available to the
+// domain upon module import (which should happen immediately if import caused compile)
 
-TEST_P(CompilerImplTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponUpload) {
+TEST_P(CompilerImplTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponCompiledModuleImport) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -918,13 +1441,11 @@ fn f() {}
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -937,18 +1458,19 @@ fn f() {}
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// types defined prior to compilation should be available for use
-// by Yama code, including the built-in types None, Int, UInt, Float,
-// Bool, and Char
+// types loaded from outside modules (ie. extern types) should be available to Yama code
 
-TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedPriorToCompilation_MayBeUsedByYamaCode) {
+TEST_P(CompilerImplTests, DeclAndScope_ExternTypes_MayBeUsedByYamaCode) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
-    // below tests for primitives and custom types defined prior to
-    // the compilation, w/ the observe# fns covering the ladder
+    // below usage of types from implicitly imported 'yama' module, alongside usage of
+    // fns from imported fns.abc, cover the implicit decl of types made available to
+    // Yama code from outside modules
 
     var a: None;
     observeNone(a);
@@ -974,13 +1496,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -999,13 +1519,14 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// types defined by Yama code should be available for use by said 
-// Yama code
+// types defined by Yama code should be available for use by said Yama code
 
 TEST_P(CompilerImplTests, DeclAndScope_TypesDefinedInYamaCode_MayBeUsedByYamaCode) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
+
+import fns.abc;
 
 fn a() {
     observeChar('a');
@@ -1030,12 +1551,10 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto a = dm->load("a"_str);
-    const auto b = dm->load("b"_str);
-    const auto c = dm->load("c"_str);
-    const auto f = dm->load("f"_str);
+    const auto a = dm->load("a:a"_str);
+    const auto b = dm->load("a:b"_str);
+    const auto c = dm->load("a:c"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
     ASSERT_TRUE(c);
@@ -1045,10 +1564,10 @@ fn f() {
     ASSERT_EQ(b->kind(), yama::kind::function);
     ASSERT_EQ(c->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(a->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(b->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(c->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(a->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(b->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(c->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1064,6 +1583,52 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// types defined in Yama code may share unqualified name w/ extern type
+
+TEST_P(CompilerImplTests, DeclAndScope_TypeDefinedInYamaCode_SharesUnqualifiedName_WithExternType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn Int() -> Char { // shares unqualified name w/ yama:Int
+    return 'a';
+}
+
+fn observeInt() -> Char { // shares unqualified name w/ fns.abc:observeInt
+    return 'b';
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto our_Int = dm->load("a:Int"_str);
+    const auto our_observeInt = dm->load("a:observeInt"_str);
+    ASSERT_TRUE(our_Int);
+    ASSERT_TRUE(our_observeInt);
+
+    ASSERT_EQ(our_Int->kind(), yama::kind::function);
+    ASSERT_EQ(our_observeInt->kind(), yama::kind::function);
+    ASSERT_EQ(our_Int->callsig().value().fmt(), "fn() -> yama:Char");
+    ASSERT_EQ(our_observeInt->callsig().value().fmt(), "fn() -> yama:Char");
+
+    ASSERT_TRUE(ctx->push_fn(*our_Int).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*our_observeInt).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_char(U'a'));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_char(U'b'));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // IMPORTANT: this test mainly covers the coexistence between *shadower* and *shadowed*
 //            decls, w/ the behaviour of shadowing in regards to referencing behaviour
 //            being deferred to tests for 'type specifiers' and 'identifier exprs'
@@ -1076,7 +1641,9 @@ TEST_P(CompilerImplTests, DeclAndScope_DeclShadowingBehaviour) {
 
     std::string txt = R"(
 
-fn a() {} // fn a will be shadowed by 'a's below, w/ this test covering coexistence mainly
+import fns.abc;
+
+fn a() {} // (unqualified ref to) fn 'a' will be shadowed by 'a's below, w/ this test covering coexistence mainly
 
 fn f(a: Int) {
     observeInt(a);
@@ -1096,18 +1663,16 @@ fn f(a: Int) {
 
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
-
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
     
-    const auto a = dm->load("a"_str);
-    const auto f = dm->load("f"_str);
+    const auto a = dm->load("a:a"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(a);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(a->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(a->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> None");
+    ASSERT_EQ(a->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Int) -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->push_int(21).good());
@@ -1126,9 +1691,9 @@ fn f(a: Int) {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// test to ensure impl properly impls local var scope not starting until after
-// the decl itself, w/ this meaning that the init exprs of the local var cannot
-// reference itself
+// test to ensure impl properly impls local var scope not starting until after the
+// decl itself, w/ this meaning that the init exprs of the local var cannot reference
+// itself
 
 TEST_P(CompilerImplTests, DeclAndScope_LocalVarScopeBeginsWhenExpected) {
     ASSERT_TRUE(ready);
@@ -1144,38 +1709,6 @@ fn f() {
     EXPECT_FALSE(_perform_compile(*this, txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
-}
-
-// illegal to declare a type in global scope with the name of a type
-// defined prior to compilation, including the built-in types None,
-// Int, UInt, Float, Bool, and Char
-
-TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByBuiltInType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn Int() {}
-
-)";
-
-    EXPECT_FALSE(_perform_compile(*this, txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
-}
-
-TEST_P(CompilerImplTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByNonBuiltInType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn observeInt() {}
-
-)";
-
-    EXPECT_FALSE(_perform_compile(*this, txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
 }
 
 // illegal to declare a two or more types in global scope w/ a common name
@@ -1303,16 +1836,18 @@ fn f() {
 //      - type specifiers exist relative to some block, and their ability to reference
 //        decls respects the scope and shadowing rules of decls
 
-// specify built-in type
+// specify extern type
 
-TEST_P(CompilerImplTests, TypeSpecifier_SpecifyBuiltInType) {
+TEST_P(CompilerImplTests, TypeSpecifier_SpecifyExternType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
-    var a: Int = 10;
-    observeInt(a);
+    var a: Int = 10; // 'Int' specifies extern yama:Int
+    observeInt(a); // 'observeInt' specifies extern fns.abc:observeInt
 }
 
 )";
@@ -1320,13 +1855,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1358,17 +1891,15 @@ fn f() -> g {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1381,6 +1912,50 @@ fn f() -> g {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// specify type in Yama code which shadows an extern type
+
+TEST_P(CompilerImplTests, TypeSpecifier_SpecifyTypeInYamaCode_WhichShadowsExternType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn observeInt(x: Char) { // shadows fns.abc:observeInt
+    observeChar(x); // will observe fns.abc:observeChar behaviour
+}
+
+fn f() {
+    observeInt('a'); // ref our observeInt
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto observeInt = dm->load("a:observeInt"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(observeInt);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(observeInt->kind(), yama::kind::function);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(observeInt->callsig().value().fmt(), "fn(yama:Char) -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'a');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // illegal for type spec to specify non-type
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
@@ -1389,7 +1964,7 @@ TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
     std::string txt = R"(
 
 fn f() {
-    var a: T; // no type named T
+    var a: T; // error! no type named T
 }
 
 )";
@@ -1399,7 +1974,28 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
-// cannot reference type which has been shadowed by parameter
+// illegal ambiguous unqualified name type specify (between two or more extern types)
+
+TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfAmbiguousUnqualifiedNameTypeSpecify_BetweenTwoOrMoreExternTypes) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc; // imports 'observeInt'
+import fns2.abc; // imports 'observeInt'
+
+fn f() {
+    observeInt(10); // error! could be fns.abc:observeInt or fns2.abc:observeInt, ambiguous!
+}
+
+)";
+
+    EXPECT_FALSE(_perform_compile(*this, txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_ambiguous_name), 1);
+}
+
+// cannot (unqualified name) reference type which has been shadowed by parameter
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
     ASSERT_TRUE(ready);
@@ -1407,7 +2003,7 @@ TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
     std::string txt = R"(
 
 fn f(Int: Float) { // <- shadows Int type
-    var a: Int; // error, Int refers to param
+    var a: Int; // error! Int refers to param, not yama:Int!
 }
 
 )";
@@ -1417,7 +2013,7 @@ fn f(Int: Float) { // <- shadows Int type
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
 
-// cannot reference type which has been shadowed by local var
+// cannot (unqualified name) reference type which has been shadowed by local var
 
 TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
     ASSERT_TRUE(ready);
@@ -1426,7 +2022,7 @@ TEST_P(CompilerImplTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
 
 fn f() {
     var Int = 10; // shadows Int type (ironically)
-    var a: Int; // error, Int refers to local var
+    var a: Int; // error! Int refers to local var, not yama:Int!
 }
 
 )";
@@ -1470,6 +2066,8 @@ TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_NoInitAssign) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a: Char;
     observeChar(a);
@@ -1480,13 +2078,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1507,6 +2103,8 @@ TEST_P(CompilerImplTests, VariableDecl_NoTypeAnnot_InitAssign) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a = 'y';
     observeChar(a);
@@ -1517,13 +2115,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1544,6 +2140,8 @@ TEST_P(CompilerImplTests, VariableDecl_TypeAnnot_InitAssign) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a: Char = 'y';
     observeChar(a);
@@ -1554,13 +2152,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1599,6 +2195,8 @@ TEST_P(CompilerImplTests, VariableDecl_InitializationAndMutability) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a = 0;
     observeInt(a);
@@ -1617,13 +2215,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1676,12 +2272,6 @@ fn f() {
 }
 
 
-// TODO: below function decl tests don't cover None return type fns w/ 'return x;'
-//       return stmt, which 'x' is some None returning expr
-//
-//       these are covered by our return stmt tests, but function decl tests (which
-//       cover the decl itself being able to handle usage of them) isn't covered yet
-
 // function decl
 //
 //      - defines non-local function if appears in global block
@@ -1691,6 +2281,9 @@ fn f() {
 // 
 //      - forms w/ explicit return type explicitly specify their return type
 //      - forms w/out explicit return type have None as their return type implicitly
+// 
+//      - w/ return type None, regardless of whether return type is explicit or implicit,
+//        'return;' (aka. None return stmt) may be used
 // 
 //      - w/out return type None, control paths in the function reachable from the
 //        entrypoint MUST either end w/ an explicit return stmt, or enter an infinite
@@ -1718,6 +2311,72 @@ fn f() {
 //        in the function body local block and initialized to the values of the arguments
 //        passed to the function from the call site
 
+// function w/ explicit return type, which is None, may use 'return;'
+
+TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_MayUseNoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() -> None {
+    return;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// function w/ implicit return type, which is None, may use 'return;'
+
+TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_MayUseNoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    return;
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // function w/ explicit return type, which is NOT None, w/ all control paths exiting
 // via return stmt
 
@@ -1725,6 +2384,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_AllCont
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
+
+import fns.abc;
 
 fn f() -> Int {
     // test w/ slightly *nuanced* control flow
@@ -1744,13 +2405,11 @@ fn f() -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1771,6 +2430,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_NoRetur
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
+
+import fns.abc;
 
 fn f() -> Int { // <- non-None return type, so normally would need explicit return stmt on each control path
     // test w/ slightly *nuanced* control flow
@@ -1794,13 +2455,11 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     EXPECT_EQ(ctx->panics(), 0);
 
@@ -1826,6 +2485,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControl
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() -> None {
     // test w/ slightly *nuanced* control flow
     if (true) {
@@ -1844,13 +2505,11 @@ fn f() -> None {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1872,6 +2531,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControl
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() -> None {
     // test w/ slightly *nuanced* control flow
     if (true) {
@@ -1889,13 +2550,11 @@ fn f() -> None {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1918,6 +2577,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControl
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() { // <- implies return type is None
     // test w/ slightly *nuanced* control flow
     if (true) {
@@ -1936,13 +2597,11 @@ fn f() { // <- implies return type is None
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -1964,6 +2623,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControl
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() { // <- implies return type is None
     // test w/ slightly *nuanced* control flow
     if (true) {
@@ -1981,13 +2642,11 @@ fn f() { // <- implies return type is None
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2010,6 +2669,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ParamList) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f(a, b, c: Int, d: Bool, e: Char) {
     observeInt(a);
     observeInt(b);
@@ -2023,13 +2684,11 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Int, Int, Int, Bool, Char) -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Int, yama:Int, yama:Int, yama:Bool, yama:Char) -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->push_int(11).good());
@@ -2058,6 +2717,8 @@ TEST_P(CompilerImplTests, FunctionDecl_ParamList_WithMaxParams) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
+
+import fns.abc;
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23: Int) {
     observeInt(p0);
@@ -2091,13 +2752,11 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int, yama:Int) -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->push_int(24).good());
@@ -2278,6 +2937,8 @@ TEST_P(CompilerImplTests, AssignmentStmt_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a = 10;
     observeInt(a);
@@ -2290,13 +2951,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2364,6 +3023,8 @@ TEST_P(CompilerImplTests, ExprStmt_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     100; // legal, but totally transparent
     observeInt(10); // legal, and not transparent
@@ -2374,13 +3035,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2417,6 +3076,8 @@ TEST_P(CompilerImplTests, IfStmt_NoElse) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f(a: Bool) {
     observeBool(a);
     if (a) {
@@ -2430,13 +3091,11 @@ fn f(a: Bool) {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Bool) -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Bool) -> yama:None");
 
     {
         sidefx = sidefx_t{};
@@ -2484,6 +3143,8 @@ TEST_P(CompilerImplTests, IfStmt_Else) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f(a: Bool) {
     observeBool(a);
     if (a) {
@@ -2500,13 +3161,11 @@ fn f(a: Bool) {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Bool) -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Bool) -> yama:None");
 
     {
         sidefx = sidefx_t{};
@@ -2555,6 +3214,8 @@ TEST_P(CompilerImplTests, IfStmt_ElseIfChain) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f(a: Char) {
     observeChar(a);
     if (isEqChar(a, 'a')) {
@@ -2577,13 +3238,11 @@ fn f(a: Char) {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Char) -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Char) -> yama:None");
 
     {
         sidefx = sidefx_t{};
@@ -2714,6 +3373,8 @@ TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaBreak) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -2732,13 +3393,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2764,6 +3423,8 @@ TEST_P(CompilerImplTests, LoopStmt_BasicUsage_ExitViaReturn) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -2782,13 +3443,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2822,6 +3481,8 @@ TEST_P(CompilerImplTests, BreakStmt_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -2840,13 +3501,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2873,6 +3532,8 @@ TEST_P(CompilerImplTests, BreakStmt_LocalVarInLoopBody) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -2893,13 +3554,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -2952,6 +3611,8 @@ TEST_P(CompilerImplTests, ContinueStmt_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -2971,13 +3632,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3004,6 +3663,8 @@ TEST_P(CompilerImplTests, ContinueStmt_LocalVarInLoopBody) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(-1);
     var i = 0;
@@ -3025,13 +3686,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3084,6 +3743,8 @@ TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NonNoneReturnType) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() -> Int {
     return 10;
     observeInt(0); // <- shouldn't be reached
@@ -3094,13 +3755,11 @@ fn f() -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3120,6 +3779,8 @@ TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NoneReturnStmt) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     return;
     observeInt(0); // <- shouldn't be reached
@@ -3130,13 +3791,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3156,6 +3815,8 @@ TEST_P(CompilerImplTests, ReturnStmt_BasicUsage_NoneReturnType_NonNoneReturnStmt
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn g() {} // <- to get None object (as Yama currently lacks another way to get it)
 
 fn f() {
@@ -3168,17 +3829,15 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3264,17 +3923,15 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> g");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3294,6 +3951,8 @@ TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_Param) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f(a: Int) -> Int {
     observeInt(a);
     return a;
@@ -3304,13 +3963,11 @@ fn f(a: Int) -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->push_int(-21).good());
@@ -3332,6 +3989,8 @@ TEST_P(CompilerImplTests, IdentifierExpr_AccessValueOf_LocalVar) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() -> Int {
     var a = -21;
     observeInt(a);
@@ -3343,13 +4002,11 @@ fn f() -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3363,12 +4020,55 @@ fn f() -> Int {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// extern fn shadowed by fn defined in Yama code
+
+TEST_P(CompilerImplTests, IdentifierExpr_FnDefinedInYamaCodeShadowsExternFn) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn observeInt() {} // shadows fns.abc:observeInt
+
+fn f() -> observeInt { // return fn value to see if it works
+    return observeInt; // <- should be our fn
+}
+
+)";
+
+    const auto result = _perform_compile(*this, txt);
+    ASSERT_TRUE(result);
+
+    const auto observeInt = dm->load("a:observeInt"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(observeInt);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(observeInt->kind(), yama::kind::function);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(observeInt->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:observeInt");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(observeInt.value()).value());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // function shadowed by parameter
 
 TEST_P(CompilerImplTests, IdentifierExpr_ParamShadowsFn) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
+
+import fns.abc;
 
 fn g() {}
 
@@ -3381,17 +4081,15 @@ fn f(g: Int) {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn(Int) -> None");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Int) -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->push_int(-21).good());
@@ -3413,6 +4111,8 @@ TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsFn) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn g() {}
 
 fn f() {
@@ -3425,17 +4125,15 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3456,6 +4154,8 @@ TEST_P(CompilerImplTests, IdentifierExpr_LocalVarShadowsAnotherLocalVar) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     var a = 101;
     observeInt(a); // <- not shadowed here
@@ -3471,13 +4171,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3619,6 +4317,8 @@ TEST_P(CompilerImplTests, IdentifierExpr_Assignable_IfLocalVar) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() -> Int {
     var a = -21;
     a = 10; // overwrite previous value
@@ -3631,13 +4331,11 @@ fn f() -> Int {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3668,6 +4366,8 @@ TEST_P(CompilerImplTests, IntLiteralExpr_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeInt(0);
     observeInt(1);
@@ -3696,13 +4396,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3805,6 +4503,8 @@ TEST_P(CompilerImplTests, UIntLiteralExpr_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeUInt(0u);
     observeUInt(1u);
@@ -3823,13 +4523,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -3917,15 +4615,13 @@ fn f6() -> Float { return nan; }
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f0 = dm->load("f0"_str);
-    const auto f1 = dm->load("f1"_str);
-    const auto f2 = dm->load("f2"_str);
-    const auto f3 = dm->load("f3"_str);
-    const auto f4 = dm->load("f4"_str);
-    const auto f5 = dm->load("f5"_str);
-    const auto f6 = dm->load("f6"_str);
+    const auto f0 = dm->load("a:f0"_str);
+    const auto f1 = dm->load("a:f1"_str);
+    const auto f2 = dm->load("a:f2"_str);
+    const auto f3 = dm->load("a:f3"_str);
+    const auto f4 = dm->load("a:f4"_str);
+    const auto f5 = dm->load("a:f5"_str);
+    const auto f6 = dm->load("a:f6"_str);
     ASSERT_TRUE(f0);
     ASSERT_TRUE(f1);
     ASSERT_TRUE(f2);
@@ -3941,13 +4637,13 @@ fn f6() -> Float { return nan; }
     ASSERT_EQ(f4->kind(), yama::kind::function);
     ASSERT_EQ(f5->kind(), yama::kind::function);
     ASSERT_EQ(f6->kind(), yama::kind::function);
-    ASSERT_EQ(f0->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f1->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f2->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f3->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f4->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f5->callsig().value().fmt(), "fn() -> Float");
-    ASSERT_EQ(f6->callsig().value().fmt(), "fn() -> Float");
+    ASSERT_EQ(f0->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f1->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f2->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f3->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f4->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f5->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f6->callsig().value().fmt(), "fn() -> yama:Float");
 
     // f6 is handled seperately, due to NAN values being annoying
 
@@ -4011,13 +4707,11 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Float");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4049,13 +4743,11 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> Float");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Float");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4105,6 +4797,8 @@ TEST_P(CompilerImplTests, BoolLiteralExpr_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn f() {
     observeBool(true);
     observeBool(false);
@@ -4115,13 +4809,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4169,6 +4861,8 @@ TEST_P(CompilerImplTests, CharLiteralExpr_BasicUsage) {
     // IMPORTANT: for Unicode input to work, we gotta use a UTF-8 string literal
     std::u8string txt0 = u8R"(
 
+import fns.abc;
+
 fn f() {
     observeChar('a');
     observeChar('b');
@@ -4211,13 +4905,11 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto f = dm->load("f"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4338,6 +5030,8 @@ TEST_P(CompilerImplTests, CallExpr_BasicUsage) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn choose(which: Bool, a, b: Int) -> Int {
     if (which) {
         return a;
@@ -4357,17 +5051,15 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto choose = dm->load("choose"_str);
-    const auto f = dm->load("f"_str);
+    const auto choose = dm->load("a:choose"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(choose);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(choose->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(choose->callsig().value().fmt(), "fn(Bool, Int, Int) -> Int");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(choose->callsig().value().fmt(), "fn(yama:Bool, yama:Int, yama:Int) -> yama:Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4389,6 +5081,8 @@ TEST_P(CompilerImplTests, CallExpr_EvalOrder) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn get_callobj() -> g { observeChar('c'); return g; }
 
 fn foo() -> Int { observeInt(0); return 0; }
@@ -4398,6 +5092,8 @@ fn baz() -> Int { observeInt(2); return 0; }
 fn g(a, b, c: Int) -> Int { return 0; }
 
 fn f() {
+    // Yama has well defined eval order
+
     get_callobj()(foo(), g(foo(), bar(), baz()), bar());
 }
 
@@ -4406,14 +5102,12 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto get_callobj = dm->load("get_callobj"_str);
-    const auto foo = dm->load("foo"_str);
-    const auto bar = dm->load("bar"_str);
-    const auto baz = dm->load("baz"_str);
-    const auto g = dm->load("g"_str);
-    const auto f = dm->load("f"_str);
+    const auto get_callobj = dm->load("a:get_callobj"_str);
+    const auto foo = dm->load("a:foo"_str);
+    const auto bar = dm->load("a:bar"_str);
+    const auto baz = dm->load("a:baz"_str);
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(get_callobj);
     ASSERT_TRUE(foo);
     ASSERT_TRUE(bar);
@@ -4427,12 +5121,12 @@ fn f() {
     ASSERT_EQ(baz->kind(), yama::kind::function);
     ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(get_callobj->callsig().value().fmt(), "fn() -> g");
-    ASSERT_EQ(foo->callsig().value().fmt(), "fn() -> Int");
-    ASSERT_EQ(bar->callsig().value().fmt(), "fn() -> Int");
-    ASSERT_EQ(baz->callsig().value().fmt(), "fn() -> Int");
-    ASSERT_EQ(g->callsig().value().fmt(), "fn(Int, Int, Int) -> Int");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(get_callobj->callsig().value().fmt(), "fn() -> a:g");
+    ASSERT_EQ(foo->callsig().value().fmt(), "fn() -> yama:Int");
+    ASSERT_EQ(bar->callsig().value().fmt(), "fn() -> yama:Int");
+    ASSERT_EQ(baz->callsig().value().fmt(), "fn() -> yama:Int");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn(yama:Int, yama:Int, yama:Int) -> yama:Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
@@ -4458,6 +5152,8 @@ TEST_P(CompilerImplTests, CallExpr_Nesting) {
 
     std::string txt = R"(
 
+import fns.abc;
+
 fn foo(x: Int) -> foo { observeInt(x); return foo; }
 
 fn f() {
@@ -4469,17 +5165,15 @@ fn f() {
     const auto result = _perform_compile(*this, txt);
     ASSERT_TRUE(result);
 
-    ASSERT_TRUE(dm->upload(yama::make_res<const yama::module_info>(result->info())));
-
-    const auto foo = dm->load("foo"_str);
-    const auto f = dm->load("f"_str);
+    const auto foo = dm->load("a:foo"_str);
+    const auto f = dm->load("a:f"_str);
     ASSERT_TRUE(foo);
     ASSERT_TRUE(f);
 
     ASSERT_EQ(foo->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(foo->callsig().value().fmt(), "fn(Int) -> foo");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> None");
+    ASSERT_EQ(foo->callsig().value().fmt(), "fn(yama:Int) -> a:foo");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());

@@ -109,14 +109,14 @@ TEST(ModuleFactoryTests, PopulatedModule) {
     ASSERT_TRUE(m.contains("C"_str));
 
     yama::type_info A_expected{
-        .fullname = "A"_str,
+        .unqualified_name = "A"_str,
         .consts = A_consts,
         .info = yama::primitive_info{
             .ptype = yama::ptype::int0,
         },
     };
     yama::type_info B_expected{
-        .fullname = "B"_str,
+        .unqualified_name = "B"_str,
         .consts = B_consts,
         .info = yama::function_info{
             .callsig = B_callsig,
@@ -127,7 +127,7 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         },
     };
     yama::type_info C_expected{
-        .fullname = "C"_str,
+        .unqualified_name = "C"_str,
         .consts = C_consts,
         .info = yama::function_info{
             .callsig = C_callsig,

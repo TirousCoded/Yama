@@ -4,13 +4,30 @@
 
 #include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
-#include <yama/core/type_info.h>
+#include <yama/core/module_info.h>
 
 
 using namespace yama::string_literals;
 
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplLoadingTests);
+
+
+// TODO: the below unit tests were initially written prior to the addition of parcels/modules,
+//       and so *naively* operates w/ only tests for domain env, w/ NONE covering parcel env
+//
+//       this is a problem, and so we'd be best to figure out how we want to revise our test
+//       suite in the future to address this
+
+// TODO: another problem arising w/ the below tests is that I'm fairly certain we lack tests
+//       covering things like inter-parcel dependency relationships between loaded types
+
+// TODO: also, maybe add in tests for things like whether impl can properly handle discerning
+//       whether the parcel env import path defining a type symbol is valid or not (w/ these
+//       tests only summarily testing the particulars of what constitutes validity of these)
+//
+//       we need this, as currently nothing is testing if impl can properly handle failing
+//       to load due to invalid import path part
 
 
 // IMPORTANT:
@@ -24,14 +41,28 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplLoadingTests);
 //      one error may correspond to multiple dsignal raises
 
 
-// NOTE: in Yama, 'instantiation' refers to the part of loading where a type_info
-//       is used to create a new type, ready for use (w/ one load being able to
-//       instantiate multiple types)
-//
-//       the term 'loading' is largely a synonym for 'instantiate'
-//
-//       this test suite's terminology comes from an older test suite this one
-//       replaced for a (now internal) 'instantiator'
+namespace {
+    class test_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        yama::res<yama::module_info> m;
+
+
+        test_parcel(yama::module_factory& mf)
+            : parcel(),
+            m(yama::make_res<yama::module_info>(mf.done())) {}
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, {} };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& import_path) override final {
+            if (import_path != ""_str) return std::nullopt;
+            return decltype(m)(m);
+        }
+    };
+}
 
 
 // IMPORTANT:
@@ -40,7 +71,7 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplLoadingTests);
 //      is nevertheless indirectly a part of its dep graph
 
 
-TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
+TEST_P(DomainImplLoadingTests, EnsureWorksWithAllConstTypes) {
     const auto dm = GetParam().factory(dbg);
 
     static_assert(yama::const_types == 7);
@@ -53,61 +84,45 @@ TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
     //        <- b0             (primitive)
     //        <- b1             (function)
 
-    // this test is a catch-all for us testing that instantiate works w/ all
+    // this test is a catch-all for us testing that loading works w/ all
     // constant types *generally*
 
-    // this test covers that instantiate properly handles non-type constants
+    // this test covers that loading properly handles non-type constants
     // in the constant table
 
-    // this test covers that instantiate properly handles type constants in
+    // this test covers that loading properly handles type constants in
     // a general case, w/ the below Instantiate_# tests then testing linking
     // behaviour more thoroughly, but presuming that this test passing means
     // that linking behaviour can be expected to *generalize* across all the
     // different type constant types
 
     static_assert(yama::const_types == 7);
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
         .add_int(-4)
         .add_uint(301)
         .add_float(3.14159)
         .add_bool(true)
         .add_char(U'y')
-        .add_primitive_type("b0"_str)
-        .add_function_type("b1"_str, yama::make_callsig_info({}, 5)); // ie. fn() -> b0
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info b0_info{
-        .fullname = "b0"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info b1_info{
-        .fullname = "b1"_str,
-        .consts = a_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 5), // ie. fn() -> b0
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
+        .add_primitive_type("self:b0"_str)
+        .add_function_type("self:b1"_str, yama::make_callsig_info({}, 5)); // ie. fn() -> b0
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b0"_str, {}, yama::ptype::bool0)
+        .add_function_type(
+            "b1"_str, decltype(a_consts)(a_consts),
+            yama::make_callsig_info({}, 5), // ie. fn() -> b0
+            10,
+            yama::noop_call_fn);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b0_info,
-        b1_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
-    const auto b0 = dm->load("b0"_str);
-    const auto b1 = dm->load("b1"_str);
+    const auto a = dm->load("p:a"_str); // <- main one under test
+    const auto b0 = dm->load("p:b0"_str);
+    const auto b1 = dm->load("p:b1"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b0);
@@ -117,10 +132,10 @@ TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
     const yama::type bb0 = b0.value();
     const yama::type bb1 = b1.value();
 
-    // for this test we only really care that type 'a' instantiates correctly
+    // for this test we only really care that type 'a' loads correctly
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), yama::const_types);
 
@@ -134,78 +149,56 @@ TEST_P(DomainImplLoadingTests, Instantiate_EnsureWorksWithAllConstTypes) {
     EXPECT_EQ(aa.consts().get<yama::function_type_const>(6), std::make_optional(bb1));
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_WithNoDeps) {
+TEST_P(DomainImplLoadingTests, WithNoDeps) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
     //      a
 
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
+    const auto a = dm->load("p:a"_str); // <- main one under test
 
     ASSERT_TRUE(a);
 
     const yama::type aa = a.value();
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_WithDeps) {
+TEST_P(DomainImplLoadingTests, WithDeps) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
     //      a -> b
     //        -> c
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:c"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b"_str, {}, yama::ptype::bool0)
+        .add_primitive_type("c"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
-    const auto b = dm->load("b"_str);
-    const auto c = dm->load("c"_str);
+    const auto a = dm->load("p:a"_str); // <- main one under test
+    const auto b = dm->load("p:b"_str);
+    const auto c = dm->load("p:c"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
@@ -216,24 +209,24 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps) {
     const yama::type cc = c.value();
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
     EXPECT_TRUE(bb.complete());
-    EXPECT_EQ(bb.fullname(), "b"_str);
+    EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 0);
 
     EXPECT_TRUE(cc.complete());
-    EXPECT_EQ(cc.fullname(), "c"_str);
+    EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_WithIndirectlyReferencedTypes) {
+TEST_P(DomainImplLoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
@@ -241,75 +234,36 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_WithIndirectlyReferencedType
     //             -> e
     //        -> c -> f
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto b_consts =
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:c"_str);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("d"_str)
-        .add_primitive_type("e"_str);
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto c_consts =
+        .add_primitive_type("self:d"_str)
+        .add_primitive_type("self:e"_str);
+    auto c_consts =
         yama::const_table_info()
-        .add_primitive_type("f"_str);
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = c_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info d_info{
-        .fullname = "d"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info e_info{
-        .fullname = "e"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info f_info{
-        .fullname = "f"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:f"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
+        .add_primitive_type("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        .add_primitive_type("d"_str, {}, yama::ptype::bool0)
+        .add_primitive_type("e"_str, {}, yama::ptype::bool0)
+        .add_primitive_type("f"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        d_info,
-        e_info,
-        f_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
-    const auto b = dm->load("b"_str);
-    const auto c = dm->load("c"_str);
-    const auto d = dm->load("d"_str);
-    const auto e = dm->load("e"_str);
-    const auto f = dm->load("f"_str);
+    const auto a = dm->load("p:a"_str); // <- main one under test
+    const auto b = dm->load("p:b"_str);
+    const auto c = dm->load("p:c"_str);
+    const auto d = dm->load("p:d"_str);
+    const auto e = dm->load("p:e"_str);
+    const auto f = dm->load("p:f"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
@@ -326,42 +280,42 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_WithIndirectlyReferencedType
     const yama::type ff = f.value();
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
     EXPECT_TRUE(bb.complete());
-    EXPECT_EQ(bb.fullname(), "b"_str);
+    EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 2);
     EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
     EXPECT_EQ(bb.consts().type(1), std::make_optional(ee));
 
     EXPECT_TRUE(cc.complete());
-    EXPECT_EQ(cc.fullname(), "c"_str);
+    EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 1);
     EXPECT_EQ(cc.consts().type(0), std::make_optional(ff));
 
     EXPECT_TRUE(dd.complete());
-    EXPECT_EQ(dd.fullname(), "d"_str);
+    EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.consts().size(), 0);
 
     EXPECT_TRUE(ee.complete());
-    EXPECT_EQ(ee.fullname(), "e"_str);
+    EXPECT_EQ(ee.fullname(), "p:e"_str);
     EXPECT_EQ(ee.kind(), yama::kind::primitive);
     EXPECT_EQ(ee.consts().size(), 0);
 
     EXPECT_TRUE(ff.complete());
-    EXPECT_EQ(ff.fullname(), "f"_str);
+    EXPECT_EQ(ff.fullname(), "p:f"_str);
     EXPECT_EQ(ff.kind(), yama::kind::primitive);
     EXPECT_EQ(ff.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
+TEST_P(DomainImplLoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
@@ -370,58 +324,33 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_TypeReferencedMultipleTimesI
     //             -> d     <- test w/ multiple refs to 'd' on same 'c' node in graph
     //             -> d
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto b_consts =
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:c"_str);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("d"_str);
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto c_consts =
+        .add_primitive_type("self:d"_str);
+    auto c_consts =
         yama::const_table_info()
-        .add_primitive_type("d"_str)
-        .add_primitive_type("d"_str)
-        .add_primitive_type("d"_str);
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = c_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info d_info{
-        .fullname = "d"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:d"_str)
+        .add_primitive_type("self:d"_str)
+        .add_primitive_type("self:d"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
+        .add_primitive_type("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        .add_primitive_type("d"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        d_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
-    const auto b = dm->load("b"_str);
-    const auto c = dm->load("c"_str);
-    const auto d = dm->load("d"_str);
+    const auto a = dm->load("p:a"_str); // <- main one under test
+    const auto b = dm->load("p:b"_str);
+    const auto c = dm->load("p:c"_str);
+    const auto d = dm->load("p:d"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
@@ -434,20 +363,20 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_TypeReferencedMultipleTimesI
     const yama::type dd = d.value();
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
     EXPECT_TRUE(bb.complete());
-    EXPECT_EQ(bb.fullname(), "b"_str);
+    EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);
     EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
 
     EXPECT_TRUE(cc.complete());
-    EXPECT_EQ(cc.fullname(), "c"_str);
+    EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 3);
     EXPECT_EQ(cc.consts().type(0), std::make_optional(dd));
@@ -455,47 +384,36 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_TypeReferencedMultipleTimesI
     EXPECT_EQ(cc.consts().type(2), std::make_optional(dd));
 
     EXPECT_TRUE(dd.complete());
-    EXPECT_EQ(dd.fullname(), "d"_str);
+    EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_DepGraphCycle) {
+TEST_P(DomainImplLoadingTests, WithDeps_DepGraphCycle) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
     //      a -> b -> a     (back ref)
     //        -> a          (back ref)
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("a"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto b_consts =
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:a"_str);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("a"_str);
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:a"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    const auto a = dm->load("a"_str); // <- main one under test
-    const auto b = dm->load("b"_str);
+    const auto a = dm->load("p:a"_str); // <- main one under test
+    const auto b = dm->load("p:b"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
@@ -504,75 +422,63 @@ TEST_P(DomainImplLoadingTests, Instantiate_WithDeps_DepGraphCycle) {
     const yama::type bb = b.value();
 
     EXPECT_TRUE(aa.complete());
-    EXPECT_EQ(aa.fullname(), "a"_str);
+    EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(aa));
 
     EXPECT_TRUE(bb.complete());
-    EXPECT_EQ(bb.fullname(), "b"_str);
+    EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);
     EXPECT_EQ(bb.consts().type(0), std::make_optional(aa));
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_Fail_OriginalTypeNotFound) {
+TEST_P(DomainImplLoadingTests, Fail_OriginalTypeNotFound) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
     //      a           <- error is that no type_info 'a' provided
 
-    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
+    yama::module_factory mf{};
 
-    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
+
+    EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
+
+    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_Fail_ReferencedTypeNotFound) {
+TEST_P(DomainImplLoadingTests, Fail_ReferencedTypeNotFound) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
     //      a -> b      <- error is that no type_info 'b' provided
     //        -> c
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    //yama::type_info b_info{
-    //    .fullname = "b"_str,
-    //    .consts = {},
-    //    .info = yama::primitive_info{
-    //        .ptype = yama::ptype::bool0,
-    //    },
-    //};
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:c"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        //.add_primitive_type("b"_str, {}, yama::ptype::bool0)
+        .add_primitive_type("c"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        //b_info,
-        c_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
+    EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
 
-    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound) {
+TEST_P(DomainImplLoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
@@ -580,75 +486,36 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_IndirectlyReferencedTypeNotFound
     //             -> e
     //        -> c -> f
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto b_consts =
+        .add_primitive_type("self:b"_str)
+        .add_primitive_type("self:c"_str);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("d"_str)
-        .add_primitive_type("e"_str);
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto c_consts =
+        .add_primitive_type("self:d"_str) // <- import of 'a' indirectly refers to 'd'
+        .add_primitive_type("self:e"_str);
+    auto c_consts =
         yama::const_table_info()
-        .add_primitive_type("f"_str);
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = c_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    //yama::type_info d_info{
-    //    .fullname = "d"_str,
-    //    .consts = {},
-    //    .info = yama::primitive_info{
-    //        .ptype = yama::ptype::bool0,
-    //    },
-    //};
-    yama::type_info e_info{
-        .fullname = "e"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info f_info{
-        .fullname = "f"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:f"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive_type("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
+        .add_primitive_type("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        //.add_primitive_type("d"_str, {}, yama::ptype::bool0) <- missing
+        .add_primitive_type("e"_str, {}, yama::ptype::bool0)
+        .add_primitive_type("f"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        //d_info,
-        e_info,
-        f_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    EXPECT_FALSE(dm->load("a"_str)); // <- should fail
+    EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
     
-    EXPECT_EQ(dbg->count(yama::dsignal::instant_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Instantiate_Fail_KindMismatch) {
+TEST_P(DomainImplLoadingTests, Fail_KindMismatch) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
@@ -657,46 +524,30 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_KindMismatch) {
     // a's b symbol's kind is primitive
     // b's kind is function
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
         // kind is intended to mismatch w/ the indirectly referenced type b
-        .add_primitive_type("b"_str);
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    const auto b_consts =
+        .add_primitive_type("self:b"_str);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("c"_str);
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+        .add_primitive_type("self:c"_str);
+    yama::module_factory mf{};
+    mf
+        .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_function_type(
+            "b"_str, decltype(b_consts)(b_consts),
+            yama::make_callsig_info({ 0 }, 0),
+            10,
+            yama::noop_call_fn)
+        .add_primitive_type("c"_str, {}, yama::ptype::bool0);
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        }));
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    EXPECT_FALSE(dm->load("a"_str)); // <- should fail (due to kind mismatch between 'a' and 'b')
+    EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail (due to kind mismatch between 'a' and 'b')
 
-    EXPECT_EQ(dbg->count(yama::dsignal::instant_kind_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_kind_mismatch), 1);
 }
 
 // TODO: maybe decompose below test into a few tests for each of the following cases:
@@ -705,7 +556,7 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_KindMismatch) {
 //          2) differ by return type indices (same const table)
 //          3) differ by const table (but have otherwise identical callsigs)
 
-TEST_P(DomainImplLoadingTests, Instantiate_Fail_CallSigMismatch) {
+TEST_P(DomainImplLoadingTests, Fail_CallSigMismatch) {
     const auto dm = GetParam().factory(dbg);
 
     // dep graph:
@@ -733,50 +584,35 @@ TEST_P(DomainImplLoadingTests, Instantiate_Fail_CallSigMismatch) {
     // a_consts, while 'b' will use clever_callsig_info_for_test w/
     // b_consts, w/ the different #_consts used by each causing
     // the above bout of *cleverness*
-    const auto clever_callsig_info_for_test = yama::make_callsig_info({ 0 }, 0);
+    auto clever_callsig_info_for_test = yama::make_callsig_info({ 0 }, 0);
 
-    const auto a_consts =
+    auto a_consts =
         yama::const_table_info()
         // callsig is intended to mismatch w/ the indirectly referenced type b
-        .add_function_type("b"_str, clever_callsig_info_for_test);
-    const auto b_consts =
+        .add_function_type("self:b"_str, clever_callsig_info_for_test);
+    auto b_consts =
         yama::const_table_info()
-        .add_primitive_type("c"_str); // <- c exists for b's constant indices to differ from a's
+        .add_primitive_type("self:c"_str); // <- c exists for b's constant indices to differ from a's
+    yama::module_factory mf{};
+    mf
+        .add_function_type(
+            "a"_str, decltype(a_consts)(a_consts),
+            decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
+            10,
+            yama::noop_call_fn)
+        .add_function_type(
+            "b"_str, decltype(b_consts)(b_consts),
+            decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
+            10,
+            yama::noop_call_fn)
+        .add_primitive_type("c"_str, {}, yama::ptype::bool0);
 
-    yama::type_info a_info{
-        .fullname = "a"_str,
-        .consts = a_consts,
-        .info = yama::function_info{
-            .callsig = clever_callsig_info_for_test,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    yama::type_info b_info{
-        .fullname = "b"_str,
-        .consts = b_consts,
-        .info = yama::function_info{
-            .callsig = clever_callsig_info_for_test,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    yama::type_info c_info{
-        .fullname = "c"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mf));
+    ASSERT_TRUE(dm->install(std::move(ib)));
 
-    ASSERT_TRUE(dm->upload({
-        a_info,
-        b_info,
-        c_info,
-        }));
+    EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail (due to callsig mismatch between 'a' and 'b')
 
-    EXPECT_FALSE(dm->load("a"_str)); // <- should fail (due to callsig mismatch between 'a' and 'b')
-
-    EXPECT_EQ(dbg->count(yama::dsignal::instant_callsig_mismatch), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_callsig_mismatch), 1);
 }
 

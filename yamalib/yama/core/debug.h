@@ -42,12 +42,12 @@ namespace yama {
         verif               = 1 << 4,           // static verification behaviour trace
         verif_error         = 1 << 5,           // static verification error
         verif_warning       = 1 << 6,           // static verification warning
-        install             = 1 << 7,           // install behaviour trace
-        install_error       = 1 << 8,           // install error
-        import              = 1 << 9,           // import behaviour trace
-        import_error        = 1 << 10,          // import error
-        instant             = 1 << 11,          // type instantiation behaviour trace
-        instant_error       = 1 << 12,          // type instantiation error
+        install             = 1 << 7,           // (parcel) install behaviour trace
+        install_error       = 1 << 8,           // (parcel) install error
+        import              = 1 << 9,           // (module) import behaviour trace
+        import_error        = 1 << 10,          // (module) import error
+        load                = 1 << 11,          // (type) loading behaviour trace
+        load_error          = 1 << 12,          // (type) loading error
         ctx_panic           = 1 << 13,          // context panic
         ctx_llcmd           = 1 << 14,          // low-level command behaviour trace
         bcode_exec          = 1 << 15,          // bcode execution trace
@@ -59,7 +59,7 @@ namespace yama {
                             | verif_error
                             | install_error
                             | import_error
-                            | instant_error
+                            | load_error
                             | ctx_panic,
 
         warnings            = verif_warning,
@@ -84,8 +84,8 @@ namespace yama {
     constexpr auto install_error_c      = dcat::install_error;
     constexpr auto import_c             = dcat::import;
     constexpr auto import_error_c       = dcat::import_error;
-    constexpr auto instant_c            = dcat::instant;
-    constexpr auto instant_error_c      = dcat::instant_error;
+    constexpr auto load_c               = dcat::load;
+    constexpr auto load_error_c         = dcat::load_error;
     constexpr auto ctx_panic_c          = dcat::ctx_panic;
     constexpr auto ctx_llcmd_c          = dcat::ctx_llcmd;
     constexpr auto bcode_exec_c         = dcat::bcode_exec;
@@ -139,10 +139,7 @@ namespace yama {
         return (cat & expect) == expect;
     }
 
-    // TODO: maybe update the below later to be properly comprehensive
-
-    // NOTE: some quick-n'-dirty (and notably non-comprehensive) static_assert-based
-    //       unit tests of yama::check
+    // some quick-n'-dirty tests
 
     static_assert(check(none_c, none_c));
     static_assert(check(all_c, none_c));
@@ -167,12 +164,13 @@ namespace yama {
     enum class dsignal : uint32_t {
         // all dsignal values should be prefixed by the name of the dcat they belong to
 
-        compile_file_not_found,
+        compile_file_not_found, // TODO: reimpl use of this in yama::domain
         compile_impl_internal, // internal error
         compile_impl_limits, // impl-defined limits exceeded
         compile_syntax_error,
         compile_name_conflict,
         compile_undeclared_name,
+        compile_ambiguous_name,
         compile_type_mismatch,
         compile_not_a_type,
         compile_not_an_expr,
@@ -188,8 +186,12 @@ namespace yama {
         compile_illegal_unicode,
         compile_invalid_operation,
         compile_wrong_arg_count,
+        compile_invalid_import,
+        compile_misplaced_import,
+        compile_invalid_env,
 
         verif_type_callsig_invalid,
+        verif_constsym_qualified_name_invalid,
         verif_constsym_callsig_invalid,
         verif_callsig_param_type_out_of_bounds,
         verif_callsig_return_type_out_of_bounds,
@@ -225,10 +227,11 @@ namespace yama {
         install_dep_graph_cycle,
 
         import_module_not_found,
+        import_invalid_module,
 
-        instant_type_not_found,
-        instant_kind_mismatch,
-        instant_callsig_mismatch,
+        load_type_not_found,
+        load_kind_mismatch,
+        load_callsig_mismatch,
 
         num, // not a valid dsignal
     };
@@ -237,7 +240,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 58);
+        static_assert(dsignals == 64);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -248,6 +251,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_syntax_error);
             _YAMA_ENTRY_(compile_name_conflict);
             _YAMA_ENTRY_(compile_undeclared_name);
+            _YAMA_ENTRY_(compile_ambiguous_name);
             _YAMA_ENTRY_(compile_type_mismatch);
             _YAMA_ENTRY_(compile_not_a_type);
             _YAMA_ENTRY_(compile_not_an_expr);
@@ -263,8 +267,12 @@ namespace yama {
             _YAMA_ENTRY_(compile_illegal_unicode);
             _YAMA_ENTRY_(compile_invalid_operation);
             _YAMA_ENTRY_(compile_wrong_arg_count);
+            _YAMA_ENTRY_(compile_invalid_import);
+            _YAMA_ENTRY_(compile_misplaced_import);
+            _YAMA_ENTRY_(compile_invalid_env);
 
             _YAMA_ENTRY_(verif_type_callsig_invalid);
+            _YAMA_ENTRY_(verif_constsym_qualified_name_invalid);
             _YAMA_ENTRY_(verif_constsym_callsig_invalid);
             _YAMA_ENTRY_(verif_callsig_param_type_out_of_bounds);
             _YAMA_ENTRY_(verif_callsig_return_type_out_of_bounds);
@@ -300,10 +308,11 @@ namespace yama {
             _YAMA_ENTRY_(install_dep_graph_cycle);
 
             _YAMA_ENTRY_(import_module_not_found);
+            _YAMA_ENTRY_(import_invalid_module);
 
-            _YAMA_ENTRY_(instant_type_not_found);
-            _YAMA_ENTRY_(instant_kind_mismatch);
-            _YAMA_ENTRY_(instant_callsig_mismatch);
+            _YAMA_ENTRY_(load_type_not_found);
+            _YAMA_ENTRY_(load_kind_mismatch);
+            _YAMA_ENTRY_(load_callsig_mismatch);
 
         default: YAMA_DEADEND; break;
         }
@@ -316,7 +325,6 @@ namespace yama {
 
     class debug : public std::enable_shared_from_this<debug> {
     public:
-
         dcat cats; // categories to filter by
 
 
@@ -346,7 +354,6 @@ namespace yama {
 
 
     protected:
-
         virtual void do_log(dcat cat, const std::string& msg) = 0;
         virtual void do_raise(dsignal sig) {}
     };
@@ -373,13 +380,11 @@ namespace yama {
 
     class null_debug final : public debug {
     public:
-
         inline null_debug(dcat cats = defaults_c)
             : debug(cats) {}
 
 
     protected:
-
         inline void do_log(dcat, const std::string&) override final {
             // do nothing
         }
@@ -388,13 +393,11 @@ namespace yama {
 
     class stderr_debug final : public debug {
     public:
-
         inline stderr_debug(dcat cats = defaults_c)
             : debug(cats) {}
 
 
     protected:
-
         inline void do_log(dcat, const std::string& msg) override final {
             std::cerr << msg << '\n';
         }
@@ -403,13 +406,11 @@ namespace yama {
 
     class stdout_debug final : public debug {
     public:
-
         inline stdout_debug(dcat cats = defaults_c)
             : debug(cats) {}
 
 
     protected:
-
         inline void do_log(dcat, const std::string& msg) override final {
             std::cout << msg << '\n';
         }
@@ -423,7 +424,6 @@ namespace yama {
 
     class proxy_debug final : public debug {
     public:
-
         const std::shared_ptr<debug> base = nullptr;
 
 
@@ -433,7 +433,6 @@ namespace yama {
 
 
     protected:
-
         void do_log(dcat cat, const std::string& msg) override final;
         void do_raise(dsignal sig) override final;
     };
@@ -465,7 +464,6 @@ namespace yama {
 
     class dsignal_debug final : public debug {
     public:
-
         std::array<size_t, dsignals> counts = { 0 };
         const std::shared_ptr<debug> base = nullptr;
 
@@ -477,16 +475,21 @@ namespace yama {
 
         // ctor sets cats == none_c if base == nullptr
 
+        // TODO: I'm not 100% sure about this last part, but we need it if we
+        //       want to make usage of this transparent (ie. so end-user can
+        //       easily change categories w/out having to access underlying)
+
+        // base->cats is set to dcat::all in order to allow for end-user
+        // to modify debug categories properly (and transparently)
+
         dsignal_debug(std::shared_ptr<debug> base);
 
 
         size_t count(dsignal sig) const noexcept;
-
         void reset() noexcept;
 
 
     protected:
-
         void do_log(dcat cat, const std::string& msg) override final;
         void do_raise(dsignal sig) override final;
     };

@@ -43,8 +43,12 @@
 
 #include "object_ref.h"
 
+#include "env.h"
+#include "specifiers.h"
+
 #include "verifier.h"
 #include "compiler.h"
+#include "install_batch.h"
 #include "domain.h"
 #include "context.h"
 

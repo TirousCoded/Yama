@@ -10,7 +10,11 @@
 #include "ptype.h"
 #include "type_info.h"
 
-#include "../internals/type_mem.h"
+// TODO: revert back to using frwd decls below if this causes cyclical include issues
+#include "callsig.h"
+#include "const_table.h"
+
+#include "../internals/type_instance.h"
 
 
 namespace yama {
@@ -20,7 +24,6 @@ namespace yama {
     class const_table;
 
     namespace internal {
-        template<typename Allocator>
         class type_instance;
         type_mem get_type_mem(type x) noexcept;
     }
@@ -41,15 +44,9 @@ namespace yama {
     class type final {
     public:
 
-        // IMPORTANT:
-        //      notice how yama::type isn't concerned about how its underlying 
-        //      memory is allocated/deallocated, and so is not coupled to any 
-        //      particular allocator
+        // TODO: remove this ctor from frontend
 
-        // ctor for init via type_instance
-
-        template<typename Allocator>
-        inline explicit type(const yama::internal::type_instance<Allocator>& instance) noexcept;
+        explicit type(const internal::type_instance& instance) noexcept;
 
         type() = delete;
         type(const type&) = default;
@@ -95,9 +92,7 @@ namespace yama {
 
 
     private:
-
-        template<typename Allocator>
-        friend class yama::internal::type_instance;
+        friend class internal::type_instance;
 
         friend internal::type_mem yama::internal::get_type_mem(type x) noexcept;
 
@@ -117,9 +112,4 @@ namespace yama {
 
 
 YAMA_SETUP_FORMAT(yama::type, x.fmt());
-
-
-template<typename Allocator>
-inline yama::type::type(const yama::internal::type_instance<Allocator>& instance) noexcept
-    : _mem(instance._mem) {}
 

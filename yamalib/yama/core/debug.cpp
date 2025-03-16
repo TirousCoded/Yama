@@ -53,8 +53,12 @@ std::shared_ptr<yama::proxy_debug> yama::proxy_dbg(std::shared_ptr<debug> base, 
 }
 
 yama::dsignal_debug::dsignal_debug(std::shared_ptr<debug> base)
-    : debug(base ? base->cats : none_c),
-    base(base) {
+    : debug(none_c),
+    base(std::move(base)) {
+    if (this->base) {
+        cats = this->base->cats;
+        this->base->cats = dcat::all;
+    }
     reset();
 }
 

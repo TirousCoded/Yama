@@ -3,6 +3,10 @@
 #include "module.h"
 
 
+yama::module yama::internal::create_module(const module_info* ptr) {
+    return yama::module(ptr);
+}
+
 yama::module_info yama::module::info() const {
     return deref_assert(_ptr);
 }

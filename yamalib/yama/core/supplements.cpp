@@ -19,7 +19,7 @@ std::vector<yama::type_info> yama::make_supplements() {
             const_table_info()
             .add_primitive_type(return_type);
         yama::type_info t{
-            .fullname = name,
+            .unqualified_name = name,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({}, 0),
@@ -37,7 +37,7 @@ std::vector<yama::type_info> yama::make_supplements() {
             .add_primitive_type("None"_str)
             .add_primitive_type(param_type);
         yama::type_info t{
-            .fullname = name,
+            .unqualified_name = name,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 1 }, 0),
@@ -54,7 +54,7 @@ std::vector<yama::type_info> yama::make_supplements() {
             const_table_info()
             .add_primitive_type(type);
         yama::type_info t{
-            .fullname = name,
+            .unqualified_name = name,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0 }, 0),
@@ -72,7 +72,7 @@ std::vector<yama::type_info> yama::make_supplements() {
             .add_primitive_type(param_type)
             .add_primitive_type(return_type);
         yama::type_info t{
-            .fullname = name,
+            .unqualified_name = name,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0, 0 }, 1),
@@ -227,7 +227,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             if (ctx.ret(0).bad()) return;
             };
         yama::type_info t{
-            .fullname = "ibit_lshift"_str,
+            .unqualified_name = "ibit_lshift"_str,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0, 1 }, 0),
@@ -250,7 +250,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             if (ctx.ret(0).bad()) return;
             };
         yama::type_info t{
-            .fullname = "ibit_rshift"_str,
+            .unqualified_name = "ibit_rshift"_str,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0, 1 }, 0),
@@ -272,7 +272,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             if (ctx.ret(0).bad()) return;
             };
         yama::type_info t{
-            .fullname = "ubit_lshift"_str,
+            .unqualified_name = "ubit_lshift"_str,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0, 0 }, 0),
@@ -294,7 +294,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             if (ctx.ret(0).bad()) return;
             };
         yama::type_info t{
-            .fullname = "ubit_rshift"_str,
+            .unqualified_name = "ubit_rshift"_str,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({ 0, 0 }, 0),
@@ -325,7 +325,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             const_table_info()
             .add_primitive_type("None"_str);
         yama::type_info t{
-            .fullname = "panic"_str,
+            .unqualified_name = "panic"_str,
             .consts = consts,
             .info = function_info{
                 .callsig = yama::make_callsig_info({}, 0),
@@ -349,7 +349,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "UInt"_str, "UInt"_str, expr, as_uint, 
             if (ctx.ret(0).bad()) return; \
         }; \
     yama::type_info t{ \
-        .fullname = in_letter "2" out_letter ""_str, \
+        .unqualified_name = in_letter "2" out_letter ""_str, \
         .consts = consts, \
         .info = function_info{ \
             .callsig = yama::make_callsig_info({ 0 }, 1), \

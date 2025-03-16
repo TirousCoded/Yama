@@ -18,14 +18,20 @@ namespace yama::internal {
 
     // IMPORTANT:
     //      first pass responsibilities:
+    //          - build table of imported modules
+    //              - detect if 'yama' module unavailable
+    //              - detect non-local import dirs
+    //              - detect import dirs appearing after first type decl
+    //              * includes implicitly imported 'yama' module
+    //              * includes explicit imports by import dirs
     //          - build symbol table(s)
     //              - detect name conflicts
-    //              - predeclare types defined prior to compilation
-    //                  * which types to predeclare is decided by which are referenced by type
+    //              - load extern types from imported modules
+    //                  * which types to load is decided by which are referenced by type
     //                    specifiers and/or identifier exprs
-    //                  * for declared types in code which conflict w/ those in domain, either the
-    //                    conflict will be detected by name conflict w/ the above, or by checking
-    //                    the domain itself
+    //                  * unqualified reference to extern type which could name a type in
+    //                    one of multiple modules will be detected as a name conflict
+    //                  * types declared in code shadow extern ones
     //              - resolution of explicitly annotated type info
     //                  * type deduction is performed in second pass
     //          - detect non-local vars
@@ -43,7 +49,7 @@ namespace yama::internal {
 
         first_pass(
             std::shared_ptr<debug> dbg,
-            compiler_services services,
+            res<compiler_services> services,
             ast_Chunk& root,
             const taul::source_code& src,
             csymtab_group_ctti& csymtabs);
@@ -54,7 +60,9 @@ namespace yama::internal {
 
 
         void visit_begin(res<ast_Chunk> x) override final;
-        //void visit_begin(res<ast_Decl> x) override final;
+        //void visit_begin(res<ast_DeclOrDir> x) override final;
+        void visit_begin(res<ast_ImportDir> x) override final;
+        //void visit_begin(res<ast_ImportPath> x) override final;
         void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
@@ -82,7 +90,9 @@ namespace yama::internal {
         //void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
-        //void visit_end(res<ast_Decl> x) override final;
+        //void visit_end(res<ast_DeclOrDir> x) override final;
+        //void visit_end(res<ast_ImportDir> x) override final;
+        //void visit_end(res<ast_ImportPath> x) override final;
         //void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;
@@ -112,7 +122,7 @@ namespace yama::internal {
 
     private:
         std::shared_ptr<debug> _dbg;
-        compiler_services _services;
+        res<compiler_services> _services;
         ast_Chunk* _root;
         const taul::source_code* _src;
         csymtab_group_ctti* _csymtabs;
@@ -149,21 +159,19 @@ namespace yama::internal {
 
 
         void _add_csymtab(res<ast_node> x);
+        void _implicitly_import_yama_module();
         void _insert_vardecl(res<ast_VarDecl> x);
         void _insert_fndecl(res<ast_FnDecl> x);
         void _insert_paramdecl(res<ast_ParamDecl> x);
 
 
-        // this method checks if x is in global block, and if so, returns whether or not
-        // a type under name exists in dm, returning false otherwise
+        // this flag is used to discern when we're at or beyond the first type decl, meaning
+        // that no further import dirs may exist
 
-        // if this method will return true, a name conflict error will be raised
+        bool _reached_first_type_decl = false;
 
-        // this is used in type decl visit method impls to judge whether or not to raise
-        // a name conflict error due to conflict w/ predeclared type (as csymtab code
-        // doesn't check for this)
-
-        bool _check_predeclared_type_name_conflict(res<ast_node> x, str name);
+        void _acknowledge_type_decl();
+        bool _import_dirs_are_legal() const noexcept;
 
 
         // this set is used to record the body blocks of fn decls
