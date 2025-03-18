@@ -34,16 +34,16 @@ std::shared_ptr<yama::parcel> yama::internal::install_manager::get_installed(par
     return is_installed(id) ? _get_install(id).prcl.base() : nullptr;
 }
 
-const yama::env& yama::internal::install_manager::domain_env() const noexcept {
+const yama::internal::env& yama::internal::install_manager::domain_env() const noexcept {
     return _domain_env_instance.get();
 }
 
-std::optional<yama::env> yama::internal::install_manager::parcel_env(const str& install_name) const noexcept {
+std::optional<yama::internal::env> yama::internal::install_manager::parcel_env(const str& install_name) const noexcept {
     const auto id = domain_env().id(install_name);
     return id ? parcel_env(*id) : std::nullopt;
 }
 
-std::optional<yama::env> yama::internal::install_manager::parcel_env(parcel_id id) const noexcept {
+std::optional<yama::internal::env> yama::internal::install_manager::parcel_env(parcel_id id) const noexcept {
     return is_installed(id) ? std::make_optional(_get_install(id).e.get()) : std::nullopt;
 }
 

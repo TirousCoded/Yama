@@ -4,43 +4,35 @@
 
 
 #include "../core/api_component.h"
-#include "../core/specifiers.h"
 #include "../core/type.h"
 
 #include "res_state.h"
-#include "install_manager.h"
-#include "importer.h"
 
 
-#define _DUMP_LOADER_LOG 0
+#define _YAMA_DUMP_LOADER_LOG 0
 
 
 namespace yama::internal {
 
 
+    class domain_data;
+
+
     class loader final : public api_component {
     public:
-        loader(
-            std::shared_ptr<debug> dbg,
-            res_state& upstream,
-            install_manager& install_manager,
-            importer& importer);
+        res_state state;
 
-        virtual ~loader() noexcept = default;
+
+        loader(std::shared_ptr<debug> dbg, domain_data& dd, res_state& upstream);
 
 
         std::optional<yama::type> load(const str& fullname);
 
 
     private:
-        install_manager* _install_manager;
-        importer* _importer;
+        domain_data* _dd;
 
-        install_manager& _get_install_manager() const noexcept;
-        importer& _get_importer() const noexcept;
-
-
-        res_state _state;
+        domain_data& _get_dd() const noexcept;
 
 
         std::optional<fullname> _resolve_fullname(const str& fullname);
@@ -110,7 +102,7 @@ namespace yama::internal {
             return false;
         }
         const type resolved = _pull_type(fullname).value();
-#if _DUMP_LOADER_LOG
+#if _YAMA_DUMP_LOADER_LOG
         std::cerr << std::format(">> {} type const. {} => {}\n", instance.fullname(), index, resolved);
 #endif
         instance.put<C>(index, resolved);

@@ -55,7 +55,7 @@ protected:
 
     void SetUp() override final {
         dbg = std::make_shared<yama::stderr_debug>();
-        dm = std::make_shared<yama::default_domain>(dbg);
+        dm = std::make_shared<yama::domain>(dbg);
         ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
 
 #if _DISABLE_LOGGING

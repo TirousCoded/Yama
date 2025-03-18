@@ -7,42 +7,38 @@
 #include "../core/callsig.h"
 
 #include "type_instance.h"
+#include "specifiers.h"
+#include "domain_data.h"
 
 
 yama::internal::loader::loader(
     std::shared_ptr<debug> dbg,
-    res_state& upstream,
-    install_manager& install_manager,
-    importer& importer)
+    domain_data& dd,
+    res_state& upstream)
     : api_component(dbg),
-    _install_manager(&install_manager),
-    _importer(&importer),
-    _state() {
-    _state.set_upstream(upstream);
+    _dd(&dd),
+    state() {
+    state.set_upstream(upstream);
 }
 
 std::optional<yama::type> yama::internal::loader::load(const str& fullname) {
     const auto resolved_fullname = _resolve_fullname(fullname);
     if (!resolved_fullname) return std::nullopt;
     const auto success = _load(*resolved_fullname);
-    _state.commit_or_discard(success);
+    state.commit_or_discard(success);
     return
         success
-        ? std::make_optional(type(deref_assert(_state.types.pull(*resolved_fullname))))
+        ? std::make_optional(type(deref_assert(state.types.pull(*resolved_fullname))))
         : std::nullopt;
 }
 
-yama::internal::install_manager& yama::internal::loader::_get_install_manager() const noexcept {
-    return deref_assert(_install_manager);
+yama::internal::domain_data& yama::internal::loader::_get_dd() const noexcept {
+    return deref_assert(_dd);
 }
 
-yama::internal::importer& yama::internal::loader::_get_importer() const noexcept {
-    return deref_assert(_importer);
-}
-
-std::optional<yama::fullname> yama::internal::loader::_resolve_fullname(const str& fullname) {
+std::optional<yama::internal::fullname> yama::internal::loader::_resolve_fullname(const str& fullname) {
     bool head_was_bad{};
-    const auto result = yama::fullname::parse(_get_install_manager().domain_env(), fullname, head_was_bad);
+    const auto result = internal::fullname::parse(_get_dd().install_manager.domain_env(), fullname, head_was_bad);
     if (!result) {
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         if (!head_was_bad) {
@@ -62,7 +58,7 @@ std::optional<yama::fullname> yama::internal::loader::_resolve_fullname(const st
 }
 
 std::optional<yama::type> yama::internal::loader::_pull_type(const fullname& fullname) const noexcept {
-    const auto found = _state.types.pull(fullname);
+    const auto found = state.types.pull(fullname);
     return
         found
         ? std::make_optional(type(*found))
@@ -77,24 +73,21 @@ bool yama::internal::loader::_load(const fullname& fullname) {
 }
 
 bool yama::internal::loader::_check_already_loaded(const fullname& fullname) const {
-    if (!_state.types.exists(fullname)) return false;
-    // this can only arise due to improper use of internal class loader
-    YAMA_LOG(dbg(), load_error_c, "error: type {} already loaded!", _fmt_fullname(fullname));
-    return true;
+    return state.types.exists(fullname);
 }
 
 bool yama::internal::loader::_add_type(const fullname& fullname) {
     if (_pull_type(fullname)) return true; // exit if type has already been added
-    YAMA_LOG(dbg(), load_c, "loading {}...", _fmt_fullname(fullname));
+    YAMA_LOG(dbg(), load_c, "loading {}...", fullname);
     const auto info = _acquire_type_info(fullname);
     if (!info) return false;
     return _create_and_link_instance(fullname, res(info));
 }
 
 std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(const fullname& fullname) {
-    const env& e = _get_install_manager().domain_env();
+    const env& e = _get_dd().install_manager.domain_env();
     const auto our_path = fullname.import_path().str(e);
-    const auto our_module = _get_importer().import(e, our_path, _state);
+    const auto our_module = _get_dd().importer.import(e, our_path, state);
     if (!our_module) {
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         YAMA_LOG(
@@ -121,7 +114,7 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
 }
 
 bool yama::internal::loader::_create_and_link_instance(const fullname& fullname, res<type_info> info) {
-    const env e = _get_install_manager().parcel_env(fullname.head()).value();
+    const env e = _get_dd().install_manager.parcel_env(fullname.head()).value();
     const auto new_instance = _create_instance(fullname, info);
     // during linking, it's possible for other types to be loaded recursively, and these
     // new types may need to link against new_instance, and so to this end, we add our
@@ -135,7 +128,7 @@ yama::res<yama::internal::type_instance> yama::internal::loader::_create_instanc
 }
 
 void yama::internal::loader::_add_instance_to_state(const fullname& fullname, res<type_instance> instance) {
-    const bool result = _state.types.push(fullname, instance);
+    const bool result = state.types.push(fullname, instance);
     YAMA_ASSERT(result);
 }
 
@@ -164,8 +157,8 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
 }
 
 bool yama::internal::loader::_check() {
-    for (const auto& I : _state.types) {
-        const env e = _get_install_manager().parcel_env(I.first.head()).value();
+    for (const auto& I : state.types) {
+        const env e = _get_dd().install_manager.parcel_env(I.first.head()).value();
         auto& instance = *I.second;
         const auto& info = get_type_mem(instance)->info;
         if (!_check_consts(e, instance, info)) return false;
@@ -241,10 +234,10 @@ bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance,
 }
 
 yama::str yama::internal::loader::_str_fullname(const fullname& fullname) const {
-    return fullname.str(_get_install_manager().domain_env());
+    return fullname.str(_get_dd().install_manager.domain_env());
 }
 
 std::string yama::internal::loader::_fmt_fullname(const fullname& fullname) const {
-    return fullname.fmt(_get_install_manager().domain_env());
+    return fullname.fmt(_get_dd().install_manager.domain_env());
 }
 

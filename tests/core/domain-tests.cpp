@@ -1,6 +1,6 @@
 
 
-#include "domain-impl-tests.h"
+#include <gtest/gtest.h>
 
 #include <yama/core/general.h>
 #include <yama/core/context.h>
@@ -13,18 +13,29 @@
 using namespace yama::string_literals;
 
 
-GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplTests);
+class DomainTests : public testing::Test {
+public:
+    std::shared_ptr<yama::dsignal_debug> dbg;
+    std::shared_ptr<yama::domain> dm;
 
 
-TEST_P(DomainImplTests, YamaParcelIsPreinstalled) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
+protected:
+    void SetUp() override final {
+        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
+        dm = std::make_shared<yama::domain>(dbg);
+    }
 
+    void TearDown() override final {
+        //
+    }
+};
+
+
+TEST_F(DomainTests, YamaParcelIsPreinstalled) {
     ASSERT_TRUE(dm->is_installed("yama"_str));
 }
 
-TEST_P(DomainImplTests, Builtins) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Builtins) {
     const auto _None = dm->load("yama:None"_str);
     const auto _Int = dm->load("yama:Int"_str);
     const auto _UInt = dm->load("yama:UInt"_str);
@@ -98,16 +109,12 @@ namespace {
     };
 }
 
-TEST_P(DomainImplTests, Install_PriorToFirstInstall) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_PriorToFirstInstall) {
     ASSERT_EQ(dm->install_count(), 1);
     ASSERT_TRUE(dm->is_installed("yama"_str));
 }
 
-TEST_P(DomainImplTests, Install_EmptyBatch) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_EmptyBatch) {
     ASSERT_TRUE(dm->install(yama::install_batch{}));
 
     ASSERT_EQ(dm->install_count(), 1);
@@ -119,9 +126,7 @@ TEST_P(DomainImplTests, Install_EmptyBatch) {
     ASSERT_TRUE(dm->is_installed("yama"_str));
 }
 
-TEST_P(DomainImplTests, Install_NoDeps) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_NoDeps) {
     auto aa = yama::make_res<test_parcel>();
     auto bb = yama::make_res<test_parcel>();
     auto cc = yama::make_res<test_parcel>();
@@ -163,9 +168,7 @@ TEST_P(DomainImplTests, Install_NoDeps) {
     }
 }
 
-TEST_P(DomainImplTests, Install_Deps) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Deps) {
     // this unit test covers both deps between parcels in same install batch, and
     // deps between parcels where one is in batch, and the other is fully installed
 
@@ -240,9 +243,7 @@ public:
     std::optional<yama::import_result> import(const yama::str&) override final { return std::nullopt; }
 };
 
-TEST_P(DomainImplTests, Install_Fail_InvalidParcel_SelfNameDepNameConflict) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InvalidParcel_SelfNameDepNameConflict) {
     auto aa = yama::make_res<test_invalid_parcel>();
 
     yama::install_batch ib{};
@@ -258,9 +259,7 @@ TEST_P(DomainImplTests, Install_Fail_InvalidParcel_SelfNameDepNameConflict) {
     ASSERT_GE(dbg->count(yama::dsignal::install_invalid_parcel), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_InstallNameConflict) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InstallNameConflict) {
     auto aa = yama::make_res<test_parcel>();
     auto bb = yama::make_res<test_parcel>();
 
@@ -291,9 +290,7 @@ TEST_P(DomainImplTests, Install_Fail_InstallNameConflict) {
     ASSERT_GE(dbg->count(yama::dsignal::install_install_name_conflict), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_MissingDepMapping) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_MissingDepMapping) {
     auto aa = yama::make_res<test_parcel>();
     aa->get_md().add_dep_name("other"_str);
 
@@ -311,9 +308,7 @@ TEST_P(DomainImplTests, Install_Fail_MissingDepMapping) {
     ASSERT_GE(dbg->count(yama::dsignal::install_missing_dep_mapping), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InvalidDepMapping_InstallName) {
     auto aa = yama::make_res<test_parcel>();
 
     yama::install_batch b0{};
@@ -331,9 +326,7 @@ TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName) {
     ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName_InstallNameRefersToAlreadyInstalledParcel) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InvalidDepMapping_InstallName_InstallNameRefersToAlreadyInstalledParcel) {
     auto aa = yama::make_res<test_parcel>();
     auto bb = yama::make_res<test_parcel>();
 
@@ -360,9 +353,7 @@ TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_InstallName_InstallNameRe
     ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_DepName) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InvalidDepMapping_DepName) {
     auto aa = yama::make_res<test_parcel>();
     auto bb = yama::make_res<test_parcel>();
 
@@ -384,9 +375,7 @@ TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_DepName) {
     ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_MappedTo) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_InvalidDepMapping_MappedTo) {
     auto aa = yama::make_res<test_parcel>();
     aa->get_md().add_dep_name("B"_str);
 
@@ -405,9 +394,7 @@ TEST_P(DomainImplTests, Install_Fail_InvalidDepMapping_MappedTo) {
     ASSERT_GE(dbg->count(yama::dsignal::install_invalid_dep_mapping), 1);
 }
 
-TEST_P(DomainImplTests, Install_Fail_DepGraphCycle) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Install_Fail_DepGraphCycle) {
     auto aa = yama::make_res<test_parcel>();
     aa->get_md().add_dep_name("other"_str);
     auto bb = yama::make_res<test_parcel>();
@@ -620,48 +607,9 @@ namespace {
             else return std::nullopt;
         }
     };
-
-
-    // test_compiler0 always fails compilation, as its purpose is solely to launder in run_test_asserts_fn
-    // to perform the behaviour of the unit test using the compiler services object
-
-    class test_compiler0 final : public yama::compiler {
-    public:
-        using run_test_asserts_fn_t = void(*)(test_compiler0& host, yama::res<yama::compiler_services> services);
-
-
-        run_test_asserts_fn_t run_test_asserts_fn;
-
-        std::shared_ptr<yama::dsignal_debug> dsignal_dbg;
-
-        bool was_invoked = false;
-
-        std::shared_ptr<test_parcel1> parcel1;
-
-        // these are for testing compiler services loading impl
-        std::optional<yama::type> result_f, result_a, result_b, result_c;
-
-
-        test_compiler0(run_test_asserts_fn_t run_test_asserts_fn, std::shared_ptr<yama::dsignal_debug> dsignal_dbg, std::shared_ptr<test_parcel1> parcel1)
-            : compiler(),
-            run_test_asserts_fn(run_test_asserts_fn),
-            dsignal_dbg(dsignal_dbg),
-            parcel1(parcel1) {}
-
-        std::optional<yama::compile_result> compile(
-            yama::res<yama::compiler_services> services,
-            const taul::source_code& src,
-            const yama::import_path& src_import_path) {
-            was_invoked = true;
-            run_test_asserts_fn(*this, services);
-            return std::nullopt; // always fail
-        }
-    };
 }
 
-TEST_P(DomainImplTests, Import) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -720,9 +668,7 @@ TEST_P(DomainImplTests, Import) {
     ASSERT_NE(def_1, root_1);
 }
 
-TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_NoHead_WithNoRelativePath) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import_Fail_ModuleNotFound_NoHead_WithNoRelativePath) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -739,9 +685,7 @@ TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_NoHead_WithNoRelativePath) {
     ASSERT_GE(dbg->count(yama::dsignal::import_module_not_found), 1);
 }
 
-TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_NoHead_WithRelativePath) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import_Fail_ModuleNotFound_NoHead_WithRelativePath) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -758,9 +702,7 @@ TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_NoHead_WithRelativePath) {
     ASSERT_GE(dbg->count(yama::dsignal::import_module_not_found), 1);
 }
 
-TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_BadHead) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import_Fail_ModuleNotFound_BadHead) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -777,9 +719,7 @@ TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_BadHead) {
     ASSERT_GE(dbg->count(yama::dsignal::import_module_not_found), 1);
 }
 
-TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_BadRelativePath) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import_Fail_ModuleNotFound_BadRelativePath) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -799,9 +739,7 @@ TEST_P(DomainImplTests, Import_Fail_ModuleNotFound_BadRelativePath) {
     ASSERT_GE(dbg->count(yama::dsignal::import_module_not_found), 1);
 }
 
-TEST_P(DomainImplTests, Import_Fail_InvalidModule_StaticVerificationFailure) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Import_Fail_InvalidModule_StaticVerificationFailure) {
     const auto parcel1 = yama::make_res<test_parcel1>();
 
     ASSERT_FALSE(parcel1->last_relative_path);
@@ -822,9 +760,7 @@ TEST_P(DomainImplTests, Import_Fail_InvalidModule_StaticVerificationFailure) {
 }
 
 
-TEST_P(DomainImplTests, Load) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Load) {
     auto our_parcel = yama::make_res<test_parcel2>();
     our_parcel->mf
         .add_type(yama::type_info(f_info))
@@ -889,9 +825,7 @@ TEST_P(DomainImplTests, Load) {
     }
 }
 
-TEST_P(DomainImplTests, Load_DisambiguationViaImportPaths) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Load_DisambiguationViaImportPaths) {
     auto our_parcel_A = yama::make_res<test_parcel2>();
     auto our_parcel_B = yama::make_res<test_parcel2>();
     our_parcel_A->mf.add_type(yama::type_info(a_info));
@@ -930,9 +864,7 @@ TEST_P(DomainImplTests, Load_DisambiguationViaImportPaths) {
     }
 }
 
-TEST_P(DomainImplTests, Load_FailDueToLoadingError) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, Load_FailDueToLoadingError) {
     // f will fail loading due to type b not being available
 
     auto our_parcel = yama::make_res<test_parcel2>();
@@ -957,192 +889,12 @@ TEST_P(DomainImplTests, Load_FailDueToLoadingError) {
 }
 
 
-TEST_P(DomainImplTests, QuickAccessLoadMethods) {
-    const auto dm = GetParam().factory(yama::domain_config{}, dbg);
-
+TEST_F(DomainTests, QuickAccessLoadMethods) {
     EXPECT_EQ(dm->load_none(), dm->load("yama:None"_str).value());
     EXPECT_EQ(dm->load_int(), dm->load("yama:Int"_str).value());
     EXPECT_EQ(dm->load_uint(), dm->load("yama:UInt"_str).value());
     EXPECT_EQ(dm->load_float(), dm->load("yama:Float"_str).value());
     EXPECT_EQ(dm->load_bool(), dm->load("yama:Bool"_str).value());
     EXPECT_EQ(dm->load_char(), dm->load("yama:Char"_str).value());
-}
-
-
-TEST_P(DomainImplTests, CompilerServices_Import) {
-    auto our_run_test_asserts_fn =
-        [](test_compiler0& host, yama::res<yama::compiler_services> services) {
-        const auto abc_1 = services->import(yama::import_path::parse(services->env(), "other.a.b.c"_str).value());
-
-        ASSERT_TRUE(host.parcel1->last_relative_path);
-        ASSERT_EQ(*host.parcel1->last_relative_path, ".a.b.c"_str);
-        
-        const auto def_1 = services->import(yama::import_path::parse(services->env(), "other.d.e.f"_str).value());
-
-        ASSERT_TRUE(host.parcel1->last_relative_path);
-        ASSERT_EQ(*host.parcel1->last_relative_path, ".d.e.f"_str);
-
-        const auto root_1 = services->import(yama::import_path::parse(services->env(), "other"_str).value()); // root
-
-        ASSERT_TRUE(host.parcel1->last_relative_path);
-        ASSERT_EQ(*host.parcel1->last_relative_path, ""_str);
-
-        const auto selfstuff_1 = services->import(yama::import_path::parse(services->env(), "self.selfstuff"_str).value()); // via self-name, not from other
-
-        ASSERT_TRUE(host.parcel1->last_relative_path);
-        ASSERT_EQ(*host.parcel1->last_relative_path, ""_str); // <- accessed self-name, not other
-
-        // lookup of memoized will NOT result in parcel import method call
-        host.parcel1->last_relative_path.reset();
-
-        const auto abc_2 = services->import(yama::import_path::parse(services->env(), "other.a.b.c"_str).value()); // test imports memoize
-
-        ASSERT_FALSE(host.parcel1->last_relative_path);
-
-        const auto def_2 = services->import(yama::import_path::parse(services->env(), "other.d.e.f"_str).value()); // test imports memoize
-
-        ASSERT_FALSE(host.parcel1->last_relative_path);
-
-        const auto root_2 = services->import(yama::import_path::parse(services->env(), "other"_str).value()); // test imports memoize
-
-        ASSERT_FALSE(host.parcel1->last_relative_path);
-
-        const auto selfstuff_2 = services->import(yama::import_path::parse(services->env(), "self.selfstuff"_str).value()); // test imports memoize
-
-        ASSERT_FALSE(host.parcel1->last_relative_path); // should never even have accessed other
-
-
-        ASSERT_TRUE(abc_1);
-        ASSERT_TRUE(def_1);
-        ASSERT_TRUE(root_1);
-        ASSERT_TRUE(selfstuff_1);
-        ASSERT_TRUE(abc_2);
-        ASSERT_TRUE(def_2);
-        ASSERT_TRUE(root_2);
-        ASSERT_TRUE(selfstuff_2);
-
-        ASSERT_TRUE(abc_1->result.holds_module());
-        ASSERT_TRUE(def_1->result.holds_module());
-        ASSERT_TRUE(root_1->result.holds_module());
-        ASSERT_TRUE(selfstuff_1->result.holds_module());
-        ASSERT_TRUE(abc_2->result.holds_module());
-        ASSERT_TRUE(def_2->result.holds_module());
-        ASSERT_TRUE(root_2->result.holds_module());
-        ASSERT_TRUE(selfstuff_2->result.holds_module());
-
-        ASSERT_EQ(*abc_1->result.get_module(), modinf_abc);
-        ASSERT_EQ(*def_1->result.get_module(), modinf_def);
-        ASSERT_EQ(*root_1->result.get_module(), modinf_root);
-        ASSERT_EQ(*selfstuff_1->result.get_module(), modinf_selfstuff);
-        ASSERT_EQ(*abc_2->result.get_module(), modinf_abc);
-        ASSERT_EQ(*def_2->result.get_module(), modinf_def);
-        ASSERT_EQ(*root_2->result.get_module(), modinf_root);
-        ASSERT_EQ(*selfstuff_2->result.get_module(), modinf_selfstuff);
-        };
-
-    const auto parcel1 = yama::make_res<test_parcel1>();
-    const auto parcel2 = yama::make_res<test_parcel3>();
-
-    ASSERT_FALSE(parcel1->last_relative_path);
-
-    auto our_compiler = std::make_shared<test_compiler0>(our_run_test_asserts_fn, dbg, parcel1);
-
-    yama::domain_config config{
-        .compiler = our_compiler,
-    };
-
-    const auto dm = GetParam().factory(config, dbg);
-
-    yama::install_batch ib{};
-    ib
-        .install("parcel1"_str, parcel1)
-        .install("parcel2"_str, parcel2)
-        .map_dep("parcel2"_str, "yama"_str, "yama"_str)
-        .map_dep("parcel2"_str, "other"_str, "parcel1"_str);
-
-    ASSERT_TRUE(dm->install(std::move(ib)));
-
-    const auto result = dm->import("parcel2"_str); // trigger compiler, expect failure
-    ASSERT_TRUE(our_compiler->was_invoked);
-    ASSERT_FALSE(result);
-    if (HasFatalFailure()) return; // if fatal assertion failure occurred within our_run_test_asserts_fn
-}
-
-// TODO: maybe add unit tests for more precisely testing module-not-found due to the HEAD
-//       being bad, or the RELATIVE PATH being bad
-
-TEST_P(DomainImplTests, CompilerServices_Import_Fail_ModuleNotFound) {
-    auto our_run_test_asserts_fn =
-        [](test_compiler0& host, yama::res<yama::compiler_services> services) {
-        ASSERT_FALSE(services->import(yama::import_path::parse(services->env(), "other.does.not.exist"_str).value()));
-
-        ASSERT_GE(host.dsignal_dbg->count(yama::dsignal::import_module_not_found), 1);
-        };
-
-    const auto parcel1 = yama::make_res<test_parcel1>();
-    const auto parcel2 = yama::make_res<test_parcel3>();
-    std::cerr << "-- " << parcel2->id() << "\n";
-    ASSERT_FALSE(parcel1->last_relative_path);
-
-    auto our_compiler = std::make_shared<test_compiler0>(our_run_test_asserts_fn, dbg, parcel1);
-
-    yama::domain_config config{
-        .compiler = our_compiler,
-    };
-
-    const auto dm = GetParam().factory(config, dbg);
-
-    yama::install_batch ib{};
-    ib
-        .install("parcel1"_str, parcel1)
-        .install("parcel2"_str, parcel2)
-        .map_dep("parcel2"_str, "yama"_str, "yama"_str)
-        .map_dep("parcel2"_str, "other"_str, "parcel1"_str);
-
-    ASSERT_TRUE(dm->install(std::move(ib)));
-
-    const auto result = dm->import("parcel2"_str); // trigger compiler, expect failure
-    ASSERT_TRUE(our_compiler->was_invoked);
-    ASSERT_FALSE(result);
-    if (HasFatalFailure()) return; // if fatal assertion failure occurred within our_run_test_asserts_fn
-}
-
-TEST_P(DomainImplTests, CompilerServices_Import_Fail_InvalidModule_StaticVerificationFailure) {
-    auto our_run_test_asserts_fn =
-        [](test_compiler0& host, yama::res<yama::compiler_services> services) {
-        ASSERT_FALSE(services->import(yama::import_path::parse(services->env(), "other.bad"_str).value()));
-
-        ASSERT_TRUE(host.parcel1->last_relative_path);
-        ASSERT_EQ(*host.parcel1->last_relative_path, ".bad"_str);
-
-        ASSERT_GE(host.dsignal_dbg->count(yama::dsignal::import_invalid_module), 1);
-        };
-
-    const auto parcel1 = yama::make_res<test_parcel1>();
-    const auto parcel2 = yama::make_res<test_parcel3>();
-
-    ASSERT_FALSE(parcel1->last_relative_path);
-
-    auto our_compiler = std::make_shared<test_compiler0>(our_run_test_asserts_fn, dbg, parcel1);
-
-    yama::domain_config config{
-        .compiler = our_compiler,
-    };
-
-    const auto dm = GetParam().factory(config, dbg);
-
-    yama::install_batch ib{};
-    ib
-        .install("parcel1"_str, parcel1)
-        .install("parcel2"_str, parcel2)
-        .map_dep("parcel2"_str, "yama"_str, "yama"_str)
-        .map_dep("parcel2"_str, "other"_str, "parcel1"_str);
-
-    ASSERT_TRUE(dm->install(std::move(ib)));
-
-    const auto result = dm->import("parcel2"_str); // trigger compiler, expect failure
-    ASSERT_TRUE(our_compiler->was_invoked);
-    ASSERT_FALSE(result);
-    if (HasFatalFailure()) return; // if fatal assertion failure occurred within our_run_test_asserts_fn
 }
 

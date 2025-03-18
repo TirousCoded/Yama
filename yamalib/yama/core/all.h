@@ -3,10 +3,13 @@
 #pragma once
 
 
+#include "api_version.h"
+
 #include "macros.h"
 #include "asserts.h"
 
 #include "general.h"
+#include "concepts.h"
 #include "res.h"
 
 #include "spinlock.h"
@@ -43,11 +46,7 @@
 
 #include "object_ref.h"
 
-#include "env.h"
-#include "specifiers.h"
-
 #include "verifier.h"
-#include "compiler.h"
 #include "install_batch.h"
 #include "domain.h"
 #include "context.h"

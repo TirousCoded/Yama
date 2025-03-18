@@ -5,6 +5,8 @@
 
 #include <atomic>
 
+#include "concepts.h"
+
 
 namespace yama {
 
@@ -20,11 +22,14 @@ namespace yama {
 
 
         void lock();
+        bool try_lock();
         void unlock() noexcept;
 
 
     private:
         std::atomic_flag _locked;
     };
+
+    static_assert(lockable_type<spinlock>);
 }
 

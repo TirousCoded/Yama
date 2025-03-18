@@ -60,7 +60,6 @@ static struct Globals final {
 
 class ContextTests : public testing::Test {
 public:
-
     class testing_parcel final : public yama::parcel {
     public:
         std::optional<yama::parcel_metadata> md;
@@ -103,12 +102,11 @@ public:
 
 
 protected:
-
     void SetUp() override final {
         globals = Globals{};
 
         dbg = std::make_shared<yama::stderr_debug>();
-        dm = std::make_shared<yama::default_domain>(dbg);
+        dm = std::make_shared<yama::domain>(dbg);
         ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
 
         our_parcel = std::make_shared<testing_parcel>();

@@ -6,10 +6,11 @@
 #include <unordered_map>
 
 #include "../core/general.h"
+#include "../core/concepts.h"
 #include "../core/res.h"
 #include "../core/module_info.h"
-#include "../core/specifiers.h"
 
+#include "../internals/specifiers.h"
 #include "../internals/type_instance.h"
 
 
@@ -202,8 +203,20 @@ namespace yama::internal {
     }
 
 
-    using type_area = res_area<yama::fullname, type_instance>;
-    using module_area = res_area<yama::import_path, module_info>;
+    // TODO: I'm really conflicted as to whether below should use fullname/import_path as
+    //       keys, or if they should just use yama::str (describing the fullname/import path
+    //       in domain env)
+    //
+    //       I dislike using non-str for key as fullname may later require heap alloc to
+    //       be properly parsed, and that means having complex parsing and heap allocs upon
+    //       end-user trying to load something (even if load would otherwise be *trivial*)
+
+    // TODO: if we do try and make below use yama::str as key, please take into consideration
+    //       that we'll run into an issue in ~::loader::_check where we'll not have a clear
+    //       way of discerning the env to use to parse the fullname str
+
+    using type_area = res_area<fullname, type_instance>;
+    using module_area = res_area<import_path, module_info>;
 
 
     class res_state final {

@@ -3,12 +3,12 @@
 #pragma once
 
 
-#include "general.h"
-#include "res.h"
-#include "parcel.h"
+#include "../core/general.h"
+#include "../core/res.h"
+#include "../core/parcel.h"
 
 
-namespace yama {
+namespace yama::internal {
 
 
     // TODO: env[_instance] has NOT been unit tested yet
@@ -44,7 +44,7 @@ namespace yama {
 
 
     private:
-        friend class yama::env_instance;
+        friend class yama::internal::env_instance;
         struct _data_t final {
             std::unordered_map<str, parcel_id> name_to_id;
             std::unordered_map<parcel_id, str> id_to_name;
@@ -54,9 +54,9 @@ namespace yama {
     };
 }
 
-YAMA_SETUP_FORMAT(yama::env, x.fmt());
+YAMA_SETUP_FORMAT(yama::internal::env, x.fmt());
 
-namespace yama {
+namespace yama::internal {
 
 
     // env_instance is used by owner of env to mutate its state
@@ -73,13 +73,13 @@ namespace yama {
         env_instance& operator=(env_instance&&) noexcept = default;
 
 
-        const env& get() const noexcept;
+        const internal::env& get() const noexcept;
 
         void add(const str& name, parcel_id id);
 
 
     private:
-        env _env;
+        internal::env _env;
     };
 }
 

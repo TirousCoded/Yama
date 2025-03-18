@@ -3,9 +3,9 @@
 #include "verifier.h"
 
 #include "kind-features.h"
-#include "specifiers.h"
 
 #include "../internals/util.h"
+#include "../internals/specifiers.h"
 
 
 using namespace yama::string_literals;
@@ -17,10 +17,8 @@ using namespace yama::string_literals;
 yama::verifier::verifier(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
 
-yama::default_verifier::default_verifier(std::shared_ptr<debug> dbg)
-    : verifier(dbg) {}
-
-bool yama::default_verifier::verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) {
+bool yama::verifier::verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) {
+    YAMA_ASSERT(internal::valid_import_path(module_path));
     _begin_verify(subject);
     const bool success = _verify(subject, module_path, metadata);
     _end_verify(success);
@@ -28,7 +26,8 @@ bool yama::default_verifier::verify(const type_info& subject, const parcel_metad
     return success;
 }
 
-bool yama::default_verifier::verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) {
+bool yama::verifier::verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) {
+    YAMA_ASSERT(internal::valid_import_path(module_path));
     YAMA_LOG(dbg(), verif_c,
         "verifying module ({} types) (at {})...",
         subject.size(),
@@ -39,11 +38,11 @@ bool yama::default_verifier::verify(const module_info& subject, const parcel_met
     return true;
 }
 
-std::string yama::default_verifier::_cfg_block::fmt() const {
+std::string yama::verifier::_cfg_block::fmt() const {
     return std::format("{{block [{}, {})}}", first, last);
 }
 
-bool yama::default_verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) const noexcept {
+bool yama::verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) const noexcept {
     static_assert(bc::opcodes == 12);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
@@ -54,7 +53,7 @@ bool yama::default_verifier::_cfg_block::final_instr_has_jump(const bc::code& bc
     }
 }
 
-bool yama::default_verifier::_cfg_block::final_instr_has_fallthrough(const bc::code& bcode) const noexcept {
+bool yama::verifier::_cfg_block::final_instr_has_fallthrough(const bc::code& bcode) const noexcept {
     static_assert(bc::opcodes == 12);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
@@ -65,11 +64,11 @@ bool yama::default_verifier::_cfg_block::final_instr_has_fallthrough(const bc::c
     }
 }
 
-std::string yama::default_verifier::_fmt_branch(size_t from, size_t to) {
+std::string yama::verifier::_fmt_branch(size_t from, size_t to) {
     return std::format("{{branch {} -> {}}}", from, to);
 }
 
-void yama::default_verifier::_dump_cfg(const yama::type_info& subject, const bc::code& bcode) {
+void yama::verifier::_dump_cfg(const yama::type_info& subject, const bc::code& bcode) {
     YAMA_LOG(dbg(), verif_error_c, "dumping CFG:");
     for (size_t i = 0; i < bcode.count(); i++) {
         // _cfg_blocks is a hash map w/ instrs as keys, so we're just gonna
@@ -130,15 +129,15 @@ void yama::default_verifier::_dump_cfg(const yama::type_info& subject, const bc:
     }
 }
 
-const yama::str& yama::default_verifier::_module_path() const {
+const yama::str& yama::verifier::_module_path() const {
     return _current_module_path.value();
 }
 
-void yama::default_verifier::_bind_module_path(const str& module_path) {
+void yama::verifier::_bind_module_path(const str& module_path) {
     _current_module_path = module_path;
 }
 
-bool yama::default_verifier::_verify(const type_info& subject, const str& module_path, const parcel_metadata& metadata) {
+bool yama::verifier::_verify(const type_info& subject, const str& module_path, const parcel_metadata& metadata) {
     _bind_module_path(module_path);
     if (!_verify_type(subject)) {
         return false;
@@ -152,27 +151,27 @@ bool yama::default_verifier::_verify(const type_info& subject, const str& module
     return true;
 }
 
-void yama::default_verifier::_begin_verify(const type_info& subject) {
+void yama::verifier::_begin_verify(const type_info& subject) {
     YAMA_LOG(dbg(), verif_c, "verifying {}...", subject.unqualified_name);
 }
 
-void yama::default_verifier::_end_verify(bool success) {
+void yama::verifier::_end_verify(bool success) {
     // TODO: should we even log anything here?
 }
 
-void yama::default_verifier::_post_verify_cleanup() {
+void yama::verifier::_post_verify_cleanup() {
     _cfg_division_points.clear();
     _cfg_blocks.clear();
 }
 
-bool yama::default_verifier::_verify_type(const type_info& subject) {
+bool yama::verifier::_verify_type(const type_info& subject) {
     if (!_verify_type_callsig(subject)) {
         return false;
     }
     return true;
 }
 
-bool yama::default_verifier::_verify_type_callsig(const type_info& subject) {
+bool yama::verifier::_verify_type_callsig(const type_info& subject) {
     const bool type_has_callsig = (bool)subject.callsig();
     if (!type_has_callsig) {
         // if no callsig to check, default to returning successful
@@ -218,7 +217,7 @@ bool yama::default_verifier::_verify_type_callsig(const type_info& subject) {
     return success;
 }
 
-bool yama::default_verifier::_verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata) {
+bool yama::verifier::_verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata) {
     bool success = true;
     for (const_t i = 0; i < subject.consts.size(); i++) {
         // keep iterating if we find a failure so as to get a chance
@@ -231,7 +230,7 @@ bool yama::default_verifier::_verify_constant_symbols(const type_info& subject, 
     return success;
 }
 
-bool yama::default_verifier::_verify_constant_symbol(const type_info& subject, const_t index, const parcel_metadata& metadata) {
+bool yama::verifier::_verify_constant_symbol(const type_info& subject, const_t index, const parcel_metadata& metadata) {
     if (!_verify_constant_symbol_qualified_name(subject, index, metadata)) {
         return false;
     }
@@ -241,13 +240,13 @@ bool yama::default_verifier::_verify_constant_symbol(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_verify_constant_symbol_qualified_name(const type_info& subject, const_t index, const parcel_metadata& metadata) {
+bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& subject, const_t index, const parcel_metadata& metadata) {
     const bool has_qualified_name = (bool)subject.consts.qualified_name(index);
     if (!has_qualified_name) {
         return true; // default to successful
     }
     const str qualified_name = subject.consts.qualified_name(index).value();
-    const auto parsed = parse_qualified_name(qualified_name);
+    const auto parsed = internal::parse_qualified_name(qualified_name);
     if (!parsed) {
         YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
         YAMA_LOG(
@@ -267,7 +266,7 @@ bool yama::default_verifier::_verify_constant_symbol_qualified_name(const type_i
     return true;
 }
 
-bool yama::default_verifier::_verify_constant_symbol_callsig(const type_info& subject, const_t index) {
+bool yama::verifier::_verify_constant_symbol_callsig(const type_info& subject, const_t index) {
     const bool has_callsig = (bool)subject.consts.callsig(index);
     if (!has_callsig) {
         return true; // default to successful
@@ -312,7 +311,7 @@ bool yama::default_verifier::_verify_constant_symbol_callsig(const type_info& su
     return success;
 }
 
-yama::default_verifier::_callsig_report yama::default_verifier::gen_callsig_report(const type_info& subject, const callsig_info* callsig) {
+yama::verifier::_callsig_report yama::verifier::gen_callsig_report(const type_info& subject, const callsig_info* callsig) {
     _callsig_report result{};
     YAMA_DEREF_SAFE(callsig) {
         for (const auto& I : callsig->params) {
@@ -335,7 +334,7 @@ yama::default_verifier::_callsig_report yama::default_verifier::gen_callsig_repo
     return result;
 }
 
-bool yama::default_verifier::_verify_bcode(const type_info& subject) {
+bool yama::verifier::_verify_bcode(const type_info& subject) {
     // if no bcode on this type, return success *by default*
     if (!subject.bcode()) {
         return true;
@@ -357,7 +356,7 @@ bool yama::default_verifier::_verify_bcode(const type_info& subject) {
     return true;
 }
 
-bool yama::default_verifier::_verify_bcode_not_empty(const type_info& subject, const bc::code& bcode) {
+bool yama::verifier::_verify_bcode_not_empty(const type_info& subject, const bc::code& bcode) {
     if (bcode.count() == 0) {
         YAMA_RAISE(dbg(), dsignal::verif_binary_is_empty);
         YAMA_LOG(
@@ -369,12 +368,12 @@ bool yama::default_verifier::_verify_bcode_not_empty(const type_info& subject, c
     return true;
 }
 
-void yama::default_verifier::_build_cfg(const bc::code& bcode) {
+void yama::verifier::_build_cfg(const bc::code& bcode) {
     _build_cfg_division_points(bcode);
     _build_cfg_blocks(bcode);
 }
 
-void yama::default_verifier::_build_cfg_division_points(const bc::code& bcode) {
+void yama::verifier::_build_cfg_division_points(const bc::code& bcode) {
     // NOTE: collect up 'division points', defined by:
     //          1) start/end of bcode
     //          2) jump destinations (which are not out-of-bounds)
@@ -402,23 +401,23 @@ void yama::default_verifier::_build_cfg_division_points(const bc::code& bcode) {
     }
 }
 
-void yama::default_verifier::_add_start_and_end_division_points(const bc::code& bcode) {
+void yama::verifier::_add_start_and_end_division_points(const bc::code& bcode) {
     _cfg_division_points.emplace(0);
     _cfg_division_points.emplace(bcode.count());
 }
 
-void yama::default_verifier::_add_end_of_instr_division_point(const bc::code& bcode, size_t i) {
+void yama::verifier::_add_end_of_instr_division_point(const bc::code& bcode, size_t i) {
     _cfg_division_points.emplace(i + 1);
 }
 
-void yama::default_verifier::_add_jump_dest_division_point(const bc::code& bcode, size_t i, int16_t sBx) {
+void yama::verifier::_add_jump_dest_division_point(const bc::code& bcode, size_t i, int16_t sBx) {
     if (!_jump_dest_in_bounds(bcode, i, sBx)) {
         return;
     }
     _cfg_division_points.emplace(_calc_jump_dest(i, sBx));
 }
 
-void yama::default_verifier::_build_cfg_blocks(const bc::code& bcode) {
+void yama::verifier::_build_cfg_blocks(const bc::code& bcode) {
     // NOTE: the trick here is that std::set, being *ordered*, will ensure that our
     //       set of division points is organized correctly for us, while also ensuring
     //       that we avoid duplicate division points
@@ -429,7 +428,7 @@ void yama::default_verifier::_build_cfg_blocks(const bc::code& bcode) {
     YAMA_ASSERT(_cfg_blocks.size() == _cfg_division_points.size() - 1);
 }
 
-void yama::default_verifier::_add_cfg_block(const bc::code& bcode, size_t first, size_t last) {
+void yama::verifier::_add_cfg_block(const bc::code& bcode, size_t first, size_t last) {
     YAMA_ASSERT(last - first >= 1);
     _cfg_block new_block{
         .first = first,
@@ -439,7 +438,7 @@ void yama::default_verifier::_add_cfg_block(const bc::code& bcode, size_t first,
     _cfg_blocks[first] = std::move(new_block);
 }
 
-bool yama::default_verifier::_verif_cfg(const type_info& subject, const bc::code& bcode) {
+bool yama::verifier::_verif_cfg(const type_info& subject, const bc::code& bcode) {
     if (!_visit_entrypoint_block(subject, bcode)) {
         return false;
     }
@@ -447,7 +446,7 @@ bool yama::default_verifier::_verif_cfg(const type_info& subject, const bc::code
     return true;
 }
 
-void yama::default_verifier::_report_dead_code_blocks(const type_info& subject, const bc::code& bcode) {
+void yama::verifier::_report_dead_code_blocks(const type_info& subject, const bc::code& bcode) {
     for (const auto& I : _cfg_blocks) {
         if (I.second.processed) {
             continue;
@@ -459,7 +458,7 @@ void yama::default_verifier::_report_dead_code_blocks(const type_info& subject, 
     }
 }
 
-bool yama::default_verifier::_visit_entrypoint_block(const type_info& subject, const bc::code& bcode) {
+bool yama::verifier::_visit_entrypoint_block(const type_info& subject, const bc::code& bcode) {
     // NOTE: notice that we're passing an *dummy* size_t(-1) incoming_branched_from value
     if (!_visit_block(subject, bcode, 0, _make_entrypoint_initial_reg_set(subject), size_t(-1))) {
         YAMA_LOG(
@@ -482,7 +481,7 @@ bool yama::default_verifier::_visit_entrypoint_block(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_visit_block(const type_info& subject, const bc::code& bcode, size_t block_instr_index, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+bool yama::verifier::_visit_block(const type_info& subject, const bc::code& bcode, size_t block_instr_index, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
     YAMA_ASSERT(_cfg_blocks.contains(block_instr_index));
     auto& b = _cfg_blocks.at(block_instr_index);
     return
@@ -491,7 +490,7 @@ bool yama::default_verifier::_visit_block(const type_info& subject, const bc::co
         : _visit_unprocessed_block(subject, bcode, b, incoming_reg_set, incoming_branched_from);
 }
 
-bool yama::default_verifier::_visit_processed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+bool yama::verifier::_visit_processed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
     YAMA_ASSERT(incoming_branched_from < bcode.count());
     if (!_verify_no_register_coherence_violation(subject, bcode, block, incoming_reg_set, incoming_branched_from)) {
         return false;
@@ -499,7 +498,7 @@ bool yama::default_verifier::_visit_processed_block(const type_info& subject, co
     return true;
 }
 
-bool yama::default_verifier::_visit_unprocessed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+bool yama::verifier::_visit_unprocessed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
     block.processed = true;
     block.processed_by = incoming_branched_from;
     // use copy of incoming_reg_set for block.[initial/final]_reg_set
@@ -513,7 +512,7 @@ bool yama::default_verifier::_visit_unprocessed_block(const type_info& subject, 
     
     // NOTE: at this point, if either the primary or fallthrough branch destinations are out-of-bounds,
     //       we're just gonna quietly *skip* them, as checking for branch validity is gonna be left
-    //       to other parts of the verifier to handle
+    //       to other parts of the base_verifier to handle
 
     const auto final_instr_index = block.final_instr_index();
     const auto final_instr = bcode[final_instr_index];
@@ -538,7 +537,7 @@ bool yama::default_verifier::_visit_unprocessed_block(const type_info& subject, 
     return true;
 }
 
-bool yama::default_verifier::_verify_no_register_coherence_violation(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+bool yama::verifier::_verify_no_register_coherence_violation(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
     bool success = true;
     if (block.initial_reg_set.size() == incoming_reg_set.size()) {
         for (size_t i = 0; i < block.initial_reg_set.size(); i++) {
@@ -567,7 +566,7 @@ bool yama::default_verifier::_verify_no_register_coherence_violation(const type_
     return success;
 }
 
-bool yama::default_verifier::_symbolic_exec(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
+bool yama::verifier::_symbolic_exec(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
 #if _LOG_SYMBOLIC_EXEC == 1
     YAMA_LOG(
         dbg(), general_c,
@@ -601,7 +600,7 @@ bool yama::default_verifier::_symbolic_exec(const type_info& subject, const bc::
     return true;
 }
 
-bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from, size_t i) {
+bool yama::verifier::_symbolic_exec_step(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from, size_t i) {
     const auto instr = bcode[i];
 #if _LOG_SYMBOLIC_EXEC == 1
         YAMA_LOG(
@@ -808,7 +807,7 @@ bool yama::default_verifier::_symbolic_exec_step(const type_info& subject, const
     return true;
 }
 
-bool yama::default_verifier::_verify_RTop_exists(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RTop_exists(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     if (block.final_reg_set.size() == 0) {
         YAMA_RAISE(dbg(), dsignal::verif_RTop_does_not_exist);
         YAMA_LOG(
@@ -820,7 +819,7 @@ bool yama::default_verifier::_verify_RTop_exists(const type_info& subject, const
     return true;
 }
 
-bool yama::default_verifier::_verify_RTop_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RTop_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RTop = _R_type(block, block.final_reg_set.size() - 1);
     const auto _other = _bool_type();
     if (_RTop != _other) {
@@ -834,7 +833,7 @@ bool yama::default_verifier::_verify_RTop_is_type_bool(const type_info& subject,
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     if (bcode[i].A >= block.final_reg_set.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_RA_out_of_bounds);
         YAMA_LOG(
@@ -846,7 +845,7 @@ bool yama::default_verifier::_verify_RA_in_bounds(const type_info& subject, cons
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_is_type_none(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_is_type_none(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _other = _none_type();
     if (_RA != _other) {
@@ -860,14 +859,14 @@ bool yama::default_verifier::_verify_RA_is_type_none(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_is_type_none_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_is_type_none_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
         : _verify_RA_is_type_none(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _other = _bool_type();
     if (_RA != _other) {
@@ -881,7 +880,7 @@ bool yama::default_verifier::_verify_RA_is_type_bool(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto RA = _R_type(block, bcode[i].A);
     const auto this_return_type_index = deref_assert(subject.callsig()).ret;
     const str this_return_type = subject.consts.qualified_name(this_return_type_index).value();
@@ -896,7 +895,7 @@ bool yama::default_verifier::_verify_RA_is_return_type_of_this_call(const type_i
     return true;
 }
 
-bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     YAMA_ASSERT(bcode[i].A <= block.final_reg_set.size());
     const size_t final_reg_set_size_after_popping_args = block.final_reg_set.size() - size_t(bcode[i].A);
     if (bcode[i].B >= final_reg_set_size_after_popping_args) {
@@ -910,7 +909,7 @@ bool yama::default_verifier::_verify_RB_in_bounds(const type_info& subject, cons
     return true;
 }
 
-bool yama::default_verifier::_verify_RB_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RB_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
     const auto callobj = _R_type(block, args_index);
     const auto callobj_index = _find_type_const(subject, callobj).value();
@@ -928,14 +927,14 @@ bool yama::default_verifier::_verify_RB_is_return_type_of_call_object(const type
     return true;
 }
 
-bool yama::default_verifier::_verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
         : _verify_RB_is_return_type_of_call_object(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::verifier::_verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
     if (bcode[i].B >= subject.consts.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_KoB_out_of_bounds);
         YAMA_LOG(
@@ -947,7 +946,7 @@ bool yama::default_verifier::_verify_KoB_in_bounds(const type_info& subject, con
     return true;
 }
 
-bool yama::default_verifier::_verify_KoB_is_object_const(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::verifier::_verify_KoB_is_object_const(const type_info& subject, const bc::code& bcode, size_t i) {
     const auto KoB_const_type = subject.consts.const_type(bcode[i].B).value();
     if (!is_object_const(KoB_const_type)) {
         YAMA_RAISE(dbg(), dsignal::verif_KoB_not_object_const);
@@ -960,7 +959,7 @@ bool yama::default_verifier::_verify_KoB_is_object_const(const type_info& subjec
     return true;
 }
 
-bool yama::default_verifier::_verify_ArgB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::verifier::_verify_ArgB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
     // NOTE: remember, 'args' passed into a call includes the call object, not just callable type's params
     const auto args = deref_assert(subject.callsig()).params.size() + 1;
     if (bcode[i].B >= args) {
@@ -974,7 +973,7 @@ bool yama::default_verifier::_verify_ArgB_in_bounds(const type_info& subject, co
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_and_RB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_RB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _RB = _R_type(block, bcode[i].B);
     if (_RA != _RB) {
@@ -988,14 +987,14 @@ bool yama::default_verifier::_verify_RA_and_RB_agree_on_type(const type_info& su
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_and_RB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_RB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
         : _verify_RA_and_RB_agree_on_type(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_RA_and_KoB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_KoB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _KoB = _Ko_type(subject, bcode[i].B);
     if (_RA != _KoB) {
@@ -1009,14 +1008,14 @@ bool yama::default_verifier::_verify_RA_and_KoB_agree_on_type(const type_info& s
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
         : _verify_RA_and_KoB_agree_on_type(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _ArgB = _Arg_type(subject, bcode[i].B);
     if (_RA != _ArgB) {
@@ -1030,14 +1029,14 @@ bool yama::default_verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& 
     return true;
 }
 
-bool yama::default_verifier::_verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     return
         bcode.reinit_flag(i)
         ? true
         : _verify_RA_and_ArgB_agree_on_type(subject, bcode, block, i);
 }
 
-bool yama::default_verifier::_verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
     const auto callobj_type = _R_type(block, args_index);
     const auto callobj_type_index = _find_type_const(subject, callobj_type).value();
@@ -1054,7 +1053,7 @@ bool yama::default_verifier::_verify_ArgRs_legal_call_object(const type_info& su
     return true;
 }
 
-bool yama::default_verifier::_verify_ArgRs_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_ArgRs_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     if (size_t(bcode[i].A) > block.final_reg_set.size()) {
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_out_of_bounds);
         YAMA_LOG(
@@ -1066,7 +1065,7 @@ bool yama::default_verifier::_verify_ArgRs_in_bounds(const type_info& subject, c
     return true;
 }
 
-bool yama::default_verifier::_verify_ArgRs_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::verifier::_verify_ArgRs_have_at_least_one_object(const type_info& subject, const bc::code& bcode, size_t i) {
     if (bcode[i].A == 0) {
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_zero_objects);
         YAMA_LOG(
@@ -1078,7 +1077,7 @@ bool yama::default_verifier::_verify_ArgRs_have_at_least_one_object(const type_i
     return true;
 }
 
-bool yama::default_verifier::_verify_param_arg_registers_are_correct_number_and_types(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
     const auto args_count = size_t(bcode[i].A);
     const auto callobj_type = _R_type(block, args_index);
@@ -1119,7 +1118,7 @@ bool yama::default_verifier::_verify_param_arg_registers_are_correct_number_and_
     return success;
 }
 
-bool yama::default_verifier::_verify_pushing_does_not_overflow(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_pushing_does_not_overflow(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     if (block.final_reg_set.size() == subject.max_locals()) {
         YAMA_RAISE(dbg(), dsignal::verif_pushing_overflows);
         YAMA_LOG(
@@ -1131,7 +1130,7 @@ bool yama::default_verifier::_verify_pushing_does_not_overflow(const type_info& 
     return true;
 }
 
-bool yama::default_verifier::_verify_program_counter_valid_after_jump_by_sBx_offset(const type_info& subject, const bc::code& bcode, size_t i) {
+bool yama::verifier::_verify_program_counter_valid_after_jump_by_sBx_offset(const type_info& subject, const bc::code& bcode, size_t i) {
     if (!_jump_dest_in_bounds(bcode, i, bcode[i].sBx)) {
         YAMA_RAISE(dbg(), dsignal::verif_puts_PC_out_of_bounds);
         YAMA_LOG(
@@ -1143,7 +1142,7 @@ bool yama::default_verifier::_verify_program_counter_valid_after_jump_by_sBx_off
     return true;
 }
 
-bool yama::default_verifier::_verify_program_counter_valid_after_fallthrough(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_program_counter_valid_after_fallthrough(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     if (block.last >= bcode.count()) {
         YAMA_RAISE(dbg(), dsignal::verif_fallthrough_puts_PC_out_of_bounds);
         YAMA_LOG(
@@ -1155,30 +1154,30 @@ bool yama::default_verifier::_verify_program_counter_valid_after_fallthrough(con
     return true;
 }
 
-yama::default_verifier::_reg_set_state yama::default_verifier::_make_entrypoint_initial_reg_set(const type_info& subject) {
+yama::verifier::_reg_set_state yama::verifier::_make_entrypoint_initial_reg_set(const type_info& subject) {
     return _reg_set_state{};
 }
 
-yama::str yama::default_verifier::_none_type() {
+yama::str yama::verifier::_none_type() {
     return "yama:None"_str;
 }
 
-yama::str yama::default_verifier::_bool_type() {
+yama::str yama::verifier::_bool_type() {
     return "yama:Bool"_str;
 }
 
-yama::str yama::default_verifier::_R_type(const _cfg_block& block, size_t index) {
+yama::str yama::verifier::_R_type(const _cfg_block& block, size_t index) {
     return block.final_reg_set[index];
 }
 
-yama::str yama::default_verifier::_R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index) {
+yama::str yama::verifier::_R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index) {
     const auto RA_type = _R_type(block, index);
     const auto RA_index = _find_type_const(subject, RA_type).value();
     const auto RA_return_type_index = deref_assert(subject.consts.callsig(RA_index)).ret;
     return subject.consts.qualified_name(RA_return_type_index).value();
 }
 
-yama::str yama::default_verifier::_Ko_type(const type_info& subject, size_t index) {
+yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
     static_assert(const_types == 7);
     switch (subject.consts.const_type(index).value()) {
     case const_type::int0:          return "yama:Int"_str;                                  break;
@@ -1192,7 +1191,7 @@ yama::str yama::default_verifier::_Ko_type(const type_info& subject, size_t inde
     return str();
 }
 
-yama::str yama::default_verifier::_Arg_type(const type_info& subject, size_t index) {
+yama::str yama::verifier::_Arg_type(const type_info& subject, size_t index) {
     if (index == 0) { // callobj arg
         return str(std::format("{}:{}", _module_path(), subject.unqualified_name));
     }
@@ -1201,11 +1200,11 @@ yama::str yama::default_verifier::_Arg_type(const type_info& subject, size_t ind
     }
 }
 
-size_t yama::default_verifier::_calc_jump_dest(size_t i, int16_t sBx) {
+size_t yama::verifier::_calc_jump_dest(size_t i, int16_t sBx) {
     return i + 1 + std::make_signed_t<size_t>(sBx);
 }
 
-bool yama::default_verifier::_jump_dest_in_bounds(const bc::code& bcode, size_t i, int16_t sBx) {
+bool yama::verifier::_jump_dest_in_bounds(const bc::code& bcode, size_t i, int16_t sBx) {
     // NOTE: due to sBx being 16-bit, we 100% know that if sBx being negative results
     //       in integer underflow, that the result will be greater than bcode.count(),
     //       as 16-bit range isn't big enough to cause it to reach all the way back
@@ -1213,7 +1212,7 @@ bool yama::default_verifier::_jump_dest_in_bounds(const bc::code& bcode, size_t 
     return _calc_jump_dest(i, sBx) < bcode.count();
 }
 
-std::optional<size_t> yama::default_verifier::_find_type_const(const type_info& subject, const str& x) {
+std::optional<size_t> yama::verifier::_find_type_const(const type_info& subject, const str& x) {
     // NOTE: need to do a O(n)-time search of the constant table
     for (size_t i = 0; i < subject.consts.size(); i++) {
         if (subject.consts.qualified_name(i) == x) {
@@ -1223,11 +1222,11 @@ std::optional<size_t> yama::default_verifier::_find_type_const(const type_info& 
     return std::nullopt;
 }
 
-bool yama::default_verifier::_is_newtop(uint8_t x) const noexcept {
+bool yama::verifier::_is_newtop(uint8_t x) const noexcept {
     return x == uint8_t(yama::newtop);
 }
 
-void yama::default_verifier::_push(str type, _cfg_block& block) {
+void yama::verifier::_push(str type, _cfg_block& block) {
     block.final_reg_set.push_back(type);
 #if _LOG_SYMBOLIC_EXEC == 1
     YAMA_LOG(
@@ -1238,7 +1237,7 @@ void yama::default_verifier::_push(str type, _cfg_block& block) {
 #endif
 }
 
-void yama::default_verifier::_put(str type, size_t index, _cfg_block& block) {
+void yama::verifier::_put(str type, size_t index, _cfg_block& block) {
     if (index < block.final_reg_set.size()) {
         block.final_reg_set[index] = type;
 #if _LOG_SYMBOLIC_EXEC == 1
@@ -1253,7 +1252,7 @@ void yama::default_verifier::_put(str type, size_t index, _cfg_block& block) {
     else YAMA_DEADEND;
 }
 
-void yama::default_verifier::_pop(size_t n, _cfg_block& block) {
+void yama::verifier::_pop(size_t n, _cfg_block& block) {
     if (n >= block.final_reg_set.size())    block.final_reg_set.clear();
     else                                    for (auto nn = n; nn >= 1; nn--) block.final_reg_set.pop_back();
 #if _LOG_SYMBOLIC_EXEC == 1
@@ -1265,7 +1264,7 @@ void yama::default_verifier::_pop(size_t n, _cfg_block& block) {
 #endif
 }
 
-std::string yama::default_verifier::fmt_reg_set_state_diagnostic(const _reg_set_state& x) {
+std::string yama::verifier::fmt_reg_set_state_diagnostic(const _reg_set_state& x) {
     std::string result{};
     bool not_first = false;
     for (const auto& I : x) {

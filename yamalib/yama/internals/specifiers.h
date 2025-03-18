@@ -3,20 +3,16 @@
 #pragma once
 
 
-#include "macros.h"
+#include "../core/macros.h"
+
 #include "env.h"
 
 
-namespace yama {
+namespace yama::internal {
 
 
-    // TODO: these classes have not been unit tested
-
-    // TODO: when we do unit test + revise these, be sure to look into better formalizing
-    //       their parsing/formatting semantics
-    //
-    //       as part of this, maybe employ a TAUL spec to allow for us to easily maintain
-    //       a more nuanced syntax for specifiers
+    // TODO: maybe employ a TAUL spec to allow for us to easily maintain a more nuanced
+    //       syntax for specifiers
 
     class import_path;
     class qualified_name;
@@ -37,6 +33,25 @@ namespace yama {
     std::optional<parsed_import_path> parse_import_path(const str& input);
     std::optional<parsed_qualified_name> parse_qualified_name(const str& input);
     std::optional<parsed_fullname> parse_fullname(const str& input);
+
+
+    // TODO: later, if we add heap allocs to parsing, be sure to revise below (especially
+    //       valid_fullname) to ensure they avoid heap usage
+
+    bool valid_import_path(const str& input);
+    bool valid_qualified_name(const str& input);
+    bool valid_fullname(const str& input);
+
+
+    // extract_head_name extracts the head identifier portion of x
+
+    // x may be an import path, qualified name, or fullname
+
+    std::optional<str> extract_head_name(const str& x);
+
+
+    // TODO: the below classes are all fairly 'fat', and we can likely GREATLY improve
+    //       them in terms of space efficiency
 
 
     // IMPORTANT: these 'specifiers' are intended to be *env agnostic*, meaning that they
@@ -100,8 +115,8 @@ namespace yama {
         qualified_name& operator=(qualified_name&&) noexcept = default;
 
 
-        const yama::import_path& import_path() const noexcept;
-        inline operator const yama::import_path&() const noexcept { return import_path(); }
+        const yama::internal::import_path& import_path() const noexcept;
+        inline operator const yama::internal::import_path&() const noexcept { return import_path(); }
 
         const str& unqualified_name() const noexcept;
 
@@ -129,11 +144,11 @@ namespace yama {
 
 
     private:
-        yama::import_path _import_path;
+        yama::internal::import_path _import_path;
         yama::str _unqualified_name;
 
 
-        qualified_name(yama::import_path&& import_path, yama::str&& unqualified_name);
+        qualified_name(yama::internal::import_path&& import_path, yama::str&& unqualified_name);
     };
 
 
@@ -142,6 +157,10 @@ namespace yama {
     //
     //       something like a 'yama::specifier_cache' which gets injected into parse, or
     //       maybe we could use thread-local caching in the impl
+    //
+    //       it could also help to figure out ways to reduce heap allocs down to one, by
+    //       computing the blocks we'll need, and then allocating a single big block,
+    //       everything we need onto this one big block
 
     class fullname final {
     public:
@@ -155,11 +174,11 @@ namespace yama {
         fullname& operator=(fullname&&) noexcept = default;
 
 
-        const yama::qualified_name& qualified_name() const noexcept;
-        inline operator const yama::qualified_name&() const noexcept { return qualified_name(); }
+        const yama::internal::qualified_name& qualified_name() const noexcept;
+        inline operator const yama::internal::qualified_name&() const noexcept { return qualified_name(); }
 
-        const yama::import_path& import_path() const noexcept;
-        inline operator const yama::import_path&() const noexcept { return import_path(); }
+        const yama::internal::import_path& import_path() const noexcept;
+        inline operator const yama::internal::import_path&() const noexcept { return import_path(); }
 
         const str& unqualified_name() const noexcept;
 
@@ -187,19 +206,19 @@ namespace yama {
 
 
     private:
-        yama::qualified_name _qualified_name;
+        yama::internal::qualified_name _qualified_name;
 
 
-        fullname(yama::qualified_name&& qualified_name);
+        fullname(yama::internal::qualified_name&& qualified_name);
     };
 }
 
 
-YAMA_SETUP_HASH(yama::import_path, x.hash());
-YAMA_SETUP_HASH(yama::qualified_name, x.hash());
-YAMA_SETUP_HASH(yama::fullname, x.hash());
+YAMA_SETUP_HASH(yama::internal::import_path, x.hash());
+YAMA_SETUP_HASH(yama::internal::qualified_name, x.hash());
+YAMA_SETUP_HASH(yama::internal::fullname, x.hash());
 
-YAMA_SETUP_FORMAT(yama::import_path, x.fmt());
-YAMA_SETUP_FORMAT(yama::qualified_name, x.fmt());
-YAMA_SETUP_FORMAT(yama::fullname, x.fmt());
+YAMA_SETUP_FORMAT(yama::internal::import_path, x.fmt());
+YAMA_SETUP_FORMAT(yama::internal::qualified_name, x.fmt());
+YAMA_SETUP_FORMAT(yama::internal::fullname, x.fmt());
 

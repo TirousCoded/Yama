@@ -8,40 +8,36 @@
 #include "../core/api_component.h"
 #include "../core/module.h"
 #include "../core/parcel.h"
-#include "../core/env.h"
-#include "../core/specifiers.h"
 #include "../core/verifier.h"
-#include "../core/compiler.h"
 
+#include "env.h"
+#include "specifiers.h"
 #include "res_state.h"
 #include "install_manager.h"
+#include "compiler.h"
 
 
 namespace yama::internal {
 
 
+    class domain_data;
+
+
     class importer final : public api_component {
     public:
-        importer(std::shared_ptr<debug> dbg, install_manager& install_manager, verifier& verifier, compiler& compiler);
+        module_area state;
 
-        virtual ~importer() noexcept = default;
+
+        importer(std::shared_ptr<debug> dbg, domain_data& dd);
 
 
         std::optional<yama::module> import(const env& e, const str& path, res_state& upstream);
 
 
     private:
-        install_manager* _install_manager;
-        verifier* _verifier;
-        compiler* _compiler;
+        domain_data* _dd;
 
-
-        install_manager& _get_install_manager() const noexcept;
-        verifier& _get_verifier() const noexcept;
-        compiler& _get_compiler() const noexcept;
-
-
-        module_area _state;
+        domain_data& _get_dd() const noexcept;
 
 
         bool _import(const env& e, const import_path& path);
@@ -63,13 +59,13 @@ namespace yama::internal {
             _compiler_services(std::shared_ptr<debug> dbg, parcel_id compilation_env_parcel_id, importer& upstream);
 
 
-            yama::env env() const override final;
-            std::optional<import_result_ext> import(const yama::import_path& path) override final;
+            internal::env env() const override final;
+            std::optional<import_result_ext> import(const import_path& path) override final;
 
 
         private:
             importer* _upstream;
-            yama::env _env;
+            internal::env _env;
 
 
             bool _verify(const module_info& m, const import_path& path, std::shared_ptr<parcel> p);

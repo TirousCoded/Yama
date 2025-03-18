@@ -1,7 +1,10 @@
 
 
-#include "domain-impl-loading-tests.h"
+#include <gtest/gtest.h>
 
+#include <yama/core/res.h>
+#include <yama/core/debug.h>
+#include <yama/core/domain.h>
 #include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
 #include <yama/core/module_info.h>
@@ -10,24 +13,40 @@
 using namespace yama::string_literals;
 
 
-GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DomainImplLoadingTests);
+class LoadingTests : public testing::Test {
+public:
+    std::shared_ptr<yama::dsignal_debug> dbg;
+    std::shared_ptr<yama::domain> dm;
 
 
-// TODO: the below unit tests were initially written prior to the addition of parcels/modules,
-//       and so *naively* operates w/ only tests for domain env, w/ NONE covering parcel env
-//
-//       this is a problem, and so we'd be best to figure out how we want to revise our test
-//       suite in the future to address this
+protected:
+    void SetUp() override final {
+        dbg = std::make_shared<yama::dsignal_debug>(std::make_shared<yama::stderr_debug>());
+        dm = std::make_shared<yama::domain>(dbg);
+    }
 
-// TODO: another problem arising w/ the below tests is that I'm fairly certain we lack tests
-//       covering things like inter-parcel dependency relationships between loaded types
+    void TearDown() override final {
+        //
+    }
+};
+
+
+// TODO: I'm fairly certain we lack tests covering things like inter-parcel dependency
+//       relationships between loaded types
 
 // TODO: also, maybe add in tests for things like whether impl can properly handle discerning
-//       whether the parcel env import path defining a type symbol is valid or not (w/ these
-//       tests only summarily testing the particulars of what constitutes validity of these)
+//       whether the parcel env import path defining a type ref constant is valid or not (w/
+//       these tests only summarily testing the particulars of what constitutes validity of these)
 //
 //       we need this, as currently nothing is testing if impl can properly handle failing
 //       to load due to invalid import path part
+//
+//       as part of this, be sure to look into the particulars about import dir rules in
+//       compilation-tests.cpp for what it asserts
+
+// TODO: alongside the above about type ref constant import paths being valid, we'd also do
+//       best to assert things like impl failing a load of one of these types if the module
+//       it's from is *invalid* (ie. static verif fail)
 
 
 // IMPORTANT:
@@ -71,9 +90,7 @@ namespace {
 //      is nevertheless indirectly a part of its dep graph
 
 
-TEST_P(DomainImplLoadingTests, EnsureWorksWithAllConstTypes) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     static_assert(yama::const_types == 7);
     // dep graph:
     //      a <- Int -4         (not a dep)
@@ -149,9 +166,7 @@ TEST_P(DomainImplLoadingTests, EnsureWorksWithAllConstTypes) {
     EXPECT_EQ(aa.consts().get<yama::function_type_const>(6), std::make_optional(bb1));
 }
 
-TEST_P(DomainImplLoadingTests, WithNoDeps) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, WithNoDeps) {
     // dep graph:
     //      a
 
@@ -175,9 +190,7 @@ TEST_P(DomainImplLoadingTests, WithNoDeps) {
     EXPECT_EQ(aa.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, WithDeps) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, WithDeps) {
     // dep graph:
     //      a -> b
     //        -> c
@@ -226,9 +239,7 @@ TEST_P(DomainImplLoadingTests, WithDeps) {
     EXPECT_EQ(cc.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     // dep graph:
     //      a -> b -> d
     //             -> e
@@ -315,9 +326,7 @@ TEST_P(DomainImplLoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     EXPECT_EQ(ff.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     // dep graph:
     //      a -> b -> d
     //        -> c -> d
@@ -389,9 +398,7 @@ TEST_P(DomainImplLoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepG
     EXPECT_EQ(dd.consts().size(), 0);
 }
 
-TEST_P(DomainImplLoadingTests, WithDeps_DepGraphCycle) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
     // dep graph:
     //      a -> b -> a     (back ref)
     //        -> a          (back ref)
@@ -435,9 +442,7 @@ TEST_P(DomainImplLoadingTests, WithDeps_DepGraphCycle) {
     EXPECT_EQ(bb.consts().type(0), std::make_optional(aa));
 }
 
-TEST_P(DomainImplLoadingTests, Fail_OriginalTypeNotFound) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, Fail_OriginalTypeNotFound) {
     // dep graph:
     //      a           <- error is that no type_info 'a' provided
 
@@ -452,9 +457,7 @@ TEST_P(DomainImplLoadingTests, Fail_OriginalTypeNotFound) {
     EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Fail_ReferencedTypeNotFound) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, Fail_ReferencedTypeNotFound) {
     // dep graph:
     //      a -> b      <- error is that no type_info 'b' provided
     //        -> c
@@ -478,9 +481,7 @@ TEST_P(DomainImplLoadingTests, Fail_ReferencedTypeNotFound) {
     EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
     // dep graph:
     //      a -> b -> d     <- error is that no type_info 'd' provided
     //             -> e
@@ -515,9 +516,7 @@ TEST_P(DomainImplLoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
     EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
 }
 
-TEST_P(DomainImplLoadingTests, Fail_KindMismatch) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, Fail_KindMismatch) {
     // dep graph:
     //      a -> b -> c
 
@@ -556,9 +555,7 @@ TEST_P(DomainImplLoadingTests, Fail_KindMismatch) {
 //          2) differ by return type indices (same const table)
 //          3) differ by const table (but have otherwise identical callsigs)
 
-TEST_P(DomainImplLoadingTests, Fail_CallSigMismatch) {
-    const auto dm = GetParam().factory(dbg);
-
+TEST_F(LoadingTests, Fail_CallSigMismatch) {
     // dep graph:
     //      a -> b -> c
 

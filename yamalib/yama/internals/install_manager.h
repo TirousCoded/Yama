@@ -8,7 +8,8 @@
 #include "../core/api_component.h"
 #include "../core/general.h"
 #include "../core/install_batch.h"
-#include "../core/env.h"
+
+#include "../internals/env.h"
 
 
 namespace yama::internal {

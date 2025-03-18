@@ -23,25 +23,15 @@ namespace yama {
     // is established later during instantiation
 
 
-    class verifier : public api_component {
+    class verifier final : public api_component {
     public:
         verifier(std::shared_ptr<debug> dbg = nullptr);
 
 
         // module_path specifies the module inside which verification occurs
 
-        virtual bool verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) = 0;
-        virtual bool verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) = 0;
-    };
-
-
-    class default_verifier final : public verifier {
-    public:
-        default_verifier(std::shared_ptr<debug> dbg = nullptr);
-
-
-        bool verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) override final;
-        bool verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) override final;
+        bool verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path);
+        bool verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path);
 
 
     private:
