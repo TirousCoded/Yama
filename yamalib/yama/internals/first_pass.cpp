@@ -45,7 +45,7 @@ void yama::internal::first_pass::visit_begin(res<ast_ImportDir> x) {
         }
     }
     else {
-        if (_in_fn_ctx()) {
+        if (_is_in_fn()) {
             _compile_error(
                 *x,
                 dsignal::compile_misplaced_import,
@@ -62,42 +62,18 @@ void yama::internal::first_pass::visit_begin(res<ast_ImportDir> x) {
 
 void yama::internal::first_pass::visit_begin(res<ast_VarDecl> x) {
     const auto name = x->name.str(_get_src());
-    if (!_in_fn_ctx()) {
+    if (!_is_in_fn()) {
         _compile_error(
             *x,
             dsignal::compile_nonlocal_var,
             "illegal non-local var {}!",
             name);
     }
-    _acknowledge_type_decl();
     _insert_vardecl(x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_FnDecl> x) {
-    const auto name = x->name.str(_get_src());
-    if (_in_fn_ctx()) {
-        _compile_error(
-            *x,
-            dsignal::compile_local_fn,
-            "illegal local fn {}!",
-            name);
-    }
-    if (x->callsig->params.size() > 24) {
-        _compile_error(
-            *x,
-            dsignal::compile_invalid_param_list,
-            "illegal fn {} with >24 params!",
-            name);
-    }
-    _acknowledge_type_decl();
-    _mark_as_fn_body_block(*x->block);
-    _enter_fn_ctx();
-    _insert_fndecl(x);
-    // for fn decls, since we need to have params and local vars be in the same
-    // block, we add the csymtab to the fn decl, and suppress adding one for the
-    // body block AST node
-    _add_csymtab(x);
-    _cfg_fn_decl_begin();
+    _begin_fn(x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ParamDecl> x) {
@@ -108,77 +84,55 @@ void yama::internal::first_pass::visit_begin(res<ast_Block> x) {
     if (!_is_fn_body_block(*x)) { // suppress if we're the body block of a fn (see visit_begin for ast_FnDecl above)
         _add_csymtab(x);
     }
-    _cfg_block_begin();
+    _cfg.begin_block();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_IfStmt> x) {
-    _cfg_if_stmt_begin();
+    _cfg.begin_if_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_LoopStmt> x) {
-    _enter_loop_ctx();
-    _cfg_loop_stmt_begin();
+    _cfg.begin_loop_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_BreakStmt> x) {
-    if (!_in_loop_ctx()) { // illegal break stmt if not directly/indirectly in loop stmt block
+    if (!_cfg.is_in_loop()) { // illegal break stmt if not directly/indirectly in loop stmt block
         _compile_error(
             *x,
             dsignal::compile_not_in_loop,
             "cannot use break outside of a loop stmt!");
     }
-    _cfg_break_stmt();
+    _cfg.break_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ContinueStmt> x) {
-    if (!_in_loop_ctx()) { // illegal continue stmt if not directly/indirectly in loop stmt block
+    if (!_cfg.is_in_loop()) { // illegal continue stmt if not directly/indirectly in loop stmt block
         _compile_error(
             *x,
             dsignal::compile_not_in_loop,
             "cannot use continue outside of a loop stmt!");
     }
-    _cfg_continue_stmt();
+    _cfg.continue_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ReturnStmt> x) {
-    _cfg_return_stmt();
+    _cfg.return_stmt();
 }
 
 void yama::internal::first_pass::visit_end(res<ast_FnDecl> x) {
-    const auto name = x->name.str(_get_src());
-    const bool all_paths_have_explicit_returns_or_infinite_loops = _cfg_fn_decl_end();
-    // TODO: while it shouldn't cause issues, I think if there's a name conflict the below code
-    //       might assign to the wrong fn decl
-    // propagate above to symbol (+ fail quietly if no symbol due to compiling code being in error)
-    if (const auto symbol = _get_csymtabs().lookup(_get_root(), name, 0)) {
-        if (symbol->is<fn_csym>()) { // <- if name conflict error, symbol could be not a fn
-            symbol->as<fn_csym>().all_paths_return_or_loop = all_paths_have_explicit_returns_or_infinite_loops;
-        }
-    }
-    const bool requires_explicit_returns = !_fn_decl_return_type_is_none(*x);
-    // if type annot, and type annot is not None, then control-flow error
-    // if not all control paths have explicit return stmt (or infinite loop)
-    if (requires_explicit_returns && !all_paths_have_explicit_returns_or_infinite_loops) {
-        _compile_error(
-            *x,
-            dsignal::compile_no_return_stmt,
-            "for {}, not all control paths end with a return stmt!",
-            x->name.str(_get_src()));
-    }
-    _exit_fn_ctx();
+    _end_fn();
 }
 
 void yama::internal::first_pass::visit_end(res<ast_Block> x) {
-    _cfg_block_end();
+    _cfg.end_block();
 }
 
 void yama::internal::first_pass::visit_end(res<ast_IfStmt> x) {
-    _cfg_if_stmt_end();
+    _cfg.end_if_stmt();
 }
 
 void yama::internal::first_pass::visit_end(res<ast_LoopStmt> x) {
-    _cfg_loop_stmt_end();
-    _exit_loop_ctx();
+    _cfg.end_loop_stmt();
 }
 
 yama::internal::ast_Chunk& yama::internal::first_pass::_get_root() const noexcept {
@@ -242,10 +196,8 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
     }
 }
 
-void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
+bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
     const auto unqualified_name = x->name.str(_get_src());
-    // disable relevant param decl behaviour if we never setup the fn decl properly
-    _has_last_fn_decl = false;
     // prepare symbol
     fn_csym sym{};
     if (x->callsig->result) {
@@ -294,24 +246,18 @@ void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
             unqualified_name);
-        return; // abort
     }
-    // update _last_fn_decl, and reset _param_index, for reasons explained
-    _has_last_fn_decl = true;
-    _last_fn_decl = unqualified_name;
-    _param_index = 0;
+    return success;
 }
 
 void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     const auto name = x->name.str(_get_src());
-    auto& our_fn = deref_assert(_get_csymtabs().lookup(_get_root(), _last_fn_decl, 0));
     const auto our_fn_return_type =
-        _has_last_fn_decl
-        ? our_fn.as<fn_csym>().params[_param_index].type
+        _is_in_fn() && _current_fn().symbol
+        ? _current_fn().symbol->as<fn_csym>().params[_current_fn().next_param_index()].type
         : std::nullopt;
     // prepare symbol
     param_csym sym{
-        // lookup fn decl of this param decl, then use _param_index to get type for this param decl
         .type = our_fn_return_type,
     };
     // report if no type annotation
@@ -339,8 +285,69 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
             "name {} already in use by another decl!",
             name);
     }
-    // incr _param_index for reasons explained
-    _param_index++;
+}
+
+bool yama::internal::first_pass::_is_in_fn() {
+    //YAMA_ASSERT(_cfg.is_in_fn() == !_fn_decl_stk.empty());
+    return _cfg.is_in_fn();
+}
+
+yama::internal::first_pass::_fn_decl& yama::internal::first_pass::_current_fn() {
+    YAMA_ASSERT(_is_in_fn());
+    return _fn_decl_stk.back();
+}
+
+void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
+    const auto name = x->name.str(_get_src());
+    if (_is_in_fn()) {
+        _compile_error(
+            *x,
+            dsignal::compile_local_fn,
+            "illegal local fn {}!",
+            name);
+    }
+    if (x->callsig->params.size() > 24) {
+        _compile_error(
+            *x,
+            dsignal::compile_invalid_param_list,
+            "illegal fn {} with >24 params!",
+            name);
+    }
+    _acknowledge_type_decl();
+    _mark_as_fn_body_block(*x->block);
+    _cfg.begin_fn();
+    const bool no_name_conflict = _insert_fndecl(x);
+    // for fn decls, since we need to have params and local vars be in the same
+    // block, we add the csymtab to the fn decl, and suppress adding one for the
+    // body block AST node
+    _add_csymtab(x);
+    _fn_decl details{
+        .node = x,
+        // if name conflict arose, then should be nullptr
+        .symbol = no_name_conflict ? _get_csymtabs().lookup(_get_root(), x->name.str(_get_src()), 0) : nullptr,
+    };
+    _fn_decl_stk.push_back(std::move(details));
+}
+
+void yama::internal::first_pass::_end_fn() {
+    const auto& nd = *_current_fn().node;
+    const auto name = nd.name.str(_get_src());
+    const bool all_paths_have_explicit_returns_or_infinite_loops = _cfg.check_fn();
+    // propagate above to symbol (+ fail quietly if no symbol due to compiling code being in error)
+    if (const auto symbol = _current_fn().symbol) {
+        symbol->as<fn_csym>().all_paths_return_or_loop = all_paths_have_explicit_returns_or_infinite_loops;
+    }
+    const bool requires_explicit_returns = !_fn_decl_return_type_is_none(nd);
+    // if type annot, and type annot is not None, then control-flow error
+    // if not all control paths have explicit return stmt (or infinite loop)
+    if (requires_explicit_returns && !all_paths_have_explicit_returns_or_infinite_loops) {
+        _compile_error(
+            nd,
+            dsignal::compile_no_return_stmt,
+            "for {}, not all control paths end with a return stmt!",
+            name);
+    }
+    _cfg.end_fn();
 }
 
 void yama::internal::first_pass::_acknowledge_type_decl() {
@@ -357,124 +364,6 @@ void yama::internal::first_pass::_mark_as_fn_body_block(const ast_Block& x) {
 
 bool yama::internal::first_pass::_is_fn_body_block(const ast_Block& x) const noexcept {
     return _fn_body_blocks.contains(x.id);
-}
-
-bool yama::internal::first_pass::_cfg_has_current() {
-    return !_cfg_paths.empty();
-}
-
-yama::internal::first_pass::_cfg_paths_t& yama::internal::first_pass::_cfg_current() {
-    YAMA_ASSERT(_cfg_has_current());
-    return _cfg_paths.back();
-}
-
-void yama::internal::first_pass::_cfg_push(bool is_block) {
-    _cfg_paths.push_back(_cfg_paths_t{ .is_block = is_block });
-}
-
-yama::internal::first_pass::_cfg_paths_t yama::internal::first_pass::_cfg_pop() {
-    YAMA_ASSERT(_cfg_has_current());
-    const _cfg_paths_t result = _cfg_current();
-    _cfg_paths.pop_back();
-    return result;
-}
-
-bool yama::internal::first_pass::_cfg_is_dead_code() {
-    YAMA_ASSERT(_cfg_has_current());
-    return 
-        _cfg_current().is_block &&
-        _cfg_current().block_endpoints >= 1;
-}
-
-void yama::internal::first_pass::_cfg_break_stmt() {
-    if (!_cfg_has_current()) return;
-    if (_cfg_is_dead_code()) return; // skip dead code
-    if (!_in_loop_ctx()) return; // ignore illegal break stmts
-    _cfg_current().block_endpoints++;
-    _cfg_current().breaks++;
-}
-
-void yama::internal::first_pass::_cfg_continue_stmt() {
-    if (!_cfg_has_current()) return;
-    if (_cfg_is_dead_code()) return; // skip dead code
-    if (!_in_loop_ctx()) return; // ignore illegal continue stmts
-    _cfg_current().block_endpoints++;
-    _cfg_current().fn_endpoints++;
-}
-
-void yama::internal::first_pass::_cfg_return_stmt() {
-    if (!_cfg_has_current()) return;
-    if (_cfg_is_dead_code()) return; // skip dead code
-    _cfg_current().block_endpoints++;
-    _cfg_current().fn_endpoints++;
-}
-
-void yama::internal::first_pass::_cfg_block_begin() {
-    if (!_cfg_has_current()) return;
-    _cfg_push(true);
-}
-
-void yama::internal::first_pass::_cfg_block_end() {
-    if (!_cfg_has_current()) return;
-    const auto top = _cfg_pop();
-    YAMA_ASSERT(_cfg_has_current());
-    if (_cfg_is_dead_code()) return; // skip dead code
-    if (top.block_endpoints >= 1) {
-        _cfg_current().block_endpoints++;
-    }
-    if (top.fn_endpoints >= 1) {
-        _cfg_current().fn_endpoints++;
-    }
-    if (top.breaks >= 1) {
-        _cfg_current().breaks++;
-    }
-}
-
-void yama::internal::first_pass::_cfg_if_stmt_begin() {
-    if (!_cfg_has_current()) return;
-    _cfg_push(false);
-}
-
-void yama::internal::first_pass::_cfg_if_stmt_end() {
-    if (!_cfg_has_current()) return;
-    const auto top = _cfg_pop();
-    YAMA_ASSERT(_cfg_has_current());
-    if (_cfg_is_dead_code()) return; // skip dead code
-    if (top.block_endpoints >= 2) { // propagate only if both if/else parts have
-        _cfg_current().block_endpoints++;
-    }
-    if (top.fn_endpoints >= 2) { // propagate only if both if/else parts have
-        _cfg_current().fn_endpoints++;
-    }
-    if (top.breaks >= 1) { // propagate if either part has
-        _cfg_current().breaks++;
-    }
-}
-
-void yama::internal::first_pass::_cfg_loop_stmt_begin() {
-    if (!_cfg_has_current()) return;
-    _cfg_push(false);
-}
-
-void yama::internal::first_pass::_cfg_loop_stmt_end() {
-    if (!_cfg_has_current()) return;
-    const auto top = _cfg_pop();
-    YAMA_ASSERT(_cfg_has_current());
-    if (_cfg_is_dead_code()) return; // skip dead code
-    if (top.breaks == 0) { // implicit continue-like behaviour if no subpaths exit to code outside loop
-        _cfg_current().block_endpoints++; // w/out breaks, loop stmt guarantees code after loop is dead code
-        _cfg_current().fn_endpoints++; // w/out breaks, loop stmt guarantees its code will return from fn, or enter infinite loop
-    }
-}
-
-void yama::internal::first_pass::_cfg_fn_decl_begin() {
-    _cfg_push(false); // push 'base' entry for this fn decl
-}
-
-bool yama::internal::first_pass::_cfg_fn_decl_end() {
-    YAMA_ASSERT(_cfg_has_current());
-    const auto top = _cfg_pop();
-    return top.fn_endpoints >= 1;
 }
 
 bool yama::internal::first_pass::_fn_decl_return_type_is_none(const ast_FnDecl& x) {

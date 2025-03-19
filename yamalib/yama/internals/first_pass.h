@@ -5,12 +5,13 @@
 
 #include <unordered_set>
 
+#include "../core/debug.h"
+#include "../core/domain.h"
+
 #include "ast.h"
 #include "csymtab.h"
 #include "csymtab_group_ctti.h"
-
-#include "../core/debug.h"
-#include "../core/domain.h"
+#include "cfg_analyzer.h"
 
 
 namespace yama::internal {
@@ -123,17 +124,10 @@ namespace yama::internal {
     private:
         std::shared_ptr<debug> _dbg;
         res<compiler_services> _services;
+
         ast_Chunk* _root;
         const taul::source_code* _src;
         csymtab_group_ctti* _csymtabs;
-
-        // upon encounterng an ast_FnDecl, we store its name here for its ast_ParamDecl(s)
-        // to access, alongside storing an index (incr for each ast_ParamDecl) so they
-        // can know their index in the ast_FnDecl's param list
-        bool _has_last_fn_decl = false; // <- disables param decl behaviour if fn failed to declare due to name conflict
-        str _last_fn_decl;
-        size_t _param_index = size_t(-1);
-
 
         ast_Chunk& _get_root() const noexcept;
         const taul::source_code& _get_src() const noexcept;
@@ -158,11 +152,37 @@ namespace yama::internal {
             Args&&... args);
 
 
+        // this handles control-flow analysis for us, including providing info
+        // to the rest of the system about what the CFG is like at those points
+
+        cfg_analyzer _cfg;
+
+
         void _add_csymtab(res<ast_node> x);
         void _implicitly_import_yama_module();
         void _insert_vardecl(res<ast_VarDecl> x);
-        void _insert_fndecl(res<ast_FnDecl> x);
+        bool _insert_fndecl(res<ast_FnDecl> x);
         void _insert_paramdecl(res<ast_ParamDecl> x);
+
+
+        // this stack maintains what fn decl is currently being evaluated
+
+        struct _fn_decl final {
+            res<ast_FnDecl> node;
+            std::shared_ptr<csymtab::entry> symbol; // nullptr if error
+            size_t param_index = 0; // used to help params discern their index
+
+
+            inline size_t next_param_index() { return param_index++; }
+        };
+
+        std::vector<_fn_decl> _fn_decl_stk;
+
+        bool _is_in_fn();
+        _fn_decl& _current_fn();
+        
+        void _begin_fn(res<ast_FnDecl> x);
+        void _end_fn();
 
 
         // this flag is used to discern when we're at or beyond the first type decl, meaning
@@ -180,80 +200,6 @@ namespace yama::internal {
 
         void _mark_as_fn_body_block(const ast_Block& x);
         bool _is_fn_body_block(const ast_Block& x) const noexcept;
-
-
-        // the below counter is used to discern when the AST traversal is in the context
-        // of the interior of a fn
-
-        size_t _fn_ctx = 0;
-
-        inline bool _in_fn_ctx() const noexcept { return _fn_ctx >= 1; }
-        inline void _enter_fn_ctx() { _fn_ctx++; }
-        inline void _exit_fn_ctx() { YAMA_ASSERT(_in_fn_ctx()); _fn_ctx--; }
-
-
-        // the below counter is used to discern when the AST traversal is in a context
-        // where break/continue stmts are okay to use
-
-        size_t _loop_ctx = 0;
-
-        inline bool _in_loop_ctx() const noexcept { return _loop_ctx >= 1; }
-        inline void _enter_loop_ctx() { _loop_ctx++; }
-        inline void _exit_loop_ctx() { YAMA_ASSERT(_in_loop_ctx()); _loop_ctx--; }
-
-
-        // TODO: the below control-flow analysis I find to be somewhat confusing
-
-        // below, 'control path' refers to 'control paths reachable from the entrypoint'
-
-        // below, stmts are conceptualized as bundling together >=1 'subpath' control paths
-        // subordinated by the overall control path of the stmt
-
-        // as the pass depth-first traverses the AST, the below stack is used to analyse
-        // the control-flow of the code
-
-        // the below stack gets an entry for each block or composite stmt encountered, and a
-        // special base entry for the fn decl itself (w/ this also meaning that local fns will
-        // have a local 'base', and then entries about it relative to this base, but w/ these
-        // being semantically disconnected from anything below the local base)
-
-        // each entry records counters which count observed properties of the control paths
-        // within a given stmt
-
-        // each entry, upon the visit_end method for its corresponding AST node being
-        // called will, according to its semantics, propagate its info upstream
-
-        struct _cfg_paths_t final {
-            bool    is_block;               // if entry is for a block
-            size_t  block_endpoints = 0;    // control paths in which all subpaths exit block w/ break/continue/return stmts
-            size_t  fn_endpoints    = 0;    // control paths in which all subpaths exit fn w/ return stmts, or enters infinite loops
-            size_t  breaks          = 0;    // control paths containing >=1 subpaths which exit via break stmts
-        };
-
-        std::vector<_cfg_paths_t> _cfg_paths;
-
-        bool _cfg_has_current();
-        _cfg_paths_t& _cfg_current();
-        void _cfg_push(bool is_block);
-        _cfg_paths_t _cfg_pop(); // pops top _cfg_paths entry, returning it
-
-        bool _cfg_is_dead_code();
-
-        void _cfg_break_stmt();
-        void _cfg_continue_stmt();
-        void _cfg_return_stmt();
-        
-        void _cfg_block_begin();
-        void _cfg_block_end();
-        
-        void _cfg_if_stmt_begin();
-        void _cfg_if_stmt_end();
-
-        void _cfg_loop_stmt_begin();
-        void _cfg_loop_stmt_end();
-
-        void _cfg_fn_decl_begin();
-        bool _cfg_fn_decl_end(); // returns if can guarantee all control paths either reach return stmt, or enter infinite loop
 
 
         // returns if x either has no return type annot, or its return type is None
