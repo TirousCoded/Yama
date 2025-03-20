@@ -480,6 +480,7 @@ namespace yama::internal {
     class ast_Block final : public ast_node {
     public:
         std::vector<res<ast_Stmt>> stmts;
+        bool is_fn_body_block = false;
 
 
         inline ast_Block(taul::source_pos pos, ast_id_t id)
@@ -640,6 +641,7 @@ namespace yama::internal {
     public:
         std::shared_ptr<ast_PrimaryExpr> primary;
         std::vector<res<ast_Args>> args;
+        bool is_assign_stmt_lvalue = false;
 
 
         inline ast_Expr(taul::source_pos pos, ast_id_t id)
@@ -829,6 +831,7 @@ namespace yama::internal {
     
     class ast_Args final : public ast_node {
     public:
+        std::weak_ptr<ast_Expr> expr; // back-ref to the expr this Args exists within
         std::vector<res<ast_Expr>> args;
 
 

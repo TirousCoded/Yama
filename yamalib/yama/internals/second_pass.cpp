@@ -21,24 +21,24 @@ yama::internal::second_pass::second_pass(
     _src_import_path(src_import_path),
     _root(&root),
     _src(&src),
-    _csymtabs(&csymtabs) {}
+    _csymtabs(&csymtabs),
+    _er(dbg, src) {}
 
 void yama::internal::second_pass::visit_begin(res<ast_FnDecl> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     _begin_target(x->name.str(_get_src())); // begin new fn type for code gen
-    _mark_as_fn_body_block(*x->block);
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_Block> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     if (_is_if_stmt_body(*x)) { // if we're the if stmt's body block
         _mark_as_if_stmt_cond_reg(-1); // mark as if stmt's cond expr reg
         if (!_reg_type_check(-1, "yama:Bool"_str)) { // if stmt cond expr
-            _compile_error(
+            _er.error(
                 *x,
                 dsignal::compile_type_mismatch,
                 "if stmt condition expr is type {0}, but expected {1}!",
@@ -58,22 +58,15 @@ void yama::internal::second_pass::visit_begin(res<ast_Block> x) {
     _push_scope();
 }
 
-void yama::internal::second_pass::visit_begin(res<ast_ExprStmt> x) {
-    if (err) {
-        return;
-    }
-    if (x->assign) _mark_as_assign_stmt_lvalue(*x->expr);
-}
-
 void yama::internal::second_pass::visit_begin(res<ast_IfStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     _push_if_stmt(*x);
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_LoopStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     _push_loop_stmt(*x);
@@ -82,10 +75,6 @@ void yama::internal::second_pass::visit_begin(res<ast_LoopStmt> x) {
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
-    // add entries to _args_node_to_expr_node_map
-    for (const auto& I : x->args) {
-        _args_node_to_expr_node_map[I->id] = x.get();
-    }
     // IMPORTANT:
     //      expr eval operates as follows:
     //          1) this occurs, when evals the primary expr at the base of the expr,
@@ -98,11 +87,11 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
     //              * this occurs in a visit_end call
     //          4) #2 and #3 above occur for each subsequent suffix, w/ the final
     //             temporary remaining being the temporary of the whole expr
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // suppress this and nested if the lvalue of an assignment stmt
-    if (_is_assign_stmt_lvalue(*x)) {
+    if (x->is_assign_stmt_lvalue) {
         _push_suppress();
     }
     // skip if suppressed
@@ -134,7 +123,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                     _add_sym(x->primary->name->low_pos());
                 }
                 else {
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_undeclared_name,
                         "undeclared name {}!",
@@ -149,7 +138,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 _add_sym(x->primary->name->low_pos());
             }
             else { // not a param, local var, or fn
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_not_an_expr,
                     "invalid expr!",
@@ -159,14 +148,14 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
         }
         else {
             if (ambiguous) { // ambiguous
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_ambiguous_name,
                     "ambiguous name {}!",
                     name);
             }
             else { // nothing found
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_undeclared_name,
                     "undeclared name {}!",
@@ -180,7 +169,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const auto lit_nd = res(x->primary->lit->as_int());
             const parsed_int v = parse_int(lit_nd->lit.str(_get_src())).value();
             if (v.overflow) { // overflow error
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_numeric_overflow,
                     "numeric overflow ({})!",
@@ -188,7 +177,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
                 return; // abort
             }
             else if (v.underflow) { // underflow error
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_numeric_underflow,
                     "numeric underflow ({})!",
@@ -205,7 +194,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const auto lit_nd = res(x->primary->lit->as_uint());
             const parsed_uint v = parse_uint(lit_nd->lit.str(_get_src())).value();
             if (v.overflow) { // overflow error
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_numeric_overflow,
                     "numeric overflow ({})!",
@@ -239,7 +228,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const auto txt_corrected = txt.substr(1, txt.length() - 2); // <- text w/out single-quotes
             const parsed_char v = parse_char(txt_corrected).value();
             if (!taul::is_unicode(v.v)) { // illegal Unicode error
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_illegal_unicode,
                     "illegal Unicode ({})!",
@@ -258,7 +247,7 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     if (x->assign) {
@@ -266,7 +255,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
             const auto type = _get_csymtabs().ensure_qualified(x->type->type->type.str(_get_src()));
             // if explicit type annot, type check it against temporary of the var decl
             if (!_reg_type_check(-1, type)) {
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_type_mismatch,
                     "var decl initializer expr is type {0}, but expected {1}!",
@@ -320,7 +309,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
                     _add_sym(x->low_pos());
                 }
                 else { // not a primitive or fn type
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_not_a_type,
                         "invalid type specifier!");
@@ -329,14 +318,14 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
             }
             else {
                 if (ambiguous) { // ambiguous
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_ambiguous_name,
                         "ambiguous name {}!",
                         type);
                 }
                 else { // nothing found
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_undeclared_name,
                         "undeclared name {}!",
@@ -346,7 +335,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
             }
         }
         else { // no type annot, nor assign
-            _compile_error(
+            _er.error(
                 *x,
                 dsignal::compile_invalid_local_var,
                 "cannot declare local var with no type annotation or initializer!");
@@ -356,7 +345,7 @@ void yama::internal::second_pass::visit_end(res<ast_VarDecl> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_FnDecl> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     _apply_bcode_to_target(*x);
@@ -364,11 +353,10 @@ void yama::internal::second_pass::visit_end(res<ast_FnDecl> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_Block> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
-    const bool this_is_fn_body_block = _is_fn_body_block(*x);
-    if (this_is_fn_body_block) {
+    if (x->is_fn_body_block) {
         // if we're None returning, and not all control paths have an explicit return
         // stmt or enter infinite loops, write a ret instr
         const bool is_none_returning = _target_csym().return_type.value_or("yama:None"_str) == "yama:None"_str;
@@ -382,7 +370,7 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
             _pop_temp(1, false); // pop instr after ret would just be dead code
         }
     }
-    _pop_scope(*x, !this_is_fn_body_block); // pop instr after ret would just be dead code
+    _pop_scope(*x, !x->is_fn_body_block); // pop instr after ret would just be dead code
     if (_is_if_stmt_body(*x) && _top_if_stmt().has_else_part) {
         // write unconditional branch to the exit label to skip the else-part (if any)
         cw.add_jump(_top_if_stmt().exit_label);
@@ -393,7 +381,7 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     if (x->assign) { // assignment stmt
@@ -405,7 +393,7 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
                     const auto& info = symbol->as<var_csym>();
                     // type check assignment before allowing it
                     if (!_reg_type_check(-1, info.type.value())) {
-                        _compile_error(
+                        _er.error(
                             *x,
                             dsignal::compile_type_mismatch,
                             "assigning expr is type {0}, but expected {1}!",
@@ -420,21 +408,21 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
                     }
                 }
                 else if (symbol->is<param_csym>()) { // non-assignable
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_nonassignable_expr,
                         "cannot assign to non-assignable expr!");
                     return; // abort
                 }
                 else if (symbol->is<fn_csym>()) { // non-assignable
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_nonassignable_expr,
                         "cannot assign to non-assignable expr!");
                     return; // abort
                 }
                 else { // not a param, local var, or fn
-                    _compile_error(
+                    _er.error(
                         *x,
                         dsignal::compile_not_an_expr,
                         "invalid expr!");
@@ -442,7 +430,7 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
                 }
             }
             else { // nothing found
-                _compile_error(
+                _er.error(
                     *x,
                     dsignal::compile_undeclared_name,
                     "undeclared name {}!",
@@ -451,7 +439,7 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
             }
         }
         else { // lvalue isn't even an identifier expr, so non-assignable
-            _compile_error(
+            _er.error(
                 *x,
                 dsignal::compile_nonassignable_expr,
                 "cannot assign to non-assignable expr!");
@@ -465,7 +453,7 @@ void yama::internal::second_pass::visit_end(res<ast_ExprStmt> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_IfStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // write exit label
@@ -474,7 +462,7 @@ void yama::internal::second_pass::visit_end(res<ast_IfStmt> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_LoopStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // write unconditional branch to continue label
@@ -486,7 +474,7 @@ void yama::internal::second_pass::visit_end(res<ast_LoopStmt> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_BreakStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // IMPORTANT: we can't just pop all the registers of the current scope, as
@@ -501,7 +489,7 @@ void yama::internal::second_pass::visit_end(res<ast_BreakStmt> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_ContinueStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // IMPORTANT: we can't just pop all the registers of the current scope, as
@@ -516,13 +504,13 @@ void yama::internal::second_pass::visit_end(res<ast_ContinueStmt> x) {
 }
 
 void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     if (x->expr) { // form 'return x;'
         // type check return value expr, w/ return type None if no explicit return type
         if (!_reg_type_check(-1, _target_csym().return_type.value_or("yama:None"_str))) {
-            _compile_error(
+            _er.error(
                 *x,
                 dsignal::compile_type_mismatch,
                 "return stmt expr is type {0}, but expected {1}!",
@@ -537,7 +525,7 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
         // this form may not be used if return type isn't None
         const str expected_return_type = "yama:None"_str;
         if (_target_csym().return_type.value_or("yama:None"_str) != expected_return_type) {
-            _compile_error(
+            _er.error(
                 *x,
                 dsignal::compile_type_mismatch,
                 "return stmt returns {} object but return type is {}!",
@@ -556,14 +544,13 @@ void yama::internal::second_pass::visit_end(res<ast_ReturnStmt> x) {
 
 void yama::internal::second_pass::visit_end(res<ast_Expr> x) {
     // unsuppress if we're the one that suppressed
-    if (_is_assign_stmt_lvalue(*x)) {
+    if (x->is_assign_stmt_lvalue) {
         _pop_suppress();
     }
 }
 
 void yama::internal::second_pass::visit_end(res<ast_Args> x) {
-    YAMA_ASSERT(_args_node_to_expr_node_map.contains(x->id));
-    if (err) {
+    if (_er.is_fatal()) {
         return;
     }
     // skip if suppressed
@@ -579,8 +566,8 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
     if (const auto symbol = _get_csymtabs().lookup(_get_root(), _reg_abs(callobj_reg_index).type, 0)) {
         // whatever the callobj is, it's not a callable type
         if (!symbol->is<fn_csym>()) {
-            _compile_error(
-                deref_assert(_args_node_to_expr_node_map.at(x->id)),
+            _er.error(
+                deref_assert(x->expr.lock()),
                 dsignal::compile_invalid_operation,
                 "cannot call non-callable type {}!",
                 _reg(callobj_reg_index).type);
@@ -589,8 +576,8 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         const auto& info = symbol->as<fn_csym>();
         // check that arg count is correct
         if (arg_count != info.params.size()) {
-            _compile_error(
-                deref_assert(_args_node_to_expr_node_map.at(x->id)),
+            _er.error(
+                deref_assert(x->expr.lock()),
                 dsignal::compile_wrong_arg_count,
                 "call to {} given {} args, but expected {}!",
                 _reg(callobj_reg_index).type, arg_count, info.params.size());
@@ -602,7 +589,7 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
             const auto arg_reg_index = callobj_reg_index + i + 1;
             const auto arg_number = i + 1;
             if (!_reg_type_check(arg_reg_index, info.params[i].type.value())) {
-                _compile_error(
+                _er.error(
                     *x->args[i],
                     dsignal::compile_type_mismatch,
                     "arg {0} expr is type {1}, but expected {2}!",
@@ -613,7 +600,7 @@ void yama::internal::second_pass::visit_end(res<ast_Args> x) {
         if (!args_are_correct_types) { // don't return until we've type checked ALL args
             return; // abort
         }
-        const taul::source_pos expr_pos = deref_assert(_args_node_to_expr_node_map.at(x->id)).low_pos();
+        const taul::source_pos expr_pos = deref_assert(x->expr.lock()).low_pos();
         // return value should overwrite callobj
         const size_t return_value_reg_index = callobj_reg_index;
         // write the call instr
@@ -681,13 +668,13 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
         }
         else {
             if (label_not_found) { // if this, then the compiler is broken
-                _compile_error(
+                _er.error(
                     x,
                     dsignal::compile_impl_internal,
                     "internal error; label_not_found == true!");
             }
             else { // exceeded branch dist limit
-                _compile_error(
+                _er.error(
                     x,
                     dsignal::compile_impl_limits,
                     "fn {} contains branch which exceeds max branch offset limits!",
@@ -870,7 +857,7 @@ yama::internal::second_pass::_scope_t& yama::internal::second_pass::_top_scope()
 
 void yama::internal::second_pass::_push_temp(const ast_node& x, str type) {
     if (_regs() >= _reg_limit) { // register count exceeds impl limit
-        _compile_error(
+        _er.error(
             x,
             dsignal::compile_impl_limits,
             "fn {} contains parts requiring >{} registers to store all temporaries and local vars, exceeding limit!",
@@ -980,22 +967,6 @@ void yama::internal::second_pass::_promote_to_localvar(ast_VarDecl& x) {
 
 bool yama::internal::second_pass::_reg_type_check(ssize_t index, str expected) {
     return _reg(index).type == expected;
-}
-
-void yama::internal::second_pass::_mark_as_fn_body_block(const ast_Block& x) {
-    _fn_body_blocks.insert(x.id);
-}
-
-bool yama::internal::second_pass::_is_fn_body_block(const ast_Block& x) const noexcept {
-    return _fn_body_blocks.contains(x.id);
-}
-
-void yama::internal::second_pass::_mark_as_assign_stmt_lvalue(const ast_Expr& x) {
-    _assign_stmt_lvalue_exprs.insert(x.id);
-}
-
-bool yama::internal::second_pass::_is_assign_stmt_lvalue(const ast_Expr& x) const noexcept {
-    return _assign_stmt_lvalue_exprs.contains(x.id);
 }
 
 bool yama::internal::second_pass::_in_if_stmt() const noexcept {

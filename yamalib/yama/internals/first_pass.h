@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "csymtab.h"
 #include "csymtab_group_ctti.h"
+#include "error_reporter.h"
 #include "cfg_analyzer.h"
 
 
@@ -57,7 +58,7 @@ namespace yama::internal {
 
 
         // returns if the pass succeeded
-        inline bool good() const noexcept { return !err; }
+        inline bool good() const noexcept { return !_er.is_fatal(); }
 
 
         void visit_begin(res<ast_Chunk> x) override final;
@@ -134,22 +135,7 @@ namespace yama::internal {
         csymtab_group_ctti& _get_csymtabs() const noexcept;
 
 
-        // err indicates if the compilation has encountered a fatal error
-
-        bool err = false;
-
-        inline void _fatal() {
-            err = true;
-        }
-
-        // helper for raising compile-time error msgs
-
-        template<typename... Args>
-        inline void _compile_error(
-            const ast_node& where,
-            dsignal dsig,
-            std::format_string<Args...> fmt,
-            Args&&... args);
+        error_reporter _er;
 
 
         // this handles control-flow analysis for us, including providing info
@@ -194,32 +180,9 @@ namespace yama::internal {
         bool _import_dirs_are_legal() const noexcept;
 
 
-        // this set is used to record the body blocks of fn decls
-
-        std::unordered_set<ast_id_t> _fn_body_blocks;
-
-        void _mark_as_fn_body_block(const ast_Block& x);
-        bool _is_fn_body_block(const ast_Block& x) const noexcept;
-
-
         // returns if x either has no return type annot, or its return type is None
 
         bool _fn_decl_return_type_is_none(const ast_FnDecl& x);
     };
-
-    template<typename... Args>
-    inline void first_pass::_compile_error(
-        const ast_node& where,
-        dsignal dsig,
-        std::format_string<Args...> fmt,
-        Args&&... args) {
-        YAMA_RAISE(_dbg, dsig);
-        YAMA_LOG(
-            _dbg, compile_error_c,
-            "error: {} {}",
-            _get_src().location_at(where.low_pos()),
-            std::format(fmt, std::forward<Args&&>(args)...));
-        _fatal();
-    }
 }
 

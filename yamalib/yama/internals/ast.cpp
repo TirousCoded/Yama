@@ -298,6 +298,7 @@ void yama::internal::ast_FnDecl::do_give(res<ast_CallSig> x) {
 
 void yama::internal::ast_FnDecl::do_give(res<ast_Block> x) {
     block = x;
+    x->is_fn_body_block = true;
 }
 
 void yama::internal::ast_CallSig::fmt(ast_formatter& x) {
@@ -490,6 +491,9 @@ void yama::internal::ast_ExprStmt::do_give(res<ast_Expr> x) {
 
 void yama::internal::ast_ExprStmt::do_give(res<ast_Assign> x) {
     assign = x;
+    if (expr) {
+        expr->is_assign_stmt_lvalue = true;
+    }
 }
 
 std::shared_ptr<yama::internal::ast_node> yama::internal::ast_IfStmt::get_else_block_or_stmt() const noexcept {
@@ -640,6 +644,7 @@ void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
 
 void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
     args.push_back(x);
+    x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
 }
 
 void yama::internal::ast_PrimaryExpr::fmt(ast_formatter& x) {

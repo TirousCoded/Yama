@@ -45,7 +45,7 @@ namespace yama::internal {
 
 
         // returns if the pass succeeded
-        inline bool good() const noexcept { return !err; }
+        inline bool good() const noexcept { return !_er.is_fatal(); }
 
 
         //void visit_begin(res<ast_Chunk> x) override final;
@@ -59,7 +59,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_Result> x) override final;
         void visit_begin(res<ast_Block> x) override final;
         //void visit_begin(res<ast_Stmt> x) override final;
-        void visit_begin(res<ast_ExprStmt> x) override final;
+        //void visit_begin(res<ast_ExprStmt> x) override final;
         void visit_begin(res<ast_IfStmt> x) override final;
         void visit_begin(res<ast_LoopStmt> x) override final;
         //void visit_begin(res<ast_BreakStmt> x) override final;
@@ -113,34 +113,19 @@ namespace yama::internal {
         std::shared_ptr<debug> _dbg;
         res<compiler_services> _services;
         const import_path _src_import_path;
+
         ast_Chunk* _root;
         const taul::source_code* _src;
         csymtab_group_ctti* _csymtabs;
-
 
         ast_Chunk& _get_root() const noexcept;
         const taul::source_code& _get_src() const noexcept;
         csymtab_group_ctti& _get_csymtabs() const noexcept;
 
 
-        // err indicates if the compilation has encountered a fatal error
+        // if fatal error, the compilation is not to perform further code gen
 
-        // if so, the compilation is not to perform any further code gen
-
-        bool err = false;
-
-        inline void _fatal() {
-            err = true;
-        }
-
-        // helper for raising compile-time error msgs
-
-        template<typename... Args>
-        inline void _compile_error(
-            const ast_node& where,
-            dsignal dsig,
-            std::format_string<Args...> fmt,
-            Args&&... args);
+        error_reporter _er;
 
 
         // TODO: at present, ALL custom types are fn types
@@ -214,16 +199,6 @@ namespace yama::internal {
         // _add_sym expects to be called AFTER the cw.add_# method call
 
         void _add_sym(taul::source_pos pos);
-
-
-        // TODO: _args_node_to_expr_node_map is super rough, and there's probably a
-        //       more *elegant* way of doing what it exists to do
-
-        // this maps Args AST node IDs to the Expr AST node which corresponds to them,
-        // w/ this info being used for _add_sym, and deciding the src pos for
-        // compile errors
-
-        std::unordered_map<ast_id_t, const ast_Expr*> _args_node_to_expr_node_map;
 
 
         // as the AST is traversed, an oprand stack-like 'register stack' is used to
@@ -307,24 +282,6 @@ namespace yama::internal {
         bool _reg_type_check(ssize_t index, str expected); // allows negative indices, like _reg
 
 
-        // this set is used to record the body blocks of fn decls
-
-        std::unordered_set<ast_id_t> _fn_body_blocks;
-
-        void _mark_as_fn_body_block(const ast_Block& x);
-        bool _is_fn_body_block(const ast_Block& x) const noexcept;
-
-
-        // this set is used to record the 'lvalue' exprs of assignment stmts, in order to
-        // signal to them not to be evaluated as normal, as right now all the lvalue portion
-        // does is specify a local var to assign to
-
-        std::unordered_set<ast_id_t> _assign_stmt_lvalue_exprs;
-
-        void _mark_as_assign_stmt_lvalue(const ast_Expr& x);
-        bool _is_assign_stmt_lvalue(const ast_Expr& x) const noexcept;
-
-
         // for ast_Expr and ast_Args which comprise the 'lvalue' expr of assignment stmts,
         // the below suppress counter is used to let the outer-most ast_Expr signal to the
         // ast_Expr(s) and ast_Args(s) nested within it to skip eval
@@ -368,21 +325,6 @@ namespace yama::internal {
         void _push_loop_stmt(const ast_LoopStmt& x);
         void _pop_loop_stmt();
     };
-
-    template<typename... Args>
-    inline void second_pass::_compile_error(
-        const ast_node& where,
-        dsignal dsig,
-        std::format_string<Args...> fmt,
-        Args&&... args) {
-        YAMA_RAISE(_dbg, dsig);
-        YAMA_LOG(
-            _dbg, compile_error_c,
-            "error: {} {}",
-            _get_src().location_at(where.low_pos()),
-            std::format(fmt, std::forward<Args&&>(args)...));
-        _fatal();
-    }
 
     template<const_type C>
     inline std::optional<const_t> second_pass::_find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept {
