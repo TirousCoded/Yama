@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "ast.h"
+#include "ctypesys.h"
 
 
 namespace yama::internal {
@@ -19,8 +20,9 @@ namespace yama::internal {
         //
     };
     struct var_csym final {
-        std::optional<str> type;
-        std::optional<size_t> reg; // register index of local var (resolved in second pass)
+        const ast_TypeSpec* annot_type; // type specified by annotation, if any
+        std::optional<ctype> deduced_type; // type deduced from initializer, if any (resolved in second_pass)
+        std::optional<size_t> reg; // register index of local var (resolved in second_pass)
 
 
         // var_csym is recognized as a 'local var symbol' only once reg has been assigned
@@ -30,54 +32,69 @@ namespace yama::internal {
     struct fn_csym final {
         struct param final {
             str name;
-            std::optional<str> type;
+            const ast_TypeSpec* type;
         };
 
 
         std::vector<param> params;
-        std::optional<str> return_type;
+        const ast_TypeSpec* return_type;
 
         // if all control paths (reachable from entrypoint) either reach explicit return
         // stmts, or enter infinite loops
+
         std::optional<bool> all_paths_return_or_loop;
 
+        // if fn is None returning
 
-        std::string fmt_params() const;
+        std::optional<bool> is_none_returning;
+
+
+        std::string fmt_params(const taul::source_code& src) const;
     };
     struct param_csym final {
-        std::optional<str> type;
+        const ast_TypeSpec* type;
+    };
+
+    struct csymtab_entry final {
+        using info_t = std::variant<
+            prim_csym,
+            var_csym,
+            fn_csym,
+            param_csym
+        >;
+
+
+        str                         name;
+        std::shared_ptr<ast_node>   node; // the node corresponding to this entry's declaration, if any
+        taul::source_pos            starts; // where in src scope begins (continuing until end of block), should be 0 if has global scope
+        info_t                      info;
+
+
+        template<typename Info>
+        inline bool is() const noexcept {
+            return std::holds_alternative<Info>(info);
+        }
+        template<typename Info>
+        inline Info& as() noexcept {
+            YAMA_ASSERT(is<Info>());
+            return std::get<Info>(info);
+        }
+
+
+        inline bool is_type() const noexcept {
+            static_assert(std::variant_size_v<info_t> == 4); // reminder
+            return
+                is<prim_csym>() ||
+                is<fn_csym>();
+        }
+
+
+        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
     };
 
     // csymtab defines Yama's internal repr for a symbol table
     class csymtab final {
     public:
-        struct entry final {
-            using info_t = std::variant<
-                prim_csym,
-                var_csym,
-                fn_csym,
-                param_csym
-            >;
-
-
-            str                         name;
-            std::shared_ptr<ast_node>   node; // the node corresponding to this entry's declaration, if any
-            taul::source_pos            starts; // where in src scope begins (continuing until end of block), should be 0 if has global scope
-            info_t                      info;
-
-
-            template<typename Info>
-            inline bool is() const noexcept {
-                return std::holds_alternative<Info>(info);
-            }
-            template<typename Info>
-            inline Info& as() noexcept {
-                YAMA_ASSERT(is<Info>());
-                return std::get<Info>(info);
-            }
-
-            std::string fmt(size_t tabs = 0, const char* tab = "    ");
-        };
 
 
         csymtab() = default;
@@ -93,29 +110,29 @@ namespace yama::internal {
             if (_entries.contains(name)) {
                 return false;
             }
-            auto new_entry = entry{
+            auto new_entry = csymtab_entry{
                 .name = name,
                 .node = node,
                 .starts = starts,
                 .info = std::forward<Info>(info),
             };
-            _entries.try_emplace(name, make_res<entry>(std::move(new_entry)));
+            _entries.try_emplace(name, make_res<csymtab_entry>(std::move(new_entry)));
             return true;
         }
 
-        inline std::shared_ptr<entry> fetch(const str& name) const noexcept {
+        inline std::shared_ptr<csymtab_entry> fetch(const str& name) const noexcept {
             const auto it = _entries.find(name);
             return
                 it != _entries.end()
-                ? std::shared_ptr<entry>(it->second)
+                ? std::shared_ptr<csymtab_entry>(it->second)
                 : nullptr;
         }
 
-        std::string fmt(size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
 
 
     private:
-        std::unordered_map<str, res<entry>> _entries;
+        std::unordered_map<str, res<csymtab_entry>> _entries;
     };
 
     // csymtab_group maps Chunk/Block AST nodes (by ID) to corresponding csymtab(s)
@@ -169,7 +186,7 @@ namespace yama::internal {
         // from the symbol table of x, if any, and propagating to upstream symbol tables
         // of ancestor AST nodes of x (note how these rules let x be nodes w/out symbol tables),
         // w/ symbols which haven't entered scope by src_pos not being visible
-        inline std::shared_ptr<csymtab::entry> lookup(ast_node& x, const str& name, taul::source_pos src_pos) const noexcept {
+        inline std::shared_ptr<csymtab_entry> lookup(const ast_node& x, const str& name, taul::source_pos src_pos) const noexcept {
             // IMPORTANT: we CAN'T use node_of_inner_most here, as we care about visibility throughout all csymtabs relative to x
             // below code will recursively skip past interim parent nodes w/out symbol tables
             if (const auto table = get(x.id)) {
@@ -204,7 +221,7 @@ namespace yama::internal {
             return false;
         }
 
-        std::string fmt(size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
 
 
     private:

@@ -2,6 +2,8 @@
 
 #include "first_pass.h"
 
+#include "compiler.h"
+
 
 using namespace yama::string_literals;
 
@@ -9,68 +11,38 @@ using namespace yama::string_literals;
 yama::internal::first_pass::first_pass(
     std::shared_ptr<debug> dbg,
     res<compiler_services> services,
+    const import_path& src_import_path,
     ast_Chunk& root,
     const taul::source_code& src,
-    csymtab_group_ctti& csymtabs)
+    specifier_provider& sp,
+    error_reporter& er,
+    csymtab_group& csymtabs,
+    ctypesys_local& ctypesys,
+    ctype_resolver& ctype_resolver)
     : _dbg(dbg),
     _services(services),
+    _src_import_path(src_import_path),
     _root(&root),
     _src(&src),
+    _sp(&sp),
+    _er(&er),
     _csymtabs(&csymtabs),
-    _er(dbg, src),
+    _ctypesys(&ctypesys),
+    _ctype_resolver(&ctype_resolver),
     _cfg() {}
 
 void yama::internal::first_pass::visit_begin(res<ast_Chunk> x) {
     _add_csymtab(x);
+    _get_ctypesys().register_module(_src_import_path, res(_get_csymtabs().get(x->id)), _get_e());
     _implicitly_import_yama_module();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ImportDir> x) {
-    if (_import_dirs_are_legal()) {
-        const str import_path_s = str(x->path(_get_src()).value());
-        const auto import_path = import_path::parse(_services->env(), import_path_s);
-        if (!import_path) {
-            _er.error(
-                *x,
-                dsignal::compile_invalid_import,
-                "cannot import {}!",
-                import_path_s);
-            return; // abort
-        }
-        const bool valid_import = _get_csymtabs().add_import(deref_assert(import_path));
-        if (!valid_import) {
-            _er.error(
-                *x,
-                dsignal::compile_invalid_import,
-                "cannot import {}!",
-                import_path_s);
-        }
-    }
-    else {
-        if (_is_in_fn()) {
-            _er.error(
-                *x,
-                dsignal::compile_misplaced_import,
-                "illegal local import!");
-        }
-        else {
-            _er.error(
-                *x,
-                dsignal::compile_misplaced_import,
-                "illegal import appearing after first type decl!");
-        }
-    }
+    _explicitly_import_module(x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_VarDecl> x) {
-    const auto name = x->name.str(_get_src());
-    if (!_is_in_fn()) {
-        _er.error(
-            *x,
-            dsignal::compile_nonlocal_var,
-            "illegal non-local var {}!",
-            name);
-    }
+    _check_var_is_local(x);
     _insert_vardecl(x);
 }
 
@@ -83,9 +55,8 @@ void yama::internal::first_pass::visit_begin(res<ast_ParamDecl> x) {
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_Block> x) {
-    if (!x->is_fn_body_block) { // suppress if we're the body block of a fn (see visit_begin for ast_FnDecl above)
-        _add_csymtab(x);
-    }
+    // only if NOT the body block of a fn (otherwise fn handles this)
+    if (!x->is_fn_body_block) _add_csymtab(x);
     _cfg.begin_block();
 }
 
@@ -98,27 +69,25 @@ void yama::internal::first_pass::visit_begin(res<ast_LoopStmt> x) {
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_BreakStmt> x) {
-    if (!_cfg.is_in_loop()) { // illegal break stmt if not directly/indirectly in loop stmt block
-        _er.error(
-            *x,
-            dsignal::compile_not_in_loop,
-            "cannot use break outside of a loop stmt!");
-    }
+    _check_break_is_in_loop_stmt(x);
     _cfg.break_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ContinueStmt> x) {
-    if (!_cfg.is_in_loop()) { // illegal continue stmt if not directly/indirectly in loop stmt block
-        _er.error(
-            *x,
-            dsignal::compile_not_in_loop,
-            "cannot use continue outside of a loop stmt!");
-    }
+    _check_continue_is_in_loop_stmt(x);
     _cfg.continue_stmt();
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ReturnStmt> x) {
     _cfg.return_stmt();
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_PrimaryExpr> x) {
+    _get_ctype_resolver().add(*x);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_TypeSpec> x) {
+    _get_ctype_resolver().add(*x);
 }
 
 void yama::internal::first_pass::visit_end(res<ast_FnDecl> x) {
@@ -145,8 +114,28 @@ const taul::source_code& yama::internal::first_pass::_get_src() const noexcept {
     return yama::deref_assert(_src);
 }
 
-yama::internal::csymtab_group_ctti& yama::internal::first_pass::_get_csymtabs() const noexcept {
+yama::internal::specifier_provider& yama::internal::first_pass::_get_sp() const noexcept {
+    return deref_assert(_sp);
+}
+
+yama::internal::error_reporter& yama::internal::first_pass::_get_er() const noexcept {
+    return deref_assert(_er);
+}
+
+yama::internal::csymtab_group& yama::internal::first_pass::_get_csymtabs() const noexcept {
     return deref_assert(_csymtabs);
+}
+
+yama::internal::ctypesys_local& yama::internal::first_pass::_get_ctypesys() const noexcept {
+    return deref_assert(_ctypesys);
+}
+
+yama::internal::ctype_resolver& yama::internal::first_pass::_get_ctype_resolver() const noexcept {
+    return deref_assert(_ctype_resolver);
+}
+
+yama::internal::env yama::internal::first_pass::_get_e() const {
+    return _services->env();
 }
 
 void yama::internal::first_pass::_add_csymtab(res<ast_node> x) {
@@ -154,20 +143,62 @@ void yama::internal::first_pass::_add_csymtab(res<ast_node> x) {
 }
 
 void yama::internal::first_pass::_implicitly_import_yama_module() {
-    const auto import_path = import_path::parse(_services->env(), "yama"_str);
+    YAMA_ASSERT(_import_dirs_are_legal());
+    const auto import_path = _get_sp().pull_ip(_get_e(), "yama"_str);
     if (!import_path) {
-        _er.error(
+        _get_er().error(
             _get_root(),
             dsignal::compile_invalid_env,
             "compilation env has no available 'yama' module!");
         return; // abort
     }
-    const bool valid_import = _get_csymtabs().add_import(deref_assert(import_path));
-    if (!valid_import) {
-        _er.error(
+    if (_get_ctypesys().import(import_path.value())) {
+        _get_ctypesys().add_import(import_path.value());
+    }
+    else {
+        _get_er().error(
             _get_root(),
             dsignal::compile_invalid_env,
             "compilation env has no available 'yama' module!");
+    }
+}
+
+void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportDir>& x) {
+    if (_import_dirs_are_legal()) {
+        const str import_path_s = str(x->path(_get_src()).value());
+        const auto import_path = _get_sp().pull_ip(_get_e(), import_path_s);
+        if (!import_path) {
+            _get_er().error(
+                *x,
+                dsignal::compile_invalid_import,
+                "cannot import {}!",
+                import_path_s);
+            return; // abort
+        }
+        if (_get_ctypesys().import(import_path.value())) {
+            _get_ctypesys().add_import(import_path.value());
+        }
+        else {
+            _get_er().error(
+                *x,
+                dsignal::compile_invalid_import,
+                "cannot import {}!",
+                import_path_s);
+        }
+    }
+    else {
+        if (_is_in_fn()) {
+            _get_er().error(
+                *x,
+                dsignal::compile_misplaced_import,
+                "illegal local import!");
+        }
+        else {
+            _get_er().error(
+                *x,
+                dsignal::compile_misplaced_import,
+                "illegal import appearing after first type decl!");
+        }
     }
 }
 
@@ -176,8 +207,7 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
     // prepare symbol
     var_csym sym{};
     if (x->type) { // get annotated type, if any
-        const auto unqualified_name = x->type->type->type.str(_get_src());
-        sym.type = _get_csymtabs().ensure_qualified(unqualified_name);
+        sym.annot_type = x->type->type.get();
     }
     // insert symbol
     bool no_table_found = false;
@@ -190,7 +220,7 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -203,13 +233,12 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
     // prepare symbol
     fn_csym sym{};
     if (x->callsig->result) {
-        const auto return_type_unqualified_name = x->callsig->result->type->type.str(_get_src());
-        sym.return_type = _get_csymtabs().ensure_qualified(return_type_unqualified_name);
+        sym.return_type = x->callsig->result->type.get();
     }
     for (const auto& I : x->callsig->params) {
         sym.params.push_back(fn_csym::param{
             .name = I->name.str(_get_src()),
-            .type = std::nullopt, // <- will be filled in below
+            .type = nullptr, // <- will be filled in below
             });
     }
     // given some form like 'a: Int, b, c: Char', the below iterates backwards over
@@ -228,8 +257,7 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
             annot = in->type; // encountered new type annot
         }
         if (annot) { // output type info from last encountered type annot
-            const auto param_type_unqualified_name = annot->type->type.str(_get_src());
-            out.type = _get_csymtabs().ensure_qualified(param_type_unqualified_name);
+            out.type = annot->type.get();
         }
     }
     // insert symbol
@@ -243,7 +271,7 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -254,17 +282,17 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
 
 void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     const auto name = x->name.str(_get_src());
-    const auto our_fn_return_type =
+    const auto our_param_type =
         _is_in_fn() && _current_fn().symbol
         ? _current_fn().symbol->as<fn_csym>().params[_current_fn().next_param_index()].type
-        : std::nullopt;
+        : nullptr;
     // prepare symbol
     param_csym sym{
-        .type = our_fn_return_type,
+        .type = our_param_type,
     };
     // report if no type annotation
     if (!sym.type) {
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_invalid_param_list,
             "param {} has no type annotation!",
@@ -281,7 +309,7 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -302,14 +330,14 @@ yama::internal::first_pass::_fn_decl& yama::internal::first_pass::_current_fn() 
 void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
     const auto name = x->name.str(_get_src());
     if (_is_in_fn()) {
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_local_fn,
             "illegal local fn {}!",
             name);
     }
     if (x->callsig->params.size() > 24) {
-        _er.error(
+        _get_er().error(
             *x,
             dsignal::compile_invalid_param_list,
             "illegal fn {} with >24 params!",
@@ -325,28 +353,15 @@ void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
     _fn_decl details{
         .node = x,
         // if name conflict arose, then should be nullptr
-        .symbol = no_name_conflict ? _get_csymtabs().lookup(_get_root(), x->name.str(_get_src()), 0) : nullptr,
+        .symbol = no_name_conflict ? _get_csymtabs().lookup(_get_root(), name, 0) : nullptr,
     };
     _fn_decl_stk.push_back(std::move(details));
 }
 
 void yama::internal::first_pass::_end_fn() {
-    const auto& nd = *_current_fn().node;
-    const auto name = nd.name.str(_get_src());
-    const bool all_paths_have_explicit_returns_or_infinite_loops = _cfg.check_fn();
     // propagate above to symbol (+ fail quietly if no symbol due to compiling code being in error)
-    if (const auto symbol = _current_fn().symbol) {
-        symbol->as<fn_csym>().all_paths_return_or_loop = all_paths_have_explicit_returns_or_infinite_loops;
-    }
-    const bool requires_explicit_returns = !_fn_decl_return_type_is_none(nd);
-    // if type annot, and type annot is not None, then control-flow error
-    // if not all control paths have explicit return stmt (or infinite loop)
-    if (requires_explicit_returns && !all_paths_have_explicit_returns_or_infinite_loops) {
-        _er.error(
-            nd,
-            dsignal::compile_no_return_stmt,
-            "for {}, not all control paths end with a return stmt!",
-            name);
+    if (const auto& symbol = _current_fn().symbol) {
+        symbol->as<fn_csym>().all_paths_return_or_loop = _cfg.check_fn();
     }
     _cfg.end_fn();
 }
@@ -359,9 +374,28 @@ bool yama::internal::first_pass::_import_dirs_are_legal() const noexcept {
     return !_reached_first_type_decl;
 }
 
-bool yama::internal::first_pass::_fn_decl_return_type_is_none(const ast_FnDecl& x) {
-    return
-        !x.callsig->result || // either no type annot
-        x.callsig->result->type->type.str(_get_src()) == "None"_str; // or type annot is 'None'
+void yama::internal::first_pass::_check_var_is_local(res<ast_VarDecl> x) {
+    if (_is_in_fn()) return;
+    _get_er().error(
+        *x,
+        dsignal::compile_nonlocal_var,
+        "illegal non-local var {}!",
+        x->name.str(_get_src()));
+}
+
+void yama::internal::first_pass::_check_break_is_in_loop_stmt(const res<ast_BreakStmt>& x) {
+    if (_cfg.is_in_loop()) return;
+    _get_er().error(
+        *x,
+        dsignal::compile_not_in_loop,
+        "cannot use break outside of a loop stmt!");
+}
+
+void yama::internal::first_pass::_check_continue_is_in_loop_stmt(const res<ast_ContinueStmt>& x) {
+    if (_cfg.is_in_loop()) return;
+    _get_er().error(
+        *x,
+        dsignal::compile_not_in_loop,
+        "cannot use continue outside of a loop stmt!");
 }
 

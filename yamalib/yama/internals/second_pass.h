@@ -5,16 +5,20 @@
 
 #include <unordered_set>
 
+#include "../core/debug.h"
+
 #include "ast.h"
 #include "csymtab.h"
-#include "csymtab_group_ctti.h"
+#include "ctypesys.h"
+#include "ctype_resolver.h"
+#include "const_table_populator.h"
 #include "first_pass.h"
-
-#include "../core/debug.h"
-#include "../core/domain.h"
 
 
 namespace yama::internal {
+
+
+    class compiler_services;
 
 
     // IMPORTANT:
@@ -31,7 +35,6 @@ namespace yama::internal {
 
     class second_pass final : public ast_visitor {
     public:
-
         module_factory results; // result of code gen
 
 
@@ -41,14 +44,18 @@ namespace yama::internal {
             const import_path& src_import_path,
             ast_Chunk& root,
             const taul::source_code& src,
-            csymtab_group_ctti& csymtabs);
+            specifier_provider& sp,
+            error_reporter& er,
+            csymtab_group& csymtabs,
+            ctypesys_local& ctypesys,
+            ctype_resolver& ctype_resolver);
 
 
         // returns if the pass succeeded
-        inline bool good() const noexcept { return !_er.is_fatal(); }
+        inline bool good() const noexcept { return !_get_er().is_fatal(); }
 
 
-        //void visit_begin(res<ast_Chunk> x) override final;
+        void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_DeclOrDir> x) override final;
         //void visit_begin(res<ast_ImportDir> x) override final;
         //void visit_begin(res<ast_ImportPath> x) override final;
@@ -116,16 +123,27 @@ namespace yama::internal {
 
         ast_Chunk* _root;
         const taul::source_code* _src;
-        csymtab_group_ctti* _csymtabs;
+        specifier_provider* _sp;
+        error_reporter* _er;
+        csymtab_group* _csymtabs;
+        ctypesys_local* _ctypesys;
+        ctype_resolver* _ctype_resolver;
 
         ast_Chunk& _get_root() const noexcept;
         const taul::source_code& _get_src() const noexcept;
-        csymtab_group_ctti& _get_csymtabs() const noexcept;
+        specifier_provider& _get_sp() const noexcept;
+        error_reporter& _get_er() const noexcept;
+        csymtab_group& _get_csymtabs() const noexcept;
+        ctypesys_local& _get_ctypesys() const noexcept;
+        ctype_resolver& _get_ctype_resolver() const noexcept;
+
+        env _get_e() const;
 
 
-        // if fatal error, the compilation is not to perform further code gen
+        // IMPORTANT: if fatal error, the compilation is not to perform further code gen
 
-        error_reporter _er;
+
+        const_table_populator _ctp;
 
 
         // TODO: at present, ALL custom types are fn types
@@ -148,57 +166,17 @@ namespace yama::internal {
         std::optional<size_t> _target_param_index(const str& name);
 
 
-        // IMPORTANT: when refactoring/revising, remember that this constant table exists in
-        //            the same parcel env as the compilation, so it's super straightforward
-        //            to keep names correct
-
-        // these methods populate the current code gen target w/ constants, populating it in a
-        // pull-based manner, w/ these methods also doing things like trying to avoid having
-        // duplicates
-
-        // the method for type constants DO NOT check if said types actually exist (except for
-        // maybe asserts)
-
-        const_t _pull_int_c(int_t x);
-        const_t _pull_uint_c(uint_t x);
-        const_t _pull_float_c(float_t x); // not gonna try to avoid duplicates for floats, to avoid potential issues
-        const_t _pull_bool_c(bool_t x);
-        const_t _pull_char_c(char_t x);
-        const_t _pull_type_c(const str& name);
-
-        const_t _pull_prim_type_c(const str& name);
-        const_t _pull_fn_type_c(const str& name);
-
-        template<const_type C>
-        inline std::optional<const_t> _find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept;
-        callsig_info _build_callsig_for_fn_type(const str& name);
-
-
-        // when writing bcode, the below is used to gen code_writer label IDs
-
         using label_id_t = bc::code_writer::label_id_t;
 
         label_id_t _next_label = 0;
 
-        inline label_id_t _gen_label() noexcept {
-            _next_label++;
-            return _next_label - 1;
-        }
+        inline auto _gen_label() noexcept { return _next_label++; } // used to gen code_writer label IDs
 
 
-        // this is the code_writer used to write bcode, which'll get applied onto
-        // the current code gen target upon the fn decl's visit_end method call
-
-        bc::code_writer cw;
-
-
-        // this is the bcode symbols we're outputting
-
+        bc::code_writer cw; // gets applied onto current code gen target in fn decl's visit_end call
         bc::syms syms;
 
-        // _add_sym expects to be called AFTER the cw.add_# method call
-
-        void _add_sym(taul::source_pos pos);
+        void _add_sym(taul::source_pos pos); // call this AFTER cw.add_# method call
 
 
         // as the AST is traversed, an oprand stack-like 'register stack' is used to
@@ -210,7 +188,7 @@ namespace yama::internal {
         // the stack holds two types of registers: 'temporaries' and 'local vars'
 
         struct _reg_t final {
-            str                             type;               // the name of the type encapsulated by the register
+            ctype                           type;               // type encapsulated by the register
             std::optional<str>              localvar;           // name of the local var of this register (or std::nullopt if a temporary)
             size_t                          index       = 0;    // the stack index of this register
 
@@ -261,12 +239,12 @@ namespace yama::internal {
         //            lookup the local var, you'll get its entry even though it shouldn't be
         //            valid anymore
 
-        void _push_temp(const ast_node& x, str type);
+        void _push_temp(const ast_node& x, ctype type);
         void _pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos = 0);
 
         // _reinit_temp is used to change the type of existing temporaries/local vars
 
-        void _reinit_temp(ssize_t index, str new_type); // allows negative indices, like _reg
+        void _reinit_temp(ssize_t index, ctype new_type); // allows negative indices, like _reg
 
         void _push_scope();
         void _pop_scope(const ast_Block& x, bool write_pop_instr); // unwinds local vars
@@ -279,18 +257,17 @@ namespace yama::internal {
 
         // for type checking, the following is used to check the type expect of a register
 
-        bool _reg_type_check(ssize_t index, str expected); // allows negative indices, like _reg
+        bool _reg_type_check(ssize_t index, ctype expected); // allows negative indices, like _reg
 
 
-        // for ast_Expr and ast_Args which comprise the 'lvalue' expr of assignment stmts,
-        // the below suppress counter is used to let the outer-most ast_Expr signal to the
-        // ast_Expr(s) and ast_Args(s) nested within it to skip eval
+        // for ast_ExprStmt(s) w/ an assignment, the expr on the left-hand-size of this assignment
+        // is called the 'lvalue', and is special in that normal eval semantics don't apply to it
 
-        size_t _suppress = 0;
+        size_t _lvalue_scopes = 0;
 
-        inline bool _is_suppressed() const noexcept { return _suppress >= 1; }
-        inline void _push_suppress() { _suppress++; }
-        inline void _pop_suppress() { YAMA_ASSERT(_is_suppressed()); _suppress--; }
+        inline bool _is_in_lvalue() const noexcept { return _lvalue_scopes >= 1; }
+        inline void _push_lvalue() { _lvalue_scopes++; }
+        inline void _pop_lvalue() { YAMA_ASSERT(_is_in_lvalue()); _lvalue_scopes--; }
 
 
         struct _if_stmt_t final {
@@ -325,17 +302,5 @@ namespace yama::internal {
         void _push_loop_stmt(const ast_LoopStmt& x);
         void _pop_loop_stmt();
     };
-
-    template<const_type C>
-    inline std::optional<const_t> second_pass::_find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept {
-        for (const_t i = 0; i < consts.consts.size(); i++) {
-            if (const auto c = consts.get<C>(i)) {
-                if (c->v == x) {
-                    return i;
-                }
-            }
-        }
-        return std::nullopt;
-    }
 }
 

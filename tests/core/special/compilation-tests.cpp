@@ -23,7 +23,12 @@ public:
     bool ready = false; // if fixture setup correctly
 
 
-    std::optional<yama::module> perform_compile(const std::string& txt);
+    std::optional<yama::module> perform_compile(
+        const std::string& txt,
+        const std::string& txt_multi_a = "",
+        const std::string& txt_multi_b = "",
+        const std::string& txt_multi_c = "",
+        const std::string& txt_multi_d = "");
 
 
 protected:
@@ -376,13 +381,16 @@ namespace {
     public:
         std::optional<yama::parcel_metadata> md;
         std::string our_src;
+        std::string our_src_multi_a;
+        std::string our_src_multi_b;
+        std::string our_src_multi_c;
 
 
         test_parcel() = default;
 
 
         const yama::parcel_metadata& metadata() override final {
-            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str, "fns"_str, "fns2"_str } };
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str, "fns"_str, "fns2"_str, "other"_str } };
             return *md;
         }
         std::optional<yama::import_result> import(const yama::str& relative_path) override final {
@@ -390,6 +398,24 @@ namespace {
                 // return source code, invoking compiler
                 taul::source_code src{};
                 src.add_str("src"_str, yama::str(our_src));
+                return yama::import_result(std::move(src));
+            }
+            else if (relative_path == ".multi.a") {
+                // return source code, inducing multi-source compilation
+                taul::source_code src{};
+                src.add_str("src2"_str, yama::str(our_src_multi_a));
+                return yama::import_result(std::move(src));
+            }
+            else if (relative_path == ".multi.b") {
+                // return source code, inducing multi-source compilation
+                taul::source_code src{};
+                src.add_str("src3"_str, yama::str(our_src_multi_b));
+                return yama::import_result(std::move(src));
+            }
+            else if (relative_path == ".multi.c") {
+                // return source code, inducing multi-source compilation
+                taul::source_code src{};
+                src.add_str("src4"_str, yama::str(our_src_multi_c));
                 return yama::import_result(std::move(src));
             }
             // .abc exists to test importing a module which exists in same parcel as compiling module
@@ -401,6 +427,34 @@ namespace {
             else return std::nullopt;
         }
     };
+
+
+    // other_test_parcel exists to let us test multi-parcel multi-source compilation
+
+    class other_test_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::string our_src_multi_d;
+
+
+        other_test_parcel() = default;
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str, "fns"_str } };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& relative_path) override final {
+            if (relative_path == ".multi.d") {
+                // return source code, inducing multi-parcel multi-source compilation
+                taul::source_code src{};
+                src.add_str("src5"_str, yama::str(our_src_multi_d));
+                return yama::import_result(std::move(src));
+            }
+            else return std::nullopt;
+        }
+    };
+
 
 
     // this parcel is equiv to test_parcel, existing for a specific test case where the parcel itself
@@ -436,11 +490,21 @@ namespace {
     yama::res<fns_parcel> our_fns_parcel = yama::make_res<fns_parcel>();
     yama::res<fns_parcel> our_fns2_parcel = yama::make_res<fns_parcel>();
     yama::res<test_parcel> our_test_parcel = yama::make_res<test_parcel>();
+    yama::res<other_test_parcel> our_other_test_parcel = yama::make_res<other_test_parcel>();
 }
 
 
-std::optional<yama::module> CompilationTests::perform_compile(const std::string& txt) {
+std::optional<yama::module> CompilationTests::perform_compile(
+    const std::string& txt,
+    const std::string& txt_multi_a,
+    const std::string& txt_multi_b,
+    const std::string& txt_multi_c,
+    const std::string& txt_multi_d) {
     our_test_parcel->our_src = txt;
+    our_test_parcel->our_src_multi_a = txt_multi_a;
+    our_test_parcel->our_src_multi_b = txt_multi_b;
+    our_test_parcel->our_src_multi_c = txt_multi_c;
+    our_other_test_parcel->our_src_multi_d = txt_multi_d;
     return dm->import("a"_str);
 }
 
@@ -460,7 +524,11 @@ void CompilationTests::SetUp() {
         .install("a"_str, our_test_parcel)
         .map_dep("a"_str, "yama"_str, "yama"_str)
         .map_dep("a"_str, "fns"_str, "fns"_str)
-        .map_dep("a"_str, "fns2"_str, "fns2"_str);
+        .map_dep("a"_str, "fns2"_str, "fns2"_str)
+        .map_dep("a"_str, "other"_str, "other"_str)
+        .install("other"_str, our_other_test_parcel)
+        .map_dep("other"_str, "yama"_str, "yama"_str)
+        .map_dep("other"_str, "fns"_str, "fns"_str);
 
     ready = dm->install(std::move(ib));
 }
@@ -1086,6 +1154,7 @@ TEST_F(CompilationTests, General_Fail_InvalidParcelEnv_YamaModuleIsNotFromYamaPa
         .map_dep("bad"_str, "yama"_str, "helper"_str) // <- wrong!
         .map_dep("bad"_str, "fns"_str, "fns"_str)
         .map_dep("bad"_str, "fns2"_str, "fns2"_str)
+        .map_dep("bad"_str, "other"_str, "other"_str)
         .map_dep("helper"_str, "yama"_str, "yama"_str);
     ASSERT_TRUE(dm->install(std::move(ib)));
 
@@ -1145,6 +1214,11 @@ fn f() {}
 //      - import dirs may exist only in the global block
 //
 //      - import dirs may exist only prior to the first type decl
+// 
+//      - import dirs may induce multi-source compilation
+//
+//          - import dirs within these additional translation units may induce
+//            further multi-source compilation
 
 // explicit import dir, w/ module imported from dependency
 
@@ -1403,6 +1477,338 @@ fn f() -> Int {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// multi-source compilation
+
+TEST_F(CompilationTests, ImportDir_MultiSourceCompilation) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+
+fn f() {
+    aaa(); // self.multi.a:aaa
+    bbb(); // self.multi.b:bbb
+    ccc(); // self.multi.c:ccc
+}
+
+)";
+    
+    std::string txt_multi_a = R"(
+
+import fns.abc;
+
+fn aaa() {
+    observeChar('a');
+}
+
+)";
+    
+    std::string txt_multi_b = R"(
+
+import fns.abc;
+
+fn bbb() {
+    observeChar('b');
+}
+
+)";
+    
+    std::string txt_multi_c = R"(
+
+import fns.abc;
+
+fn ccc() {
+    observeChar('c');
+}
+
+)";
+
+    const auto result = perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'a');
+    expected.observe_char(U'b');
+    expected.observe_char(U'c');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// multi-source compilation where compiling modules added to compilation by import dirs
+// inducing their compilation in turn induce the compilation of yet more modules
+
+TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_IndirectCompilingModuleAddition) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.multi.a; // add new src to compilation
+
+fn f() {
+    aaa(); // self.multi.a:aaa
+}
+
+)";
+    
+    std::string txt_multi_a = R"(
+
+import self.multi.b; // add new src to compilation
+import fns.abc;
+
+fn aaa() {
+    observeChar('a');
+    bbb(); // self.multi.b:bbb
+}
+
+)";
+    
+    std::string txt_multi_b = R"(
+
+import self.multi.b; // add new src to compilation
+import fns.abc;
+
+fn bbb() {
+    observeChar('b');
+    ccc(); // self.multi.c:ccc
+}
+
+)";
+    
+    std::string txt_multi_c = R"(
+
+import fns.abc;
+
+fn ccc() {
+    observeChar('c');
+}
+
+)";
+
+    const auto result = perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'a');
+    expected.observe_char(U'b');
+    expected.observe_char(U'c');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// multi-parcel multi-source compilation
+
+TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_MultiParcel) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+import other.multi.d; // add new src to compilation (from another parcel!)
+
+fn f() {
+    aaa(); // self.multi.a:aaa
+    bbb(); // self.multi.b:bbb
+    ccc(); // self.multi.c:ccc
+    ddd(); // other.multi.d:ddd
+}
+
+)";
+
+    std::string txt_multi_a = R"(
+
+import fns.abc;
+
+fn aaa() {
+    observeChar('a');
+}
+
+)";
+
+    std::string txt_multi_b = R"(
+
+import fns.abc;
+
+fn bbb() {
+    observeChar('b');
+}
+
+)";
+
+    std::string txt_multi_c = R"(
+
+import fns.abc;
+
+fn ccc() {
+    observeChar('c');
+}
+
+)";
+    
+    std::string txt_multi_d = R"(
+
+import fns.abc;
+
+fn ddd() {
+    observeChar('d');
+}
+
+)";
+
+    const auto result = perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c, txt_multi_d);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'a');
+    expected.observe_char(U'b');
+    expected.observe_char(U'c');
+    expected.observe_char(U'd');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// multi-source compilation where dep graph cycles between compiling modules do not cause issues
+
+// remember that parcels aren't allowed to have dep graph cycles between them, so we need-not
+// worry about the notion of multi-parcel dep graph cycles
+
+TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_TolerateCompilingModuleDepGraphCycles) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+
+fn f() {
+    aaa(); // self.multi.a:aaa
+    bbb(); // self.multi.b:bbb
+    ccc(); // self.multi.c:ccc
+}
+
+)";
+
+    std::string txt_multi_a = R"(
+
+// will form dep graph cycles w/ other compiling modules
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+import fns.abc;
+
+fn get_b() -> Char {
+    return 'b';
+}
+
+fn aaa() {
+    observeChar(get_a()); // self.multi.c:get_a
+}
+
+)";
+
+    std::string txt_multi_b = R"(
+
+// will form dep graph cycles w/ other compiling modules
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+import fns.abc;
+
+fn get_c() -> Char {
+    return 'c';
+}
+
+fn bbb() {
+    observeChar(get_b()); // self.multi.a:get_b
+}
+
+)";
+
+    std::string txt_multi_c = R"(
+
+// will form dep graph cycles w/ other compiling modules
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+import fns.abc;
+
+fn get_a() -> Char {
+    return 'a';
+}
+
+fn ccc() {
+    observeChar(get_c()); // self.multi.b:get_c
+}
+
+)";
+
+    const auto result = perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'a');
+    expected.observe_char(U'b');
+    expected.observe_char(U'c');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // illegal to import non-existent module
 
 TEST_F(CompilationTests, ImportDir_Fail_ImportNonExistentModule) {
@@ -1481,6 +1887,72 @@ import fns.abc; // error! illegal after first type decl
     ASSERT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
+}
+
+// multi-source compilation failure (including w/ the error arising in another parcel!)
+
+TEST_F(CompilationTests, ImportDir_Fail_MultiSourceCompilationFailure) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.multi.a; // add new src to compilation
+import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
+import other.multi.d; // add new src to compilation (from another parcel!)
+
+fn f() {
+    aaa(); // self.multi.a:aaa
+    bbb(); // self.multi.b:bbb
+    ccc(); // self.multi.c:ccc
+    ddd(); // other.multi.d:ddd
+}
+
+)";
+
+    std::string txt_multi_a = R"(
+
+import fns.abc;
+
+fn aaa() {
+    observeChar('a');
+}
+
+)";
+
+    std::string txt_multi_b = R"(
+
+import fns.abc;
+
+fn bbb() {
+    observeChar('b');
+}
+
+)";
+
+    std::string txt_multi_c = R"(
+
+import fns.abc;
+
+fn ccc() {
+    observeChar('c');
+}
+
+)";
+
+    std::string txt_multi_d = R"(
+
+import fns.abc;
+
+fn ddd() {
+    unknown_fn(); // <- error! no fn named unknown_fn
+}
+
+)";
+
+    ASSERT_FALSE(perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c, txt_multi_d));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
 

@@ -6,16 +6,20 @@
 #include <unordered_set>
 
 #include "../core/debug.h"
-#include "../core/domain.h"
 
+#include "specifiers.h"
 #include "ast.h"
 #include "csymtab.h"
-#include "csymtab_group_ctti.h"
+#include "ctypesys.h"
+#include "ctype_resolver.h"
 #include "error_reporter.h"
 #include "cfg_analyzer.h"
 
 
 namespace yama::internal {
+
+
+    class compiler_services;
 
 
     // IMPORTANT:
@@ -42,23 +46,29 @@ namespace yama::internal {
     //          - detect fns w/ >24 params
     //          - detect break stmts used outside of loop stmt blocks
     //          - detect continue stmts used outside of loop stmt blocks
-    //          - detect fns w/ non-None return types w/ code w/ control paths which aren't punctuated
-    //            by return stmts, and which do not enter infinite loops
+    //          - detect fns w/ non-None return types containing control paths which aren't
+    //            punctuated by return stmts, and which do not enter infinite loops
+    //              * only control-flow analysis part is done here, w/ type info requiring part,
+    //                and error raising, being deferred to second_pass
 
 
     class first_pass final : public ast_visitor {
     public:
-
         first_pass(
             std::shared_ptr<debug> dbg,
             res<compiler_services> services,
+            const import_path& src_import_path,
             ast_Chunk& root,
             const taul::source_code& src,
-            csymtab_group_ctti& csymtabs);
+            specifier_provider& sp,
+            error_reporter& er,
+            csymtab_group& csymtabs,
+            ctypesys_local& ctypesys,
+            ctype_resolver& ctype_resolver);
 
 
         // returns if the pass succeeded
-        inline bool good() const noexcept { return !_er.is_fatal(); }
+        inline bool good() const noexcept { return !_get_er().is_fatal(); }
 
 
         void visit_begin(res<ast_Chunk> x) override final;
@@ -79,7 +89,7 @@ namespace yama::internal {
         void visit_begin(res<ast_ContinueStmt> x) override final;
         void visit_begin(res<ast_ReturnStmt> x) override final;
         //void visit_begin(res<ast_Expr> x) override final;
-        //void visit_begin(res<ast_PrimaryExpr> x) override final;
+        void visit_begin(res<ast_PrimaryExpr> x) override final;
         //void visit_begin(res<ast_Lit> x) override final;
         //void visit_begin(res<ast_IntLit> x) override final;
         //void visit_begin(res<ast_UIntLit> x) override final;
@@ -89,7 +99,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_Assign> x) override final;
         //void visit_begin(res<ast_Args> x) override final;
         //void visit_begin(res<ast_TypeAnnot> x) override final;
-        //void visit_begin(res<ast_TypeSpec> x) override final;
+        void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_DeclOrDir> x) override final;
@@ -125,17 +135,25 @@ namespace yama::internal {
     private:
         std::shared_ptr<debug> _dbg;
         res<compiler_services> _services;
+        import_path _src_import_path;
 
         ast_Chunk* _root;
         const taul::source_code* _src;
-        csymtab_group_ctti* _csymtabs;
+        specifier_provider* _sp;
+        error_reporter* _er;
+        csymtab_group* _csymtabs;
+        ctypesys_local* _ctypesys;
+        ctype_resolver* _ctype_resolver;
 
         ast_Chunk& _get_root() const noexcept;
         const taul::source_code& _get_src() const noexcept;
-        csymtab_group_ctti& _get_csymtabs() const noexcept;
+        specifier_provider& _get_sp() const noexcept;
+        error_reporter& _get_er() const noexcept;
+        csymtab_group& _get_csymtabs() const noexcept;
+        ctypesys_local& _get_ctypesys() const noexcept;
+        ctype_resolver& _get_ctype_resolver() const noexcept;
 
-
-        error_reporter _er;
+        env _get_e() const;
 
 
         // this handles control-flow analysis for us, including providing info
@@ -146,16 +164,18 @@ namespace yama::internal {
 
         void _add_csymtab(res<ast_node> x);
         void _implicitly_import_yama_module();
+        void _explicitly_import_module(const res<ast_ImportDir>& x);
         void _insert_vardecl(res<ast_VarDecl> x);
         bool _insert_fndecl(res<ast_FnDecl> x);
         void _insert_paramdecl(res<ast_ParamDecl> x);
 
 
         // this stack maintains what fn decl is currently being evaluated
+        // (it's a stack for later when we add lambda fns)
 
         struct _fn_decl final {
             res<ast_FnDecl> node;
-            std::shared_ptr<csymtab::entry> symbol; // nullptr if error
+            std::shared_ptr<csymtab_entry> symbol; // nullptr if error
             size_t param_index = 0; // used to help params discern their index
 
 
@@ -180,9 +200,9 @@ namespace yama::internal {
         bool _import_dirs_are_legal() const noexcept;
 
 
-        // returns if x either has no return type annot, or its return type is None
-
-        bool _fn_decl_return_type_is_none(const ast_FnDecl& x);
+        void _check_var_is_local(res<ast_VarDecl> x);
+        void _check_break_is_in_loop_stmt(const res<ast_BreakStmt>& x);
+        void _check_continue_is_in_loop_stmt(const res<ast_ContinueStmt>& x);
     };
 }
 

@@ -50,13 +50,33 @@ namespace yama::internal {
     std::optional<str> extract_head_name(const str& x);
 
 
-    // TODO: the below classes are all fairly 'fat', and we can likely GREATLY improve
-    //       them in terms of space efficiency
+    // TODO: specifier_provider exists for us to later add in caching to reduce heap usage
 
+    class specifier_provider final {
+    public:
+        specifier_provider() = default;
+
+
+        std::optional<import_path> pull_ip(const env& e, const yama::str& x, bool& head_was_bad);
+        std::optional<import_path> pull_ip(const env& e, const yama::str& x);
+        
+        std::optional<qualified_name> pull_qn(const env& e, const yama::str& x, bool& head_was_bad);
+        std::optional<qualified_name> pull_qn(const env& e, const yama::str& x);
+
+        std::optional<fullname> pull_f(const env& e, const yama::str& x, bool& head_was_bad);
+        std::optional<fullname> pull_f(const env& e, const yama::str& x);
+    };
+
+
+    // IMPORTANT: specifiers are intended ONLY for use within compiler, to help reduce
+    //            the complexity of dealing w/ names across different parcel envs
 
     // IMPORTANT: these 'specifiers' are intended to be *env agnostic*, meaning that they
     //            use parcel IDs rather than name identifiers to encode parcel association,
     //            w/ envs only being relevant upon parse/format
+
+    // TODO: the below classes are all fairly 'fat', and we can likely GREATLY improve
+    //       them in terms of space efficiency
 
 
     class import_path final {
@@ -105,6 +125,8 @@ namespace yama::internal {
 
     class qualified_name final {
     public:
+        qualified_name(internal::import_path ip, const str& uqn);
+
         qualified_name() = delete;
         qualified_name(const qualified_name&) = default;
         qualified_name(qualified_name&&) noexcept = default;
@@ -146,9 +168,6 @@ namespace yama::internal {
     private:
         yama::internal::import_path _import_path;
         yama::str _unqualified_name;
-
-
-        qualified_name(yama::internal::import_path&& import_path, yama::str&& unqualified_name);
     };
 
 
@@ -164,6 +183,8 @@ namespace yama::internal {
 
     class fullname final {
     public:
+        fullname(internal::qualified_name qn);
+
         fullname() = delete;
         fullname(const fullname&) = default;
         fullname(fullname&&) noexcept = default;
@@ -207,9 +228,6 @@ namespace yama::internal {
 
     private:
         yama::internal::qualified_name _qualified_name;
-
-
-        fullname(yama::internal::qualified_name&& qualified_name);
     };
 }
 

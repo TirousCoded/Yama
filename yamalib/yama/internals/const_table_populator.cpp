@@ -1,0 +1,131 @@
+
+
+#include "const_table_populator.h"
+
+#include "../core/general.h"
+
+#include "compiler.h"
+
+
+using namespace yama::string_literals;
+
+
+yama::internal::const_table_populator::const_table_populator(ctypesys_local& ctypesys)
+    : _ctypesys(&ctypesys) {}
+
+void yama::internal::const_table_populator::bind(yama::type_info& new_target, ast_Chunk& root) {
+    _root = &root;
+    _target = &new_target;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_int(int_t x) {
+    auto& _consts = _get_target().consts;
+    // first try and find existing constant
+    if (const auto found = _find_existing_c<int_const>(_consts, x)) {
+        return found.value();
+    }
+    // add new constant and return it
+    _consts.add_int(x);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_uint(uint_t x) {
+    auto& _consts = _get_target().consts;
+    // first try and find existing constant
+    if (const auto found = _find_existing_c<uint_const>(_consts, x)) {
+        return found.value();
+    }
+    // add new constant and return it
+    _consts.add_uint(x);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_float(float_t x) {
+    auto& _consts = _get_target().consts;
+    // NOTE: as stated, we're not gonna bother trying to compare floats to
+    //       avoid duplicates, as comparing floats is never consistent enough
+    //       to not potentially cause problems
+    _consts.add_float(x);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_bool(bool_t x) {
+    auto& _consts = _get_target().consts;
+    // first try and find existing constant
+    if (const auto found = _find_existing_c<bool_const>(_consts, x)) {
+        return found.value();
+    }
+    // add new constant and return it
+    _consts.add_bool(x);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_char(char_t x) {
+    auto& _consts = _get_target().consts;
+    // first try and find existing constant
+    if (const auto found = _find_existing_c<char_const>(_consts, x)) {
+        return found.value();
+    }
+    // add new constant and return it
+    _consts.add_char(x);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_type(const ctype& t) {
+    if (t.kind() == kind::primitive)        return pull_prim_type(t);
+    else if (t.kind() == kind::function)    return pull_fn_type(t);
+    else                                    YAMA_DEADEND;
+    return const_t{};
+}
+
+yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype& t) {
+    const auto qn = t.fullname().qualified_name().str(_get_ctypesys().services()->env());
+    auto& _consts = _get_target().consts;
+    // search for existing constant to use
+    for (const_t i = 0; i < _consts.consts.size(); i++) {
+        if (const auto ptr = _consts.get<yama::primitive_type_const>(i)) {
+            if (deref_assert(ptr).qualified_name != qn) continue;
+            return i;
+        }
+    }
+    // add new constant and return it
+    _consts.add_primitive_type(qn);
+    return _consts.consts.size() - 1;
+}
+
+yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t) {
+    const auto qn = t.fullname().qualified_name().str(_get_ctypesys().services()->env());
+    auto& _consts = _get_target().consts;
+    // search for existing constant to use
+    for (const_t i = 0; i < _consts.consts.size(); i++) {
+        if (const auto ptr = _consts.get<yama::function_type_const>(i)) {
+            if (deref_assert(ptr).qualified_name != qn) continue;
+            return i;
+        }
+    }
+    // IMPORTANT: in order to allow for fn type constants' callsigs to have cyclical dependence
+    //            w/ one another, we gonna first add a fn type constant w/ a *stub* callsig, then
+    //            we're gonna build its proper callsig (recursively pulling on other constants),
+    //            and then we're gonna *patch* our type constant w/ this new callsig
+    // add new constant
+    _consts.add_function_type(qn, callsig_info{}); // <- now available for reference
+    // get index of our type constant
+    const const_t our_index = _consts.consts.size() - 1;
+    // build our proper callsig
+    callsig_info proper_callsig = build_callsig_for_fn_type(t);
+    // patch proper_callsig onto our type constant
+    _consts._patch_function_type(our_index, std::move(proper_callsig));
+    return our_index; // return index of our type constant
+}
+
+yama::callsig_info yama::internal::const_table_populator::build_callsig_for_fn_type(const ctype& t) {
+    callsig_info result{};
+    // resolve parameter types
+    for (size_t i = 0; i < t.param_count(); i++) {
+        result.params.push_back(pull_type(t.param_type(i).value()));
+    }
+    // resolve return type
+    result.ret = pull_type(_get_ctypesys().default_none(t.return_type()));
+    return result;
+}
+

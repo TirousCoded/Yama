@@ -863,6 +863,10 @@ void yama::internal::ast_TypeAnnot::do_give(res<ast_TypeSpec> x) {
     type = x;
 }
 
+std::string yama::internal::ast_TypeSpec::fmt_type(const taul::source_code& src) const {
+    return type.str(src).fmt();
+}
+
 void yama::internal::ast_TypeSpec::fmt(ast_formatter& x) {
     x.open("TypeSpec", low_pos(), high_pos(), id);
     x.next("type", type);

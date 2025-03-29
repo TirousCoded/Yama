@@ -7,9 +7,6 @@
 #include "util.h"
 
 
-yama::internal::fullname::fullname(yama::internal::qualified_name&& qualified_name)
-    : _qualified_name(std::forward<yama::internal::qualified_name>(qualified_name)) {}
-
 std::optional<yama::internal::parsed_import_path> yama::internal::parse_import_path(const str& input) {
     auto [head, relative_path] = internal::split(input, '.', true);
     return parsed_import_path{
@@ -52,6 +49,30 @@ bool yama::internal::valid_fullname(const str& input) {
 std::optional<yama::str> yama::internal::extract_head_name(const str& x) {
     const auto [head, rest] = internal::split(x, ".:");
     return head;
+}
+
+std::optional<yama::internal::import_path> yama::internal::specifier_provider::pull_ip(const env& e, const yama::str& x, bool& head_was_bad) {
+    return import_path::parse(e, x, head_was_bad);
+}
+
+std::optional<yama::internal::import_path> yama::internal::specifier_provider::pull_ip(const env& e, const yama::str& x) {
+    return import_path::parse(e, x);
+}
+
+std::optional<yama::internal::qualified_name> yama::internal::specifier_provider::pull_qn(const env& e, const yama::str& x, bool& head_was_bad) {
+    return qualified_name::parse(e, x, head_was_bad);
+}
+
+std::optional<yama::internal::qualified_name> yama::internal::specifier_provider::pull_qn(const env& e, const yama::str& x) {
+    return qualified_name::parse(e, x);
+}
+
+std::optional<yama::internal::fullname> yama::internal::specifier_provider::pull_f(const env& e, const yama::str& x, bool& head_was_bad) {
+    return fullname::parse(e, x, head_was_bad);
+}
+
+std::optional<yama::internal::fullname> yama::internal::specifier_provider::pull_f(const env& e, const yama::str& x) {
+    return fullname::parse(e, x);
 }
 
 yama::parcel_id yama::internal::import_path::head() const noexcept {
@@ -113,6 +134,10 @@ yama::internal::import_path::import_path(parcel_id head, yama::str&& relative_pa
     : _head(head),
     _relative_path(std::forward<yama::str>(relative_path)) {}
 
+yama::internal::qualified_name::qualified_name(internal::import_path ip, const yama::str& uqn)
+    : _import_path(std::move(ip)),
+    _unqualified_name(uqn) {}
+
 const yama::internal::import_path& yama::internal::qualified_name::import_path() const noexcept {
     return _import_path;
 }
@@ -168,9 +193,8 @@ std::optional<yama::internal::qualified_name> yama::internal::qualified_name::pa
     return parse(e, x, head_was_bad);
 }
 
-yama::internal::qualified_name::qualified_name(yama::internal::import_path&& import_path, yama::str&& unqualified_name)
-    : _import_path(std::forward<yama::internal::import_path>(import_path)),
-    _unqualified_name(std::forward<yama::str>(unqualified_name)) {}
+yama::internal::fullname::fullname(internal::qualified_name qn)
+    : _qualified_name(std::move(qn)) {}
 
 const yama::internal::qualified_name& yama::internal::fullname::qualified_name() const noexcept {
     return _qualified_name;

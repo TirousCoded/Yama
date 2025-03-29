@@ -17,7 +17,7 @@ namespace yama {
 
 
     namespace internal {
-        class second_pass;
+        class const_table_populator;
     }
 
 
@@ -215,10 +215,10 @@ namespace yama {
 
 
     private:
-        friend class yama::internal::second_pass;
+        friend class yama::internal::const_table_populator;
 
 
-        // hacky little thing needed for second_pass
+        // hacky little thing needed for const_table_populator
 
         const_table_info& _patch_function_type(const_t x, callsig_info new_callsig);
     };

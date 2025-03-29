@@ -33,20 +33,28 @@ std::optional<yama::internal::compile_result> yama::internal::compiler::compile(
             src.location_at(*syntax_error));
         return std::nullopt;
     }
-    csymtab_group csymtabs{};
-    csymtab_group_ctti csymtabs_ctti(services, src_import_path, *ast.root, csymtabs);
+    specifier_provider our_sp{};
+    error_reporter our_er(dbg(), src);
+    csymtab_group our_csymtabs{};
+    ctype_resolver our_ctype_resolver(our_csymtabs, our_er, src);
+    ctypesys our_ctypesys(our_sp, services, our_ctype_resolver);
+    ctypesys_local our_ctypesys_local(our_ctypesys, src, src_import_path);
 #if _DUMP_LOG
     std::cerr << "-- first pass!\n";
 #endif
-    first_pass fp(dbg(), services, *ast.root, src, csymtabs_ctti);
+    first_pass fp(dbg(), services, src_import_path, *ast.root, src, our_sp, our_er, our_csymtabs, our_ctypesys_local, our_ctype_resolver);
     ast.root->accept(fp);
+#if 0
+    std::cerr << ast.root->fmt_tree(src) << "\n";
+    std::cerr << our_csymtabs.fmt(src) << "\n";
+#endif
     if (!fp.good()) {
         return std::nullopt;
     }
 #if _DUMP_LOG
     std::cerr << "-- second pass!\n";
 #endif
-    second_pass sp(dbg(), services, src_import_path, *ast.root, src, csymtabs_ctti);
+    second_pass sp(dbg(), services, src_import_path, *ast.root, src, our_sp, our_er, our_csymtabs, our_ctypesys_local, our_ctype_resolver);
     ast.root->accept(sp);
     if (!sp.good()) {
         return std::nullopt;

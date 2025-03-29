@@ -875,6 +875,11 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
+        // TODO: update later when we add import aliases
+
+        std::string fmt_type(const taul::source_code& src) const;
+
+
         inline void give_to(ast_node& target) override final { target.give(res<ast_TypeSpec>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;

@@ -25,9 +25,9 @@ namespace yama::internal {
             _src(&src) {}
 
 
-        inline bool is_fatal() const noexcept { return _err; }
+        bool is_fatal() const noexcept;
 
-        inline void fatal() { _err = true; }
+        void fatal();
 
 
         template<typename... Args>
