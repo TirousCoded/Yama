@@ -7,6 +7,7 @@
 
 #include <taul/source_code.h>
 
+#include "safeptr.h"
 #include "ast.h"
 #include "csymtab.h"
 #include "ctypesys.h"
@@ -16,22 +17,26 @@
 namespace yama::internal {
 
 
-    // ctype_resolver is *populated* via 'add' calls in first_pass, and then 'resolve' is
-    // to be used at the vary start of second_pass to resolve ctypes, and only thereafter
+    class translation_unit;
+    class compilation_state;
+
+
+    // ctype_resolver is *populated* via 'add' calls in first passes, and then 'resolve' is
+    // to be used immediately before second passes to resolve ctypes, and only thereafter
     // may get/operator[] be used to query them
 
     class ctype_resolver final {
     public:
-        ctype_resolver(
-            csymtab_group& csymtabs,
-            error_reporter& er,
-            const taul::source_code& src);
+        safeptr<compilation_state> cs;
 
 
-        void add(const ast_TypeSpec& x);
-        void add(const ast_PrimaryExpr& x); // handles if x is not a type spec (ie. need-not check in first_pass)
+        ctype_resolver(compilation_state& cs);
 
-        void resolve(ctypesys_local& ctypesys);
+
+        void add(translation_unit& tu, const ast_TypeSpec& x);
+        void add(translation_unit& tu, const ast_PrimaryExpr& x); // handles if x is not a type spec (ie. need-not check in first_pass)
+
+        void resolve();
 
         std::optional<ctype> get(const ast_TypeSpec* x) const noexcept; // fails quietly if x == nullptr
         std::optional<ctype> get(const ast_PrimaryExpr* x) const noexcept; // fails quietly if x == nullptr
@@ -40,18 +45,20 @@ namespace yama::internal {
 
 
     private:
-        csymtab_group* _csymtabs;
-        error_reporter* _er;
-        const taul::source_code* _src;
-
-        std::unordered_map<const ast_TypeSpec*, std::optional<ctype>> _type_spec_mappings;
-        std::unordered_map<const ast_PrimaryExpr*, std::optional<ctype>> _primary_expr_mappings;
+        struct _entry_t final {
+            safeptr<translation_unit> tu;
+            std::optional<ctype> t;
+        };
 
 
-        void _resolve(ctypesys_local& ctypesys, const ast_TypeSpec& x, std::optional<ctype>& target);
-        void _resolve(ctypesys_local& ctypesys, const ast_PrimaryExpr& x, std::optional<ctype>& target);
-        bool _is_type_spec_id_expr(const ast_PrimaryExpr& x);
-        void _report(bool ambiguous, const ast_node& where, const std::string& name);
+        std::unordered_map<const ast_TypeSpec*, _entry_t> _type_spec_mappings;
+        std::unordered_map<const ast_PrimaryExpr*, _entry_t> _primary_expr_mappings;
+
+
+        void _resolve(translation_unit& tu, const ast_TypeSpec& x, std::optional<ctype>& target);
+        void _resolve(translation_unit& tu, const ast_PrimaryExpr& x, std::optional<ctype>& target);
+        bool _is_type_spec_id_expr(translation_unit& tu, const ast_PrimaryExpr& x);
+        void _report(translation_unit& tu, bool ambiguous, const ast_node& where, const std::string& name);
     };
 }
 

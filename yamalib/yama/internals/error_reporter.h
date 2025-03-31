@@ -8,28 +8,39 @@
 #include "../core/asserts.h"
 #include "../core/debug.h"
 
+#include "safeptr.h"
 #include "ast.h"
 
 
 namespace yama::internal {
 
 
+    class translation_unit;
+
+
     // TODO: when needed, add support for things like warnings
 
     class error_reporter final {
     public:
-        inline error_reporter(
-            std::shared_ptr<debug> dbg,
-            const taul::source_code& src)
-            : _dbg(std::move(dbg)),
-            _src(&src) {}
+        safeptr<translation_unit> tu;
 
 
+        error_reporter(translation_unit& tu);
+
+
+        bool good() const noexcept;
         bool is_fatal() const noexcept;
 
         void fatal();
 
 
+        template<typename... Args>
+        inline void error(
+            taul::source_pos where,
+            dsignal dsig,
+            std::format_string<Args...> fmt,
+            Args&&... args);
+        
         template<typename... Args>
         inline void error(
             const ast_node& where,
@@ -39,21 +50,27 @@ namespace yama::internal {
         
 
     private:
-        std::shared_ptr<debug> _dbg;
-        const taul::source_code* _src;
-
         bool _err = false;
+
+
+        std::shared_ptr<debug> _dbg();
+        taul::source_location _loc_at(taul::source_pos where);
     };
 
     template<typename... Args>
-    inline void error_reporter::error(const ast_node& where, dsignal dsig, std::format_string<Args...> fmt, Args&&... args) {
-        YAMA_RAISE(_dbg, dsig);
+    inline void error_reporter::error(taul::source_pos where, dsignal dsig, std::format_string<Args...> fmt, Args&&... args) {
+        YAMA_RAISE(_dbg(), dsig);
         YAMA_LOG(
-            _dbg, compile_error_c,
+            _dbg(), compile_error_c,
             "error: {} {}",
-            yama::deref_assert(_src).location_at(where.low_pos()),
-            std::format(fmt, std::forward<Args&&>(args)...));
+            _loc_at(where),
+            std::format(fmt, std::forward<Args>(args)...));
         fatal();
+    }
+
+    template<typename... Args>
+    inline void error_reporter::error(const ast_node& where, dsignal dsig, std::format_string<Args...> fmt, Args&&... args) {
+        error(where.low_pos(), dsig, fmt, std::forward<Args>(args)...);
     }
 }
 

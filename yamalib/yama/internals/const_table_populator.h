@@ -13,12 +13,18 @@
 namespace yama::internal {
 
 
+    class translation_unit;
+
+
     class const_table_populator final {
     public:
-        const_table_populator(ctypesys_local& ctypesys);
+        safeptr<translation_unit> tu;
 
 
-        void bind(yama::type_info& new_target, ast_Chunk& root);
+        const_table_populator(translation_unit& tu);
+
+
+        void bind(yama::type_info& new_target);
 
 
         // TODO: I'm not 100% on our whole thing of not avoiding duplicates for floats, so maybe
@@ -50,12 +56,8 @@ namespace yama::internal {
 
 
     private:
-        ctypesys_local* _ctypesys = nullptr;
-        ast_Chunk* _root = nullptr;
         yama::type_info* _target = nullptr;
 
-        inline auto& _get_ctypesys() noexcept { return yama::deref_assert(_ctypesys); }
-        inline auto& _get_root() noexcept { return yama::deref_assert(_root); }
         inline auto& _get_target() noexcept { return yama::deref_assert(_target); }
 
 

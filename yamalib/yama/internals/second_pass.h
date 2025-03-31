@@ -3,22 +3,19 @@
 #pragma once
 
 
-#include <unordered_set>
 
-#include "../core/debug.h"
+#include "../core/bcode.h"
+#include "../core/type_info.h"
 
+#include "safeptr.h"
 #include "ast.h"
 #include "csymtab.h"
-#include "ctypesys.h"
-#include "ctype_resolver.h"
-#include "const_table_populator.h"
-#include "first_pass.h"
 
 
 namespace yama::internal {
 
 
-    class compiler_services;
+    class translation_unit;
 
 
     // IMPORTANT:
@@ -35,27 +32,13 @@ namespace yama::internal {
 
     class second_pass final : public ast_visitor {
     public:
-        module_factory results; // result of code gen
+        safeptr<translation_unit> tu;
 
 
-        second_pass(
-            std::shared_ptr<debug> dbg,
-            res<compiler_services> services,
-            const import_path& src_import_path,
-            ast_Chunk& root,
-            const taul::source_code& src,
-            specifier_provider& sp,
-            error_reporter& er,
-            csymtab_group& csymtabs,
-            ctypesys_local& ctypesys,
-            ctype_resolver& ctype_resolver);
+        second_pass(translation_unit& tu);
 
 
-        // returns if the pass succeeded
-        inline bool good() const noexcept { return !_get_er().is_fatal(); }
-
-
-        void visit_begin(res<ast_Chunk> x) override final;
+        //void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_DeclOrDir> x) override final;
         //void visit_begin(res<ast_ImportDir> x) override final;
         //void visit_begin(res<ast_ImportPath> x) override final;
@@ -117,33 +100,7 @@ namespace yama::internal {
 
 
     private:
-        std::shared_ptr<debug> _dbg;
-        res<compiler_services> _services;
-        const import_path _src_import_path;
-
-        ast_Chunk* _root;
-        const taul::source_code* _src;
-        specifier_provider* _sp;
-        error_reporter* _er;
-        csymtab_group* _csymtabs;
-        ctypesys_local* _ctypesys;
-        ctype_resolver* _ctype_resolver;
-
-        ast_Chunk& _get_root() const noexcept;
-        const taul::source_code& _get_src() const noexcept;
-        specifier_provider& _get_sp() const noexcept;
-        error_reporter& _get_er() const noexcept;
-        csymtab_group& _get_csymtabs() const noexcept;
-        ctypesys_local& _get_ctypesys() const noexcept;
-        ctype_resolver& _get_ctype_resolver() const noexcept;
-
-        env _get_e() const;
-
-
         // IMPORTANT: if fatal error, the compilation is not to perform further code gen
-
-
-        const_table_populator _ctp;
 
 
         // TODO: at present, ALL custom types are fn types

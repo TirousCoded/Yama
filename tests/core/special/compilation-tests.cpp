@@ -1579,7 +1579,7 @@ fn aaa() {
     
     std::string txt_multi_b = R"(
 
-import self.multi.b; // add new src to compilation
+import self.multi.c; // add new src to compilation
 import fns.abc;
 
 fn bbb() {
@@ -1707,12 +1707,12 @@ fn ddd() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// multi-source compilation where dep graph cycles between compiling modules do not cause issues
+// multi-source compilation where import graph cycles between compiling modules do not cause issues
 
 // remember that parcels aren't allowed to have dep graph cycles between them, so we need-not
 // worry about the notion of multi-parcel dep graph cycles
 
-TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_TolerateCompilingModuleDepGraphCycles) {
+TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_TolerateCompilingModuleImportGraphCycles) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(

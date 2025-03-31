@@ -4,17 +4,16 @@
 
 #include "../core/general.h"
 
-#include "compiler.h"
+#include "compilation_state.h"
 
 
 using namespace yama::string_literals;
 
 
-yama::internal::const_table_populator::const_table_populator(ctypesys_local& ctypesys)
-    : _ctypesys(&ctypesys) {}
+yama::internal::const_table_populator::const_table_populator(translation_unit& tu)
+    : tu(tu) {}
 
-void yama::internal::const_table_populator::bind(yama::type_info& new_target, ast_Chunk& root) {
-    _root = &root;
+void yama::internal::const_table_populator::bind(yama::type_info& new_target) {
     _target = &new_target;
 }
 
@@ -79,7 +78,7 @@ yama::const_t yama::internal::const_table_populator::pull_type(const ctype& t) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(_get_ctypesys().services()->env());
+    const auto qn = t.fullname().qualified_name().str(tu->e());
     auto& _consts = _get_target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
@@ -94,7 +93,7 @@ yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype&
 }
 
 yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(_get_ctypesys().services()->env());
+    const auto qn = t.fullname().qualified_name().str(tu->e());
     auto& _consts = _get_target().consts;
     // search for existing constant to use
     for (const_t i = 0; i < _consts.consts.size(); i++) {
@@ -122,10 +121,10 @@ yama::callsig_info yama::internal::const_table_populator::build_callsig_for_fn_t
     callsig_info result{};
     // resolve parameter types
     for (size_t i = 0; i < t.param_count(); i++) {
-        result.params.push_back(pull_type(t.param_type(i).value()));
+        result.params.push_back(pull_type(t.param_type(i, tu->cs->resolver).value()));
     }
     // resolve return type
-    result.ret = pull_type(_get_ctypesys().default_none(t.return_type()));
+    result.ret = pull_type(tu->types.default_none(t.return_type(tu->cs->resolver)));
     return result;
 }
 
