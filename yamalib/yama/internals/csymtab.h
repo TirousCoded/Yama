@@ -16,9 +16,61 @@ namespace yama::internal {
     //            w/ new info if it wasn't available previously
 
 
+    enum class lookup_proc : uint8_t {
+        normal,
+        qualifier,
+    };
+
+    std::string fmt_lookup_proc(lookup_proc x);
+
+
+    // symbols are looked up via a name and lookup procedure
+
+    struct csym_key final {
+        str name;
+        lookup_proc lp;
+
+
+        bool operator==(const csym_key&) const noexcept = default;
+        inline size_t hash() const noexcept { return taul::hash(name, lp); }
+
+
+        static inline csym_key make(str name, lookup_proc lp) noexcept { return { .name = std::move(name), .lp = lp }; }
+    };
+}
+
+YAMA_SETUP_HASH(yama::internal::csym_key, x.hash());
+
+namespace yama::internal {
+
+
+    template<typename T>
+    concept lookup_proc_of_type =
+        requires
+    {
+        { std::remove_cvref_t<T>::lp } noexcept -> std::convertible_to<lookup_proc>;
+    };
+
+    template<lookup_proc_of_type T>
+    constexpr lookup_proc lookup_proc_of = std::remove_cvref_t<T>::lp;
+
+
+    // only named imports get symbols
+
+    struct import_csym final {
+        import_path path;
+
+
+        static constexpr lookup_proc lp = lookup_proc::qualifier;
+    };
+
     struct prim_csym final {
         //
+
+
+        static constexpr lookup_proc lp = lookup_proc::normal;
     };
+    
     struct var_csym final {
         const ast_TypeSpec* annot_type; // type specified by annotation, if any
         std::optional<ctype> deduced_type; // type deduced from initializer, if any (resolved in second_pass)
@@ -28,7 +80,11 @@ namespace yama::internal {
         // var_csym is recognized as a 'local var symbol' only once reg has been assigned
 
         inline bool is_localvar() const noexcept { return reg.has_value(); }
+
+
+        static constexpr lookup_proc lp = lookup_proc::normal;
     };
+
     struct fn_csym final {
         struct param final {
             str name;
@@ -50,13 +106,22 @@ namespace yama::internal {
 
 
         std::string fmt_params(const taul::source_code& src) const;
+
+
+        static constexpr lookup_proc lp = lookup_proc::normal;
     };
+
     struct param_csym final {
         const ast_TypeSpec* type;
+
+
+        static constexpr lookup_proc lp = lookup_proc::normal;
     };
+
 
     struct csymtab_entry final {
         using info_t = std::variant<
+            import_csym,
             prim_csym,
             var_csym,
             fn_csym,
@@ -65,6 +130,7 @@ namespace yama::internal {
 
 
         str                         name;
+        const lookup_proc           lp;
         std::shared_ptr<ast_node>   node; // the node corresponding to this entry's declaration, if any
         taul::source_pos            starts; // where in src scope begins (continuing until end of block), should be 0 if has global scope
         info_t                      info;
@@ -82,10 +148,18 @@ namespace yama::internal {
 
 
         inline bool is_type() const noexcept {
-            static_assert(std::variant_size_v<info_t> == 4); // reminder
-            return
-                is<prim_csym>() ||
-                is<fn_csym>();
+            static_assert(std::variant_size_v<info_t> == 5); // reminder
+            if (is<import_csym>())      return false;
+            else if (is<prim_csym>())   return true;
+            else if (is<var_csym>())    return false;
+            else if (is<fn_csym>())     return true;
+            else if (is<param_csym>())  return false;
+            else                        YAMA_DEADEND;
+            return bool{};
+        }
+
+        inline csym_key get_key() const noexcept {
+            return csym_key::make(name, lp);
         }
 
 
@@ -95,8 +169,6 @@ namespace yama::internal {
     // csymtab defines Yama's internal repr for a symbol table
     class csymtab final {
     public:
-
-
         csymtab() = default;
 
 
@@ -107,21 +179,23 @@ namespace yama::internal {
         // fails if entry under name already exists
         template<typename Info>
         inline bool insert(const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info) {
-            if (_entries.contains(name)) {
+            if (_entries.contains(csym_key::make(name, lookup_proc_of<Info>))) {
                 return false;
             }
             auto new_entry = csymtab_entry{
                 .name = name,
+                .lp = lookup_proc_of<Info>,
                 .node = node,
                 .starts = starts,
                 .info = std::forward<Info>(info),
             };
-            _entries.try_emplace(name, make_res<csymtab_entry>(std::move(new_entry)));
+            const auto key = new_entry.get_key(); // <- C++ arg eval order is undefined!
+            _entries.try_emplace(key, make_res<csymtab_entry>(std::move(new_entry)));
             return true;
         }
 
-        inline std::shared_ptr<csymtab_entry> fetch(const str& name) const noexcept {
-            const auto it = _entries.find(name);
+        inline std::shared_ptr<csymtab_entry> fetch(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
+            const auto it = _entries.find(csym_key::make(name, lp));
             return
                 it != _entries.end()
                 ? std::shared_ptr<csymtab_entry>(it->second)
@@ -132,7 +206,7 @@ namespace yama::internal {
 
 
     private:
-        std::unordered_map<str, res<csymtab_entry>> _entries;
+        std::unordered_map<csym_key, res<csymtab_entry>> _entries;
     };
 
     // csymtab_group maps Chunk/Block AST nodes (by ID) to corresponding csymtab(s)
@@ -186,11 +260,11 @@ namespace yama::internal {
         // from the symbol table of x, if any, and propagating to upstream symbol tables
         // of ancestor AST nodes of x (note how these rules let x be nodes w/out symbol tables),
         // w/ symbols which haven't entered scope by src_pos not being visible
-        inline std::shared_ptr<csymtab_entry> lookup(const ast_node& x, const str& name, taul::source_pos src_pos) const noexcept {
+        inline std::shared_ptr<csymtab_entry> lookup(const ast_node& x, const str& name, taul::source_pos src_pos, lookup_proc lp = lookup_proc::normal) const noexcept {
             // IMPORTANT: we CAN'T use node_of_inner_most here, as we care about visibility throughout all csymtabs relative to x
             // below code will recursively skip past interim parent nodes w/out symbol tables
             if (const auto table = get(x.id)) {
-                if (const auto result = table->fetch(name)) {
+                if (const auto result = table->fetch(name, lp)) {
                     if (src_pos >= result->starts) {
                         return result;
                     }
@@ -199,7 +273,7 @@ namespace yama::internal {
             const auto upstream = x.parent.lock();
             return
                 upstream
-                ? lookup(*upstream, name, src_pos)
+                ? lookup(*upstream, name, src_pos, lp)
                 : nullptr;
         }
 

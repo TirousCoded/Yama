@@ -14,9 +14,9 @@ using namespace yama::string_literals;
 
 
 void yama::internal::ast_visitor::visit_begin(res<ast_Chunk> x) {}
-void yama::internal::ast_visitor::visit_begin(res<ast_DeclOrDir> x) {}
-void yama::internal::ast_visitor::visit_begin(res<ast_ImportDir> x) {}
-void yama::internal::ast_visitor::visit_begin(res<ast_ImportPath> x) {}
+void yama::internal::ast_visitor::visit_begin(res<ast_Decl> x) {}
+void yama::internal::ast_visitor::visit_begin(res<ast_ImportDecl> x) {}
+void yama::internal::ast_visitor::visit_begin(res<ast_RelativePath> x) {}
 void yama::internal::ast_visitor::visit_begin(res<ast_VarDecl> x) {}
 void yama::internal::ast_visitor::visit_begin(res<ast_FnDecl> x) {}
 void yama::internal::ast_visitor::visit_begin(res<ast_CallSig> x) {}
@@ -44,9 +44,9 @@ void yama::internal::ast_visitor::visit_begin(res<ast_TypeAnnot> x) {}
 void yama::internal::ast_visitor::visit_begin(res<ast_TypeSpec> x) {}
 
 void yama::internal::ast_visitor::visit_end(res<ast_Chunk> x) {}
-void yama::internal::ast_visitor::visit_end(res<ast_DeclOrDir> x) {}
-void yama::internal::ast_visitor::visit_end(res<ast_ImportDir> x) {}
-void yama::internal::ast_visitor::visit_end(res<ast_ImportPath> x) {}
+void yama::internal::ast_visitor::visit_end(res<ast_Decl> x) {}
+void yama::internal::ast_visitor::visit_end(res<ast_ImportDecl> x) {}
+void yama::internal::ast_visitor::visit_end(res<ast_RelativePath> x) {}
 void yama::internal::ast_visitor::visit_end(res<ast_VarDecl> x) {}
 void yama::internal::ast_visitor::visit_end(res<ast_FnDecl> x) {}
 void yama::internal::ast_visitor::visit_end(res<ast_CallSig> x) {}
@@ -75,9 +75,9 @@ void yama::internal::ast_visitor::visit_end(res<ast_TypeSpec> x) {}
 
 void yama::internal::ast_node::do_give(taul::token x) {}
 void yama::internal::ast_node::do_give(res<ast_Chunk> x) {}
-void yama::internal::ast_node::do_give(res<ast_DeclOrDir> x) {}
-void yama::internal::ast_node::do_give(res<ast_ImportDir> x) {}
-void yama::internal::ast_node::do_give(res<ast_ImportPath> x) {}
+void yama::internal::ast_node::do_give(res<ast_Decl> x) {}
+void yama::internal::ast_node::do_give(res<ast_ImportDecl> x) {}
+void yama::internal::ast_node::do_give(res<ast_RelativePath> x) {}
 void yama::internal::ast_node::do_give(res<ast_VarDecl> x) {}
 void yama::internal::ast_node::do_give(res<ast_FnDecl> x) {}
 void yama::internal::ast_node::do_give(res<ast_CallSig> x) {}
@@ -106,8 +106,8 @@ void yama::internal::ast_node::do_give(res<ast_TypeSpec> x) {}
 
 void yama::internal::ast_Chunk::fmt(ast_formatter& x) {
     x.open("Chunk", low_pos(), high_pos(), id);
-    x.next("decls_and_dirs");
-    for (const auto& I : decls_and_dirs) {
+    x.next("decls");
+    for (const auto& I : decls) {
         I->fmt(x);
     }
     x.close();
@@ -115,83 +115,95 @@ void yama::internal::ast_Chunk::fmt(ast_formatter& x) {
 
 void yama::internal::ast_Chunk::accept(ast_visitor& x) {
     x.visit_begin(res<ast_Chunk>(shared_from_this()));
-    for (const auto& I : decls_and_dirs) {
+    for (const auto& I : decls) {
         I->accept(x);
     }
     x.visit_end(res<ast_Chunk>(shared_from_this()));
 }
 
-void yama::internal::ast_Chunk::do_give(res<ast_DeclOrDir> x) {
-    decls_and_dirs.push_back(x);
+void yama::internal::ast_Chunk::do_give(res<ast_Decl> x) {
+    decls.push_back(x);
 }
 
-std::shared_ptr<yama::internal::ast_node> yama::internal::ast_DeclOrDir::get_decl_or_dir() {
-    switch (decl_or_dir.index()) {
-    case 0: return std::get<0>(decl_or_dir);
-    case 1: return std::get<1>(decl_or_dir);
-    case 2: return std::get<2>(decl_or_dir);
+std::shared_ptr<yama::internal::ast_node> yama::internal::ast_Decl::get_decl() {
+    switch (decl.index()) {
+    case 0: return std::get<0>(decl);
+    case 1: return std::get<1>(decl);
+    case 2: return std::get<2>(decl);
     default: return nullptr;
     }
 }
 
-void yama::internal::ast_DeclOrDir::fmt(ast_formatter& x) {
-    x.open("DeclOrDir", low_pos(), high_pos(), id);
-    if (auto a = get_decl_or_dir()) {
-        x.next("decl_or_dir");
+void yama::internal::ast_Decl::fmt(ast_formatter& x) {
+    x.open("Decl", low_pos(), high_pos(), id);
+    if (auto a = get_decl()) {
+        x.next("decl");
         a->fmt(x);
     }
     x.close();
 }
 
-void yama::internal::ast_DeclOrDir::accept(ast_visitor& x) {
-    x.visit_begin(res<ast_DeclOrDir>(shared_from_this()));
-    if (auto a = get_decl_or_dir()) {
+void yama::internal::ast_Decl::accept(ast_visitor& x) {
+    x.visit_begin(res<ast_Decl>(shared_from_this()));
+    if (auto a = get_decl()) {
         a->accept(x);
     }
-    x.visit_end(res<ast_DeclOrDir>(shared_from_this()));
+    x.visit_end(res<ast_Decl>(shared_from_this()));
 }
 
-void yama::internal::ast_DeclOrDir::do_give(res<ast_ImportDir> x) {
-    decl_or_dir = decltype(decl_or_dir)(std::in_place_index<0>, x);
+void yama::internal::ast_Decl::do_give(res<ast_ImportDecl> x) {
+    decl = decltype(decl)(std::in_place_index<0>, x);
 }
 
-void yama::internal::ast_DeclOrDir::do_give(res<ast_VarDecl> x) {
-    decl_or_dir = decltype(decl_or_dir)(std::in_place_index<1>, x);
+void yama::internal::ast_Decl::do_give(res<ast_VarDecl> x) {
+    decl = decltype(decl)(std::in_place_index<1>, x);
 }
 
-void yama::internal::ast_DeclOrDir::do_give(res<ast_FnDecl> x) {
-    decl_or_dir = decltype(decl_or_dir)(std::in_place_index<2>, x);
+void yama::internal::ast_Decl::do_give(res<ast_FnDecl> x) {
+    decl = decltype(decl)(std::in_place_index<2>, x);
 }
 
-std::optional<std::string> yama::internal::ast_ImportDir::path(const str& src) const {
+std::optional<std::string> yama::internal::ast_ImportDecl::path(const str& src) const {
     return
-        import_path
-        ? import_path->path(src)
+        head
+        ? std::make_optional(std::format("{}{}", head->str(src), relative_path ? relative_path->relative_path(src).value_or("") : ""))
         : std::nullopt;
 }
 
-void yama::internal::ast_ImportDir::fmt(ast_formatter& x) {
-    x.open("ImportDir", low_pos(), high_pos(), id);
-    if (import_path) {
-        x.next("import_path");
-        import_path->fmt(x);
+void yama::internal::ast_ImportDecl::fmt(ast_formatter& x) {
+    x.open("ImportDecl", low_pos(), high_pos(), id);
+    if (relative_path) {
+        x.next("relative_path");
+        relative_path->fmt(x);
     }
     x.close();
 }
 
-void yama::internal::ast_ImportDir::accept(ast_visitor& x) {
-    x.visit_begin(res<ast_ImportDir>(shared_from_this()));
-    if (import_path) {
-        import_path->accept(x);
+void yama::internal::ast_ImportDecl::accept(ast_visitor& x) {
+    x.visit_begin(res<ast_ImportDecl>(shared_from_this()));
+    if (relative_path) {
+        relative_path->accept(x);
     }
-    x.visit_end(res<ast_ImportDir>(shared_from_this()));
+    x.visit_end(res<ast_ImportDecl>(shared_from_this()));
 }
 
-void yama::internal::ast_ImportDir::do_give(res<ast_ImportPath> x) {
-    import_path = x;
+void yama::internal::ast_ImportDecl::do_give(taul::token x) {
+    // first identifier is presumed to be head, and if second one is found,
+    // then we know the first was actually the name, and the second one is
+    // the head
+    if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
+        if (head) {
+            name = head;
+        }
+        head = x;
+    }
 }
 
-std::optional<std::string> yama::internal::ast_ImportPath::path(const str& src) const {
+void yama::internal::ast_ImportDecl::do_give(res<ast_RelativePath> x) {
+    relative_path = x;
+}
+
+std::optional<std::string> yama::internal::ast_RelativePath::relative_path(const str& src) const {
     if (ids_and_dots.empty()) return std::nullopt;
     std::string result{};
     for (const auto& I : ids_and_dots) {
@@ -200,20 +212,20 @@ std::optional<std::string> yama::internal::ast_ImportPath::path(const str& src) 
     return result;
 }
 
-void yama::internal::ast_ImportPath::fmt(ast_formatter& x) {
-    x.open("ImportPath", low_pos(), high_pos(), id);
+void yama::internal::ast_RelativePath::fmt(ast_formatter& x) {
+    x.open("RelativePath", low_pos(), high_pos(), id);
     for (const auto& I : ids_and_dots) {
         x.next("ids_and_dots", I);
     }
     x.close();
 }
 
-void yama::internal::ast_ImportPath::accept(ast_visitor& x) {
-    x.visit_begin(res<ast_ImportPath>(shared_from_this()));
-    x.visit_end(res<ast_ImportPath>(shared_from_this()));
+void yama::internal::ast_RelativePath::accept(ast_visitor& x) {
+    x.visit_begin(res<ast_RelativePath>(shared_from_this()));
+    x.visit_end(res<ast_RelativePath>(shared_from_this()));
 }
 
-void yama::internal::ast_ImportPath::do_give(taul::token x) {
+void yama::internal::ast_RelativePath::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
         ids_and_dots.push_back(x);
     }
@@ -403,23 +415,23 @@ void yama::internal::ast_Block::do_give(res<ast_Stmt> x) {
     stmts.push_back(x);
 }
 
-std::shared_ptr<yama::internal::ast_node> yama::internal::ast_Stmt::get_stmt_decl_or_dir() {
-    switch (stmt_decl_or_dir.index()) {
-    case 0: return std::get<0>(stmt_decl_or_dir);
-    case 1: return std::get<1>(stmt_decl_or_dir);
-    case 2: return std::get<2>(stmt_decl_or_dir);
-    case 3: return std::get<3>(stmt_decl_or_dir);
-    case 4: return std::get<4>(stmt_decl_or_dir);
-    case 5: return std::get<5>(stmt_decl_or_dir);
-    case 6: return std::get<6>(stmt_decl_or_dir);
+std::shared_ptr<yama::internal::ast_node> yama::internal::ast_Stmt::get_stmt_or_decl() {
+    switch (stmt_or_decl.index()) {
+    case 0: return std::get<0>(stmt_or_decl);
+    case 1: return std::get<1>(stmt_or_decl);
+    case 2: return std::get<2>(stmt_or_decl);
+    case 3: return std::get<3>(stmt_or_decl);
+    case 4: return std::get<4>(stmt_or_decl);
+    case 5: return std::get<5>(stmt_or_decl);
+    case 6: return std::get<6>(stmt_or_decl);
     default: return nullptr;
     }
 }
 
 void yama::internal::ast_Stmt::fmt(ast_formatter& x) {
     x.open("Stmt", low_pos(), high_pos(), id);
-    if (auto a = get_stmt_decl_or_dir()) {
-        x.next("stmt_decl_or_dir");
+    if (auto a = get_stmt_or_decl()) {
+        x.next("stmt_or_decl");
         a->fmt(x);
     }
     x.close();
@@ -427,38 +439,38 @@ void yama::internal::ast_Stmt::fmt(ast_formatter& x) {
 
 void yama::internal::ast_Stmt::accept(ast_visitor& x) {
     x.visit_begin(res<ast_Stmt>(shared_from_this()));
-    if (auto a = get_stmt_decl_or_dir()) {
+    if (auto a = get_stmt_or_decl()) {
         a->accept(x);
     }
     x.visit_end(res<ast_Stmt>(shared_from_this()));
 }
 
-void yama::internal::ast_Stmt::do_give(res<ast_DeclOrDir> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<0>, x);
+void yama::internal::ast_Stmt::do_give(res<ast_Decl> x) {
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<0>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_ExprStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<1>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<1>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_IfStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<2>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<2>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_LoopStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<3>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<3>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_BreakStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<4>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<4>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_ContinueStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<5>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<5>, x);
 }
 
 void yama::internal::ast_Stmt::do_give(res<ast_ReturnStmt> x) {
-    stmt_decl_or_dir = decltype(stmt_decl_or_dir)(std::in_place_index<6>, x);
+    stmt_or_decl = decltype(stmt_or_decl)(std::in_place_index<6>, x);
 }
 
 void yama::internal::ast_ExprStmt::fmt(ast_formatter& x) {
@@ -647,8 +659,19 @@ void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
     x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
 }
 
+std::string yama::internal::ast_PrimaryExpr::fmt_name(const taul::source_code& src) const {
+    if (!name) return "";
+    return
+        qualifier
+        ? std::format("{}:{}", qualifier->str(src).fmt(), name->str(src).fmt())
+        : name->str(src).fmt();
+}
+
 void yama::internal::ast_PrimaryExpr::fmt(ast_formatter& x) {
     x.open("PrimaryExpr", low_pos(), high_pos(), id);
+    if (qualifier) {
+        x.next("qualifier", *qualifier);
+    }
     if (name) {
         x.next("name", *name);
     }
@@ -669,7 +692,12 @@ void yama::internal::ast_PrimaryExpr::accept(ast_visitor& x) {
 
 void yama::internal::ast_PrimaryExpr::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
-        name = std::make_optional(x);
+        if (name) {
+            // if we encounter second identifier, then first one was actually
+            // for qualifier, not name
+            qualifier = name;
+        }
+        name = x;
     }
 }
 
@@ -863,13 +891,22 @@ void yama::internal::ast_TypeAnnot::do_give(res<ast_TypeSpec> x) {
     type = x;
 }
 
-std::string yama::internal::ast_TypeSpec::fmt_type(const taul::source_code& src) const {
-    return type.str(src).fmt();
+std::string yama::internal::ast_TypeSpec::fmt_name(const taul::source_code& src) const {
+    if (!name) return "";
+    return
+        qualifier
+        ? std::format("{}:{}", qualifier->str(src).fmt(), name->str(src).fmt())
+        : name->str(src).fmt();
 }
 
 void yama::internal::ast_TypeSpec::fmt(ast_formatter& x) {
     x.open("TypeSpec", low_pos(), high_pos(), id);
-    x.next("type", type);
+    if (qualifier) {
+        x.next("qualifier", *qualifier);
+    }
+    if (name) {
+        x.next("name", *name);
+    }
     x.close();
 }
 
@@ -880,7 +917,12 @@ void yama::internal::ast_TypeSpec::accept(ast_visitor& x) {
 
 void yama::internal::ast_TypeSpec::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
-        type = x;
+        if (name) {
+            // if we encounter second identifier, then first one was actually
+            // for qualifier, not name
+            qualifier = name;
+        }
+        name = x;
     }
 }
 
@@ -905,9 +947,9 @@ void yama::internal::ast_parser::listener::on_syntactic(taul::ppr_ref ppr, taul:
 if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()._next_id))
 
     _YAMA_UNIT_(Chunk);
-    else _YAMA_UNIT_(DeclOrDir);
-    else _YAMA_UNIT_(ImportDir);
-    else _YAMA_UNIT_(ImportPath);
+    else _YAMA_UNIT_(Decl);
+    else _YAMA_UNIT_(ImportDecl);
+    else _YAMA_UNIT_(RelativePath);
     else _YAMA_UNIT_(VarDecl);
     else _YAMA_UNIT_(FnDecl);
     else _YAMA_UNIT_(CallSig);
@@ -956,11 +998,11 @@ void yama::internal::ast_parser::listener::on_close() {
 }
 
 void yama::internal::ast_parser::listener::on_terminal_error(taul::token_range ids, taul::token input) {
-    client()._syntax_error = std::make_optional(input.low_pos());
+    client()._syntax_error = input.low_pos();
 }
 
 void yama::internal::ast_parser::listener::on_nonterminal_error(taul::symbol_id id, taul::token input) {
-    client()._syntax_error = std::make_optional(input.low_pos());
+    client()._syntax_error = input.low_pos();
 }
 
 yama::internal::ast_parser::result yama::internal::ast_parser::parse(const taul::source_code& src) {

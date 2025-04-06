@@ -23,10 +23,10 @@ namespace yama::internal {
     //      first pass responsibilities:
     //          - build table of imported modules
     //              - detect if 'yama' module unavailable
-    //              - detect non-local import dirs
-    //              - detect import dirs appearing after first type decl
+    //              - detect non-local import decls
+    //              - detect import decls appearing after first type decl
     //              * includes implicitly imported 'yama' module
-    //              * includes explicit imports by import dirs
+    //              * includes explicit imports by import decls
     //          - build symbol table(s)
     //              - detect name conflicts
     //              - load extern types from imported modules
@@ -58,9 +58,9 @@ namespace yama::internal {
 
 
         void visit_begin(res<ast_Chunk> x) override final;
-        //void visit_begin(res<ast_DeclOrDir> x) override final;
-        void visit_begin(res<ast_ImportDir> x) override final;
-        //void visit_begin(res<ast_ImportPath> x) override final;
+        //void visit_begin(res<ast_Decl> x) override final;
+        void visit_begin(res<ast_ImportDecl> x) override final;
+        //void visit_begin(res<ast_RelativePath> x) override final;
         void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
@@ -88,9 +88,9 @@ namespace yama::internal {
         void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
-        //void visit_end(res<ast_DeclOrDir> x) override final;
-        //void visit_end(res<ast_ImportDir> x) override final;
-        //void visit_end(res<ast_ImportPath> x) override final;
+        //void visit_end(res<ast_Decl> x) override final;
+        //void visit_end(res<ast_ImportDecl> x) override final;
+        //void visit_end(res<ast_RelativePath> x) override final;
         //void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;
@@ -127,7 +127,9 @@ namespace yama::internal {
 
         void _add_csymtab(res<ast_node> x);
         void _implicitly_import_yama_module();
-        void _explicitly_import_module(const res<ast_ImportDir>& x);
+        void _explicitly_import_module(const res<ast_ImportDecl>& x);
+        void _insert_importdecl(res<ast_ImportDecl> x, const import_path& path);
+        void _insert_importdecl_for_implicit_yama_import(const import_path& path);
         void _insert_vardecl(res<ast_VarDecl> x);
         bool _insert_fndecl(res<ast_FnDecl> x);
         void _insert_paramdecl(res<ast_ParamDecl> x);
@@ -155,12 +157,12 @@ namespace yama::internal {
 
 
         // this flag is used to discern when we're at or beyond the first type decl, meaning
-        // that no further import dirs may exist
+        // that no further import decls may exist
 
         bool _reached_first_type_decl = false;
 
         void _acknowledge_type_decl();
-        bool _import_dirs_are_legal() const noexcept;
+        bool _import_decls_are_legal() const noexcept;
 
 
         void _check_var_is_local(res<ast_VarDecl> x);

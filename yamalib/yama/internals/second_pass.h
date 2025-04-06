@@ -39,9 +39,9 @@ namespace yama::internal {
 
 
         //void visit_begin(res<ast_Chunk> x) override final;
-        //void visit_begin(res<ast_DeclOrDir> x) override final;
-        //void visit_begin(res<ast_ImportDir> x) override final;
-        //void visit_begin(res<ast_ImportPath> x) override final;
+        //void visit_begin(res<ast_Decl> x) override final;
+        //void visit_begin(res<ast_ImportDecl> x) override final;
+        //void visit_begin(res<ast_RelativePath> x) override final;
         //void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
@@ -69,9 +69,9 @@ namespace yama::internal {
         //void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
-        //void visit_end(res<ast_DeclOrDir> x) override final;
-        //void visit_end(res<ast_ImportDir> x) override final;
-        //void visit_end(res<ast_ImportPath> x) override final;
+        //void visit_end(res<ast_Decl> x) override final;
+        //void visit_end(res<ast_ImportDecl> x) override final;
+        //void visit_end(res<ast_RelativePath> x) override final;
         void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;

@@ -6,9 +6,9 @@
 #include "../core/debug.h"
 #include "../core/verifier.h"
 
-#include "compiler.h"
 #include "res_state.h"
 #include "install_manager.h"
+#include "compiler.h"
 #include "importer.h"
 #include "loader.h"
 

@@ -171,6 +171,7 @@ namespace yama {
         compile_name_conflict,
         compile_undeclared_name,
         compile_ambiguous_name,
+        compile_undeclared_qualifier,
         compile_type_mismatch,
         compile_not_a_type,
         compile_not_an_expr,
@@ -240,7 +241,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 64);
+        static_assert(dsignals == 65);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -252,6 +253,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_name_conflict);
             _YAMA_ENTRY_(compile_undeclared_name);
             _YAMA_ENTRY_(compile_ambiguous_name);
+            _YAMA_ENTRY_(compile_undeclared_qualifier);
             _YAMA_ENTRY_(compile_type_mismatch);
             _YAMA_ENTRY_(compile_not_a_type);
             _YAMA_ENTRY_(compile_not_an_expr);

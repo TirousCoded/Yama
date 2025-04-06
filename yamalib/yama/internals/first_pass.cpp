@@ -4,8 +4,6 @@
 
 #include "compiler.h"
 
-#include "compilation_state.h"
-
 
 using namespace yama::string_literals;
 
@@ -19,7 +17,7 @@ void yama::internal::first_pass::visit_begin(res<ast_Chunk> x) {
     _implicitly_import_yama_module();
 }
 
-void yama::internal::first_pass::visit_begin(res<ast_ImportDir> x) {
+void yama::internal::first_pass::visit_begin(res<ast_ImportDecl> x) {
     _explicitly_import_module(x);
 }
 
@@ -93,7 +91,7 @@ void yama::internal::first_pass::_add_csymtab(res<ast_node> x) {
 }
 
 void yama::internal::first_pass::_implicitly_import_yama_module() {
-    YAMA_ASSERT(_import_dirs_are_legal());
+    YAMA_ASSERT(_import_decls_are_legal());
     const auto import_path = tu->cs->sp.pull_ip(tu->e(), "yama"_str);
     if (!import_path) {
         tu->er.error(
@@ -102,8 +100,9 @@ void yama::internal::first_pass::_implicitly_import_yama_module() {
             "compilation env has no available 'yama' module!");
         return; // abort
     }
-    if (tu->types.import(import_path.value())) {
-        tu->types.add_import(import_path.value());
+    if (tu->types.import(*import_path)) {
+        tu->types.bind_import(*import_path);
+        _insert_importdecl_for_implicit_yama_import(*import_path);
     }
     else {
         tu->er.error(
@@ -113,8 +112,8 @@ void yama::internal::first_pass::_implicitly_import_yama_module() {
     }
 }
 
-void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportDir>& x) {
-    if (_import_dirs_are_legal()) {
+void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportDecl>& x) {
+    if (_import_decls_are_legal()) {
         const str import_path_s = str(x->path(tu->src).value());
         const auto import_path = tu->cs->sp.pull_ip(tu->e(), import_path_s);
         if (!import_path) {
@@ -125,8 +124,9 @@ void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportD
                 import_path_s);
             return; // abort
         }
-        if (tu->types.import(import_path.value())) {
-            tu->types.add_import(import_path.value());
+        if (tu->types.import(*import_path)) {
+            tu->types.bind_import(*import_path);
+            _insert_importdecl(x, *import_path);
         }
         else {
             tu->er.error(
@@ -149,6 +149,60 @@ void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportD
                 dsignal::compile_misplaced_import,
                 "illegal import appearing after first type decl!");
         }
+    }
+}
+
+void yama::internal::first_pass::_insert_importdecl(res<ast_ImportDecl> x, const import_path& path) {
+    if (!x->name) return; // if unnamed, don't insert anything
+    const auto name = x->name->str(tu->src);
+    // prepare symbol
+    import_csym sym{
+        .path = path,
+    };
+    // insert symbol
+    bool no_table_found = false;
+    const bool success = tu->syms.insert(
+        *x,
+        name,
+        x,
+        0,
+        sym,
+        &no_table_found);
+    YAMA_ASSERT(!no_table_found);
+    if (!success) { // if failed insert, report name conflict
+        tu->er.error(
+            *x,
+            dsignal::compile_name_conflict,
+            // add the 'import' bit as only other import decls can conflict w/ this
+            "name {} already in use by another import decl!",
+            name);
+    }
+}
+
+void yama::internal::first_pass::_insert_importdecl_for_implicit_yama_import(const import_path& path) {
+    const auto name = "yama"_str;
+    // prepare symbol
+    import_csym sym{
+        .path = path,
+    };
+    // insert symbol
+    bool no_table_found = false;
+    const bool success = tu->syms.insert(
+        tu->root(),
+        name,
+        nullptr, // <- no associated AST node
+        0,
+        sym,
+        &no_table_found);
+    YAMA_ASSERT(!no_table_found);
+    // NOTE: below failure should NEVER occur, but is here for *completeness*
+    if (!success) { // if failed insert, report name conflict
+        tu->er.error(
+            tu->root(),
+            dsignal::compile_name_conflict,
+            // add the 'import' bit as only other import decls can conflict w/ this
+            "name {} already in use by another import decl!",
+            name);
     }
 }
 
@@ -320,7 +374,7 @@ void yama::internal::first_pass::_acknowledge_type_decl() {
     _reached_first_type_decl = true;
 }
 
-bool yama::internal::first_pass::_import_dirs_are_legal() const noexcept {
+bool yama::internal::first_pass::_import_decls_are_legal() const noexcept {
     return !_reached_first_type_decl;
 }
 

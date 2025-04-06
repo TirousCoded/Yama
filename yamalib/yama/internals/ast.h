@@ -34,9 +34,9 @@ namespace yama::internal {
     class ast_node;
 
     class ast_Chunk;
-    class ast_DeclOrDir;
-    class ast_ImportDir;
-    class ast_ImportPath;
+    class ast_Decl;
+    class ast_ImportDecl;
+    class ast_RelativePath;
     class ast_VarDecl;
     class ast_FnDecl;
     class ast_CallSig;
@@ -74,9 +74,9 @@ namespace yama::internal {
         // visit_begin is fired before propagating to children
 
         virtual void visit_begin(res<ast_Chunk> x);
-        virtual void visit_begin(res<ast_DeclOrDir> x);
-        virtual void visit_begin(res<ast_ImportDir> x);
-        virtual void visit_begin(res<ast_ImportPath> x);
+        virtual void visit_begin(res<ast_Decl> x);
+        virtual void visit_begin(res<ast_ImportDecl> x);
+        virtual void visit_begin(res<ast_RelativePath> x);
         virtual void visit_begin(res<ast_VarDecl> x);
         virtual void visit_begin(res<ast_FnDecl> x);
         virtual void visit_begin(res<ast_CallSig> x);
@@ -106,9 +106,9 @@ namespace yama::internal {
         // visit_end is fired after propagating to children
 
         virtual void visit_end(res<ast_Chunk> x);
-        virtual void visit_end(res<ast_DeclOrDir> x);
-        virtual void visit_end(res<ast_ImportDir> x);
-        virtual void visit_end(res<ast_ImportPath> x);
+        virtual void visit_end(res<ast_Decl> x);
+        virtual void visit_end(res<ast_ImportDecl> x);
+        virtual void visit_end(res<ast_RelativePath> x);
         virtual void visit_end(res<ast_VarDecl> x);
         virtual void visit_end(res<ast_FnDecl> x);
         virtual void visit_end(res<ast_CallSig> x);
@@ -253,9 +253,9 @@ namespace yama::internal {
     protected:
         virtual void do_give(taul::token x);
         virtual void do_give(res<ast_Chunk> x);
-        virtual void do_give(res<ast_DeclOrDir> x);
-        virtual void do_give(res<ast_ImportDir> x);
-        virtual void do_give(res<ast_ImportPath> x);
+        virtual void do_give(res<ast_Decl> x);
+        virtual void do_give(res<ast_ImportDecl> x);
+        virtual void do_give(res<ast_RelativePath> x);
         virtual void do_give(res<ast_VarDecl> x);
         virtual void do_give(res<ast_FnDecl> x);
         virtual void do_give(res<ast_CallSig> x);
@@ -290,7 +290,7 @@ namespace yama::internal {
 
     class ast_Chunk final : public ast_node {
     public:
-        std::vector<res<ast_DeclOrDir>> decls_and_dirs;
+        std::vector<res<ast_Decl>> decls;
 
 
         inline ast_Chunk(taul::source_pos pos, ast_id_t id)
@@ -303,70 +303,73 @@ namespace yama::internal {
 
 
     protected:
-        void do_give(res<ast_DeclOrDir> x) override final;
+        void do_give(res<ast_Decl> x) override final;
     };
 
-    class ast_DeclOrDir final : public ast_node {
+    class ast_Decl final : public ast_node {
     public:
         std::variant<
-            std::shared_ptr<ast_ImportDir>,
+            std::shared_ptr<ast_ImportDecl>,
             std::shared_ptr<ast_VarDecl>,
             std::shared_ptr<ast_FnDecl>
-            > decl_or_dir;
+            > decl;
 
 
-        inline ast_DeclOrDir(taul::source_pos pos, ast_id_t id)
+        inline ast_Decl(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
-        std::shared_ptr<ast_node> get_decl_or_dir();
+        std::shared_ptr<ast_node> get_decl();
 
 
-        inline void give_to(ast_node& target) override final { target.give(res<ast_DeclOrDir>(shared_from_this())); }
+        inline void give_to(ast_node& target) override final { target.give(res<ast_Decl>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;
 
 
     protected:
-        void do_give(res<ast_ImportDir> x) override final;
+        void do_give(res<ast_ImportDecl> x) override final;
         void do_give(res<ast_VarDecl> x) override final;
         void do_give(res<ast_FnDecl> x) override final;
     };
     
-    class ast_ImportDir final : public ast_node {
+    class ast_ImportDecl final : public ast_node {
     public:
-        std::shared_ptr<ast_ImportPath> import_path;
+        std::optional<taul::token> name;
+        std::optional<taul::token> head;
+        std::shared_ptr<ast_RelativePath> relative_path;
 
 
-        inline ast_ImportDir(taul::source_pos pos, ast_id_t id)
+        inline ast_ImportDecl(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
         std::optional<std::string> path(const str& src) const;
 
 
-        inline void give_to(ast_node& target) override final { target.give(res<ast_ImportDir>(shared_from_this())); }
+        inline void give_to(ast_node& target) override final { target.give(res<ast_ImportDecl>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;
 
 
     protected:
-        void do_give(res<ast_ImportPath> x) override final;
+        void do_give(taul::token x) override final;
+        void do_give(res<ast_RelativePath> x) override final;
     };
     
-    class ast_ImportPath final : public ast_node {
+    class ast_RelativePath final : public ast_node {
     public:
         std::vector<taul::token> ids_and_dots;
 
 
-        inline ast_ImportPath(taul::source_pos pos, ast_id_t id)
+        inline ast_RelativePath(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
-        std::optional<std::string> path(const str& src) const;
+        std::optional<std::string> relative_path(const str& src) const;
 
 
-        inline void give_to(ast_node& target) override final { target.give(res<ast_ImportPath>(shared_from_this())); }
+        inline void give_to(ast_node& target) override final { target.give(res<ast_RelativePath>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;
 
@@ -499,21 +502,21 @@ namespace yama::internal {
     class ast_Stmt final : public ast_node {
     public:
         std::variant<
-            std::shared_ptr<ast_DeclOrDir>,
+            std::shared_ptr<ast_Decl>,
             std::shared_ptr<ast_ExprStmt>,
             std::shared_ptr<ast_IfStmt>,
             std::shared_ptr<ast_LoopStmt>,
             std::shared_ptr<ast_BreakStmt>,
             std::shared_ptr<ast_ContinueStmt>,
             std::shared_ptr<ast_ReturnStmt>
-            > stmt_decl_or_dir;
+            > stmt_or_decl;
 
 
         inline ast_Stmt(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
-        std::shared_ptr<ast_node> get_stmt_decl_or_dir();
+        std::shared_ptr<ast_node> get_stmt_or_decl();
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_Stmt>(shared_from_this())); }
@@ -522,7 +525,7 @@ namespace yama::internal {
 
 
     protected:
-        void do_give(res<ast_DeclOrDir> x) override final;
+        void do_give(res<ast_Decl> x) override final;
         void do_give(res<ast_ExprStmt> x) override final;
         void do_give(res<ast_IfStmt> x) override final;
         void do_give(res<ast_LoopStmt> x) override final;
@@ -660,12 +663,20 @@ namespace yama::internal {
     
     class ast_PrimaryExpr final : public ast_node {
     public:
+        std::optional<taul::token> qualifier;
         std::optional<taul::token> name;
         std::shared_ptr<ast_Lit> lit;
 
 
         inline ast_PrimaryExpr(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
+
+
+        // TODO: maybe revise fmt_name if we add type args
+
+        // fmt_name fmts name w/ or w/out qualifier
+
+        std::string fmt_name(const taul::source_code& src) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_PrimaryExpr>(shared_from_this())); }
@@ -868,16 +879,19 @@ namespace yama::internal {
     
     class ast_TypeSpec final : public ast_node {
     public:
-        taul::token type;
+        std::optional<taul::token> qualifier;
+        std::optional<taul::token> name;
 
 
         inline ast_TypeSpec(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
-        // TODO: update later when we add import aliases
+        // TODO: maybe revise fmt_name if we add type args
 
-        std::string fmt_type(const taul::source_code& src) const;
+        // fmt_name fmts name w/ or w/out qualifier
+
+        std::string fmt_name(const taul::source_code& src) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_TypeSpec>(shared_from_this())); }

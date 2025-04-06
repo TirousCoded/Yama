@@ -18,7 +18,7 @@ namespace yama::internal {
 
 
     class translation_unit;
-    class compilation_state;
+    class compiler;
 
 
     // ctype_resolver is *populated* via 'add' calls in first passes, and then 'resolve' is
@@ -27,10 +27,10 @@ namespace yama::internal {
 
     class ctype_resolver final {
     public:
-        safeptr<compilation_state> cs;
+        safeptr<compiler> cs;
 
 
-        ctype_resolver(compilation_state& cs);
+        ctype_resolver(compiler& cs);
 
 
         void add(translation_unit& tu, const ast_TypeSpec& x);
@@ -58,7 +58,7 @@ namespace yama::internal {
         void _resolve(translation_unit& tu, const ast_TypeSpec& x, std::optional<ctype>& target);
         void _resolve(translation_unit& tu, const ast_PrimaryExpr& x, std::optional<ctype>& target);
         bool _is_type_spec_id_expr(translation_unit& tu, const ast_PrimaryExpr& x);
-        void _report(translation_unit& tu, bool ambiguous, const ast_node& where, const std::string& name);
+        void _report(translation_unit& tu, bool ambiguous, bool bad_qualifier, const ast_node& where, std::optional<std::string_view> qualifier, const std::string& name);
     };
 }
 

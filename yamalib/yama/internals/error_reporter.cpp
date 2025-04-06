@@ -2,7 +2,7 @@
 
 #include "error_reporter.h"
 
-#include "compilation_state.h"
+#include "compiler.h"
 
 
 yama::internal::error_reporter::error_reporter(translation_unit& tu)

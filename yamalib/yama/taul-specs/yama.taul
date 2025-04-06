@@ -146,17 +146,16 @@ lexer section:
 parser section:
 
 
-    Chunk                           : DeclOrDir* end ;
+    Chunk                           : Decl* end ;
 
-    # NOTE: DeclOrDir excludes ParamDecl as it is introduced in a unique way
+    # NOTE: Decl excludes ParamDecl as it is introduced in a unique way
 
-    DeclOrDir                       : ImportDir
+    Decl                            : ImportDecl
                                     | VarDecl
                                     | FnDecl ;
 
-    ImportDir                       : IMPORT ImportPath SEMI ;
-
-    ImportPath                      : IDENTIFIER ( DOT IDENTIFIER )* ;
+    ImportDecl                      : IMPORT IDENTIFIER ( COLON IDENTIFIER )? RelativePath? SEMI ;
+    RelativePath                    : ( DOT IDENTIFIER )+ ;
 
     # NOTE: VarDecl is for specifying local and non-local variables
 
@@ -172,7 +171,7 @@ parser section:
     # NOTE: certain statements (ie. assignment) are parsed as exprs, due to
     #       how their syntax would otherwise be ambiguous w/ them
 
-    Stmt                            : DeclOrDir
+    Stmt                            : Decl
                                     | ExprStmt
                                     | IfStmt
                                     | LoopStmt
@@ -181,19 +180,19 @@ parser section:
                                     | ReturnStmt
                                     ;
 
-    ExprStmt                        : Expr Assign? SEMI ;   # expr/assign stmt
+    ExprStmt                        : Expr Assign? SEMI ;               # expr/assign stmt
     IfStmt                          : IF L_ROUND Expr R_ROUND Block ( ELSE ( Block | IfStmt ) )? ;
     LoopStmt                        : LOOP Block ;
     BreakStmt                       : BREAK SEMI ;
     ContinueStmt                    : CONTINUE SEMI ;
     ReturnStmt                      : RETURN Expr? SEMI ;
 
-    precedence Expr                 : Expr Args             # call expr
-                                    | PrimaryExpr           # primary expr
+    precedence Expr                 : Expr Args                         # call expr
+                                    | PrimaryExpr                       # primary expr
                                     ;
                                     
-    PrimaryExpr                     : IDENTIFIER            # identifier expr
-                                    | Lit                   # literal expr
+    PrimaryExpr                     : IDENTIFIER ( COLON IDENTIFIER )?  # identifier expr
+                                    | Lit                               # literal expr
                                     ;
 
     Lit                             : IntLit
@@ -212,6 +211,6 @@ parser section:
     Assign                          : ASSIGN Expr ;
     Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
 
-    TypeAnnot                       : COLON TypeSpec ; # type annotation
-    TypeSpec                        : IDENTIFIER ;
+    TypeAnnot                       : COLON TypeSpec ;
+    TypeSpec                        : IDENTIFIER ( COLON IDENTIFIER )? ;
 

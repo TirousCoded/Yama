@@ -6,7 +6,7 @@
 #include "../core/general.h"
 
 #include "domain_data.h"
-#include "compilation_state.h"
+#include "compiler.h"
 
 
 using namespace yama::string_literals;
@@ -154,7 +154,7 @@ const yama::res<yama::module_info>& yama::internal::cmodule::_modinf() const {
     return std::get<res<module_info>>(_info);
 }
 
-yama::internal::ctypesys::ctypesys(compilation_state& cs)
+yama::internal::ctypesys::ctypesys(compiler& cs)
     : cs(cs) {}
 
 std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys::fetch_module(const import_path& x) const {
@@ -249,23 +249,64 @@ std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const 
     return load(unqualified_name, ambiguous);
 }
 
-std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_TypeSpec& x, bool& ambiguous) {
-    // guarantee ambiguous always gets set
+std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const str& qualifier, const str& unqualified_name, bool& bad_qualifier) {
+    // guarantee bad_qualifier always gets set
+    bad_qualifier = false;
+    // query qualifier symbol
+    std::optional<ctype> result{};
+    if (const auto qualifier_sym = tu->syms.lookup(tu->root(), qualifier, 0, lookup_proc::qualifier)) {
+        const auto& symbol = qualifier_sym->as<import_csym>();
+        // attempt load itself
+        result = tu->cs->types.load(qualified_name(symbol.path, unqualified_name));
+    }
+    else bad_qualifier = true;
+    return result;
+}
+
+std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const str& qualifier, const str& unqualified_name) {
+    bool bad_qualifier{};
+    return load(qualifier, unqualified_name, bad_qualifier);
+}
+
+std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_TypeSpec& x, bool& ambiguous, bool& bad_qualifier) {
+    // guarantee ambiguous and bad_qualifier always gets set
     ambiguous = false;
-    // TODO: later we'll need to account for import alias qualifiers
-    return load(x.type.str(tu->src), ambiguous);
+    bad_qualifier = false;
+    // attempt load based on if qualified
+    const auto name = x.name.value().str(tu->src);
+    return
+        x.qualifier
+        ? load(x.qualifier->str(tu->src), name, bad_qualifier)
+        : load(name, ambiguous);
 }
 
 std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_TypeSpec& x) {
-    bool ambiguous{};
-    return load(x, ambiguous);
+    bool ambiguous{}, bad_qualifier{};
+    return load(x, ambiguous, bad_qualifier);
+}
+
+std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_PrimaryExpr& x, bool& ambiguous, bool& bad_qualifier) {
+    // guarantee ambiguous and bad_qualifier always gets set
+    ambiguous = false;
+    bad_qualifier = false;
+    // attempt load based on if qualified
+    const auto name = x.name.value().str(tu->src);
+    return
+        x.qualifier
+        ? load(x.qualifier->str(tu->src), name, bad_qualifier)
+        : load(name, ambiguous);
+}
+
+std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_PrimaryExpr& x) {
+    bool ambiguous{}, bad_qualifier{};
+    return load(x, ambiguous, bad_qualifier);
 }
 
 std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys_local::register_module(translation_unit& x) {
     return tu->cs->types.register_module(x);
 }
 
-void yama::internal::ctypesys_local::add_import(const import_path& where) {
+void yama::internal::ctypesys_local::bind_import(const import_path& where) {
     // IMPORTANT: keep tu->src_path out of _import_set
     if (where != tu->src_path) _import_set.insert(where);
 }

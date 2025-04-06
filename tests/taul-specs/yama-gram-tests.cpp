@@ -1025,11 +1025,10 @@ TEST_F(YamaGramTests, PPRs) {
 
     EXPECT_TRUE(gram->has_ppr("Chunk"_str));
 
-    EXPECT_TRUE(gram->has_ppr("DeclOrDir"_str));
+    EXPECT_TRUE(gram->has_ppr("Decl"_str));
 
-    EXPECT_TRUE(gram->has_ppr("ImportDir"_str));
-
-    EXPECT_TRUE(gram->has_ppr("ImportPath"_str));
+    EXPECT_TRUE(gram->has_ppr("ImportDecl"_str));
+    EXPECT_TRUE(gram->has_ppr("RelativePath"_str));
 
     EXPECT_TRUE(gram->has_ppr("VarDecl"_str));
     EXPECT_TRUE(gram->has_ppr("FnDecl"_str));
@@ -1119,7 +1118,7 @@ TEST_F(YamaGramTests, Chunk_NonEmpty) {
     {
         auto node0 = pattern.syntactic_autoclose("Chunk"_str, cntr);
         {
-            auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
             {
                 auto node2 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
                 pattern.lexical("VAR"_str, cntr, 3);
@@ -1131,7 +1130,7 @@ TEST_F(YamaGramTests, Chunk_NonEmpty) {
         pattern.skip("\r\n", cntr);
         pattern.skip("\r\n", cntr);
         {
-            auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
             {
                 auto node2 = pattern.syntactic_autoclose("FnDecl"_str, cntr);
                 pattern.lexical("FN"_str, cntr, 2);
@@ -1159,7 +1158,7 @@ TEST_F(YamaGramTests, Chunk_NonEmpty) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, DeclOrDir_ImportDir) {
+TEST_F(YamaGramTests, Decl_ImportDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1171,14 +1170,14 @@ TEST_F(YamaGramTests, DeclOrDir_ImportDir) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+        auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
         {
-            auto node2 = pattern.syntactic_autoclose("ImportDir"_str, cntr);
+            auto node2 = pattern.syntactic_autoclose("ImportDecl"_str, cntr);
             pattern.lexical("IMPORT"_str, cntr, 6);
             pattern.skip(" ", cntr);
+            pattern.lexical("IDENTIFIER"_str, cntr, 3);
             {
-                auto node3 = pattern.syntactic_autoclose("ImportPath"_str, cntr);
-                pattern.lexical("IDENTIFIER"_str, cntr, 3);
+                auto node3 = pattern.syntactic_autoclose("RelativePath"_str, cntr);
                 pattern.lexical("DOT"_str, cntr, 1);
                 pattern.lexical("IDENTIFIER"_str, cntr, 3);
                 pattern.lexical("DOT"_str, cntr, 1);
@@ -1188,14 +1187,14 @@ TEST_F(YamaGramTests, DeclOrDir_ImportDir) {
         }
     }
 
-    auto result = parser->parse("DeclOrDir"_str);
+    auto result = parser->parse("Decl"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, DeclOrDir_VarDecl) {
+TEST_F(YamaGramTests, Decl_VarDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1207,7 +1206,7 @@ TEST_F(YamaGramTests, DeclOrDir_VarDecl) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+        auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
         {
             auto node2 = pattern.syntactic_autoclose("VarDecl"_str, cntr);
             pattern.lexical("VAR"_str, cntr, 3);
@@ -1217,14 +1216,14 @@ TEST_F(YamaGramTests, DeclOrDir_VarDecl) {
         }
     }
 
-    auto result = parser->parse("DeclOrDir"_str);
+    auto result = parser->parse("Decl"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, DeclOrDir_FnDecl) {
+TEST_F(YamaGramTests, Decl_FnDecl) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1236,7 +1235,7 @@ TEST_F(YamaGramTests, DeclOrDir_FnDecl) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+        auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
         {
             auto node2 = pattern.syntactic_autoclose("FnDecl"_str, cntr);
             pattern.lexical("FN"_str, cntr, 2);
@@ -1248,14 +1247,40 @@ TEST_F(YamaGramTests, DeclOrDir_FnDecl) {
         }
     }
 
-    auto result = parser->parse("DeclOrDir"_str);
+    auto result = parser->parse("Decl"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, ImportDir) {
+TEST_F(YamaGramTests, ImportDecl_Unnamed_NoRelativePath) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "import abc;"_str);
+    
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node1 = pattern.syntactic_autoclose("ImportDecl"_str, cntr);
+        pattern.lexical("IMPORT"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        pattern.lexical("SEMI"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("ImportDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ImportDecl_Unnamed_RelativePath) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -1267,12 +1292,12 @@ TEST_F(YamaGramTests, ImportDir) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = pattern.syntactic_autoclose("ImportDir"_str, cntr);
+        auto node1 = pattern.syntactic_autoclose("ImportDecl"_str, cntr);
         pattern.lexical("IMPORT"_str, cntr, 6);
         pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
         {
-            auto node2 = pattern.syntactic_autoclose("ImportPath"_str, cntr);
-            pattern.lexical("IDENTIFIER"_str, cntr, 3);
+            auto node2 = pattern.syntactic_autoclose("RelativePath"_str, cntr);
             pattern.lexical("DOT"_str, cntr, 1);
             pattern.lexical("IDENTIFIER"_str, cntr, 3);
             pattern.lexical("DOT"_str, cntr, 1);
@@ -1281,18 +1306,83 @@ TEST_F(YamaGramTests, ImportDir) {
         pattern.lexical("SEMI"_str, cntr, 1);
     }
 
-    auto result = parser->parse("ImportDir"_str);
+    auto result = parser->parse("ImportDecl"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, ImportPath) {
+TEST_F(YamaGramTests, ImportDecl_Named_NoRelativePath) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
-    input.add_str(""_str, "abc.def.ghi"_str);
+    input.add_str(""_str, "import a: abc;"_str);
+    
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node1 = pattern.syntactic_autoclose("ImportDecl"_str, cntr);
+        pattern.lexical("IMPORT"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.lexical("COLON"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        pattern.lexical("SEMI"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("ImportDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ImportDecl_Named_RelativePath) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "import a: abc.def.ghi;"_str);
+    
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node1 = pattern.syntactic_autoclose("ImportDecl"_str, cntr);
+        pattern.lexical("IMPORT"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 1);
+        pattern.lexical("COLON"_str, cntr, 1);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        {
+            auto node2 = pattern.syntactic_autoclose("RelativePath"_str, cntr);
+            pattern.lexical("DOT"_str, cntr, 1);
+            pattern.lexical("IDENTIFIER"_str, cntr, 3);
+            pattern.lexical("DOT"_str, cntr, 1);
+            pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        }
+        pattern.lexical("SEMI"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("ImportDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, RelativePath) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, ".def.ghi"_str);
 
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
@@ -1300,15 +1390,14 @@ TEST_F(YamaGramTests, ImportPath) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node1 = pattern.syntactic_autoclose("ImportPath"_str, cntr);
-        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        auto node1 = pattern.syntactic_autoclose("RelativePath"_str, cntr);
         pattern.lexical("DOT"_str, cntr, 1);
         pattern.lexical("IDENTIFIER"_str, cntr, 3);
         pattern.lexical("DOT"_str, cntr, 1);
         pattern.lexical("IDENTIFIER"_str, cntr, 3);
     }
 
-    auto result = parser->parse("ImportPath"_str);
+    auto result = parser->parse("RelativePath"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
@@ -1709,7 +1798,7 @@ TEST_F(YamaGramTests, Stmt_Decl) {
     {
         auto node0 = pattern.syntactic_autoclose("Stmt"_str, cntr);
         {
-            auto node1 = pattern.syntactic_autoclose("DeclOrDir"_str, cntr);
+            auto node1 = pattern.syntactic_autoclose("Decl"_str, cntr);
             pattern.loose_syntactic("VarDecl"_str, cntr, 6);
         }
     }
@@ -2230,7 +2319,7 @@ TEST_F(YamaGramTests, Expr_SuffixNesting) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr) {
+TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr_NoQualifier) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2243,6 +2332,31 @@ TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr) {
     taul::parse_tree_pattern pattern(*gram);
     {
         auto node0 = pattern.syntactic_autoclose("PrimaryExpr"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+    }
+
+    auto result = parser->parse("PrimaryExpr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr_Qualifier) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "abc:def"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("PrimaryExpr"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        pattern.lexical("COLON"_str, cntr, 1);
         pattern.lexical("IDENTIFIER"_str, cntr, 3);
     }
 
@@ -2772,7 +2886,7 @@ TEST_F(YamaGramTests, TypeAnnot) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, TypeSpec) {
+TEST_F(YamaGramTests, TypeSpec_NoQualifier) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2785,6 +2899,31 @@ TEST_F(YamaGramTests, TypeSpec) {
     taul::parse_tree_pattern pattern(*gram);
     {
         auto node0 = pattern.syntactic_autoclose("TypeSpec"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 5);
+    }
+
+    auto result = parser->parse("TypeSpec"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, TypeSpec_Qualifier) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "yama:Float"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("TypeSpec"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 4);
+        pattern.lexical("COLON"_str, cntr, 1);
         pattern.lexical("IDENTIFIER"_str, cntr, 5);
     }
 

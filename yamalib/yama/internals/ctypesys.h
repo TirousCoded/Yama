@@ -18,7 +18,7 @@
 namespace yama::internal {
 
 
-    class compilation_state;
+    class compiler;
     class translation_unit;
 
 
@@ -117,10 +117,10 @@ namespace yama::internal {
 
     class ctypesys final {
     public:
-        safeptr<compilation_state> cs;
+        safeptr<compiler> cs;
 
 
-        ctypesys(compilation_state& cs);
+        ctypesys(compiler& cs);
 
 
         std::shared_ptr<cmodule> fetch_module(const import_path& x) const; // fetch w/out importing
@@ -163,15 +163,29 @@ namespace yama::internal {
         std::optional<ctype> load(const str& unqualified_name, bool& ambiguous);
         std::optional<ctype> load(const str& unqualified_name);
 
-        std::optional<ctype> load(const ast_TypeSpec& x, bool& ambiguous);
+        // load via qualified name lookup
+
+        // bad_qualifier will be set to true if load fails due to qualifier being undeclared
+        // name, and false in every other case
+
+        std::optional<ctype> load(const str& qualifier, const str& unqualified_name, bool& bad_qualifier);
+        std::optional<ctype> load(const str& qualifier, const str& unqualified_name);
+
+        // load via type spec
+
+        std::optional<ctype> load(const ast_TypeSpec& x, bool& ambiguous, bool& bad_qualifier);
         std::optional<ctype> load(const ast_TypeSpec& x);
+
+        // load via identifier expr primary expr
+
+        std::optional<ctype> load(const ast_PrimaryExpr& x, bool& ambiguous, bool& bad_qualifier);
+        std::optional<ctype> load(const ast_PrimaryExpr& x);
 
         std::shared_ptr<cmodule> register_module(translation_unit& x);
 
-        // TODO: add_import DOES NOT perform import itself, just acknowledgement for shadowing,
-        //       w/ me worrying this distinction may cause future confusion
+        // bind_import adds where to import set for shadowing
 
-        void add_import(const import_path& where); // adds to import set of compiling module
+        void bind_import(const import_path& where);
 
 
         ctype default_none(const std::optional<ctype>& x);

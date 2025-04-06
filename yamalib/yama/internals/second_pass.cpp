@@ -2,7 +2,7 @@
 
 #include "second_pass.h"
 
-#include "compilation_state.h"
+#include "compiler.h"
 
 
 using namespace yama::string_literals;
@@ -19,7 +19,7 @@ void yama::internal::second_pass::visit_begin(res<ast_FnDecl> x) {
         return;
     }
     const str name = x->name.str(tu->src);
-    auto& symbol = deref_assert(tu->syms.lookup(*x, name, x->low_pos())).as<fn_csym>();
+    auto& symbol = deref_assert(tu->syms.lookup(*x, name, 0)).as<fn_csym>();
     // begin new fn type for code gen
     _begin_target(name);
     // resolve if fn type is None returning
@@ -781,7 +781,7 @@ void yama::internal::second_pass::_pop_scope(const ast_Block& x, bool write_pop_
 void yama::internal::second_pass::_promote_to_localvar(ast_VarDecl& x) {
     YAMA_ASSERT(_top_reg().is_temp());
     const auto localvar_name = x.name.str(tu->src);
-    const auto localvar_type = _top_reg().type; // *deduce* local var type from type of temporary
+    const ctype localvar_type = _top_reg().type; // *deduce* local var type from type of temporary
     // tell the temporary (now local var) register the name of its local var
     _top_reg().localvar = localvar_name;
     // update symbol table entry

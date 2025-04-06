@@ -2,10 +2,10 @@
 
 #include "ctype_resolver.h"
 
-#include "compilation_state.h"
+#include "compiler.h"
 
 
-yama::internal::ctype_resolver::ctype_resolver(compilation_state& cs)
+yama::internal::ctype_resolver::ctype_resolver(compiler& cs)
     : cs(cs) {}
 
 void yama::internal::ctype_resolver::add(translation_unit& tu, const ast_TypeSpec& x) {
@@ -38,7 +38,7 @@ std::optional<yama::internal::ctype> yama::internal::ctype_resolver::get(const a
 }
 
 void yama::internal::ctype_resolver::_resolve(translation_unit& tu, const ast_TypeSpec& x, std::optional<ctype>& target) {
-    if (const auto sym = tu.syms.lookup(x, x.type.str(tu.src), x.low_pos()); sym && !sym->is_type()) {
+    if (const auto sym = tu.syms.lookup(x, x.name.value().str(tu.src), x.low_pos()); sym && !sym->is_type()) {
         tu.er.error(
             x,
             dsignal::compile_not_a_type,
@@ -46,20 +46,21 @@ void yama::internal::ctype_resolver::_resolve(translation_unit& tu, const ast_Ty
         return;
     }
     bool ambiguous{};
-    if (const auto t = tu.types.load(x, ambiguous)) {
+    bool bad_qualifier{};
+    if (const auto t = tu.types.load(x, ambiguous, bad_qualifier)) {
         target = *t;
     }
-    else _report(tu, ambiguous, x, x.fmt_type(tu.src));
+    else _report(tu, ambiguous, bad_qualifier, x, x.qualifier ? std::make_optional(x.qualifier->str(tu.src)) : std::nullopt, x.fmt_name(tu.src));
 }
 
 void yama::internal::ctype_resolver::_resolve(translation_unit& tu, const ast_PrimaryExpr& x, std::optional<ctype>& target) {
     if (!_is_type_spec_id_expr(tu, x)) return; // don't want to raise error if x isn't *supposed* to even be a type spec
-    const auto name = x.name.value().str(tu.src);
     bool ambiguous{};
-    if (const auto t = tu.types.load(name, ambiguous)) {
+    bool bad_qualifier{};
+    if (const auto t = tu.types.load(x, ambiguous, bad_qualifier)) {
         target = *t;
     }
-    else _report(tu, ambiguous, x, name.fmt());
+    else _report(tu, ambiguous, bad_qualifier, x, x.qualifier ? std::make_optional(x.qualifier->str(tu.src)) : std::nullopt, x.fmt_name(tu.src));
 }
 
 bool yama::internal::ctype_resolver::_is_type_spec_id_expr(translation_unit& tu, const ast_PrimaryExpr& x) {
@@ -69,13 +70,20 @@ bool yama::internal::ctype_resolver::_is_type_spec_id_expr(translation_unit& tu,
     return !sym || sym->is_type();
 }
 
-void yama::internal::ctype_resolver::_report(translation_unit& tu, bool ambiguous, const ast_node& where, const std::string& name) {
+void yama::internal::ctype_resolver::_report(translation_unit& tu, bool ambiguous, bool bad_qualifier, const ast_node& where, std::optional<std::string_view> qualifier, const std::string& name) {
     if (ambiguous) { // ambiguous
         tu.er.error(
             where,
             dsignal::compile_ambiguous_name,
             "ambiguous name {}!",
             name);
+    }
+    if (bad_qualifier) { // bad qualifier
+        tu.er.error(
+            where,
+            dsignal::compile_undeclared_qualifier,
+            "undeclared qualifier {}!",
+            std::string(qualifier.value()));
     }
     else { // nothing found
         tu.er.error(

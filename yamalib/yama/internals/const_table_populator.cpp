@@ -4,7 +4,7 @@
 
 #include "../core/general.h"
 
-#include "compilation_state.h"
+#include "compiler.h"
 
 
 using namespace yama::string_literals;

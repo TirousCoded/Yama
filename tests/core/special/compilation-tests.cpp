@@ -1120,7 +1120,7 @@ TEST_F(CompilationTests, General_Fail_InvalidParcelEnv_NoYamaModuleAvailable) {
     ASSERT_TRUE(dm->install(std::move(ib)));
 
     // perfectly valid Yama code, but should fail compile up-front due to
-    // no 'yama' dep to use for implicit import dir
+    // no 'yama' dep to use for implicit import decl
 
     std::string txt = R"(
 
@@ -1159,7 +1159,7 @@ TEST_F(CompilationTests, General_Fail_InvalidParcelEnv_YamaModuleIsNotFromYamaPa
     ASSERT_TRUE(dm->install(std::move(ib)));
 
     // perfectly valid Yama code, but should fail compile up-front due to
-    // 'yama' dep to use for implicit import dir being *wrong*
+    // 'yama' dep to use for implicit import decl being *wrong*
 
     std::string txt = R"(
 
@@ -1174,312 +1174,14 @@ fn f() {}
 }
 
 
-// IMPORTANT: 'dir' is short for 'directive'
-
-// import dir
-//
-//      - the compilation defines an 'import set' of modules which have been
-//        imported such that their contents are made available
-// 
-//          - if two imported modules have similarly named types, no issue arises
-//            from them coexisting (just so long as they're not referenced unqualified)
-// 
-//      - import dirs add new modules to the import set
-// 
-//          - the 'import path specifiers' used in import dirs specify the module
-//            imported
-// 
-//              - import path specifiers are relative to the parcel env of the parcel
-//                of the compiling module
-// 
-//          - compilation must be able to succeed at importing a module via an import
-//            dir's import path specifier to add to the import set
-// 
-//              - if compilation succeeds, the modules imported during compilation
-//                become part of the module import state observable by end-user
-// 
-//          - redundant import dirs are tolerated
-// 
-//          - import dirs importing the compiling module itself are tolerated
-// 
-//      - compilation defines an implicit import dir which imports the 'yama' module
-//
-//          - this module is the root of the 'yama' dep of the compiling module's
-//            parcel, which is expected to map to the special parcel defining
-//            builtin Yama types
-//
-//          - due to rules defined above in 'general', this module is guaranteed to
-//            be available, and its contents should be as expected
-//
-//      - import dirs may exist only in the global block
-//
-//      - import dirs may exist only prior to the first type decl
-// 
-//      - import dirs may induce multi-source compilation
-//
-//          - import dirs within these additional translation units may induce
-//            further multi-source compilation
-
-// explicit import dir, w/ module imported from dependency
-
-TEST_F(CompilationTests, ImportDir_ExplicitImportDir_ModuleImportedFromDep) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-fn f() {
-    observeInt(10); // fns.abc:observeInt
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// explicit import dir, w/ module imported from same parcel as compiling module
-
-TEST_F(CompilationTests, ImportDir_ExplicitImportDir_ModuleImportedFromSameParcelAsCompilingModule) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import self.abc;
-
-fn f() {
-    acknowledge(); // self.abc:acknowledge
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    expected.observe_misc("ack");
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// explicit import dir, imported modules share types w/ common unqualified name
-
-TEST_F(CompilationTests, ImportDir_ExplicitImportDir_ImportedModulesShareTypesWithCommonUnqualifiedName) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-import fns2.abc; // <- won't conflict
-
-fn f() {}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// implicit yama import dir
-
-TEST_F(CompilationTests, ImportDir_ImplicitYamaImportDir) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() -> Int { // Int exposed by implicit yama import
-    return 10;
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// redundant import dirs are tolerated
-
-TEST_F(CompilationTests, ImportDir_RedundantImportDirsAreTolerated) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-import fns.abc;
-import fns.abc;
-import fns.abc;
-import fns.abc;
-import fns.abc;
-
-fn f() {
-    observeInt(10); // observeInt is in fns.abc
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// redundant import dirs are tolerated, for implicit yama import dir
-
-TEST_F(CompilationTests, ImportDir_RedundantImportDirsAreTolerated_ForImplicitYamaImportDir) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import yama;
-import yama;
-import yama;
-import yama;
-
-fn f() -> Int { // Int exposed by implicit yama import
-    return 10;
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// import dirs importing the compiling module itself are tolerated
-
-TEST_F(CompilationTests, ImportDir_ImportDirsImportingTheCompilingModuleItselfAreTolerated) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import self;
-import self;
-import self;
-import self;
-import self;
-
-fn f() -> Int {
-    return 10;
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
 // multi-source compilation
+//
+//      - below tests layout rules of multi-source compilation
 
-TEST_F(CompilationTests, ImportDir_MultiSourceCompilation) {
+// multi-source compilation where compiling modules are added to compilation by import decls
+// (inducing their compilation)
+
+TEST_F(CompilationTests, MultiSourceCompilation_DirectCompilingModuleAddition) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -1495,7 +1197,7 @@ fn f() {
 }
 
 )";
-    
+
     std::string txt_multi_a = R"(
 
 import fns.abc;
@@ -1505,7 +1207,7 @@ fn aaa() {
 }
 
 )";
-    
+
     std::string txt_multi_b = R"(
 
 import fns.abc;
@@ -1515,7 +1217,7 @@ fn bbb() {
 }
 
 )";
-    
+
     std::string txt_multi_c = R"(
 
 import fns.abc;
@@ -1549,10 +1251,10 @@ fn ccc() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// multi-source compilation where compiling modules added to compilation by import dirs
-// inducing their compilation in turn induce the compilation of yet more modules
+// multi-source compilation where compiling modules added to compilation by import decls
+// (inducing their compilation) in turn induce the compilation of yet more modules
 
-TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_IndirectCompilingModuleAddition) {
+TEST_F(CompilationTests, MultiSourceCompilation_IndirectCompilingModuleAddition) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -1564,7 +1266,7 @@ fn f() {
 }
 
 )";
-    
+
     std::string txt_multi_a = R"(
 
 import self.multi.b; // add new src to compilation
@@ -1576,7 +1278,7 @@ fn aaa() {
 }
 
 )";
-    
+
     std::string txt_multi_b = R"(
 
 import self.multi.c; // add new src to compilation
@@ -1588,7 +1290,7 @@ fn bbb() {
 }
 
 )";
-    
+
     std::string txt_multi_c = R"(
 
 import fns.abc;
@@ -1624,7 +1326,7 @@ fn ccc() {
 
 // multi-parcel multi-source compilation
 
-TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_MultiParcel) {
+TEST_F(CompilationTests, MultiSourceCompilation_MultiParcel) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -1672,7 +1374,7 @@ fn ccc() {
 }
 
 )";
-    
+
     std::string txt_multi_d = R"(
 
 import fns.abc;
@@ -1712,7 +1414,7 @@ fn ddd() {
 // remember that parcels aren't allowed to have dep graph cycles between them, so we need-not
 // worry about the notion of multi-parcel dep graph cycles
 
-TEST_F(CompilationTests, ImportDir_MultiSourceCompilation_TolerateCompilingModuleImportGraphCycles) {
+TEST_F(CompilationTests, MultiSourceCompilation_TolerateCompilingModuleImportGraphCycles) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -1809,89 +1511,9 @@ fn ccc() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// illegal to import non-existent module
-
-TEST_F(CompilationTests, ImportDir_Fail_ImportNonExistentModule) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns; // error! fns parcel has no root module!
-
-fn f() -> Int {
-    return 10;
-}
-
-)";
-
-    ASSERT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_import), 1);
-}
-
-// illegal to import non-existent module, w/ import failing due to invalid module
-
-// I want to test this explicitly to ensure that the particular part of the
-// impl which handles importing during compilation knows to statically verify
-// imported modules
-
-TEST_F(CompilationTests, ImportDir_Fail_ImportInvalidModule) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.bad; // error! fns.bad was invalid!
-
-fn f() -> Int {
-    return 10;
-}
-
-)";
-
-    ASSERT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_import), 1);
-}
-
-// illegal for import dir to exist in local scope
-
-TEST_F(CompilationTests, ImportDir_Fail_ImportDirExistsInLocalScope) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    import fns.abc; // error! illegal in local scope!
-}
-
-)";
-
-    ASSERT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
-}
-
-TEST_F(CompilationTests, ImportDir_Fail_ImportDirExistsAfterFirstTypeDecl) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    //...
-}
-
-import fns.abc; // error! illegal after first type decl
-
-)";
-
-    ASSERT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
-}
-
 // multi-source compilation failure (including w/ the error arising in another parcel!)
 
-TEST_F(CompilationTests, ImportDir_Fail_MultiSourceCompilationFailure) {
+TEST_F(CompilationTests, MultiSourceCompilation_Fail_InducedCompilationFails) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -1958,8 +1580,8 @@ fn ddd() {
 
 // decl & scope
 // 
-//      - 'decls' bind name identifiers to types, parameters and local vars
-//      - decls have 'scopes' which define when that binding is valid
+//      - 'decls' bind name identifiers to imports, types, parameters and local vars
+//      - decls have 'scopes' which define when their binding is valid
 //
 //      - decl scope is dictated by what 'block' they were declared in,
 //        as well as what region within said block the decl is valid for
@@ -1968,25 +1590,36 @@ fn ddd() {
 // 
 //      - blocks are either either 'global' or 'local'
 //      - global blocks define the top-level global scope inside of which
-//        types are defined
+//        imports and types are defined
 //      - local blocks define local scopes within function bodies and
 //        the nested scopes within statements
 //      - for any given chunk of Yama code, the global block is the root
 //        of the block hierarchy
 // 
-//      - decls in the same block may not share names
+//      - decls in the same block may not share names, unless otherwise specified
 // 
 //      - within the global block are contained all types loaded from modules imported
-//        via import dirs
+//        via import decls
 //      - within the global block, types are differentiated by parcel env 'fullname'
 //          * this means that it's allowed for types defined in the Yama code to share
 //            unqualified names w/ extern types (as they shouldn't conflict)
 //          * unqualified name conflicts should only arise on reference
 // 
+//      - given a type and import decl w/ a common unqualified name, the two decls
+//        are not considered to be in conflict
+//          * this is okay as types and imports operate w/ different lookup procedures
+// 
+//      - when looking up an identifier via an unqualified name, the lookup occurs w/
+//        either 'normal lookup procedure' or 'qualifier lookup procedure'
+//      - normal lookup procedure is the default, and is used to lookup types, parameters
+//        and local vars, ignoring imports
+//      - qualifier lookup procedure is used to lookup imports used to qualify type
+//        specifiers or identifier exprs, and ignores all decls except imports
+// 
 //      - decls may 'shadow' one another
 // 
-//          - decls in child blocks may 'shadow' ones in ancestoral blocks by
-//            using the same name as them
+//          - decls in child blocks shadow ones in ancestoral blocks by using the same
+//            name as them
 // 
 //          - given an extern type and a type defined in Yama code w/ the same
 //            unqualified name, unqualified name access of this name will select the
@@ -1994,8 +1627,12 @@ fn ddd() {
 // 
 //      - the different scopes decls have are as follows:
 // 
-//          - type decls for extern types exist in the global block, w/ their scope
-//            beginning/ending at the start/end of this block
+//          - import decls exist in the global block, w/ their scope beginning/ending
+//            at the start/end of this block
+//              * these are in scope at all points in the Yama code
+// 
+//          - extern types exist in the global block, w/ their scope beginning/ending
+//            at the start/end of this block
 //              * these are in scope at all points in the Yama code
 // 
 //          - type decls exist in the global block, w/ their scope beginning/ending
@@ -2279,6 +1916,54 @@ fn f(a: Int) {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// IMPORTANT: like w/ shadowing, coexistence is tested here, but the particulars of referencing
+//            are left to type specifier and identifier expr tests
+
+// test that given a type decl and an import decl w/ a common unqualified name, that
+// the two can coexist w/out a name conflict arising
+
+TEST_F(CompilationTests, DeclAndScope_TypeAndImportWithCommonUnqualifiedNameDoNotCauseNameConflict) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn a() -> Int {
+    return 3;
+}
+
+fn f() {
+    a:observeInt(a()); // <- the two 'a's coexist w/out conflict
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto a = dm->load("a:a"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(a);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(a->kind(), yama::kind::function);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(a->callsig().value().fmt(), "fn() -> yama:Int");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(3);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // test to ensure impl properly impls local var scope not starting until after the
 // decl itself, w/ this meaning that the init exprs of the local var cannot reference
 // itself
@@ -2299,9 +1984,42 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
-// illegal to declare a two or more types in global scope w/ a common name
+// illegal to declare two or more imports in global scope w/ a common name
 
-TEST_F(CompilationTests, DeclAndScope_Fail_IfDeclTypeWithNameOfTypeAlreadyTaken_ByAnotherTypeInYamaCode) {
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Import_Import) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+import a: yama; // error! name 'a' already taken
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
+}
+
+// illegal to declare import w/ name of implicit 'yama' import
+
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Import_Import_OneIsImplicitYamaImport) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import yama: fns.abc; // error! name 'yama' already taken
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_name_conflict), 1);
+}
+
+// illegal to declare two or more types in global scope w/ a common name
+
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Type_Type_BothFromYamaCode) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2320,7 +2038,7 @@ fn f(a: Int) {}
 // illegal for a parameter to have the same name as another parameter
 // in the same parameter list
 
-TEST_F(CompilationTests, DeclAndScope_Fail_IfTwoParamsShareName) {
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Param_Param) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2337,7 +2055,7 @@ fn f(a, a: Int) {}
 // illegal to declare a local var in function body block w/ the name
 // of a parameter
 
-TEST_F(CompilationTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfParam) {
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_Param) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2356,7 +2074,7 @@ fn f(a: Int) {
 // illegal to declare a local var in function body block w/ the name
 // of another local var in that block
 
-TEST_F(CompilationTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInFnBodyBlock) {
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_LocalVar_BothInFnBodyBlock) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2376,7 +2094,7 @@ fn f() {
 // illegal to declare a local var in a nested local block w/ the name
 // of another local var in that block
 
-TEST_F(CompilationTests, DeclAndScope_Fail_IfDeclareLocalVar_WithNameOfAnotherLocalVar_BothInNestedBlock) {
+TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_LocalVar_BothInNestedBlock) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2423,10 +2141,13 @@ fn f() {
 // 
 //      - type specifiers exist relative to some block, and their ability to reference
 //        decls respects the scope and shadowing rules of decls
+//
+//      - type specifiers w/ import decl name qualifiers lookup the import to use via
+//        qualifier lookup procedure
 
-// specify extern type
+// specify extern type via unqualified type specifier
 
-TEST_F(CompilationTests, TypeSpecifier_SpecifyExternType) {
+TEST_F(CompilationTests, TypeSpecifier_SpecifyExternType_UnqualifiedTypeSpecifier) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2436,6 +2157,43 @@ import fns.abc;
 fn f() {
     var a: Int = 10; // 'Int' specifies extern yama:Int
     observeInt(a); // 'observeInt' specifies extern fns.abc:observeInt
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// specify extern type via qualified type specifier
+
+TEST_F(CompilationTests, TypeSpecifier_SpecifyExternType_QualifiedTypeSpecifier) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import other: fns.abc;
+
+fn f() {
+    var a: yama:Int = 10; // 'yama:Int' specifies extern yama:Int
+    other:observeInt(a); // 'other:observeInt' specifies extern fns.abc:observeInt
 }
 
 )";
@@ -2544,9 +2302,89 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// specify type via qualifier which names an import which shares an unqualified name
+// w/ a type in Yama code
+
+TEST_F(CompilationTests, TypeSpecifier_QualifierNameAlsoUsedByType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn a() {}
+
+fn g(x: a:observeInt) {} // <- type spec (ie. not an id expr)
+
+fn f() {
+    g(observeInt);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// type specified twice, once w/ qualifier, and once w/out, both refer to same type
+
+TEST_F(CompilationTests, TypeSpecifier_TypeSpecifiedTwice_OnceWithQualifier_OnceWithNoQualifier_BothRefSameType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn g(x: observeInt) {} // <- type spec (ie. not an id expr)
+fn h(x: a:observeInt) {} // <- type spec (ie. not an id expr)
+
+fn f() {
+    // observeInt and a:observeInt are same type
+    g(observeInt);
+    h(observeInt);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // illegal for type spec to specify non-type
 
-TEST_F(CompilationTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName) {
+TEST_F(CompilationTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName_NoQualifier) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -2560,6 +2398,24 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
+}
+
+// illegal for type spec to have undeclared qualifier
+
+TEST_F(CompilationTests, TypeSpecifier_Fail_UndeclaredQualifier) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: missing:T; // error! no type named missing:T
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_qualifier), 1);
 }
 
 // illegal ambiguous unqualified name type specify (between two or more extern types)
@@ -2618,6 +2474,522 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
+}
+
+
+// IMPORTANT: multi-source compilation is tested elsewhere
+
+// import decl
+// 
+//      - each translation unit has an 'import set' of modules
+// 
+//          - the set of 'extern types' of the translation unit is the sum of the sets of
+//            types exposed by the modules in its import set, w/ these types being made
+//            available to the translation unit
+// 
+//          - extern types may be referenced w/ (import decl name) qualification
+// 
+//          - extern types may be referenced w/out qualification if and only if their are
+//            not multiple extern types w/ the same unqualified name
+// 
+//      - import decl adds module specified by 'import path specifier' to import set
+// 
+//          - import path specifiers are relative to the parcel env of the parcel
+//            of the compiling module
+// 
+//      - import decl name is *optional*
+// 
+//          - no name means qualified type access is not available
+//
+//      - import decl must appear only in global block
+//      - import decl must appear prior to first type decl
+//          * this makes impl easier
+// 
+//      - multiple import decls may import the same module
+// 
+//          - in which case said import decls are considered simply different aliases for
+//            the same module, sharing the same set of exposed extern types
+// 
+//      - import decls may import the compiling module itself
+//
+//      - import decls must specify module which is valid 
+//      - import decls may induce multi-source compilation (recursively)
+// 
+//      - translation units implicitly contain a special implicit import decl which imports
+//        the 'yama' module
+//
+//          - import decl has name 'yama'
+//
+//          - this module is the root of the 'yama' dep of the compiling module's
+//            parcel, which is expected to map to the special parcel defining
+//            builtin Yama types
+//
+//          - due to rules defined above in 'general', this module is guaranteed to
+//            be available, and its contents should be as expected
+
+// explicit import decl, unnamed, module imported from dependency
+
+TEST_F(CompilationTests, ExplicitImportDecl_Unnamed_ModuleImportedFromDep) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    observeInt(10); // fns.abc:observeInt
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// explicit import decl, unnamed, module imported from same parcel as compiling module
+
+TEST_F(CompilationTests, ExplicitImportDecl_Unnamed_ModuleImportedFromSameParcelAsCompilingModule) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self.abc;
+
+fn f() {
+    acknowledge(); // self.abc:acknowledge
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_misc("ack");
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// explicit import decl, named, module imported from dependency
+
+TEST_F(CompilationTests, ExplicitImportDecl_Named_ModuleImportedFromDep) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import abc: fns.abc;
+
+fn f() {
+    abc:observeInt(10); // fns.abc:observeInt
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// explicit import decl, named, module imported from same parcel as compiling module
+
+TEST_F(CompilationTests, ExplicitImportDecl_Named_ModuleImportedFromSameParcelAsCompilingModule) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import abc: self.abc;
+
+fn f() {
+    abc:acknowledge(); // self.abc:acknowledge
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_misc("ack");
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// extern type set contains types w/ same unqualified name
+
+TEST_F(CompilationTests, ImportDecl_ExternTypeSetContainsTypesWithSameUnqualifiedName) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+import fns2.abc; // <- won't conflict
+
+fn f() {}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// implicit yama import decl
+
+TEST_F(CompilationTests, ImportDecl_ImplicitYamaImportDecl) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn g() -> yama:Int { // 'yama' name is used by implicit import decl
+    return 10;
+}
+
+fn f() -> Int { // Int exposed by implicit yama import
+    return g(); // <- yama:Int and Int are same type
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// redundant import decls are tolerated
+
+TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+import fns.abc;
+
+fn f() {
+    observeInt(10); // observeInt is in fns.abc
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// redundant import decls are tolerated, for implicit yama import decl
+
+TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated_ForImplicitYamaImportDecl) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import yama;
+import yama;
+import yama;
+import yama;
+
+fn f() -> Int { // Int exposed by implicit yama import
+    return 10;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// redundant import decls are tolerated, type accessed via multiple import decl name qualifiers
+
+TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated_TypeAccessedViaMultipleImportDeclNameQualifiers) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import abc1: fns.abc;
+import abc2: fns.abc;
+
+fn g(x: observeInt) {} // <- test can unqualify access observeInt
+
+fn f() {
+    g(abc1:observeInt); // <- abc1:observeInt is same type as observeInt
+    g(abc2:observeInt); // <- abc2:observeInt is same type as observeInt
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// import decls importing the compiling module itself are tolerated
+
+// TODO: maybe seperate out below into its own unit test
+
+// here we also test that types accessed via qualifying w/ name of self import
+// are the same types as those being defined in the compiling module itself
+
+TEST_F(CompilationTests, ImportDecl_ImportDeclsImportingTheCompilingModuleItselfAreTolerated) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import self;
+import self;
+import self;
+import a: self; // <- give this one a name to test w/
+import self;
+
+fn h() {}
+
+fn g(x: h) {} // <- assert that type of arg passed is same type as 'h'
+
+fn f() -> Int {
+    g(h); // <- should work
+    g(a:h); // <- should also work (ie. h and a:h are same type)
+    return 10;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal to import non-existent module
+
+TEST_F(CompilationTests, ImportDecl_Fail_ImportNonExistentModule) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns; // error! fns parcel has no root module!
+
+fn f() -> Int {
+    return 10;
+}
+
+)";
+
+    ASSERT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_import), 1);
+}
+
+// illegal to import non-existent module, w/ import failing due to invalid module
+
+// I want to test this explicitly to ensure that the particular part of the
+// impl which handles importing during compilation knows to statically verify
+// imported modules
+
+TEST_F(CompilationTests, ImportDecl_Fail_ImportInvalidModule) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.bad; // error! fns.bad was invalid!
+
+fn f() -> Int {
+    return 10;
+}
+
+)";
+
+    ASSERT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_import), 1);
+}
+
+// illegal for import decl to exist in local scope
+
+TEST_F(CompilationTests, ImportDecl_Fail_ImportDeclExistsInLocalScope) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    import fns.abc; // error! illegal in local scope!
+}
+
+)";
+
+    ASSERT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
+}
+
+// illegal for import decl to exist after first type decl
+
+TEST_F(CompilationTests, ImportDecl_Fail_ImportDeclExistsAfterFirstTypeDecl) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    //...
+}
+
+import fns.abc; // error! illegal after first type decl
+
+)";
+
+    ASSERT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_misplaced_import), 1);
 }
 
 
@@ -4479,6 +4851,9 @@ fn f() -> Int {
 // 
 //      - specifies a reference to a function, parameter, or local var, for sake of either
 //        accessing a value, or (in case of local vars) assigning it
+//
+//      - identifier exprs w/ import decl name qualifiers lookup the import to use via
+//        qualifier lookup procedure
 // 
 //      - if referring to a function, the identifier expr corresponds to the instantiation
 //        of a stateless object of the function type specified
@@ -4493,9 +4868,9 @@ fn f() -> Int {
 //
 //      - illegal if referring to a non-function type
 
-// access value of function reference
+// access value of function reference, w/out import decl qualifier
 
-TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn) {
+TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn_WithNoQualifier) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -4526,6 +4901,45 @@ fn g() {} // make sure impl can handle fn not declared until AFTER first use!
 
     // expected return value
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// access value of function reference, w/ import decl qualifier
+
+TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn_WithQualifier) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import abc: fns.abc;
+
+fn f() -> observeInt {
+    return abc:observeInt;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto observeInt = dm->load("fns.abc:observeInt"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(observeInt);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(observeInt->kind(), yama::kind::function);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(observeInt->callsig().value().fmt(), "fn(yama:Int) -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> fns.abc:observeInt");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*observeInt));
 
     // expected side effects
     sidefx_t expected{};
@@ -4779,9 +5193,91 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// illegal reference to non-function type
+// reference w/ qualifier which names an import which shares an unqualified name
+// w/ a type in Yama code
 
-TEST_F(CompilationTests, IdentifierExpr_Fail_IfRefersToNonFnType) {
+TEST_F(CompilationTests, IdentifierExpr_QualifierNameAlsoUsedByType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn a() {}
+
+fn f() {
+    a:observeInt(100); // <- id expr (ie. not a type spec)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// reference fn twice, once w/ qualifier, and once w/out, both refer to same type
+
+TEST_F(CompilationTests, IdentifierExpr_RefFnTwice_OnceWithQualifier_OnceWithNoQualifier_BothRefSameType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn g(x: observeInt) {
+    x(100);
+}
+
+fn f() {
+    // observeInt and a:observeInt are same type
+    g(observeInt); // <- id expr (ie. not a type spec)
+    g(a:observeInt); // <- id expr (ie. not a type spec)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    expected.observe_int(100);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal reference to non-function type, w/ no qualifier
+
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnType_WithNoQualifier) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -4797,9 +5293,27 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
 }
 
+// illegal reference to non-function type, w/ qualifier
+
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnType_WithQualifier) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = yama:Int; // 'yama:Int' is not a fn type
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
+}
+
 // illegal reference to undeclared name
 
-TEST_F(CompilationTests, IdentifierExpr_Fail_IfRefersToUndeclaredName) {
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsUndeclaredName) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -4815,10 +5329,28 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
+// illegal reference w/ undeclared qualifier
+
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsWithUndeclaredQualifier) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = missing:T; // no import decl named 'missing:T'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_qualifier), 1);
+}
+
 // illegal reference to local var not yet in scope (ie. the identifier expr is
 // in the same block as the local var, but the local var isn't in scope yet)
 
-TEST_F(CompilationTests, IdentifierExpr_Fail_IfRefersToLocalVarNotYetInScope) {
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsLocalVarNotYetInScope) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -4837,7 +5369,7 @@ fn f() {
 
 // illegal reference to local var which has gone out-of-scope
 
-TEST_F(CompilationTests, IdentifierExpr_Fail_IfRefersToLocalVarWhichIsOutOfScope) {
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsLocalVarWhichIsOutOfScope) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
