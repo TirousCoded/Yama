@@ -712,7 +712,7 @@ bool yama::verifier::_symbolic_exec_step(const type_info& subject, const bc::cod
         }
         else {
             const bool valid =
-                _verify_RB_in_bounds(subject, bcode, block, i) &&
+                _verify_RB_in_bounds_for_copy_instr(subject, bcode, block, i) &&
                 _verify_RA_and_RB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
             if (!valid) {
                 return false;
@@ -729,7 +729,7 @@ bool yama::verifier::_symbolic_exec_step(const type_info& subject, const bc::cod
             _verify_ArgRs_have_at_least_one_object(subject, bcode, i) &&
             _verify_ArgRs_legal_call_object(subject, bcode, block, i) &&
             _verify_param_arg_registers_are_correct_number_and_types(subject, bcode, block, i) &&
-            (_is_newtop(instr.B) ? true : _verify_RB_in_bounds(subject, bcode, block, i)) &&
+            (_is_newtop(instr.B) ? true : _verify_RB_in_bounds_for_call_instr(subject, bcode, block, i)) &&
             (_is_newtop(instr.B) ? true : _verify_RB_is_return_type_of_call_object_skip_if_reinit(subject, bcode, block, i));
         if (!valid) {
             return false;
@@ -895,7 +895,19 @@ bool yama::verifier::_verify_RA_is_return_type_of_this_call(const type_info& sub
     return true;
 }
 
-bool yama::verifier::_verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+bool yama::verifier::_verify_RB_in_bounds_for_copy_instr(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    if (bcode[i].B >= block.final_reg_set.size()) {
+        YAMA_RAISE(dbg(), dsignal::verif_RB_out_of_bounds);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
+            subject.unqualified_name, i, bcode[i].B);
+        return false;
+    }
+    return true;
+}
+
+bool yama::verifier::_verify_RB_in_bounds_for_call_instr(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     YAMA_ASSERT(bcode[i].A <= block.final_reg_set.size());
     const size_t final_reg_set_size_after_popping_args = block.final_reg_set.size() - size_t(bcode[i].A);
     if (bcode[i].B >= final_reg_set_size_after_popping_args) {

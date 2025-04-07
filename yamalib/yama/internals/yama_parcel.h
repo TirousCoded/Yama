@@ -15,7 +15,7 @@ namespace yama::internal {
 
 
         const yama::parcel_metadata& metadata() override final {
-            if (!md) md = yama::parcel_metadata{ str::lit("self"), {} };
+            if (!md) md = yama::parcel_metadata{ str::lit("yama"), {} };
             return *md;
         }
         std::optional<import_result> import(const str& relative_path) override final;
@@ -23,10 +23,11 @@ namespace yama::internal {
 
     private:
         std::optional<yama::parcel_metadata> md;
-        std::shared_ptr<module_info> _root_modinf;
+        std::shared_ptr<module_info> _root_modinf, _util_modinf;
 
 
         res<module_info> _get_root_modinf();
+        res<module_info> _get_util_modinf();
     };
 }
 

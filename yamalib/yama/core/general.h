@@ -3,8 +3,10 @@
 #pragma once
 
 
+#include <cstdio>
 #include <utility>
 #include <iterator>
+#include <format>
 
 #include <taul/str.h>
 
@@ -28,6 +30,21 @@ namespace yama {
 
     namespace string_literals {
         using namespace taul::string_literals;
+    }
+
+
+    // useful C++23 inspired print fns
+
+    template<typename... Args>
+    inline void print(std::format_string<Args...> fmt, Args&&... args) {
+        std::cout << std::format(fmt, std::forward<Args>(args)...);
+    }
+    template<typename... Args>
+    inline void println(std::format_string<Args...> fmt, Args&&... args) {
+        std::cout << std::format(fmt, std::forward<Args>(args)...) << "\n";
+    }
+    inline void println() {
+        std::cout << "\n";
     }
 }
 

@@ -136,7 +136,8 @@ namespace yama {
         bool _verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         // NOTE: 'this call' refers to the call the instruction is in, for verifying ret instrs
         bool _verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
-        bool _verify_RB_in_bounds(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RB_in_bounds_for_copy_instr(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RB_in_bounds_for_call_instr(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RB_is_return_type_of_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);

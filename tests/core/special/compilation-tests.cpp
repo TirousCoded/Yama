@@ -6071,6 +6071,24 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// illegal multi-codepoint char literal
+
+TEST_F(CompilationTests, CharLiteralExpr_Fail_IllegalMultiCodepointCharLiteral) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = 'ab';
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_malformed_literal), 1);
+}
+
 // illegal Unicode, UTF-16 surrogate
 
 TEST_F(CompilationTests, CharLiteralExpr_Fail_IllegalUnicode_UTF16Surrogate) {

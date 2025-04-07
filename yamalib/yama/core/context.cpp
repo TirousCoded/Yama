@@ -448,6 +448,7 @@ bool yama::context::_has_curr_type() noexcept {
 
 bool yama::context::_push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t max_locals) {
     if (call_frames() == max_call_frames()) return false; // overflow
+    YAMA_LOG(dbg(), ctx_llcmd_c, " > call frame {}: *enter*", call_frames());
     const bool has_top_cf = !_callstk.empty();
     YAMA_ASSERT(has_top_cf || args_start == 0); // if pushing user call frame then args_start == 0
     // prep new call frame
@@ -471,6 +472,7 @@ void yama::context::_pop_cf() {
     if (_callstk.empty()) return;
     _pop_regs(locals());
     _callstk.pop_back();
+    YAMA_LOG(dbg(), ctx_llcmd_c, " > call frame {}: *exit*", call_frames()); // 'call_frames()' is what index was
 }
 
 void yama::context::_push_user_cf() {
@@ -508,10 +510,15 @@ void yama::context::_try_handle_panic_for_user_cf() {
 }
 
 std::string yama::context::_fmt_R_no_preview(local_t x) {
-    return
-        x < locals()
-        ? std::format("R({})", x)
-        : std::format("R({}) (out-of-bounds)", x);
+    if (x < locals()) {
+        return std::format("R({})", x);
+    }
+    else if (x == (local_t)newtop) {
+        return std::format("R(push {})", locals());
+    }
+    else {
+        return std::format("R({}) (out-of-bounds)", x);
+    }
 }
 
 std::string yama::context::_fmt_R(local_t x) {
@@ -716,7 +723,6 @@ std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
         return std::nullopt;
     }
     // fire call behaviour
-    YAMA_LOG(dbg(), ctx_llcmd_c, " > call frame {}: *enter*", call_frames() - 1);
     const call_fn callobj_call_fn = deref_assert(callobj_type.call_fn());
     if (callobj_call_fn != bcode_call_fn) { // fire non-bcode-based call behaviour
         callobj_call_fn(*this);
@@ -724,7 +730,6 @@ std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
     else { // fire bcode-based call behaviour
         _bcode_exec();
     }
-    YAMA_LOG(dbg(), ctx_llcmd_c, " > call frame {}: *exit*", call_frames() - 1);
     // propagate panic if call behaviour panicked
     if (panicking()) {
         _pop_cf(); // cleanup before abort

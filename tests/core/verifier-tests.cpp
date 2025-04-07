@@ -280,7 +280,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ReturnType_
 TEST_F(VerifierTests, Verify_TypeInfo_BCode_DisregardBCodeIfCallFnIsNotBCodeCallFn) {
     const auto f_bcode =
         yama::bc::code(); // otherwise illegal empty bcode
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -313,7 +313,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_TolerateDeadCode) {
         .add_noop()
         .add_put_none(yama::newtop)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -339,7 +339,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_TolerateAllControlPathsBeingCyclical
         .add_noop()
         .add_noop()
         .add_jump(-4);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -366,7 +366,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_RegisterReinitsOverwriteOneAnother) 
         .add_put_const(0, 2, true) // reinits R(0) (to Char 'y')
         .add_put_const(0, 3, true) // reinits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -400,7 +400,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_NoBranch) {
         .add_put_const(yama::newtop, 1) // inits R(1) (to Float 3.14159)
         .add_noop()
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -431,7 +431,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_MultipleExitpoints) {
         // block #3 (exitpoint)
         .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -466,7 +466,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_ControlPathsMerge) {
         // fallthrough merges into block #4
         // block #4
         .add_ret(0); // R(0) is merge of the two above Float reinits
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -502,7 +502,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_CyclicalControlPath) {
         .add_jump(-6) // jump to block #2 (forming control path cycle)
         // block #4
         .add_ret(0); // R(0) must be a Float by this point
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -545,7 +545,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstrOfBl
         .add_noop() // jump destination
         .add_put_arg(yama::newtop, 100, true) // <- error!
         .add_jump(-3);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -566,7 +566,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstrOfBl
 TEST_F(VerifierTests, Verify_TypeInfo_BCode_Fail_BinaryIsEmpty) {
     const auto f_bcode =
         yama::bc::code();
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str);
@@ -596,7 +596,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Fail_FinalBlockFallthroughToOutOfBou
         .add_noop()
         // we're using jump_if to test more nuanced scenario than just a simple fallthrough due to no branch or exitpoint
         .add_jump_true(1, -3); // illegal fallthrough to out-of-bounds instruction
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -628,7 +628,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Noop) {
         .add_noop()
         .add_put_none(yama::newtop)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -654,7 +654,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop) {
         .add_pop(1) // pops R(0)
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -680,7 +680,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_Zero) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
         .add_pop(0) // pops *nothing*
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -711,7 +711,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_Many) {
         .add_pop(5) // pops R(0), R(1), ..., R(4)
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -738,7 +738,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_MoreThanAreOnStack) {
         .add_pop(100) // pops R(0) (and more if there were any)
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 31)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -766,7 +766,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone) {
         .add_call(1, yama::newtop) // call helper, putting None into R(0)
         .add_put_none(0) // no reinit, so R(0) MUST be None already
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -793,7 +793,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Reinit) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_none(0, true) // reinits R(0) (to None) via index
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -818,7 +818,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Newtop) {
         // block #1
         .add_put_none(yama::newtop) // inits R(0) (to None) via newtop
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -843,7 +843,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Newtop_MayBeMarkedReinit) {
         // block #1
         .add_put_none(yama::newtop, true) // inits R(0) (to None) via newtop
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -872,7 +872,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_OutOfBounds) {
         .add_pop(1) // pops R(1)
         .add_put_none(1) // R(1) out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -899,7 +899,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_IsNewtopButPushingOv
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_put_none(yama::newtop) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -926,7 +926,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_WrongType_AndNotRein
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_none(0) // R(0) not type None
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -954,7 +954,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_PushingMustNotOverflow)
         .add_put_none(yama::newtop) // R(0) not type None
         .add_put_none(yama::newtop) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -982,7 +982,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_const(0, 2) // no reinit, so R(0) MUST be Int already
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1009,7 +1009,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Reinit) {
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_put_const(0, 1, true) // reinits R(0) (to Int 10) via index
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1034,7 +1034,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Newtop) {
         // block #1
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) via newtop
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1059,7 +1059,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Newtop_MayBeMarkedReinit) {
         // block #1
         .add_put_const(yama::newtop, 1, true) // inits R(0) (to Int 10) via newtop
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1088,7 +1088,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_OutOfBounds) {
         .add_pop(1) // pops R(1)
         .add_put_const(1, 1, true) // R(1) out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -1116,7 +1116,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_IsNewtopButPushingO
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) <- return value
         .add_put_const(yama::newtop, 1) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -1144,7 +1144,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_OutOfBounds) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_const(0, 2) // Ko(2) out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1172,7 +1172,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_NotAnObjectConst) 
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_const(0, 0) // Ko(0) not an object constant
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1200,7 +1200,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_And_KoB_TypesDiffer
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_const(0, 2) // Ko(2) not type Int
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1229,7 +1229,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_PushingMustNotOverflow
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_put_const(yama::newtop, 1) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1262,7 +1262,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg) {
         .add_put_arg(1, 1) // load Bool arg into R(1), w/out reinit
         .add_put_arg(2, 2) // load Float arg into R(2), w/out reinit
         .add_ret(2);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1298,7 +1298,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Reinit) {
         .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
         .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
         .add_ret(2);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1331,7 +1331,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Newtop) {
         .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
         .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
         .add_ret(2);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1364,7 +1364,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Newtop_MayBeMarkedReinit) {
         .add_put_const(1, 3) // no reinit, so R(1) MUST be Bool already
         .add_put_const(2, 4) // no reinit, so R(2) MUST be Float already
         .add_ret(2);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1396,7 +1396,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_OutOfBounds) {
         .add_pop(1) // pops R(1)
         .add_put_arg(1, 0, true) // R(1) out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1425,7 +1425,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_IsNewtopButPushingOve
         .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05) <- return value
         .add_put_arg(yama::newtop, 0) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1454,7 +1454,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_ArgB_OutOfBounds) {
         .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         .add_put_arg(0, 3) // Arg(3) out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1483,7 +1483,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_And_ArgB_TypesDiffer)
         .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         .add_put_arg(0, 1) // Arg(1) not type Float
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1512,7 +1512,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_PushingMustNotOverflow) 
         .add_put_arg(yama::newtop, 1)
         .add_put_arg(yama::newtop, 1) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -1535,14 +1535,18 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_PushingMustNotOverflow) 
 }
 
 TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy) {
+    // I once had an issue where copy instr verif was mistakenly treating R(A) as though it
+    // had call instr semantics, so I rewrote this test to catch this error
     const auto f_bcode =
         yama::bc::code()
         // block #1
-        .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
+        .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_put_const(yama::newtop, 2) // inits R(1) (to Float 3.14159)
-        .add_copy(0, 1) // no reinit, so R(1) MUST be Float already
+        .add_put_none(yama::newtop) // inits R(2) (to None)
+        .add_put_const(yama::newtop, 1) // inits R(3) (to Float 0.05)
+        .add_copy(3, 1) // no reinit, so R(1) MUST be Float already
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1554,7 +1558,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy) {
         .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
-            .max_locals = 2,
+            .max_locals = 4,
             .bcode = f_bcode,
         },
     };
@@ -1570,7 +1574,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Reinit) {
         .add_put_const(yama::newtop, 2) // inits R(1) (to Int 10)
         .add_copy(0, 1, true) // reinits R(1) (to Float)
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1597,7 +1601,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Newtop) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
         .add_copy(0, yama::newtop) // inits R(1) (to Float)
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1624,7 +1628,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Newtop_MayBeMarkedReinit) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
         .add_copy(0, yama::newtop, true) // inits R(1) (to Float)
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1655,7 +1659,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RA_OutOfBounds) {
         .add_pop(1) // pops R(2)
         .add_copy(2, 1, true) // R(2) out-of-bounds
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1688,7 +1692,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RB_OutOfBounds) {
         .add_pop(2) // pops R(2)
         .add_copy(0, 2, true) // R(2) out-of-bounds
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1717,7 +1721,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RB_IsNewtopButPushingOverf
         .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
         .add_copy(0, yama::newtop) // overflow!
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1747,7 +1751,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
         .add_put_const(yama::newtop, 2) // inits R(1) (to Float 0.05)
         .add_copy(0, 1) // R(1) not type Int
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1776,7 +1780,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_PushingMustNotOverflow) {
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_copy(0, yama::newtop) // overflow!
         .add_ret(1);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -1809,7 +1813,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call) {
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
         .add_call(4, 0) // no reinit, so R(0) MUST be Char already
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1845,7 +1849,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Reinit) {
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
         .add_call(4, 0, true) // reinits R(0) to return type Char
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1880,7 +1884,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Newtop) {
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call(4, yama::newtop) // inits R(0) to return type Char
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1915,7 +1919,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Newtop_MayBeMarkedReinit) {
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call(4, yama::newtop, true) // inits R(0) to return type Char
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1952,7 +1956,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_OutOfBounds) {
         .add_pop(2) // pops R(2) and R(3)
         .add_call(4, yama::newtop) // [R(0), R(3)] out-of-bounds
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -1988,7 +1992,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_ZeroObjects) {
         .add_put_const(yama::newtop, 1) // inits R(1) to type of call object (though this will go unused)
         .add_call(0, 0) // A == 0 means no call object specified
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2020,7 +2024,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObject) {
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
         .add_call(4, 0) // R(1) cannot be used as call object
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2059,7 +2063,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooMany) {
         .add_put_const(yama::newtop, 6) // inits R(5) to type of arg #4
         .add_call(5, 0) // 5 is too many args for call to g
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2096,7 +2100,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooFew) {
         .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
         .add_call(3, 0) // 3 is too few args for call to g
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2134,7 +2138,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_WrongTypes) {
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
         .add_call(4, 0) // arg #2 is UInt, but a Float was expected
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2171,7 +2175,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_RB_OutOfBounds_AfterTheCal
         .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
         .add_call(4, 0, true) // R(0) out-of-bounds after the call
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2209,7 +2213,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_RB_WrongType) {
         .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
         .add_call(4, 0) // R(0) not type Char
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2247,7 +2251,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR) {
         .add_call_nr(4)
         .add_put_none(yama::newtop)
         .add_ret(0); // return the None object from R(0)
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2285,7 +2289,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
         .add_call_nr(4) // [R(0), R(3)] out-of-bounds
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2321,7 +2325,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_ZeroObjects) {
         .add_call_nr(0) // A == 0 means no call object specified
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2353,7 +2357,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObject)
         .add_call_nr(4) // R(0) cannot be used as call object
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2392,7 +2396,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooMany) {
         .add_call_nr(5) // 5 is too many args for call to g
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2429,7 +2433,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooFew) {
         .add_call_nr(3) // 3 is too few args for call to g
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2467,7 +2471,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_WrongTypes) {
         .add_call_nr(4) // arg #2 is UInt, but a Float was expected
         .add_put_none(0, true)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -2500,7 +2504,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret) {
         // block #1
         .add_put_const(yama::newtop, 1) // inits R(0) (to Float 0.05)
         .add_ret(0); // return Float
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2527,7 +2531,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret_Fail_RA_OutOfBounds) {
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_pop(1) // pops R(0)
         .add_ret(0); // R(0) out-of-bounds
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -2553,7 +2557,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret_Fail_RA_WrongType) {
         // block #1
         .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
         .add_ret(0); // R(0) not type Float
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2586,7 +2590,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump) {
         // block #3
         .add_put_const(yama::newtop, 2) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2611,7 +2615,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump_Fail_PutsPCOutOfBounds) {
         yama::bc::code()
         // block #1
         .add_jump(1); // jump to out-of-bounds instruction index
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
@@ -2646,7 +2650,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump_Fail_ViolatesRegisterCoherence)
         // block #5
         .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2682,7 +2686,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopOne) {
         // block #3
         // expect R(0) to still be good
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2713,7 +2717,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopZero) {
         // block #3
         // expect R(0) to still be good
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -2750,7 +2754,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopMany) {
         // pushing should push None to R(0) as stack should be empty
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2787,7 +2791,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopMoreThanAreOnStack) {
         // pushing should push None to R(0) as stack should be empty
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2820,7 +2824,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_DoesNotExist) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2855,7 +2859,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_WrongType) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2890,7 +2894,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -2941,7 +2945,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_ViolatesRegisterCohere
         // R(0) will be either Float or Int by this point, violating register coherence
         .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -2977,7 +2981,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopOne) {
         // block #3
         // expect R(0) to still be good
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -3008,7 +3012,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopZero) {
         // block #3
         // expect R(0) to still be good
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Bool"_str)
@@ -3045,7 +3049,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopMany) {
         // pushing should push None to R(0) as stack should be empty
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -3082,7 +3086,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopMoreThanAreOnStack) {
         // pushing should push None to R(0) as stack should be empty
         .add_put_none(yama::newtop) // inits R(0) (to None)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -3115,7 +3119,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_DoesNotExist) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -3150,7 +3154,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_WrongType) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -3185,7 +3189,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
         // block #3
         .add_put_const(yama::newtop, 3) // inits R(0) (to Float 0.05)
         .add_ret(0);
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Float"_str)
@@ -3236,7 +3240,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_ViolatesRegisterCoher
         // R(0) will be either Float or Int by this point, violating register coherence
         .add_put_none(0, true) // reinits R(0) (to None)
         .add_ret(0); // return None object
-    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)

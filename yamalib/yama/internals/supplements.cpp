@@ -2,16 +2,16 @@
 
 #include "supplements.h"
 
-#include "scalars.h"
-#include "callsig_info.h"
-#include "context.h"
+#include "../core/scalars.h"
+#include "../core/callsig_info.h"
+#include "../core/context.h"
 
 
 using namespace yama::string_literals;
 
 
-std::vector<yama::type_info> yama::make_supplements() {
-    std::vector<type_info> result{};
+yama::module_info yama::internal::make_supplements() {
+    module_factory mf{};
 
     auto add_0in1out =
         [&](yama::str name, yama::str return_type, yama::call_fn cf) {
@@ -27,7 +27,7 @@ std::vector<yama::type_info> yama::make_supplements() {
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
         };
     
     auto add_1in0out =
@@ -45,7 +45,7 @@ std::vector<yama::type_info> yama::make_supplements() {
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
         };
     
     auto add_1in1out =
@@ -62,7 +62,7 @@ std::vector<yama::type_info> yama::make_supplements() {
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
         };
     
     auto add_2in1out =
@@ -80,15 +80,15 @@ std::vector<yama::type_info> yama::make_supplements() {
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
         };
 
-#define _ADD_0IN1OUT_PROMPT_FN(name, return_type, parse_expr, put_fn) \
+#define _ADD_0IN1OUT_PROMPT_FN(name, return_type_short, return_type, parse_expr, put_fn) \
 add_0in1out( \
     name, return_type, \
     [](context& ctx) { \
         while (true) { \
-            std::cerr << "input (" << return_type << "): "; \
+            std::cerr << "input (" << return_type_short << "): "; \
             std::string input{}; \
             std::cin >> input; \
             if (const auto result = ( parse_expr )) { \
@@ -235,7 +235,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
     }
     {
         auto consts =
@@ -258,7 +258,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
     }
     {
         auto consts =
@@ -280,7 +280,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
     }
     {
         auto consts =
@@ -302,7 +302,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
     }
 
     // print fns
@@ -313,11 +313,11 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     _ADD_1IN0OUT("cprint"_str, "yama:Char"_str, (std::cerr << " > " << yama::fmt_char(a) << "\n"), as_char);
 
     // prompt fns (which await valid user input)
-    _ADD_0IN1OUT_PROMPT_FN("iprompt"_str, "yama:Int"_str, yama::parse_int(input), put_int);
-    _ADD_0IN1OUT_PROMPT_FN("uprompt"_str, "yama:UInt"_str, yama::parse_uint(input), put_uint);
-    _ADD_0IN1OUT_PROMPT_FN("fprompt"_str, "yama:Float"_str, yama::parse_float(input), put_float);
-    _ADD_0IN1OUT_PROMPT_FN("bprompt"_str, "yama:Bool"_str, yama::parse_bool(input), put_bool);
-    _ADD_0IN1OUT_PROMPT_FN("cprompt"_str, "yama:Char"_str, yama::parse_char(input), put_char);
+    _ADD_0IN1OUT_PROMPT_FN("iprompt"_str, "Int"_str, "yama:Int"_str, yama::parse_int(input), put_int);
+    _ADD_0IN1OUT_PROMPT_FN("uprompt"_str, "UInt"_str, "yama:UInt"_str, yama::parse_uint(input), put_uint);
+    _ADD_0IN1OUT_PROMPT_FN("fprompt"_str, "Float"_str, "yama:Float"_str, yama::parse_float(input), put_float);
+    _ADD_0IN1OUT_PROMPT_FN("bprompt"_str, "Bool"_str, "yama:Bool"_str, yama::parse_bool(input), put_bool);
+    _ADD_0IN1OUT_PROMPT_FN("cprompt"_str, "Char"_str, "yama:Char"_str, yama::parse_char(input), put_char);
 
     // panic fn
     {
@@ -333,7 +333,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
                 .max_locals = 1,
             },
         };
-        result.push_back(t);
+        mf.add_type(std::move(t));
     }
 
 #define _ADD_CONV_FN(in_letter, out_letter, in_type, out_type, out_cpp_type, in_as_method, out_put_fn) \
@@ -357,7 +357,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             .max_locals = 1, \
         }, \
     }; \
-    result.push_back(t); \
+    mf.add_type(std::move(t)); \
 } (void)0
 
 #define _ADD_CONV_FNS(in_letter, in_type, in_as_method) \
@@ -374,6 +374,6 @@ _ADD_CONV_FN(in_letter, "c", in_type, "yama:Char"_str, yama::char_t, in_as_metho
     _ADD_CONV_FNS("b", "yama:Bool"_str, as_bool);
     _ADD_CONV_FNS("c", "yama:Char"_str, as_char);
 
-    return result;
+    return mf.done();
 }
 

@@ -7,6 +7,7 @@
 
 #include "../core/asserts.h"
 #include "../core/general.h"
+#include "../core/scalars.h"
 
 
 namespace yama::internal {
@@ -96,6 +97,11 @@ namespace yama::internal {
         YAMA_ASSERT(b_first <= b_last);
         return b_first >= a_first && b_last <= a_last;
     }
+
+
+    // TODO: replace w/ frontend version later
+
+    std::string fmt_string_literal(const str& x, char_t err = U'?');
 
 
     inline std::string fmt_tabs(size_t tabs, const char* tab) {

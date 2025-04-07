@@ -79,8 +79,8 @@ bool yama::internal::translation_unit::first_pass() {
 
 bool yama::internal::translation_unit::second_pass() {
 #if 0
-    std::cerr << std::format("{}\n", ast->fmt_tree(src));
-    std::cerr << std::format("{}\n", syms.fmt(src));
+    println("{}", ast->fmt_tree(src));
+    println("{}", syms.fmt(src));
 #endif
     root().accept(sp);
     return upload();
@@ -103,8 +103,7 @@ bool yama::internal::translation_unit::parse_ast() {
 
 bool yama::internal::translation_unit::upload() {
     if (er.is_fatal()) return false;
-    cs->dd->importer.upload_compiled_module(src_path, make_res<module_info>(output.done()));
-    return true;
+    return cs->dd->importer.upload_compiled_module(src_path, make_res<module_info>(output.done()));
 }
 
 yama::internal::env yama::internal::translation_unit::e() const {

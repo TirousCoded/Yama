@@ -3,6 +3,7 @@
 #include "second_pass.h"
 
 #include "compiler.h"
+#include "util.h"
 
 
 using namespace yama::string_literals;
@@ -231,12 +232,20 @@ void yama::internal::second_pass::visit_begin(res<ast_Expr> x) {
             const auto txt = lit_nd->lit.str(tu->src); // <- text w/ single-quotes
             const auto txt_corrected = txt.substr(1, txt.length() - 2); // <- text w/out single-quotes
             const parsed_char v = parse_char(txt_corrected).value();
-            if (!taul::is_unicode(v.v)) { // illegal Unicode error
+            if (v.bytes < txt_corrected.length()) { // illegal multi-codepoint char literal error
+                tu->er.error(
+                    *x,
+                    dsignal::compile_malformed_literal,
+                    "illegal multi-codepoint char literal ({})!",
+                    fmt_string_literal(txt_corrected));
+                return; // abort
+            }
+            else if (!taul::is_unicode(v.v)) { // illegal Unicode error
                 tu->er.error(
                     *x,
                     dsignal::compile_illegal_unicode,
                     "illegal Unicode ({})!",
-                    lit_nd->lit.str(tu->src));
+                    fmt_string_literal(txt_corrected));
                 return; // abort
             }
             else { // valid

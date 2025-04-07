@@ -182,6 +182,7 @@ namespace yama {
         compile_nonassignable_expr,
         compile_not_in_loop,
         compile_no_return_stmt,
+        compile_malformed_literal,
         compile_numeric_overflow,
         compile_numeric_underflow,
         compile_illegal_unicode,
@@ -241,7 +242,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 65);
+        static_assert(dsignals == 66);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -264,6 +265,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_nonassignable_expr);
             _YAMA_ENTRY_(compile_not_in_loop);
             _YAMA_ENTRY_(compile_no_return_stmt);
+            _YAMA_ENTRY_(compile_malformed_literal);
             _YAMA_ENTRY_(compile_numeric_overflow);
             _YAMA_ENTRY_(compile_numeric_underflow);
             _YAMA_ENTRY_(compile_illegal_unicode);

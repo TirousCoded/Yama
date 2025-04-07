@@ -9,6 +9,12 @@
 namespace yama {
 
 
+    // TODO: if we ever make a C rewrite of Yama, we could reimpl newtop_t via a preprocessor
+    //       definition called something like 'yama_newtop' which expands to '(-1)', which in
+    //       turn can then be converted into a 8-bit or 32-bit uint of the max value of the
+    //       particular type in question
+
+
     // in our system 'newtop' is a special register pseudo-index used to signal to the
     // system that it should push a new register to the local object stack, rather than
     // writing to an existing one
