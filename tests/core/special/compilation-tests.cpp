@@ -542,11 +542,93 @@ TEST_F(CompilationTests, Empty) {
 // empty
 
 )";
-    
+
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
     ASSERT_EQ(result->size(), 0); // can't really test w/ dm if *result is empty
+}
+
+TEST_F(CompilationTests, MultipleRoundsOfCompilation) {
+    ASSERT_TRUE(ready);
+
+    // I got a nasty memory corruption issue once from my impl not being able to handle
+    // multiple rounds of compilation due to failing to cleanup properly between each,
+    // so I decided to create this test to cover this behaviour
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    var temp: Int = 100;
+    observeInt(temp);
+}
+
+)";
+
+    std::string txt_multi_a = R"(
+
+import fns.abc;
+
+fn f() {
+    var temp: Int = 41;
+    observeInt(temp);
+}
+
+)";
+
+    std::string txt_multi_b = R"(
+
+import fns.abc;
+
+fn f() {
+    var temp: Int = 1_001;
+    observeInt(temp);
+}
+
+)";
+
+    // manually setup and call dm->import rather than using perform_compile
+
+    // also, we're gonna use dm->load instead of dm->import
+
+    our_test_parcel->our_src = txt;
+    our_test_parcel->our_src_multi_a = txt_multi_a;
+    our_test_parcel->our_src_multi_b = txt_multi_b;
+
+    auto f1 = dm->load("a:f"_str);
+    auto f2 = dm->load("a.multi.a:f"_str);
+    auto f3 = dm->load("a.multi.b:f"_str);
+    ASSERT_TRUE(f1);
+    ASSERT_TRUE(f2);
+    ASSERT_TRUE(f3);
+
+    ASSERT_EQ(f1->kind(), yama::kind::function);
+    ASSERT_EQ(f2->kind(), yama::kind::function);
+    ASSERT_EQ(f3->kind(), yama::kind::function);
+    ASSERT_EQ(f1->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f2->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f3->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f1).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f2).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f3).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(2).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    expected.observe_int(41);
+    expected.observe_int(1001);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 TEST_F(CompilationTests, Fail_LexicalError) {
