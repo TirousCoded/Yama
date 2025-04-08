@@ -45,48 +45,11 @@ bool yama::bc::code::reinit_flag(size_t x) const noexcept {
 }
 
 std::string yama::bc::code::fmt_instr(size_t x, const char* tab) const {
-    YAMA_ASSERT(tab);
-    YAMA_ASSERT(x < count());
-    const auto& instr = get(x);
-    auto maybe_nt =
-        [](uint8_t x) -> std::string {
-        return
-            x == uint8_t(newtop)
-            ? "NT"
-            : std::format("{}", x);
-        };
-    std::string a{};
-    static_assert(opcodes == 12);
-    switch (instr.opc) {
-    case opcode::noop:          a = std::format("{: <12}", ' ');                                break;
-    case opcode::pop:           a = std::format("{: <12}", instr.A);                            break;
-    case opcode::put_none:      a = std::format("{: <12}", maybe_nt(instr.A));                  break;
-    case opcode::put_const:     a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
-    case opcode::put_arg:       a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
-    case opcode::copy:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
-    case opcode::call:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
-    case opcode::call_nr:       a = std::format("{: <12}", instr.A);                            break;
-    case opcode::ret:           a = std::format("{: <12}", instr.A);                            break;
-    case opcode::jump:          a = std::format("{: <12}", instr.sBx);                          break;
-    case opcode::jump_true:     a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
-    case opcode::jump_false:    a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
-    default:                    YAMA_DEADEND;                                                   break;
-    }
-    std::string result = std::format("{}{: <5}{: <16}{}", tab, x, get(x).opc, a);
-    if (reinit_flag(x)) {
-        result += "(reinit)";
-    }
-    static_assert(opcodes == 12);
-    if (
-        get(x).opc == opcode::jump ||
-        get(x).opc == opcode::jump_true ||
-        get(x).opc == opcode::jump_false) {
-        // TODO: maybe add syntax for when sBx offset puts PC out-of-bounds
-        // NOTE: take note that we MUST have the '+ 1' bit below for target, since the PC is incr prior to jumping
-        size_t target = x + 1 + std::make_signed_t<size_t>(get(x).sBx);
-        result += std::format("(branches to instr {})", target);
-    }
-    return result;
+    return _fmt_instr(x, nullptr, tab);
+}
+
+std::string yama::bc::code::fmt_instr(size_t x, const syms& syms, const char* tab) const {
+    return _fmt_instr(x, &syms, tab);
 }
 
 std::string yama::bc::code::fmt_disassembly(const char* tab) const {
@@ -95,6 +58,16 @@ std::string yama::bc::code::fmt_disassembly(const char* tab) const {
     result += std::format("disassembly ({} instrs)", count());
     for (size_t i = 0; i < count(); i++) {
         result += std::format("\n{}", fmt_instr(i, tab));
+    }
+    return result;
+}
+
+std::string yama::bc::code::fmt_disassembly(const syms& syms, const char* tab) const {
+    YAMA_ASSERT(tab);
+    std::string result{};
+    result += std::format("disassembly ({} instrs)", count());
+    for (size_t i = 0; i < count(); i++) {
+        result += std::format("\n{}", fmt_instr(i, syms, tab));
     }
     return result;
 }
@@ -175,30 +148,54 @@ yama::bc::code& yama::bc::code::add_jump_false(uint8_t A, int16_t sBx) {
     return *this;
 }
 
-yama::bc::code& yama::bc::code::append(const code& x) {
-    if (_instrs.capacity() < count() + x.count()) {
-        _instrs.reserve(count() + x.count());
-        _reinit_flags.reserve(count() + x.count());
+std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* tab) const {
+    YAMA_ASSERT(tab);
+    YAMA_ASSERT(x < count());
+    const auto& instr = get(x);
+    auto maybe_nt =
+        [](uint8_t x) -> std::string {
+        return
+            x == uint8_t(newtop)
+            ? "NT"
+            : std::format("{}", x);
+        };
+    std::string a{};
+    static_assert(opcodes == 12);
+    switch (instr.opc) {
+    case opcode::noop:          a = std::format("{: <12}", ' ');                                break;
+    case opcode::pop:           a = std::format("{: <12}", instr.A);                            break;
+    case opcode::put_none:      a = std::format("{: <12}", maybe_nt(instr.A));                  break;
+    case opcode::put_const:     a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
+    case opcode::put_arg:       a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
+    case opcode::copy:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
+    case opcode::call:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
+    case opcode::call_nr:       a = std::format("{: <12}", instr.A);                            break;
+    case opcode::ret:           a = std::format("{: <12}", instr.A);                            break;
+    case opcode::jump:          a = std::format("{: <12}", instr.sBx);                          break;
+    case opcode::jump_true:     a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
+    case opcode::jump_false:    a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
+    default:                    YAMA_DEADEND;                                                   break;
     }
-    _instrs.insert(_instrs.end(), x._instrs.begin(), x._instrs.end());
-    _reinit_flags.insert(_reinit_flags.end(), x._reinit_flags.begin(), x._reinit_flags.end());
-    return *this;
-}
-
-yama::bc::code yama::bc::code::concat(const code& a, const code& b) {
-    code result{};
-    result._instrs.reserve(a.count() + b.count());
-    result._instrs.insert(result._instrs.end(), a._instrs.begin(), a._instrs.end());
-    result._instrs.insert(result._instrs.end(), b._instrs.begin(), b._instrs.end());
-    result._reinit_flags.reserve(a.count() + b.count());
-    result._reinit_flags.insert(result._reinit_flags.end(), a._reinit_flags.begin(), a._reinit_flags.end());
-    result._reinit_flags.insert(result._reinit_flags.end(), b._reinit_flags.begin(), b._reinit_flags.end());
+    std::string result = std::format("{}{: <5}{: <16}{}", tab, x, get(x).opc, a);
+    if (syms) {
+        if (const auto sym = syms->fetch(x)) {
+            result += std::format("{} ", *sym);
+        }
+    }
+    if (reinit_flag(x)) {
+        result += "(reinit)";
+    }
+    static_assert(opcodes == 12);
+    if (
+        get(x).opc == opcode::jump ||
+        get(x).opc == opcode::jump_true ||
+        get(x).opc == opcode::jump_false) {
+        // TODO: maybe add syntax for when sBx offset puts PC out-of-bounds
+        // NOTE: take note that we MUST have the '+ 1' bit below for target, since the PC is incr prior to jumping
+        size_t target = x + 1 + std::make_signed_t<size_t>(get(x).sBx);
+        result += std::format("(branches to instr {})", target);
+    }
     return result;
-}
-
-void yama::bc::code::_reset() {
-    _instrs.clear();
-    _reinit_flags.clear();
 }
 
 std::string yama::bc::sym::fmt() const {
@@ -225,6 +222,15 @@ yama::bc::syms& yama::bc::syms::add(size_t index, str origin, size_t ch, size_t 
 yama::bc::syms& yama::bc::syms::add(sym x) {
     _syms[x.index] = std::move(x);
     return *this;
+}
+
+std::string yama::bc::syms::fmt_sym(size_t index) const {
+    if (const auto sym = fetch(index)) {
+        return sym->fmt();
+    }
+    else {
+        return internal::fmt_no_sym(index);
+    }
 }
 
 size_t yama::bc::code_writer::count() const noexcept {
@@ -329,7 +335,7 @@ void yama::bc::code_writer::_bind_label_id_user(label_id_t label_id) {
 }
 
 void yama::bc::code_writer::_reset() {
-    _result._reset();
+    _result = code{}; // reinit
     _label_id_map.clear();
     _label_id_user_map.clear();
 }
@@ -392,5 +398,9 @@ bool yama::bc::instr::operator==(const instr& other) const noexcept {
         A == other.A &&
         B == other.B &&
         C == other.C;
+}
+
+std::string yama::internal::fmt_no_sym(size_t index) {
+    return std::format("[instr {}]", index);
 }
 

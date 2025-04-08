@@ -43,6 +43,8 @@ namespace yama::internal {
         inline auto operator[](const ast_TypeSpec* x) const noexcept { return get(x); }
         inline auto operator[](const ast_PrimaryExpr* x) const noexcept { return get(x); }
 
+        void cleanup();
+
 
     private:
         struct _entry_t final {

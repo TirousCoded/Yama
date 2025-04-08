@@ -78,19 +78,10 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
         // check for symbol info, and if so, add it to result
         if (callframe.t) {
             const auto info = internal::get_type_mem(deref_assert(callframe.t))->info;
-            if (info->call_fn() == bcode_call_fn) {
-                const auto& code = deref_assert(info->bcode());
-                const auto& syms = deref_assert(info->bcodesyms());
+            if (info->uses_bcode()) {
                 // remember that program counter will be incr when fetching instr, meaning
                 // we need to decr it to get current instr index
-                const size_t x_index = callframe.pc - 1;
-                if (const auto x_sym = syms[x_index]) {
-                    result += std::format(" {}", *x_sym);
-                }
-                else {
-                    // write info about instr index if actual sym isn't available
-                    result += std::format(" [instr {}]", x_index);
-                }
+                result += std::format(" {}", deref_assert(info->bsyms()).fmt_sym(callframe.pc - 1));
             }
         }
         number--;

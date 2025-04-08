@@ -123,7 +123,7 @@ TEST(ModuleFactoryTests, PopulatedModule) {
             .call_fn = B_call_fn,
             .max_locals = B_max_locals,
             .bcode = yama::bc::code{},
-            .bcodesyms = yama::bc::syms{},
+            .bsyms = yama::bc::syms{},
         },
     };
     yama::type_info C_expected{
@@ -134,7 +134,7 @@ TEST(ModuleFactoryTests, PopulatedModule) {
             .call_fn = yama::bcode_call_fn,
             .max_locals = C_max_locals,
             .bcode = C_code,
-            .bcodesyms = C_syms,
+            .bsyms = C_syms,
         },
     };
 

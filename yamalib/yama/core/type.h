@@ -58,6 +58,9 @@ namespace yama {
         type& operator=(type&&) noexcept = default;
 
 
+        const type_info& info() const noexcept;
+
+
         // complete returns if the type is 'complete', meaning that it has
         // no stubs in its constant table, and is in general ready for use
 

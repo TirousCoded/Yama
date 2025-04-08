@@ -484,6 +484,7 @@ namespace yama::internal {
     public:
         std::vector<res<ast_Stmt>> stmts;
         bool is_fn_body_block = false;
+        bool will_never_exit_via_fallthrough = false;
 
 
         inline ast_Block(taul::source_pos pos, ast_id_t id)

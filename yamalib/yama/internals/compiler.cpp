@@ -44,6 +44,8 @@ bool yama::internal::compiler::second_passes() {
 }
 
 void yama::internal::compiler::cleanup() {
+    types.cleanup();
+    resolver.cleanup();
     units.clear();
 }
 

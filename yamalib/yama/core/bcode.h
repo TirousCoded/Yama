@@ -340,6 +340,10 @@ namespace yama::bc {
     static_assert(alignof(instr) <= alignof(int32_t));
 
 
+    class code;
+    class syms;
+
+
     // code encapsulates a Yama bcode binary
 
     class code final {
@@ -374,7 +378,9 @@ namespace yama::bc {
 
 
         std::string fmt_instr(size_t x, const char* tab = "    ") const;
+        std::string fmt_instr(size_t x, const syms& syms, const char* tab = "    ") const;
         std::string fmt_disassembly(const char* tab = "    ") const;
+        std::string fmt_disassembly(const syms& syms, const char* tab = "    ") const;
 
 
         static_assert(opcodes == 12);
@@ -393,12 +399,6 @@ namespace yama::bc {
         code& add_jump_false(uint8_t A, int16_t sBx);
 
 
-        code& append(const code& x);
-
-
-        static code concat(const code& a, const code& b);
-
-
     private:
         friend class code_writer;
 
@@ -407,7 +407,7 @@ namespace yama::bc {
         std::vector<bool> _reinit_flags;
 
 
-        void _reset();
+        std::string _fmt_instr(size_t x, const syms* syms, const char* tab = "    ") const;
     };
 
 
@@ -559,8 +559,20 @@ namespace yama::bc {
         syms& add(sym x);
 
 
+        // fmt_sym will resolve a reasonable fmt string even if there is
+        // no symbol at index
+
+        std::string fmt_sym(size_t index) const;
+
+
     private:
         std::unordered_map<size_t, sym> _syms;
     };
+}
+
+namespace yama::internal {
+
+
+    std::string fmt_no_sym(size_t index);
 }
 

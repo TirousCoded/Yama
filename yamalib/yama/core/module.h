@@ -31,7 +31,7 @@ namespace yama {
         module& operator=(module&&) noexcept = default;
 
 
-        module_info info() const; // TODO: temporary
+        const module_info& info() const noexcept;
 
 
         size_t size() const noexcept;

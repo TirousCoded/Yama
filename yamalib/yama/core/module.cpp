@@ -7,7 +7,7 @@ yama::module yama::internal::create_module(const module_info* ptr) {
     return yama::module(ptr);
 }
 
-yama::module_info yama::module::info() const {
+const yama::module_info& yama::module::info() const noexcept {
     return deref_assert(_ptr);
 }
 

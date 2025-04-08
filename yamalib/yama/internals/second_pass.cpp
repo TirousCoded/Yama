@@ -344,7 +344,10 @@ void yama::internal::second_pass::visit_end(res<ast_Block> x) {
             _pop_temp(1, false); // pop instr after ret would just be dead code
         }
     }
-    _pop_scope(*x, !x->is_fn_body_block); // pop instr after ret would just be dead code
+    // pop instr after ret would just be dead code, and so too would pop instr
+    // if we 100% know block will never exit via *fallthrough* (ie. it'll only
+    // exit via break/continue/return)
+    _pop_scope(*x, !x->is_fn_body_block && !x->will_never_exit_via_fallthrough);
     if (_is_if_stmt_body(*x) && _top_if_stmt().has_else_part) {
         // write unconditional branch to the exit label to skip the else-part (if any)
         cw.add_jump(_top_if_stmt().exit_label);
@@ -456,8 +459,10 @@ void yama::internal::second_pass::visit_end(res<ast_BreakStmt> x) {
     //            loop stmt blocks can have *multiple levels* of nested scope
     // pop all temporaries and local vars to *exit* loop block scope
     const auto total_regs_in_loop_stmt = _regstk.size() - _top_loop_stmt().first_reg;
-    cw.add_pop(uint8_t(total_regs_in_loop_stmt));
-    _add_sym(x->low_pos());
+    if (total_regs_in_loop_stmt >= 1) { // don't write pop instr w/ 0 oprand
+        cw.add_pop(uint8_t(total_regs_in_loop_stmt));
+        _add_sym(x->low_pos());
+    }
     // write unconditional branch to break label
     cw.add_jump(_top_loop_stmt().break_label);
     _add_sym(x->low_pos());
@@ -471,8 +476,10 @@ void yama::internal::second_pass::visit_end(res<ast_ContinueStmt> x) {
     //            loop stmt blocks can have *multiple levels* of nested scope
     // pop all temporaries and local vars to *restart* loop block scope
     const auto total_regs_in_loop_stmt = _regstk.size() - _top_loop_stmt().first_reg;
-    cw.add_pop(uint8_t(total_regs_in_loop_stmt));
-    _add_sym(x->low_pos());
+    if (total_regs_in_loop_stmt >= 1) { // don't write pop instr w/ 0 oprand
+        cw.add_pop(uint8_t(total_regs_in_loop_stmt));
+        _add_sym(x->low_pos());
+    }
     // write unconditional branch to continue label
     cw.add_jump(_top_loop_stmt().continue_label);
     _add_sym(x->low_pos());
@@ -628,8 +635,8 @@ void yama::internal::second_pass::_apply_bcode_to_target(const ast_FnDecl& x) {
         auto& info = std::get<function_info>(_target().info);
         bool label_not_found{};
         if (auto fn_bcode = cw.done(&label_not_found)) {
-            info.bcode = fn_bcode.value();
-            info.bcodesyms = std::move(syms);
+            info.bcode = std::move(*fn_bcode);
+            info.bsyms = std::move(syms);
         }
         else {
             if (label_not_found) { // if this, then the compiler is broken
@@ -737,7 +744,7 @@ void yama::internal::second_pass::_push_temp(const ast_node& x, ctype type) {
 
 void yama::internal::second_pass::_pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos) {
     if (n > _regstk.size()) n = _regstk.size(); // <- avoid undefined behaviour for pop_back
-    if (write_pop_instr) {
+    if (write_pop_instr && n >= 1) { // don't write pop instr w/ 0 oprand
         cw.add_pop(uint8_t(n));
         _add_sym(pop_instr_pos);
     }

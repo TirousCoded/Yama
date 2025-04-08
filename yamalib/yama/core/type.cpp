@@ -14,6 +14,10 @@ yama::internal::type_mem yama::internal::get_type_mem(type x) noexcept {
 yama::type::type(const internal::type_instance& instance) noexcept
     : _mem(instance._mem) {}
 
+const yama::type_info& yama::type::info() const noexcept {
+    return *_mem->info;
+}
+
 bool yama::type::complete() const noexcept {
     return _mem->stubs == 0;
 }

@@ -91,7 +91,7 @@ void yama::verifier::_dump_cfg(const yama::type_info& subject, const bc::code& b
                 }
                 else return _fmt_branch(b.processed_by, b.first);
             }());
-        if (const auto dbgsyms = subject.bcodesyms()) {
+        if (const auto dbgsyms = subject.bsyms()) {
             if (const auto symbol = dbgsyms->fetch(b.first)) {
                 YAMA_LOG(dbg(), verif_error_c, "{}bcodesym             : {}", tab, *symbol);
             }
@@ -439,21 +439,19 @@ void yama::verifier::_add_cfg_block(const bc::code& bcode, size_t first, size_t 
 }
 
 bool yama::verifier::_verif_cfg(const type_info& subject, const bc::code& bcode) {
-    if (!_visit_entrypoint_block(subject, bcode)) {
-        return false;
-    }
+    if (!_visit_entrypoint_block(subject, bcode)) return false;
     _report_dead_code_blocks(subject, bcode);
     return true;
 }
 
 void yama::verifier::_report_dead_code_blocks(const type_info& subject, const bc::code& bcode) {
     for (const auto& I : _cfg_blocks) {
-        if (I.second.processed) {
-            continue;
-        }
+        if (I.second.processed) continue;
         YAMA_LOG(
             dbg(), verif_warning_c,
-            "warning: detected dead code {}!",
+            "warning: {} {} bcode dead code {}!",
+            subject.fmt_sym(I.first),
+            subject.unqualified_name,
             I.second.fmt());
     }
 }
@@ -463,8 +461,8 @@ bool yama::verifier::_visit_entrypoint_block(const type_info& subject, const bc:
     if (!_visit_block(subject, bcode, 0, _make_entrypoint_initial_reg_set(subject), size_t(-1))) {
         YAMA_LOG(
             dbg(), verif_warning_c,
-            "warning: {} bcode symbolic execution aborted; there may be additional issues which hadn't yet been detected!",
-            subject.unqualified_name);
+            "warning: {} {} bcode symbolic execution aborted; there may be additional issues which hadn't yet been detected!",
+            subject.fmt_sym(0), subject.unqualified_name);
         YAMA_LOG(
             dbg(), verif_error_c,
             "{}",
@@ -492,10 +490,7 @@ bool yama::verifier::_visit_block(const type_info& subject, const bc::code& bcod
 
 bool yama::verifier::_visit_processed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
     YAMA_ASSERT(incoming_branched_from < bcode.count());
-    if (!_verify_no_register_coherence_violation(subject, bcode, block, incoming_reg_set, incoming_branched_from)) {
-        return false;
-    }
-    return true;
+    return _verify_no_register_coherence_violation(subject, bcode, block, incoming_reg_set, incoming_branched_from);
 }
 
 bool yama::verifier::_visit_unprocessed_block(const type_info& subject, const bc::code& bcode, _cfg_block& block, const _reg_set_state& incoming_reg_set, size_t incoming_branched_from) {
@@ -521,15 +516,13 @@ bool yama::verifier::_visit_unprocessed_block(const type_info& subject, const bc
     const bool has_fallthrough = block.final_instr_has_fallthrough(bcode);
 
     if (has_jump && _jump_dest_in_bounds(bcode, final_instr_index, final_instr.sBx)) {
-
         const auto jump_dest = _calc_jump_dest(final_instr_index, final_instr.sBx);
         if (!_visit_block(subject, bcode, jump_dest, block.final_reg_set, final_instr_index)) {
             return false;
         }
     }
     if (has_fallthrough && block.last < bcode.count()) {
-
-        const auto jump_dest = block.last;
+        const auto& jump_dest = block.last;
         if (!_visit_block(subject, bcode, jump_dest, block.final_reg_set, final_instr_index)) {
             return false;
         }
@@ -812,8 +805,8 @@ bool yama::verifier::_verify_RTop_exists(const type_info& subject, const bc::cod
         YAMA_RAISE(dbg(), dsignal::verif_RTop_does_not_exist);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(top) does not exist!",
-            subject.unqualified_name, i);
+            "error: {} {} bcode instr {}: R(top) does not exist!",
+            subject.fmt_sym(i), subject.unqualified_name, i);
         return false;
     }
     return true;
@@ -826,8 +819,8 @@ bool yama::verifier::_verify_RTop_is_type_bool(const type_info& subject, const b
         YAMA_RAISE(dbg(), dsignal::verif_RTop_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(top) (top == {}) is type {}, but it must be {}!",
-            subject.unqualified_name, i, block.final_reg_set.size(), _RTop, _other);
+            "error: {} {} bcode instr {}: R(top) (top == {}) is type {}, but it must be {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, block.final_reg_set.size(), _RTop, _other);
         return false;
     }
     return true;
@@ -838,8 +831,8 @@ bool yama::verifier::_verify_RA_in_bounds(const type_info& subject, const bc::co
         YAMA_RAISE(dbg(), dsignal::verif_RA_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].A);
+            "error: {} {} bcode instr {}: R(A) (A == {}) out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A);
         return false;
     }
     return true;
@@ -852,8 +845,8 @@ bool yama::verifier::_verify_RA_is_type_none(const type_info& subject, const bc:
         YAMA_RAISE(dbg(), dsignal::verif_RA_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
-            subject.unqualified_name, i, bcode[i].A, _RA, _other);
+            "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, _RA, _other);
         return false;
     }
     return true;
@@ -873,8 +866,8 @@ bool yama::verifier::_verify_RA_is_type_bool(const type_info& subject, const bc:
         YAMA_RAISE(dbg(), dsignal::verif_RA_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
-            subject.unqualified_name, i, bcode[i].A, _RA, _other);
+            "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, _RA, _other);
         return false;
     }
     return true;
@@ -888,8 +881,8 @@ bool yama::verifier::_verify_RA_is_return_type_of_this_call(const type_info& sub
         YAMA_RAISE(dbg(), dsignal::verif_RA_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) is type {}, but ret expects return type {}!",
-            subject.unqualified_name, i, bcode[i].A, RA, this_return_type);
+            "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but ret expects return type {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, RA, this_return_type);
         return false;
     }
     return true;
@@ -900,8 +893,8 @@ bool yama::verifier::_verify_RB_in_bounds_for_copy_instr(const type_info& subjec
         YAMA_RAISE(dbg(), dsignal::verif_RB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].B);
+            "error: {} {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
         return false;
     }
     return true;
@@ -914,8 +907,8 @@ bool yama::verifier::_verify_RB_in_bounds_for_call_instr(const type_info& subjec
         YAMA_RAISE(dbg(), dsignal::verif_RB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].B);
+            "error: {} {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
         return false;
     }
     return true;
@@ -932,8 +925,8 @@ bool yama::verifier::_verify_RB_is_return_type_of_call_object(const type_info& s
         YAMA_RAISE(dbg(), dsignal::verif_RB_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(top-A) (top-A == {}) call object return type is {}, but return target R(B) (B == {}) is type {}!",
-            subject.unqualified_name, i, args_index, callobj_return_type, bcode[i].B, RB);
+            "error: {} {} bcode instr {}: R(top-A) (top-A == {}) call object return type is {}, but return target R(B) (B == {}) is type {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, args_index, callobj_return_type, bcode[i].B, RB);
         return false;
     }
     return true;
@@ -951,8 +944,8 @@ bool yama::verifier::_verify_KoB_in_bounds(const type_info& subject, const bc::c
         YAMA_RAISE(dbg(), dsignal::verif_KoB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: Ko(B) (B == {}) out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].B);
+            "error: {} {} bcode instr {}: Ko(B) (B == {}) out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
         return false;
     }
     return true;
@@ -964,8 +957,8 @@ bool yama::verifier::_verify_KoB_is_object_const(const type_info& subject, const
         YAMA_RAISE(dbg(), dsignal::verif_KoB_not_object_const);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: Ko(B) (B == {}) must be object constant, but isn't!",
-            subject.unqualified_name, i, bcode[i].B);
+            "error: {} {} bcode instr {}: Ko(B) (B == {}) must be object constant, but isn't!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
         return false;
     }
     return true;
@@ -978,8 +971,8 @@ bool yama::verifier::_verify_ArgB_in_bounds(const type_info& subject, const bc::
         YAMA_RAISE(dbg(), dsignal::verif_ArgB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: Arg(B) (B == {}) out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].B);
+            "error: {} {} bcode instr {}: Arg(B) (B == {}) out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
         return false;
     }
     return true;
@@ -992,8 +985,8 @@ bool yama::verifier::_verify_RA_and_RB_agree_on_type(const type_info& subject, c
         YAMA_RAISE(dbg(), dsignal::verif_RA_and_RB_types_differ);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) and R(B) (B == {}) do not agree on type ({} != {})!",
-            subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _RB);
+            "error: {} {} bcode instr {}: R(A) (A == {}) and R(B) (B == {}) do not agree on type ({} != {})!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _RB);
         return false;
     }
     return true;
@@ -1013,8 +1006,8 @@ bool yama::verifier::_verify_RA_and_KoB_agree_on_type(const type_info& subject, 
         YAMA_RAISE(dbg(), dsignal::verif_RA_and_KoB_types_differ);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) and Ko(B) (B == {}) do not agree on type ({} != {})!",
-            subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _KoB);
+            "error: {} {} bcode instr {}: R(A) (A == {}) and Ko(B) (B == {}) do not agree on type ({} != {})!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _KoB);
         return false;
     }
     return true;
@@ -1034,8 +1027,8 @@ bool yama::verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& subject,
         YAMA_RAISE(dbg(), dsignal::verif_RA_and_ArgB_types_differ);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(A) (A == {}) and Arg(B) (B == {}) do not agree on type ({} != {})!",
-            subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _ArgB);
+            "error: {} {} bcode instr {}: R(A) (A == {}) and Arg(B) (B == {}) do not agree on type ({} != {})!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _ArgB);
         return false;
     }
     return true;
@@ -1058,8 +1051,8 @@ bool yama::verifier::_verify_ArgRs_legal_call_object(const type_info& subject, c
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_illegal_callobj);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: R(top-A) (top-A == {}) is type {}, which cannot be used as call object!",
-            subject.unqualified_name, i, args_index, callobj_type);
+            "error: {} {} bcode instr {}: R(top-A) (top-A == {}) is type {}, which cannot be used as call object!",
+            subject.fmt_sym(i), subject.unqualified_name, i, args_index, callobj_type);
         return false;
     }
     return true;
@@ -1070,8 +1063,8 @@ bool yama::verifier::_verify_ArgRs_in_bounds(const type_info& subject, const bc:
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: more args registers than there are local object stack registers!",
-            subject.unqualified_name, i);
+            "error: {} {} bcode instr {}: more args registers than there are local object stack registers!",
+            subject.fmt_sym(i), subject.unqualified_name, i);
         return false;
     }
     return true;
@@ -1082,8 +1075,8 @@ bool yama::verifier::_verify_ArgRs_have_at_least_one_object(const type_info& sub
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_zero_objects);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: no args registers (ie. A == 0)!",
-            subject.unqualified_name, i);
+            "error: {} {} bcode instr {}: no args registers (ie. A == 0)!",
+            subject.fmt_sym(i), subject.unqualified_name, i);
         return false;
     }
     return true;
@@ -1104,8 +1097,8 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
         YAMA_RAISE(dbg(), dsignal::verif_ParamArgRs_wrong_number);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: param args register count is {}, but expected {}!",
-            subject.unqualified_name, i, param_args_count, expected_param_args_count);
+            "error: {} {} bcode instr {}: param args register count is {}, but expected {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, param_args_count, expected_param_args_count);
         return false;
     }
     // keep iterating to report all errors involving improper param arg types
@@ -1123,8 +1116,8 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
         }
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: param arg {} (register {}) is type {}, but expected {}!",
-            subject.unqualified_name, i, j, param_arg_index, param_arg, expected_param_arg);
+            "error: {} {} bcode instr {}: param arg {} (register {}) is type {}, but expected {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, j, param_arg_index, param_arg, expected_param_arg);
         success = false;
     }
     return success;
@@ -1135,8 +1128,8 @@ bool yama::verifier::_verify_pushing_does_not_overflow(const type_info& subject,
         YAMA_RAISE(dbg(), dsignal::verif_pushing_overflows);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: pushing new register would overflow max locals count of {}!",
-            subject.unqualified_name, i, subject.max_locals());
+            "error: {} {} bcode instr {}: pushing new register would overflow max locals count of {}!",
+            subject.fmt_sym(i), subject.unqualified_name, i, subject.max_locals());
         return false;
     }
     return true;
@@ -1147,8 +1140,8 @@ bool yama::verifier::_verify_program_counter_valid_after_jump_by_sBx_offset(cons
         YAMA_RAISE(dbg(), dsignal::verif_puts_PC_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: jump by sBx (sBx == {}) would put program counter out-of-bounds!",
-            subject.unqualified_name, i, bcode[i].sBx);
+            "error: {} {} bcode instr {}: jump by sBx (sBx == {}) would put program counter out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].sBx);
         return false;
     }
     return true;
@@ -1159,8 +1152,8 @@ bool yama::verifier::_verify_program_counter_valid_after_fallthrough(const type_
         YAMA_RAISE(dbg(), dsignal::verif_fallthrough_puts_PC_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
-            "error: {} bcode instr {}: {} fallthrough would put program counter out-of-bounds!",
-            subject.unqualified_name, i, block.fmt());
+            "error: {} {} bcode instr {}: {} fallthrough would put program counter out-of-bounds!",
+            subject.fmt_sym(i), subject.unqualified_name, i, block.fmt());
         return false;
     }
     return true;

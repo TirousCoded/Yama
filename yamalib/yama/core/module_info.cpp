@@ -59,7 +59,7 @@ yama::module_factory& yama::module_factory::add_function_type(str unqualified_na
             .call_fn = call_fn,
             .max_locals = max_locals,
             .bcode = bc::code{},
-            .bcodesyms = bc::syms{},
+            .bsyms = bc::syms{},
         },
     };
     return add_type(std::move(new_info));
@@ -74,7 +74,7 @@ yama::module_factory& yama::module_factory::add_function_type(str unqualified_na
             .call_fn = bcode_call_fn,
             .max_locals = max_locals,
             .bcode = std::forward<decltype(code)>(code),
-            .bcodesyms = std::forward<decltype(syms)>(syms),
+            .bsyms = std::forward<decltype(syms)>(syms),
         },
     };
     return add_type(std::move(new_info));

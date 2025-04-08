@@ -37,6 +37,11 @@ std::optional<yama::internal::ctype> yama::internal::ctype_resolver::get(const a
         : std::nullopt;
 }
 
+void yama::internal::ctype_resolver::cleanup() {
+    _type_spec_mappings.clear();
+    _primary_expr_mappings.clear();
+}
+
 void yama::internal::ctype_resolver::_resolve(translation_unit& tu, const ast_TypeSpec& x, std::optional<ctype>& target) {
     if (const auto sym = tu.syms.lookup(x, x.name.value().str(tu.src), x.low_pos()); sym && !sym->is_type()) {
         tu.er.error(

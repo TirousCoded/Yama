@@ -130,6 +130,8 @@ namespace yama::internal {
         std::shared_ptr<cmodule> register_module(const import_path& where, res<module_info> x);
         std::shared_ptr<cmodule> register_module(translation_unit& x);
 
+        void cleanup();
+
 
     private:
         std::unordered_map<import_path, res<cmodule>> _modules;

@@ -28,6 +28,7 @@ TEST(TypeInfoTests, PrimitiveType) {
     EXPECT_EQ(abc.call_fn(), std::nullopt);
     EXPECT_EQ(abc.max_locals(), 0);
     EXPECT_EQ(abc.bcode(), nullptr);
+    EXPECT_EQ(abc.bsyms(), nullptr);
 }
 
 TEST(TypeInfoTests, FunctionType) {
@@ -50,6 +51,6 @@ TEST(TypeInfoTests, FunctionType) {
     EXPECT_EQ(abc.call_fn(), cf);
     EXPECT_EQ(abc.max_locals(), 17);
     EXPECT_EQ(abc.bcode(), &(std::get<yama::function_info>(abc.info).bcode));
-    EXPECT_EQ(abc.bcodesyms(), &(std::get<yama::function_info>(abc.info).bcodesyms));
+    EXPECT_EQ(abc.bsyms(), &(std::get<yama::function_info>(abc.info).bsyms));
 }
 

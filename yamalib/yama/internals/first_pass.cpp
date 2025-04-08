@@ -75,6 +75,7 @@ void yama::internal::first_pass::visit_end(res<ast_FnDecl> x) {
 }
 
 void yama::internal::first_pass::visit_end(res<ast_Block> x) {
+    x->will_never_exit_via_fallthrough = _cfg.is_in_dead_code();
     _cfg.end_block();
 }
 

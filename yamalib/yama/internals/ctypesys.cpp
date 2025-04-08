@@ -206,6 +206,10 @@ std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys::register_modu
     return new_cmodule;
 }
 
+void yama::internal::ctypesys::cleanup() {
+    _modules.clear();
+}
+
 yama::internal::ctypesys_local::ctypesys_local(translation_unit& tu)
     : tu(tu) {}
 
