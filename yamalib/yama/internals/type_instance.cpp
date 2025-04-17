@@ -23,6 +23,10 @@ yama::internal::type_instance::~type_instance() noexcept {
     _destroy_mem(_mem); // RAII cleanup of _mem
 }
 
+bool yama::internal::type_instance::complete() const noexcept {
+    return _mem->stubs == 0;
+}
+
 const yama::str& yama::internal::type_instance::fullname() const noexcept {
     return _mem->fullname;
 }

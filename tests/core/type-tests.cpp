@@ -7,412 +7,155 @@
 #include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type.h>
-
-// TODO: type_instance used to be in frontend, but now it isn't,
-//       meaning our unit tests have backend code dependence,
-//       which is undesirable
-//
-//       I'm thinking maybe pull type_instance back to the frontend
-//       at some point
-#include <yama/internals/type_instance.h>
+#include <yama/core/domain.h>
 
 
 using namespace yama::string_literals;
 
 
-// just some data that appears in our tests over-and-over
-
-static const auto consts0 =
-    yama::const_table_info()
-    .add_primitive_type("a"_str)
-    .add_primitive_type("b"_str)
-    .add_primitive_type("c"_str);
-static const auto consts1 =
-    yama::const_table_info()
-    .add_primitive_type("aa"_str)
-    .add_primitive_type("bb"_str)
-    .add_primitive_type("cc"_str)
-    .add_primitive_type("dd"_str);
-
-static yama::callsig_info callsig_info0 = yama::make_callsig_info({ 0, 1, 2 }, 1);
-static yama::callsig_info callsig_info1 = yama::make_callsig_info({ 2, 0, 1 }, 0);
+namespace {
+    class test_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::unordered_map<yama::str, yama::res<yama::module_info>> mods;
 
 
-TEST(TypeTests, TypeInstanceCtor) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
+        test_parcel() = default;
+
+
+        void push(const yama::str& relative_path, yama::module_info&& m) {
+            mods.insert({ relative_path, yama::make_res<yama::module_info>(std::forward<yama::module_info>(m)) });
+        }
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str } };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str& relative_path) override final {
+            if (const auto it = mods.find(relative_path); it != mods.end()) {
+                return yama::import_result(yama::res(it->second));
+            }
+            else return std::nullopt;
+        }
     };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
-    EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.ptype(), yama::ptype::float0);
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(a.consts().size(), 3);
-    EXPECT_TRUE(a.consts().is_stub(0));
-    EXPECT_TRUE(a.consts().is_stub(1));
-    EXPECT_TRUE(a.consts().is_stub(2));
 }
 
-TEST(TypeTests, CopyCtor) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
 
-    yama::type a(a_inst);
+class TypeTests : public testing::Test {
+public:
+    std::shared_ptr<yama::debug> dbg;
+    std::shared_ptr<yama::domain> dm;
+    std::shared_ptr<test_parcel> parcel;
 
+
+protected:
+    void SetUp() override {
+        dbg = std::make_shared<yama::stderr_debug>();
+        dm = std::make_shared<yama::domain>(dbg);
+        parcel = std::make_shared<test_parcel>();
+
+        yama::install_batch ib{};
+        ib
+            .install("a"_str, yama::res(parcel))
+            .map_dep("a"_str, "yama"_str, "yama"_str);
+        dm->install(std::move(ib));
+    }
+    void TearDown() override {
+        //
+    }
+};
+
+
+// IMPORTANT: many of the basic query methods of yama::type are tested *in bulk* in
+//            our per-kind tests
+
+
+TEST_F(TypeTests, CopyCtor) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+
+    parcel->push(""_str, std::move(mf.done()));
+
+    yama::type a = dm->load("a:abc"_str).value();
     yama::type b(a); // copy ctor
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
-    EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-
-    EXPECT_FALSE(b.complete());
-    EXPECT_EQ(b.fullname(), "abc"_str);
-    EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
+    ASSERT_EQ(a, b); // compare by ref
 }
 
-TEST(TypeTests, MoveCtor) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
+TEST_F(TypeTests, MoveCtor) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
 
-    yama::type a(a_inst);
+    parcel->push(""_str, std::move(mf.done()));
 
+    yama::type a = dm->load("a:abc"_str).value();
     yama::type b(std::move(a)); // move ctor
 
-    EXPECT_FALSE(b.complete());
-    EXPECT_EQ(b.fullname(), "abc"_str);
-    EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
+    ASSERT_EQ(b, dm->load("a:abc"_str).value()); // compare by ref
 }
 
-TEST(TypeTests, CopyAssign) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::type_info b_info{
-        .unqualified_name = "def"_str,
-        .consts = consts1,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-    yama::internal::type_instance b_inst(b_info.unqualified_name, yama::make_res<yama::type_info>(b_info));
+TEST_F(TypeTests, CopyAssign) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    auto def_constsinf =
+        yama::const_table_info()
+        .add_bool(true); // <- make b consts differ from a consts
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive_type("def"_str, std::move(def_constsinf), yama::ptype::bool0);
 
-    yama::type a(a_inst);
-    yama::type b(b_inst);
+    parcel->push(""_str, std::move(mf.done()));
+
+    yama::type a = dm->load("a:abc"_str).value();
+    yama::type b = dm->load("a:def"_str).value();
 
     b = a; // copy assign
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
-    EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-
-    EXPECT_FALSE(b.complete());
-    EXPECT_EQ(b.fullname(), "abc"_str);
-    EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
+    ASSERT_EQ(a, b); // compare by ref
 }
 
-TEST(TypeTests, MoveAssign) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::type_info b_info{
-        .unqualified_name = "def"_str,
-        .consts = consts1,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-    yama::internal::type_instance b_inst(b_info.unqualified_name, yama::make_res<yama::type_info>(b_info));
+TEST_F(TypeTests, MoveAssign) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    auto def_constsinf =
+        yama::const_table_info()
+        .add_bool(true); // <- make b consts differ from a consts
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive_type("def"_str, std::move(def_constsinf), yama::ptype::bool0);
 
-    yama::type a(a_inst);
-    yama::type b(b_inst);
+    parcel->push(""_str, std::move(mf.done()));
+
+    yama::type a = dm->load("a:abc"_str).value();
+    yama::type b = dm->load("a:def"_str).value();
 
     b = std::move(a); // move assign
 
-    EXPECT_FALSE(b.complete());
-    EXPECT_EQ(b.fullname(), "abc"_str);
-    EXPECT_EQ(b.kind(), yama::kind::primitive);
-    EXPECT_EQ(b.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(b.consts(), yama::const_table(a_inst));
+    ASSERT_EQ(b, dm->load("a:abc"_str).value()); // compare by ref
 }
 
-TEST(TypeTests, Complete_IncompleteType) {
-    yama::type_info link_info{
-        .unqualified_name = "link"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance link_inst(link_info.unqualified_name, yama::make_res<yama::type_info>(link_info));
+TEST_F(TypeTests, Equality) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive_type("def"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
 
-    yama::type link(link_inst);
+    parcel->push(""_str, std::move(mf.done()));
 
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    a_inst.put<yama::primitive_type_const>(0, link);
-    //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
-    a_inst.put<yama::primitive_type_const>(2, link);
-
-    yama::type a(a_inst);
-
-    EXPECT_FALSE(a.complete());
-}
-
-TEST(TypeTests, Complete_CompleteType) {
-    yama::type_info link_info{
-        .unqualified_name = "link"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance link_inst(link_info.unqualified_name, yama::make_res<yama::type_info>(link_info));
-
-    yama::type link(link_inst);
-
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    a_inst.put<yama::primitive_type_const>(0, link);
-    a_inst.put<yama::primitive_type_const>(1, link);
-    a_inst.put<yama::primitive_type_const>(2, link);
-
-    yama::type a(a_inst);
-
-    EXPECT_TRUE(a.complete());
-}
-
-TEST(TypeTests, Complete_CompleteType_ZeroLinkSyms) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {}, // <- zero linksyms
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_TRUE(a.complete());
-}
-
-TEST(TypeTests, Fullname) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(
-        "def"_str, // <- fullname *differs* from a_info.unqualified_name
-        yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-
-    EXPECT_EQ(a.fullname(), "def"_str);
-}
-
-TEST(TypeTests, PType) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::uint,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::uint));
-}
-
-TEST(TypeTests, PType_NoPTypeForNonPrimitiveTypes) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::function_info{
-            .callsig = callsig_info0,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.ptype(), std::nullopt);
-}
-
-TEST(TypeTests, CallFn) {
-    auto cf = [](yama::context&) {};
-
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::function_info{
-            .callsig = callsig_info0,
-            .call_fn = cf,
-            .max_locals = 10,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.call_fn(), std::make_optional(cf));
-}
-
-TEST(TypeTests, CallFn_NoCallFnForNonCallableTypes) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::uint,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.call_fn(), std::nullopt);
-}
-
-TEST(TypeTests, MaxLocals) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::function_info{
-            .callsig = callsig_info0,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.max_locals(), 10);
-}
-
-TEST(TypeTests, MaxLocals_ZeroForNonCallableTypes) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::uint,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.max_locals(), 0);
-}
-
-TEST(TypeTests, Consts) {
-    yama::type_info link_info{
-        .unqualified_name = "link"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance link_inst(link_info.unqualified_name, yama::make_res<yama::type_info>(link_info));
-
-    yama::type link(link_inst);
-
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    a_inst.put<yama::primitive_type_const>(0, link);
-    //a_inst.put<yama::primitive_type_const>(1, link); <- incomplete
-    a_inst.put<yama::primitive_type_const>(2, link);
-
-    yama::type a(a_inst);
-
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-}
-
-TEST(TypeTests, Equality) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-    // b_inst is a clone of a_inst, and exists to ensure that yama::type objects
-    // of a_inst are not equal to those of b_inst
-    yama::internal::type_instance b_inst("def"_str, a_inst);
-
-    yama::type a0(a_inst);
-    yama::type a1(a_inst);
-    yama::type b(b_inst);
-
+    yama::type a0 = dm->load("a:abc"_str).value();
+    yama::type a1 = dm->load("a:abc"_str).value();
+    yama::type b = dm->load("a:def"_str).value();
 
     EXPECT_TRUE(a0 == a0);
     EXPECT_TRUE(a0 == a1);
@@ -439,190 +182,57 @@ TEST(TypeTests, Equality) {
     EXPECT_FALSE(b != b);
 }
 
-TEST(TypeTests, TypeInstance_RegularCtor) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type a(a_inst);
-
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
-    EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(a.consts().size(), 3);
-    EXPECT_TRUE(a.consts().is_stub(0));
-    EXPECT_TRUE(a.consts().is_stub(1));
-    EXPECT_TRUE(a.consts().is_stub(2));
-}
-
-TEST(TypeTests, TypeInstance_CloneCtor) {
-    yama::type_info link_info{
-        .unqualified_name = "link"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance link_inst(link_info.unqualified_name, yama::make_res<yama::type_info>(link_info));
-
-    yama::type link(link_inst);
-
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    a_inst.put<yama::primitive_type_const>(0, link);
-    //a_inst.put<yama::primitive_type_const>(1, link);
-    a_inst.put<yama::primitive_type_const>(2, link);
-
-    yama::internal::type_instance b_inst("def"_str, a_inst); // clone ctor
-
-    yama::type a(a_inst);
-    yama::type b(b_inst); // <- gotten from b_inst
-
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
-    EXPECT_EQ(a.kind(), yama::kind::primitive);
-    EXPECT_EQ(a.ptype(), std::make_optional(yama::ptype::float0));
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
-
-    EXPECT_FALSE(b.complete());
-    EXPECT_EQ(b.fullname(), "def"_str); // <- clone uses new fullname
-    EXPECT_EQ(b.kind(), a.kind());
-    EXPECT_EQ(b.ptype(), a.ptype());
-    
-    EXPECT_EQ(b.consts().size(), a.consts().size());
-
-    EXPECT_EQ(b.consts().type(0), std::make_optional(link));
-    EXPECT_EQ(a.consts().type(0), std::make_optional(link));
-    
-    EXPECT_TRUE(b.consts().is_stub(1));
-    EXPECT_TRUE(a.consts().is_stub(1));
-    
-    EXPECT_EQ(b.consts().type(2), std::make_optional(link));
-    EXPECT_EQ(a.consts().type(2), std::make_optional(link));
-
-    // equality tests already cover this, but just for completeness...
-
-    EXPECT_NE(a, b);
-}
-
-TEST(TypeTests, TypeInstance_MutationsToTypeInstanceAreVisibleToTypeAndConstTable) {
-    yama::type_info link_info{
-        .unqualified_name = "link"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance link_inst(link_info.unqualified_name, yama::make_res<yama::type_info>(link_info));
-
-    yama::type link(link_inst);
-
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
-
-    yama::type t(a_inst);           // yama::type can see changes
-    yama::const_table ct(a_inst);   // yama::const_table can see changes
-
-    EXPECT_FALSE(t.complete());
-    EXPECT_FALSE(t.consts().complete());
-    EXPECT_FALSE(ct.complete());
-    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(ct, yama::const_table(a_inst));
-
-    a_inst.put<yama::primitive_type_const>(0, link);
-
-    EXPECT_FALSE(t.complete());
-    EXPECT_FALSE(t.consts().complete());
-    EXPECT_FALSE(ct.complete());
-    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(ct, yama::const_table(a_inst));
-    
-    a_inst.put<yama::primitive_type_const>(2, link);
-
-    EXPECT_FALSE(t.complete());
-    EXPECT_FALSE(t.consts().complete());
-    EXPECT_FALSE(ct.complete());
-    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(ct, yama::const_table(a_inst));
-    
-    a_inst.put<yama::primitive_type_const>(1, link);
-
-    EXPECT_TRUE(t.complete());
-    EXPECT_TRUE(t.consts().complete());
-    EXPECT_TRUE(ct.complete());
-    EXPECT_EQ(t.consts(), yama::const_table(a_inst));
-    EXPECT_EQ(ct, yama::const_table(a_inst));
-}
-
-// per-kind tests
-
 static_assert(yama::kinds == 2);
 
-TEST(TypeTests, Primitive) {
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::float0,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
+TEST_F(TypeTests, PerKind_Primitive) {
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_int(10'000);
+    yama::module_factory mf{};
+    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
 
-    yama::type a(a_inst);
+    parcel->push(""_str, std::move(mf.done()));
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
+    yama::type a = dm->load("a:abc"_str).value();
+
+    EXPECT_EQ(a.fullname(), "a:abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
     EXPECT_EQ(a.ptype(), yama::ptype::float0);
     EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_EQ(a.call_fn(), std::nullopt);
     EXPECT_EQ(a.max_locals(), 0);
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(a.consts(), yama::const_table(a));
 }
 
-TEST(TypeTests, Function) {
-    auto a_call_fn = [](yama::context&) {};
-    auto a_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    yama::type_info a_info{
-        .unqualified_name = "abc"_str,
-        .consts = consts0,
-        .info = yama::function_info{
-            .callsig = a_callsig,
-            .call_fn = a_call_fn,
-            .max_locals = 17,
-        },
-    };
-    yama::internal::type_instance a_inst(a_info.unqualified_name, yama::make_res<yama::type_info>(a_info));
+TEST_F(TypeTests, PerKind_Function) {
+    auto abc_call_fn = [](yama::context&) {};
+    auto abc_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
+    auto abc_constsinf =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str);
+    yama::module_factory mf{};
+    mf.add_function_type(
+        "abc"_str,
+        decltype(abc_constsinf)(abc_constsinf),
+        decltype(abc_callsiginf)(abc_callsiginf),
+        17,
+        abc_call_fn);
 
-    yama::type a(a_inst);
+    parcel->push(""_str, std::move(mf.done()));
 
-    EXPECT_FALSE(a.complete());
-    EXPECT_EQ(a.fullname(), "abc"_str);
+    yama::type a = dm->load("a:abc"_str).value();
+
+    std::optional<yama::callsig> expected_callsig = yama::callsig(abc_callsiginf, yama::const_table(a));
+    std::optional<yama::call_fn> expected_call_fn = abc_call_fn;
+
+    EXPECT_EQ(a.fullname(), "a:abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::function);
     EXPECT_EQ(a.ptype(), std::nullopt);
-    EXPECT_EQ(a.callsig(), std::make_optional(yama::callsig(a_callsig, a.consts())));
-    EXPECT_EQ(a.call_fn(), std::make_optional(a_call_fn));
+    EXPECT_EQ(a.callsig(), expected_callsig);
+    EXPECT_EQ(a.call_fn(), expected_call_fn);
     EXPECT_EQ(a.max_locals(), 17);
-    EXPECT_EQ(a.consts(), yama::const_table(a_inst));
+    EXPECT_EQ(a.consts(), yama::const_table(a));
 }
 

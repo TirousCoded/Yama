@@ -16,7 +16,7 @@ yama::internal::loader::loader(
     domain_data& dd,
     res_state& upstream)
     : api_component(dbg),
-    _dd(&dd),
+    _dd(dd),
     state() {
     state.set_upstream(upstream);
 }
@@ -24,21 +24,37 @@ yama::internal::loader::loader(
 std::optional<yama::type> yama::internal::loader::load(const str& fullname) {
     const auto resolved_fullname = _resolve_fullname(fullname);
     if (!resolved_fullname) return std::nullopt;
-    const auto success = _load(*resolved_fullname);
-    state.commit_or_discard(success);
-    return
-        success
-        ? std::make_optional(type(deref_assert(state.types.pull(*resolved_fullname))))
-        : std::nullopt;
+    _last_was_success = _load(*resolved_fullname);
+    return _last_was_success ? _pull_type(*resolved_fullname) : std::nullopt;
 }
 
-yama::internal::domain_data& yama::internal::loader::_get_dd() const noexcept {
-    return deref_assert(_dd);
+void yama::internal::loader::commit_or_discard() {
+    state.commit_or_discard(_last_was_success);
+    _unlock(); // can't forget
+}
+
+void yama::internal::loader::commit_or_discard(std::shared_mutex& protects_upstream) {
+    state.commit_or_discard(_last_was_success, protects_upstream);
+    _unlock(); // can't forget
+}
+
+void yama::internal::loader::_lock() {
+    _dd->new_data_mtx.lock();
+    YAMA_ASSERT(!_holds_lock); // top-level loader use shouldn't be recursive
+    _holds_lock = true;
+}
+
+void yama::internal::loader::_unlock() {
+    if (!_holds_lock) return;
+    _holds_lock = false;
+    _dd->new_data_mtx.unlock();
 }
 
 std::optional<yama::internal::fullname> yama::internal::loader::_resolve_fullname(const str& fullname) {
     bool head_was_bad{};
-    const auto result = internal::fullname::parse(_get_dd().install_manager.domain_env(), fullname, head_was_bad);
+    // TODO: be careful replacing fullname::parse w/ a cache, as the usage of this in loader::load
+    //       will, when called in domain, only be protected by inclusive lock meant for READ ONLY STUFF
+    const auto result = internal::fullname::parse(_dd->installs.domain_env(), fullname, head_was_bad);
     if (!result) {
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         if (!head_was_bad) {
@@ -61,12 +77,13 @@ std::optional<yama::type> yama::internal::loader::_pull_type(const fullname& ful
     const auto found = state.types.pull(fullname);
     return
         found
-        ? std::make_optional(type(*found))
+        ? std::make_optional(create_type(*found))
         : std::nullopt;
 }
 
 bool yama::internal::loader::_load(const fullname& fullname) {
     if (_check_already_loaded(fullname)) return true; // <- succeeds
+    _lock(); // <- lock for new data gen
     if (!_add_type(fullname)) return false;
     if (!_check()) return false;
     return true;
@@ -85,9 +102,10 @@ bool yama::internal::loader::_add_type(const fullname& fullname) {
 }
 
 std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(const fullname& fullname) {
-    const env& e = _get_dd().install_manager.domain_env();
+    const env& e = _dd->installs.domain_env();
     const auto our_path = fullname.import_path().str(e);
-    const auto our_module = _get_dd().importer.import(e, our_path, state);
+    const auto our_module = _dd->importer.import(e, our_path, state);
+    _dd->importer.commit_or_discard(); // can't forget (also, we don't need to lock for this one)
     if (!our_module) {
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         YAMA_LOG(
@@ -105,7 +123,6 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
             _fmt_fullname(fullname),
             our_path,
             fullname.unqualified_name());
-        std::cerr << std::format("{}\n", our_module->info());
         return nullptr;
     }
     // TODO: having to clone this is gross, so maybe change type_instance to instead use raw ptr
@@ -114,7 +131,7 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
 }
 
 bool yama::internal::loader::_create_and_link_instance(const fullname& fullname, res<type_info> info) {
-    const env e = _get_dd().install_manager.parcel_env(fullname.head()).value();
+    const env e = _dd->installs.parcel_env(fullname.head()).value();
     const auto new_instance = _create_instance(fullname, info);
     // during linking, it's possible for other types to be loaded recursively, and these
     // new types may need to link against new_instance, and so to this end, we add our
@@ -133,7 +150,7 @@ void yama::internal::loader::_add_instance_to_state(const fullname& fullname, re
 }
 
 bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instance, res<type_info> info) {
-    const auto n = type(instance).consts().size();
+    const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_resolve_const(e, instance, info, i)) return false;
     }
@@ -157,9 +174,9 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
 }
 
 bool yama::internal::loader::_check() {
-    for (const auto& I : state.types) {
-        const env e = _get_dd().install_manager.parcel_env(I.first.head()).value();
-        auto& instance = *I.second;
+    for (const auto& [key, value] : state.types) {
+        const env e = _dd->installs.parcel_env(key.head()).value();
+        auto& instance = *value;
         const auto& info = get_type_mem(instance)->info;
         if (!_check_consts(e, instance, info)) return false;
     }
@@ -167,7 +184,7 @@ bool yama::internal::loader::_check() {
 }
 
 bool yama::internal::loader::_check_consts(const env& e, type_instance& instance, res<type_info> info) {
-    const auto n = type(instance).consts().size();
+    const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_check_const(e, instance, info, i)) return false;
     }
@@ -191,7 +208,7 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
 }
 
 bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
-    const auto  t               = type(instance);
+    const auto  t               = create_type(instance);
     const str   symbol_fullname = info->consts.qualified_name(index).value();
     const auto  symbol_kind     = info->consts.kind(index).value();
     const auto  resolved_kind   = resolved.kind();
@@ -208,7 +225,7 @@ bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, re
 }
 
 bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
-    const auto t                = type(instance);
+    const auto t                = create_type(instance);
     const auto symbol_callsig   = info->consts.callsig(index);
     const auto resolved_callsig = resolved.callsig();
     // if symbol_callsig is found to not be of a type w/ a callsig, return
@@ -234,10 +251,10 @@ bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance,
 }
 
 yama::str yama::internal::loader::_str_fullname(const fullname& fullname) const {
-    return fullname.str(_get_dd().install_manager.domain_env());
+    return fullname.str(_dd->installs.domain_env());
 }
 
 std::string yama::internal::loader::_fmt_fullname(const fullname& fullname) const {
-    return fullname.fmt(_get_dd().install_manager.domain_env());
+    return fullname.fmt(_dd->installs.domain_env());
 }
 

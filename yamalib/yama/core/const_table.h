@@ -5,7 +5,6 @@
 
 #include <optional>
 
-#include "res.h"
 #include "const_table_info.h"
 #include "const_type.h"
 
@@ -15,77 +14,37 @@
 namespace yama {
 
 
-    namespace internal {
-        class type_instance;
-    }
+    class type;
 
+
+    // const_table provides a non-owning view of the constant table of a type
 
     class const_table final {
     public:
-
-        // IMPORTANT:
-        //      notice how yama::const_table isn't concerned about how its 
-        //      underlying memory is allocated/deallocated, and so is not 
-        //      coupled to any particular allocator
-
-        // ctor for init via type_instance
-
-        explicit const_table(const internal::type_instance& instance) noexcept;
+        const_table(const type& x) noexcept; // implicit convert
 
         const_table() = delete;
         const_table(const const_table&) = default;
         const_table(const_table&&) noexcept = default;
-
         ~const_table() noexcept = default;
-
         const_table& operator=(const const_table&) = default;
         const_table& operator=(const_table&&) noexcept = default;
 
 
-        // complete returns if the const_table is 'complete', meaning that it
-        // contains no stubs, and is in general ready for use
+        // TODO: update our is_stub unit tests when we add types w/ stubs in their
+        //       otherwise resolved constant table (also update Get_Stub!)
 
-        bool complete() const noexcept;
+        size_t size() const noexcept; // returns the size of the constant table
 
+        // NOTE: below methods treat out-of-bounds constant indices as referring to stubs
 
-        // size returns the size of the constant table
-
-        size_t size() const noexcept;
-
-
-        // is_stub returns if the constant at x, if any, is a stub
-
-        // is_stub returns true if x is out-of-bounds (ie. all out-of-bounds indices are
-        // considered to index to constant stubs)
-
-        bool is_stub(const_t x) const noexcept;
-
-
-        // get returns constant at x, if any, as const_data_of_t<C>
-
-        // get returns std::nullopt if C is not the constant type of the constant at x
-
-        // get returns std::nullopt if the constant at x is a stub
-
+        bool is_stub(const_t x) const noexcept; // returns if constant at x, if any, is a stub
         template<const_type C>
-        inline std::optional<const_data_of_t<C>> get(const_t x) const noexcept;
+        inline std::optional<const_data_of_t<C>> get(const_t x) const noexcept; // returns constant at x as const_data_of_t<C>, or std::nullopt if cannot
+        std::optional<const_type> const_type(const_t x) const noexcept; // returns the const_type of constant at x
+        std::optional<type> type(const_t x) const noexcept; // returns type of constant at x, or std::nullopt if cannot
 
-
-        // const_type returns the const_type of the constant at x, if any
-
-        std::optional<const_type> const_type(const_t x) const noexcept;
-
-
-        // NOTE: the purpose of the below methods is to query shared characteristics,
-        //       in a way that *abstracts away* the actual constant types
-
-        std::optional<type> type(const_t x) const noexcept; // returns std::nullopt if constant is a stub
-
-
-        // yama::const_table equality compares by reference
-
-        bool operator==(const const_table&) const noexcept = default;
-
+        bool operator==(const const_table&) const noexcept = default; // compares by reference
 
         std::string fmt_const(const_t x) const;
         std::string fmt_type_const(const_t x) const;
@@ -93,20 +52,15 @@ namespace yama {
 
 
     private:
-
         friend class yama::type;
 
 
         internal::type_mem _mem;
-
-
-        explicit const_table(internal::type_mem mem) noexcept;
     };
 
 
-    // NOTE: I wanna enforce yama::const_table being no more than a pointer in size
-
-    static_assert(sizeof(const_table) <= sizeof(void*));
+    static_assert(sizeof(const_table) <= sizeof(void*)); // guarantee no more than a pointer in size
+    static_assert(std::is_trivially_copyable_v<const_table>);
 }
 
 

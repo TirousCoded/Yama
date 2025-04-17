@@ -4,14 +4,15 @@
 
 
 #include <unordered_map>
+#include <shared_mutex>
 
 #include "../core/general.h"
 #include "../core/concepts.h"
 #include "../core/res.h"
 #include "../core/module_info.h"
 
-#include "../internals/specifiers.h"
-#include "../internals/type_instance.h"
+#include "specifiers.h"
+#include "type_instance.h"
 
 
 namespace yama::internal {
@@ -28,11 +29,9 @@ namespace yama::internal {
         inline res_area(res_area<Key, T>& upstream);
 
 
-        // these do not traverse upstream resources
-
-        inline auto begin() const noexcept;
+        inline auto begin() const noexcept { return _data.begin(); }
         inline auto cbegin() const noexcept { return begin(); }
-        inline auto end() const noexcept;
+        inline auto end() const noexcept { return _data.end(); }
         inline auto cend() const noexcept { return end(); }
 
 
@@ -79,14 +78,23 @@ namespace yama::internal {
         inline void discard() noexcept;
 
 
+        // IMPORTANT: protects_upstream tells fn to *exclusive lock* it before commit
+        //
+        //            beyond this, ALL sync is expected to be handled by caller
+        //
+        //            also, remember to NOT be holding inclusive lock when using these
+        //            overloads
+
         // commit transfers resources from here to upstream
         
         // commit does nothing if there is no upstream area
 
         inline void commit();
+        inline void commit(std::shared_mutex& protects_upstream);
 
 
         inline void commit_or_discard(bool commit);
+        inline void commit_or_discard(bool commit, std::shared_mutex& protects_upstream);
 
 
     private:
@@ -102,18 +110,7 @@ namespace yama::internal {
 
     template<res_area_key Key, typename T>
     inline res_area<Key, T>::res_area(res_area<Key, T>& upstream)
-        : _upstream(&upstream),
-        _data() {}
-
-    template<res_area_key Key, typename T>
-    inline auto res_area<Key, T>::begin() const noexcept {
-        return _data.begin();
-    }
-    
-    template<res_area_key Key, typename T>
-    inline auto res_area<Key, T>::end() const noexcept {
-        return _data.end();
-    }
+        : _upstream(&upstream) {}
 
     template<res_area_key Key, typename T>
     inline void res_area<Key, T>::set_upstream(res_area<Key, T>& upstream) noexcept {
@@ -131,7 +128,7 @@ namespace yama::internal {
     inline size_t res_area<Key, T>::size() const noexcept {
         return _data.size();
     }
-    
+
     template<res_area_key Key, typename T>
     inline bool res_area<Key, T>::exists(const Key& key, bool local_only) const noexcept {
         return
@@ -175,31 +172,33 @@ namespace yama::internal {
     }
 
     template<res_area_key Key, typename T>
+    inline void res_area<Key, T>::commit(std::shared_mutex& protects_upstream) {
+        std::unique_lock lk(protects_upstream);
+        commit();
+    }
+
+    template<res_area_key Key, typename T>
     inline void res_area<Key, T>::commit_or_discard(bool commit) {
         if (commit) this->commit();
         else        discard();
     }
 
     template<res_area_key Key, typename T>
+    inline void res_area<Key, T>::commit_or_discard(bool commit, std::shared_mutex& protects_upstream) {
+        if (commit) this->commit(protects_upstream);
+        else        discard();
+    }
+
+    template<res_area_key Key, typename T>
     inline void res_area<Key, T>::_assert_no_key_conflicts_with_upstream() const noexcept {
-        if (_upstream) {
-            TAUL_ASSERT([&]() -> bool {
-                // choose either *this or *_upstream based on which is smaller, then check
-                // if the smaller one's elems are overlapping w/ the *_upstream, w/ this
-                // way of doing it being fast as it minimizes iterations
-                if (size() < _upstream->size()) {
-                    for (const auto& I : *this) {
-                        if (_upstream->exists(I.first, true)) return false;
-                    }
+        TAUL_ASSERT([&]() -> bool {
+            if (_upstream) {
+                for (const auto& [key, value] : _data) {
+                    if (_upstream->exists(key, true)) return false;
                 }
-                else {
-                    for (const auto& I : *_upstream) {
-                        if (exists(I.first, true)) return false;
-                    }
-                }
-                return true;
-                }());
-        }
+            }
+            return true;
+            }());
     }
 
 
@@ -232,7 +231,9 @@ namespace yama::internal {
         void set_no_upstream() noexcept;
         void discard() noexcept;
         void commit();
+        void commit(std::shared_mutex& protects_upstream);
         void commit_or_discard(bool commit);
+        void commit_or_discard(bool commit, std::shared_mutex& protects_upstream);
     };
 }
 

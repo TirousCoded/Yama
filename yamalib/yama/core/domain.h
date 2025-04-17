@@ -65,10 +65,12 @@ namespace yama {
     //            given an import path 'std.io.net.http', 'std' is the head, and
     //            '.io.net.http' is the relative path
 
+    // TODO: domain thread-safety hasn't really been unit tested (not sure how)
 
-    // TODO: make yama::domain thread-safe by default (make an 'IMPORTANT' mention this)
+    // IMPORTANT: domains are designed to be thread-safe
 
-    class domain : public api_component {
+
+    class domain final : public api_component {
     public:
         domain(std::shared_ptr<debug> dbg = nullptr);
 
@@ -101,7 +103,7 @@ namespace yama {
 
 
     private:
-        internal::domain_data _dd;
+        mutable internal::domain_data _dd;
 
 
         void _finish_setup();

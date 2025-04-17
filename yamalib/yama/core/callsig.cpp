@@ -6,22 +6,26 @@
 
 
 yama::callsig::callsig(const callsig_info& info, const_table consts) 
-    : _info(&info), 
+    : _info(info), 
     _consts(consts) {}
 
+const yama::callsig_info& yama::callsig::info() const noexcept {
+    return *_info;
+}
+
 size_t yama::callsig::params() const noexcept {
-    return _get_info().params.size();
+    return info().params.size();
 }
 
 std::optional<yama::type> yama::callsig::param_type(size_t index) const noexcept {
     return
-        index < _get_info().params.size()
-        ? _consts.type(_get_info().params[index])
+        index < info().params.size()
+        ? _consts.type(info().params[index])
         : std::nullopt;
 }
 
 std::optional<yama::type> yama::callsig::return_type() const noexcept {
-    return _consts.type(_get_info().ret);
+    return _consts.type(info().ret);
 }
 
 bool yama::callsig::operator==(const callsig& other) const noexcept {

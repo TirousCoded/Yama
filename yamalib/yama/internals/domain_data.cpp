@@ -4,10 +4,11 @@
 
 
 yama::internal::domain_data::domain_data(const std::shared_ptr<debug>& dbg)
-    : verif(dbg),
-    compiler(dbg, *this),
+    : installs(),
     state(),
-    install_manager(dbg),
+    installer(dbg, *this),
     importer(dbg, *this),
-    loader(dbg, *this, state) {}
+    loader(dbg, *this, state),
+    verif(dbg),
+    compiler(dbg, *this) {}
 

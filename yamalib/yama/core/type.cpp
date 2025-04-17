@@ -6,20 +6,19 @@
 #include "callsig.h"
 #include "const_table.h"
 
+#include "../internals/type_instance.h"
+
 
 yama::internal::type_mem yama::internal::get_type_mem(type x) noexcept {
     return x._mem;
 }
 
-yama::type::type(const internal::type_instance& instance) noexcept
-    : _mem(instance._mem) {}
+yama::type yama::internal::create_type(const type_instance& x) noexcept {
+    return type(x);
+}
 
 const yama::type_info& yama::type::info() const noexcept {
     return *_mem->info;
-}
-
-bool yama::type::complete() const noexcept {
-    return _mem->stubs == 0;
 }
 
 yama::str yama::type::fullname() const noexcept {
@@ -31,15 +30,15 @@ yama::kind yama::type::kind() const noexcept {
 }
 
 yama::const_table yama::type::consts() const noexcept {
-    return const_table(_mem);
+    return *this;
 }
 
 std::optional<yama::ptype> yama::type::ptype() const noexcept {
-    return _mem->info->ptype();
+    return info().ptype();
 }
 
 std::optional<yama::callsig> yama::type::callsig() const noexcept {
-    const auto ptr = _mem->info->callsig();
+    const auto ptr = info().callsig();
     return
         ptr
         ? std::make_optional(yama::callsig(*ptr, consts()))
@@ -47,17 +46,17 @@ std::optional<yama::callsig> yama::type::callsig() const noexcept {
 }
 
 std::optional<yama::call_fn> yama::type::call_fn() const noexcept {
-    return _mem->info->call_fn();
+    return info().call_fn();
 }
 
 size_t yama::type::max_locals() const noexcept {
-    return _mem->info->max_locals();
+    return info().max_locals();
 }
 
 std::string yama::type::fmt() const {
     return fullname().fmt();
 }
 
-yama::type::type(internal::type_mem mem) noexcept 
-    : _mem(mem) {}
+yama::type::type(const internal::type_instance& instance) noexcept
+    : _mem(instance._mem) {}
 

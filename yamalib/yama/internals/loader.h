@@ -6,6 +6,7 @@
 #include "../core/api_component.h"
 #include "../core/type.h"
 
+#include "safeptr.h"
 #include "res_state.h"
 
 
@@ -28,11 +29,28 @@ namespace yama::internal {
 
         std::optional<yama::type> load(const str& fullname);
 
+        // IMPORTANT: see res_area::commit comment in res_state.h for info on protects_upstream
+
+        // this MUST be called IMMEDIATELY after a call to load finishes in order to cleanup
+        // properly and, if successful, commit state upstream
+
+        void commit_or_discard();
+        void commit_or_discard(std::shared_mutex& protects_upstream);
+
 
     private:
-        domain_data* _dd;
+        safeptr<domain_data> _dd;
 
-        domain_data& _get_dd() const noexcept;
+        bool _last_was_success = false;
+
+
+        // locks _dd->new_data_mtx upon detecting need to generate new data, releasing lock
+        // during commit_or_discard call
+
+        std::atomic_bool _holds_lock = false;
+
+        void _lock();
+        void _unlock();
 
 
         std::optional<fullname> _resolve_fullname(const str& fullname);
@@ -96,7 +114,7 @@ namespace yama::internal {
     inline bool loader::_resolve_type_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
         // TODO: when we add *incomplete type cloning*-using stuff, this
         //       method may need to be revised
-        YAMA_ASSERT(type(instance).consts().is_stub(index));
+        YAMA_ASSERT(create_type(instance).consts().is_stub(index));
         const fullname fullname = fullname::parse(e, info->consts.qualified_name(index).value()).value();
         if (!_add_type(fullname)) {
             return false;
@@ -116,9 +134,9 @@ namespace yama::internal {
     
     template<const_type C>
     inline bool loader::_check_type_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
-        YAMA_ASSERT(!type(instance).consts().is_stub(index));
+        YAMA_ASSERT(!create_type(instance).consts().is_stub(index));
         const fullname fullname = fullname::parse(e, info->consts.qualified_name(index).value()).value();
-        const auto& resolved = _pull_type(fullname).value();
+        const type resolved = _pull_type(fullname).value();
         return
             _check_no_kind_mismatch(instance, info, index, resolved) &&
             _check_no_callsig_mismatch(instance, info, index, resolved);

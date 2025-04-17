@@ -325,6 +325,8 @@ namespace yama {
     }
 
 
+    // TODO: this class hasn't been unit tested
+
     // the base class of Yama debug layers
 
     class debug : public std::enable_shared_from_this<debug> {
@@ -384,40 +386,23 @@ namespace yama {
 
     class null_debug final : public debug {
     public:
-        inline null_debug(dcat cats = defaults_c)
-            : debug(cats) {}
-
-
+        inline null_debug(dcat cats = defaults_c) : debug(cats) {}
     protected:
-        inline void do_log(dcat, const std::string&) override final {
-            // do nothing
-        }
+        inline void do_log(dcat, const std::string&) override final {}
     };
-
 
     class stderr_debug final : public debug {
     public:
-        inline stderr_debug(dcat cats = defaults_c)
-            : debug(cats) {}
-
-
+        inline stderr_debug(dcat cats = defaults_c) : debug(cats) {}
     protected:
-        inline void do_log(dcat, const std::string& msg) override final {
-            std::cerr << msg << '\n';
-        }
+        inline void do_log(dcat, const std::string& msg) override final { std::cerr << msg << '\n'; }
     };
-
 
     class stdout_debug final : public debug {
     public:
-        inline stdout_debug(dcat cats = defaults_c)
-            : debug(cats) {}
-
-
+        inline stdout_debug(dcat cats = defaults_c) : debug(cats) {}
     protected:
-        inline void do_log(dcat, const std::string& msg) override final {
-            std::cout << msg << '\n';
-        }
+        inline void do_log(dcat, const std::string& msg) override final { std::cout << msg << '\n'; }
     };
 
 
@@ -459,12 +444,12 @@ namespace yama {
     std::shared_ptr<proxy_debug> proxy_dbg(std::shared_ptr<debug> base, dcat cats_mask = all_c);
 
 
+    // TODO: this class hasn't been unit tested
+
     // debug impl which provides mechanism to *count* number of times a particular
     // dsignal has been raised (w/ this being useful in unit testing)
 
     // this impl can also act as a proxy for another debug object injected into it
-
-    // TODO: this class hasn't been unit tested
 
     class dsignal_debug final : public debug {
     public:

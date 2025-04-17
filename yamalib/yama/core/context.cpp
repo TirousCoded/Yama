@@ -982,7 +982,7 @@ void yama::context::_bcode_halt() {
 }
 
 void yama::context::_bcode_jump(int16_t offset) {
-    _top_cf().pc += std::make_signed_t<size_t>(offset);
+    _top_cf().pc += ssize_t(offset);
     YAMA_LOG(dbg(), bcode_exec_c, " > jump (to {})", _top_cf().pc);
 }
 

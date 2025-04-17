@@ -109,7 +109,7 @@ bool yama::internal::translation_unit::upload() {
 }
 
 yama::internal::env yama::internal::translation_unit::e() const {
-    return cs->dd->install_manager.parcel_env(parcel()).value();
+    return cs->dd->installs.parcel_env(parcel()).value();
 }
 
 yama::internal::ast_Chunk& yama::internal::translation_unit::root() const {

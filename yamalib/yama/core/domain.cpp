@@ -16,35 +16,54 @@ yama::domain::domain(std::shared_ptr<debug> dbg)
 }
 
 bool yama::domain::install(install_batch&& x) {
-    return _dd.install_manager.install(std::forward<install_batch>(x));
+    std::scoped_lock lk(_dd.new_data_mtx, _dd.state_mtx);
+    // TODO: maybe change frontend install method to take lvalue?
+    return _dd.installer.install(install_batch(std::forward<install_batch>(x)));
 }
 
 size_t yama::domain::install_count() const noexcept {
-    return _dd.install_manager.install_count();
+    std::shared_lock lk(_dd.state_mtx);
+    return _dd.installs.install_count();
 }
 
 bool yama::domain::is_installed(const str& install_name) const noexcept {
-    return _dd.install_manager.is_installed(install_name);
+    std::shared_lock lk(_dd.state_mtx);
+    return _dd.installs.is_installed(install_name);
 }
 
 bool yama::domain::is_installed(parcel_id id) const noexcept {
-    return _dd.install_manager.is_installed(id);
+    std::shared_lock lk(_dd.state_mtx);
+    return _dd.installs.is_installed(id);
 }
 
 std::shared_ptr<yama::parcel> yama::domain::get_installed(const str& install_name) const noexcept {
-    return _dd.install_manager.get_installed(install_name);
+    std::shared_lock lk(_dd.state_mtx);
+    return _dd.installs.get_installed(install_name);
 }
 
 std::shared_ptr<yama::parcel> yama::domain::get_installed(parcel_id id) const noexcept {
-    return _dd.install_manager.get_installed(id);
+    std::shared_lock lk(_dd.state_mtx);
+    return _dd.installs.get_installed(id);
 }
 
 std::optional<yama::module> yama::domain::import(const str& import_path) {
-    return _dd.importer.import(_dd.install_manager.domain_env(), import_path, _dd.state);
+    std::optional<module> result{};
+    {
+        std::shared_lock lk(_dd.state_mtx); // <- releases before commit_or_discard
+        result = _dd.importer.import(_dd.installs.domain_env(), import_path, _dd.state);
+    }
+    _dd.importer.commit_or_discard(_dd.state_mtx); // can't forget
+    return result;
 }
 
 std::optional<yama::type> yama::domain::load(const str& fullname) {
-    return _dd.loader.load(fullname);
+    std::optional<type> result{};
+    {
+        std::shared_lock lk(_dd.state_mtx); // <- releases before commit_or_discard
+        result = _dd.loader.load(fullname);
+    }
+    _dd.loader.commit_or_discard(_dd.state_mtx); // can't forget
+    return result;
 }
 
 yama::type yama::domain::load_none() {

@@ -151,7 +151,6 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
 
     // for this test we only really care that type 'a' loads correctly
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), yama::const_types);
@@ -184,7 +183,6 @@ TEST_F(LoadingTests, WithNoDeps) {
 
     const yama::type aa = a.value();
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 0);
@@ -221,19 +219,16 @@ TEST_F(LoadingTests, WithDeps) {
     const yama::type bb = b.value();
     const yama::type cc = c.value();
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
-    EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 0);
 
-    EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 0);
@@ -290,37 +285,31 @@ TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     const yama::type ee = e.value();
     const yama::type ff = f.value();
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
-    EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 2);
     EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
     EXPECT_EQ(bb.consts().type(1), std::make_optional(ee));
 
-    EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 1);
     EXPECT_EQ(cc.consts().type(0), std::make_optional(ff));
 
-    EXPECT_TRUE(dd.complete());
     EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.consts().size(), 0);
 
-    EXPECT_TRUE(ee.complete());
     EXPECT_EQ(ee.fullname(), "p:e"_str);
     EXPECT_EQ(ee.kind(), yama::kind::primitive);
     EXPECT_EQ(ee.consts().size(), 0);
 
-    EXPECT_TRUE(ff.complete());
     EXPECT_EQ(ff.fullname(), "p:f"_str);
     EXPECT_EQ(ff.kind(), yama::kind::primitive);
     EXPECT_EQ(ff.consts().size(), 0);
@@ -371,20 +360,17 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     const yama::type cc = c.value();
     const yama::type dd = d.value();
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
 
-    EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);
     EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
 
-    EXPECT_TRUE(cc.complete());
     EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 3);
@@ -392,7 +378,6 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     EXPECT_EQ(cc.consts().type(1), std::make_optional(dd));
     EXPECT_EQ(cc.consts().type(2), std::make_optional(dd));
 
-    EXPECT_TRUE(dd.complete());
     EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
     EXPECT_EQ(dd.consts().size(), 0);
@@ -428,14 +413,12 @@ TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
     const yama::type aa = a.value();
     const yama::type bb = b.value();
 
-    EXPECT_TRUE(aa.complete());
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
     EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
     EXPECT_EQ(aa.consts().type(1), std::make_optional(aa));
 
-    EXPECT_TRUE(bb.complete());
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);

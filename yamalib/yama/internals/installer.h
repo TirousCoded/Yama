@@ -9,19 +9,28 @@
 #include "../core/general.h"
 #include "../core/install_batch.h"
 
-#include "../internals/env.h"
+#include "safeptr.h"
+#include "env.h"
 
 
 namespace yama::internal {
 
 
-    class install_manager final : public api_component {
+    class domain_data;
+
+    
+    // install_state and installer are seperate subcomponents in order to make our
+    // code cleaner and more readable w/ regards to domain thread-safety
+
+
+    class install_state final {
     public:
-        install_manager(std::shared_ptr<debug> dbg);
-        virtual ~install_manager() noexcept = default;
+        install_state() = default;
 
 
-        bool install(install_batch&& x);
+        void push(const install_batch& batch); // used by installer, no safety checks
+
+
         size_t install_count() const noexcept;
         bool is_installed(const str& install_name) const noexcept;
         bool is_installed(parcel_id id) const noexcept;
@@ -42,8 +51,26 @@ namespace yama::internal {
         std::unordered_map<parcel_id, _install_t> _installs;
         env_instance _domain_env_instance;
 
+
         _install_t& _get_install(parcel_id id) noexcept;
         const _install_t& _get_install(parcel_id id) const noexcept;
+
+
+        void _populate_domain_env(const install_batch& batch);
+        void _create_and_populate_parcel_envs(const install_batch& batch);
+    };
+
+
+    class installer final : public api_component {
+    public:
+        installer(std::shared_ptr<debug> dbg, domain_data& dd);
+
+
+        bool install(const install_batch& batch);
+
+
+    private:
+        safeptr<domain_data> _dd;
 
 
         // below are used to impl _check_no_dep_graph_cycles
@@ -88,7 +115,6 @@ namespace yama::internal {
         std::vector<str> _node_stk;
 
 
-        bool _try_install(install_batch& batch);
         bool _check_no_install_batch_errors(const install_batch& batch);
         bool _check_no_invalid_parcel_errors(const install_batch& batch);
         bool _check_no_install_name_conflicts(const install_batch& batch);
@@ -98,8 +124,6 @@ namespace yama::internal {
         bool _install_name_refs_main(str install_name) const noexcept;
         bool _install_name_refs_batch(str install_name, const install_batch& batch) const noexcept;
         bool _install_name_refs_batch_or_main(str install_name, const install_batch& batch) const noexcept;
-        void _populate_domain_env(install_batch& batch);
-        void _create_and_populate_parcel_envs(install_batch& batch);
 
         size_t _dep_graph_cycle_detect(const install_batch& batch);
         size_t _dep_graph_node_visit(const str& install_name, const install_batch& batch);

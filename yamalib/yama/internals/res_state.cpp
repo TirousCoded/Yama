@@ -23,8 +23,18 @@ void yama::internal::res_state::commit() {
     modules.commit();
 }
 
+void yama::internal::res_state::commit(std::shared_mutex& protects_upstream) {
+    std::unique_lock lk(protects_upstream);
+    commit();
+}
+
 void yama::internal::res_state::commit_or_discard(bool commit) {
     types.commit_or_discard(commit);
     modules.commit_or_discard(commit);
+}
+
+void yama::internal::res_state::commit_or_discard(bool commit, std::shared_mutex& protects_upstream) {
+    if (commit) this->commit(protects_upstream);
+    else        discard();
 }
 

@@ -92,7 +92,7 @@ std::string yama::internal::ctype::fmt(const env& e) const {
 }
 
 yama::internal::env yama::internal::ctype::_e() const {
-    return _s->cs->dd->install_manager.parcel_env(fullname().head()).value();
+    return _s->cs->dd->installs.parcel_env(fullname().head()).value();
 }
 
 bool yama::internal::ctype::_csymtab_entry_not_typeinf() const noexcept {
@@ -136,7 +136,7 @@ std::optional<yama::internal::ctype> yama::internal::cmodule::type(const str& un
 }
 
 yama::internal::env yama::internal::cmodule::_e() const {
-    return _s->cs->dd->install_manager.parcel_env(import_path().head()).value();
+    return _s->cs->dd->installs.parcel_env(import_path().head()).value();
 }
 
 bool yama::internal::cmodule::_tu_not_modinf() const noexcept {

@@ -12,22 +12,19 @@
 
 
 namespace yama::internal {
+    
+    
+    class type_instance;
 
 
     type_mem get_type_mem(const internal::type_instance& x) noexcept;
 
 
-    // yama::internal::type_instance encapsulates the state of an instantiated
-    // Yama language type, being responsible for the ownership of it
-
-    // type_instance exists for use ONLY in yama::domain impl backends
-
-    // type_instance is mutable so that the yama::domain impl can populate its
-    // constant table as needed
+    // type_instance encapsulates an instantiated Yama language type, being responsible
+    // for the ownership of its memory
 
     class type_instance final {
     public:
-
         friend class yama::const_table;
         friend class yama::type;
 
@@ -42,9 +39,7 @@ namespace yama::internal {
         // the 'Yama API semantics' mentioned above are beyond the scope of 
         // type_instance to define, being left to type_instance's end-users
 
-        type_instance(
-            str fullname,
-            res<type_info> info);
+        type_instance(str fullname, res<type_info> info);
 
         // ctor for cloning a type_instance, w/ clone being under a new name
 
@@ -52,20 +47,16 @@ namespace yama::internal {
         // to allow for *incomplete* types (ie. things like generic types w/out
         // resolved params) to be used to derive more *complete* types
 
-        type_instance(
-            str new_fullname,
-            const type_instance& other);
+        type_instance(str new_fullname, const type_instance& other);
 
         type_instance() = delete;
         type_instance(type_instance&&) noexcept = delete;
-
         ~type_instance() noexcept;
-
         type_instance& operator=(const type_instance&) = delete;
         type_instance& operator=(type_instance&&) noexcept = delete;
 
 
-        // fullname returns the fullname of the type of the type_instance
+        bool complete() const noexcept; // constant table has no stubs
 
         const str& fullname() const noexcept;
 
@@ -85,13 +76,10 @@ namespace yama::internal {
 
 
     private:
-
         friend yama::internal::type_mem yama::internal::get_type_mem(const internal::type_instance& x) noexcept;
 
 
-        // the type_instance will manage _mem via RAII
-
-        internal::type_mem  _mem;
+        internal::type_mem  _mem; // _mem is released via RAII
 
 
         static internal::type_mem _create_mem(str fullname, res<type_info> info);

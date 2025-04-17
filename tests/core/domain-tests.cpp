@@ -57,13 +57,6 @@ TEST_F(DomainTests, Builtins) {
     EXPECT_EQ(_Bool, dm->load_bool());
     EXPECT_EQ(_Char, dm->load_char());
 
-    EXPECT_TRUE(_None->complete());
-    EXPECT_TRUE(_Int->complete());
-    EXPECT_TRUE(_UInt->complete());
-    EXPECT_TRUE(_Float->complete());
-    EXPECT_TRUE(_Bool->complete());
-    EXPECT_TRUE(_Char->complete());
-
     EXPECT_EQ(_None->fullname(), "yama:None"_str);
     EXPECT_EQ(_Int->fullname(), "yama:Int"_str);
     EXPECT_EQ(_UInt->fullname(), "yama:UInt"_str);
@@ -785,7 +778,6 @@ TEST_F(DomainTests, Load) {
     EXPECT_TRUE(result_c);
 
     if (result_f) {
-        EXPECT_TRUE(result_f->complete());
         EXPECT_EQ(result_f->fullname(), "p.abc:f"_str);
         EXPECT_EQ(result_f->kind(), yama::kind::function);
 
@@ -801,7 +793,6 @@ TEST_F(DomainTests, Load) {
     }
 
     if (result_a) {
-        EXPECT_TRUE(result_a->complete());
         EXPECT_EQ(result_a->fullname(), "p.abc:a"_str);
         EXPECT_EQ(result_a->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_a->callsig());
@@ -809,7 +800,6 @@ TEST_F(DomainTests, Load) {
     }
 
     if (result_b) {
-        EXPECT_TRUE(result_b->complete());
         EXPECT_EQ(result_b->fullname(), "p.abc:b"_str);
         EXPECT_EQ(result_b->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_b->callsig());
@@ -817,7 +807,6 @@ TEST_F(DomainTests, Load) {
     }
 
     if (result_c) {
-        EXPECT_TRUE(result_c->complete());
         EXPECT_EQ(result_c->fullname(), "p.abc:c"_str);
         EXPECT_EQ(result_c->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_c->callsig());
@@ -849,14 +838,12 @@ TEST_F(DomainTests, Load_DisambiguationViaImportPaths) {
 
     // types are as expected
     if (result_A_a) {
-        EXPECT_TRUE(result_A_a->complete());
         EXPECT_EQ(result_A_a->fullname(), "A.abc:a"_str);
         EXPECT_EQ(result_A_a->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_A_a->callsig());
         EXPECT_EQ(result_A_a->consts().size(), 0);
     }
     if (result_B_a) {
-        EXPECT_TRUE(result_B_a->complete());
         EXPECT_EQ(result_B_a->fullname(), "B.abc:a"_str);
         EXPECT_EQ(result_B_a->kind(), yama::kind::primitive);
         EXPECT_FALSE(result_B_a->callsig());

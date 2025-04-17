@@ -1,70 +1,95 @@
 
 
-#include "install_manager.h"
+#include "installer.h"
 
 #include "../core/res.h"
 
+#include "domain_data.h"
 
-yama::internal::install_manager::install_manager(std::shared_ptr<debug> dbg)
-    : api_component(dbg) {}
 
-bool yama::internal::install_manager::install(install_batch&& x) {
-    install_batch temp(std::forward<install_batch>(x));
-    return _try_install(temp);
+void yama::internal::install_state::push(const install_batch& batch) {
+    _populate_domain_env(batch);
+    _create_and_populate_parcel_envs(batch);
 }
 
-size_t yama::internal::install_manager::install_count() const noexcept {
+size_t yama::internal::install_state::install_count() const noexcept {
     return domain_env().count();
 }
 
-bool yama::internal::install_manager::is_installed(const str& install_name) const noexcept {
+bool yama::internal::install_state::is_installed(const str& install_name) const noexcept {
     return domain_env().exists(install_name);
 }
 
-bool yama::internal::install_manager::is_installed(parcel_id id) const noexcept {
+bool yama::internal::install_state::is_installed(parcel_id id) const noexcept {
     return domain_env().exists(id);
 }
 
-std::shared_ptr<yama::parcel> yama::internal::install_manager::get_installed(const str& install_name) const noexcept {
+std::shared_ptr<yama::parcel> yama::internal::install_state::get_installed(const str& install_name) const noexcept {
     const auto id = domain_env().id(install_name);
     return id ? get_installed(*id) : nullptr;
 }
 
-std::shared_ptr<yama::parcel> yama::internal::install_manager::get_installed(parcel_id id) const noexcept {
+std::shared_ptr<yama::parcel> yama::internal::install_state::get_installed(parcel_id id) const noexcept {
     return is_installed(id) ? _get_install(id).prcl.base() : nullptr;
 }
 
-const yama::internal::env& yama::internal::install_manager::domain_env() const noexcept {
+const yama::internal::env& yama::internal::install_state::domain_env() const noexcept {
     return _domain_env_instance.get();
 }
 
-std::optional<yama::internal::env> yama::internal::install_manager::parcel_env(const str& install_name) const noexcept {
+std::optional<yama::internal::env> yama::internal::install_state::parcel_env(const str& install_name) const noexcept {
     const auto id = domain_env().id(install_name);
     return id ? parcel_env(*id) : std::nullopt;
 }
 
-std::optional<yama::internal::env> yama::internal::install_manager::parcel_env(parcel_id id) const noexcept {
+std::optional<yama::internal::env> yama::internal::install_state::parcel_env(parcel_id id) const noexcept {
     return is_installed(id) ? std::make_optional(_get_install(id).e.get()) : std::nullopt;
 }
 
-yama::internal::install_manager::_install_t& yama::internal::install_manager::_get_install(parcel_id id) noexcept {
+yama::internal::install_state::_install_t& yama::internal::install_state::_get_install(parcel_id id) noexcept {
     YAMA_ASSERT(_installs.contains(id));
     return _installs.at(id);
 }
 
-const yama::internal::install_manager::_install_t& yama::internal::install_manager::_get_install(parcel_id id) const noexcept {
+const yama::internal::install_state::_install_t& yama::internal::install_state::_get_install(parcel_id id) const noexcept {
     YAMA_ASSERT(_installs.contains(id));
     return _installs.at(id);
 }
 
-bool yama::internal::install_manager::_try_install(install_batch& batch) {
+void yama::internal::install_state::_populate_domain_env(const install_batch& batch) {
+    // hereafter, we can consider these parcels *installed* regarding access via install_state methods
+    for (const auto& [install_name, parcel] : batch.installs) {
+        _installs.insert({ parcel->id(), _install_t{.prcl = parcel, .e = env_instance{} } });
+        _domain_env_instance.add(install_name, parcel->id());
+    }
+}
+
+void yama::internal::install_state::_create_and_populate_parcel_envs(const install_batch& batch) {
+    for (const auto& [install_name, parcel] : batch.installs) {
+        auto& our_parcel_env = _get_install(parcel->id()).e;
+        YAMA_ASSERT(!our_parcel_env.get().exists(install_name));
+        // self-name mapping
+        our_parcel_env.add(parcel->metadata().self_name, parcel->id());
+        // dep mappings
+        for (const auto& dep_name : parcel->metadata().dep_names) {
+            dep_mapping_name dmn{ .install_name = install_name, .dep_name = dep_name };
+            const auto& name_in_domain_env = batch.dep_mappings.at(dmn);
+            our_parcel_env.add(dep_name, get_installed(name_in_domain_env)->id());
+        }
+    }
+}
+
+yama::internal::installer::installer(std::shared_ptr<debug> dbg, domain_data& dd)
+    : api_component(dbg),
+    _dd(dd) {}
+
+bool yama::internal::installer::install(const install_batch& batch) {
     if (!_check_no_install_batch_errors(batch)) return false;
-    _populate_domain_env(batch);
-    _create_and_populate_parcel_envs(batch);
+    _dd->installs.push(std::move(batch));
     return true;
 }
 
-bool yama::internal::install_manager::_check_no_install_batch_errors(const install_batch& batch) {
+bool yama::internal::installer::_check_no_install_batch_errors(const install_batch& batch) {
     return
         _check_no_invalid_parcel_errors(batch) &&
         _check_no_install_name_conflicts(batch) &&
@@ -73,7 +98,7 @@ bool yama::internal::install_manager::_check_no_install_batch_errors(const insta
         _check_no_dep_graph_cycles(batch);
 }
 
-bool yama::internal::install_manager::_check_no_invalid_parcel_errors(const install_batch& batch) {
+bool yama::internal::installer::_check_no_invalid_parcel_errors(const install_batch& batch) {
     bool success = true;
     for (const auto& [install_name, parcel] : batch.installs) {
         const auto our_self_name = parcel->metadata().self_name;
@@ -90,7 +115,7 @@ bool yama::internal::install_manager::_check_no_invalid_parcel_errors(const inst
     return success;
 }
 
-bool yama::internal::install_manager::_check_no_install_name_conflicts(const install_batch& batch) {
+bool yama::internal::installer::_check_no_install_name_conflicts(const install_batch& batch) {
     bool success = true;
     for (const auto& [install_name, parcel] : batch.installs) {
         if (!_install_name_refs_main(install_name)) continue;
@@ -104,7 +129,7 @@ bool yama::internal::install_manager::_check_no_install_name_conflicts(const ins
     return success;
 }
 
-bool yama::internal::install_manager::_check_no_missing_dep_mappings(const install_batch& batch) {
+bool yama::internal::installer::_check_no_missing_dep_mappings(const install_batch& batch) {
     bool success = true;
     for (const auto& [install_name, parcel] : batch.installs) {
         for (const auto& dep_name : parcel->metadata().dep_names) {
@@ -121,7 +146,7 @@ bool yama::internal::install_manager::_check_no_missing_dep_mappings(const insta
     return success;
 }
 
-bool yama::internal::install_manager::_check_no_invalid_dep_mappings(const install_batch& batch) {
+bool yama::internal::installer::_check_no_invalid_dep_mappings(const install_batch& batch) {
     bool success = true;
     for (const auto& [dmn, mapped_to] : batch.dep_mappings) {
         if (!_install_name_refs_batch(dmn.install_name, batch)) {
@@ -155,48 +180,25 @@ bool yama::internal::install_manager::_check_no_invalid_dep_mappings(const insta
     return success;
 }
 
-bool yama::internal::install_manager::_check_no_dep_graph_cycles(const install_batch& batch) {
+bool yama::internal::installer::_check_no_dep_graph_cycles(const install_batch& batch) {
     return _dep_graph_cycle_detect(batch) == 0;
 }
 
-bool yama::internal::install_manager::_install_name_refs_main(str install_name) const noexcept {
-    return is_installed(install_name);
+bool yama::internal::installer::_install_name_refs_main(str install_name) const noexcept {
+    return _dd->installs.is_installed(install_name);
 }
 
-bool yama::internal::install_manager::_install_name_refs_batch(str install_name, const install_batch& batch) const noexcept {
+bool yama::internal::installer::_install_name_refs_batch(str install_name, const install_batch& batch) const noexcept {
     return batch.installs.contains(install_name);
 }
 
-bool yama::internal::install_manager::_install_name_refs_batch_or_main(str install_name, const install_batch& batch) const noexcept {
+bool yama::internal::installer::_install_name_refs_batch_or_main(str install_name, const install_batch& batch) const noexcept {
     return
         _install_name_refs_main(install_name) ||
         _install_name_refs_batch(install_name, batch);
 }
 
-void yama::internal::install_manager::_populate_domain_env(install_batch& batch) {
-    // hereafter, we can consider these parcels *installed* regarding access via install_manager methods
-    for (const auto& [install_name, parcel] : batch.installs) {
-        _installs.insert({ parcel->id(), _install_t{ .prcl = parcel, .e = env_instance{} } });
-        _domain_env_instance.add(install_name, parcel->id());
-    }
-}
-
-void yama::internal::install_manager::_create_and_populate_parcel_envs(install_batch& batch) {
-    for (const auto& [install_name, parcel] : batch.installs) {
-        auto& our_parcel_env = _get_install(parcel->id()).e;
-        YAMA_ASSERT(!our_parcel_env.get().exists(install_name));
-        // self-name mapping
-        our_parcel_env.add(parcel->metadata().self_name, parcel->id());
-        // dep mappings
-        for (const auto& dep_name : parcel->metadata().dep_names) {
-            dep_mapping_name dmn{ .install_name = install_name, .dep_name = dep_name };
-            const auto& name_in_domain_env = batch.dep_mappings.at(dmn);
-            our_parcel_env.add(dep_name, get_installed(name_in_domain_env)->id());
-        }
-    }
-}
-
-size_t yama::internal::install_manager::_dep_graph_cycle_detect(const install_batch& batch) {
+size_t yama::internal::installer::_dep_graph_cycle_detect(const install_batch& batch) {
     _dep_graph_process_init(batch);
     size_t cycles = 0;
     while (!_unprocessed_nodes.empty()) {
@@ -209,7 +211,7 @@ size_t yama::internal::install_manager::_dep_graph_cycle_detect(const install_ba
     return cycles;
 }
 
-size_t yama::internal::install_manager::_dep_graph_node_visit(const str& install_name, const install_batch& batch) {
+size_t yama::internal::installer::_dep_graph_node_visit(const str& install_name, const install_batch& batch) {
     // if cycle detected, return as further traversal will be infinite recursion
     if (_dep_graph_detect_and_report_cycle(install_name)) return 1;
     _dep_graph_move_unprocessed_to_visited(install_name);
@@ -219,7 +221,7 @@ size_t yama::internal::install_manager::_dep_graph_node_visit(const str& install
     return cycles;
 }
 
-size_t yama::internal::install_manager::_dep_graph_traverse_outgoing_edges(const str& install_name, const install_batch& batch) {
+size_t yama::internal::installer::_dep_graph_traverse_outgoing_edges(const str& install_name, const install_batch& batch) {
     size_t cycles = 0;
     for (const auto& [dmn, mapped_to] : batch.dep_mappings) {
         if (dmn.install_name != install_name) continue; // skip if dep mapping isn't for install_name
@@ -230,7 +232,7 @@ size_t yama::internal::install_manager::_dep_graph_traverse_outgoing_edges(const
     return cycles;
 }
 
-void yama::internal::install_manager::_dep_graph_process_init(const install_batch& batch) {
+void yama::internal::installer::_dep_graph_process_init(const install_batch& batch) {
     _unprocessed_nodes.clear();
     _visited_nodes.clear();
     _island_nodes.clear();
@@ -241,16 +243,16 @@ void yama::internal::install_manager::_dep_graph_process_init(const install_batc
     }
 }
 
-yama::str yama::internal::install_manager::_dep_graph_select_arbitrary_unprocessed_node() {
+yama::str yama::internal::installer::_dep_graph_select_arbitrary_unprocessed_node() {
     YAMA_ASSERT(!_unprocessed_nodes.empty());
     return *_unprocessed_nodes.begin();
 }
 
-void yama::internal::install_manager::_dep_graph_merge_visited_into_island() {
+void yama::internal::installer::_dep_graph_merge_visited_into_island() {
     _island_nodes.merge(_visited_nodes);
 }
 
-bool yama::internal::install_manager::_dep_graph_detect_and_report_cycle(const str& install_name) {
+bool yama::internal::installer::_dep_graph_detect_and_report_cycle(const str& install_name) {
     // iterate upwards through _node_stk, looking for an instance of install_name already
     // on the stack, and if detected, report the dep graph cycle found
     for (size_t i = 0; i < _node_stk.size(); i++) {
@@ -268,16 +270,16 @@ bool yama::internal::install_manager::_dep_graph_detect_and_report_cycle(const s
     return false;
 }
 
-void yama::internal::install_manager::_dep_graph_move_unprocessed_to_visited(const str& install_name) {
+void yama::internal::installer::_dep_graph_move_unprocessed_to_visited(const str& install_name) {
     _unprocessed_nodes.erase(install_name);
     _visited_nodes.insert(install_name);
 }
 
-void yama::internal::install_manager::_dep_graph_node_stk_push(const str& install_name) {
+void yama::internal::installer::_dep_graph_node_stk_push(const str& install_name) {
     _node_stk.push_back(install_name);
 }
 
-void yama::internal::install_manager::_dep_graph_node_stk_pop() {
+void yama::internal::installer::_dep_graph_node_stk_pop() {
     _node_stk.pop_back();
 }
 

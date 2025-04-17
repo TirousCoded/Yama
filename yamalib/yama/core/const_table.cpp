@@ -5,12 +5,8 @@
 #include "type.h"
 
 
-yama::const_table::const_table(const internal::type_instance& instance) noexcept
-    : _mem(instance._mem) {}
-
-bool yama::const_table::complete() const noexcept {
-    return _mem->stubs == 0;
-}
+yama::const_table::const_table(const yama::type& x) noexcept
+    : _mem(internal::get_type_mem(x)) {}
 
 size_t yama::const_table::size() const noexcept {
     return _mem->length();
@@ -64,7 +60,4 @@ std::string yama::const_table::fmt(const char* tab) const {
     }
     return result;
 }
-
-yama::const_table::const_table(internal::type_mem mem) noexcept
-    : _mem(mem) {}
 

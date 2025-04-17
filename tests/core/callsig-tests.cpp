@@ -3,437 +3,228 @@
 #include <gtest/gtest.h>
 
 #include <yama/core/general.h>
+#include <yama/core/parcel.h>
+#include <yama/core/domain.h>
 #include <yama/core/callsig.h>
 #include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
 #include <yama/core/type_info.h>
 #include <yama/core/type.h>
 
-// TODO: type_instance used to be in frontend, but now it isn't,
-//       meaning our unit tests have backend code dependence,
-//       which is undesirable
-//
-//       I'm thinking maybe pull type_instance back to the frontend
-//       at some point
-#include <yama/internals/type_instance.h>
-
 
 using namespace yama::string_literals;
 
 
-yama::internal::type_instance make_type_inst_1(
-    yama::str unqualified_name,
-    yama::const_table_info consts) {
-    yama::type_info info{
-        .unqualified_name = unqualified_name,
-        .consts = std::move(consts),
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
+namespace {
+    class test_parcel final : public yama::parcel {
+    public:
+        std::optional<yama::parcel_metadata> md;
+        std::unordered_map<yama::str, yama::res<yama::module_info>> mods;
+
+
+        test_parcel() = default;
+
+
+        void push(const yama::str& relative_path, yama::module_info&& m) {
+            mods.insert({ relative_path, yama::make_res<yama::module_info>(std::forward<yama::module_info>(m)) });
+        }
+
+
+        const yama::parcel_metadata& metadata() override final {
+            if (!md) md = yama::parcel_metadata{ "self"_str, { "yama"_str } };
+            return *md;
+        }
+        std::optional<yama::import_result> import(const yama::str & relative_path) override final {
+            if (const auto it = mods.find(relative_path); it != mods.end()) {
+                return yama::import_result(yama::res(it->second));
+            }
+            else return std::nullopt;
+        }
     };
-    return yama::internal::type_instance(unqualified_name, yama::make_res<yama::type_info>(info));
-}
-
-yama::internal::type_instance make_type_inst_2(
-    yama::str unqualified_name,
-    yama::callsig_info callsig,
-    yama::const_table_info consts) {
-    yama::type_info info{
-        .unqualified_name = unqualified_name,
-        .consts = std::move(consts),
-        .info = yama::function_info{
-            .callsig = callsig,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 10,
-        },
-    };
-    return yama::internal::type_instance(unqualified_name, yama::make_res<yama::type_info>(info));
 }
 
 
-// NOTE: the below 'Usage_***' tests will test ctor, params, param_type, 
-//       and return_type, all at once, via a series of specific use cases,
-//       rather than testing per-method
+class CallSigTests : public testing::Test {
+public:
+    std::shared_ptr<yama::debug> dbg;
+    std::shared_ptr<yama::domain> dm;
+    std::shared_ptr<test_parcel> parcel;
 
-TEST(CallSigTests, Usage_CompleteType) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
 
-    auto x_consts =
+    void push_module_with_f();
+    void push_module_with_a1_a2_b_c_and_d();
+
+
+protected:
+    void SetUp() override {
+        dbg = std::make_shared<yama::stderr_debug>();
+        dm = std::make_shared<yama::domain>(dbg);
+        parcel = std::make_shared<test_parcel>();
+
+        yama::install_batch ib{};
+        ib
+            .install("a"_str, yama::res(parcel))
+            .map_dep("a"_str, "yama"_str, "yama"_str);
+        dm->install(std::move(ib));
+    }
+    void TearDown() override {
+        //
+    }
+};
+
+void CallSigTests::push_module_with_f() {
+    // fn(Int, Float, Char) -> Float
+    auto f_constsinf =
         yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::primitive_type_const>(1, b);
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str);
+    auto f_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
 
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
+    yama::module_factory mf{};
+    mf.add_function_type("f"_str, std::move(f_constsinf), std::move(f_callsiginf), 10, yama::noop_call_fn);
 
-    
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_TRUE(x_callsig.param_type(1));
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(1)) EXPECT_EQ(x_callsig.param_type(1).value(), b);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-    
-    EXPECT_TRUE(x_callsig.return_type());
-
-    if (x_callsig.return_type()) EXPECT_EQ(x_callsig.return_type().value(), b);
+    parcel->push(""_str, std::move(mf.done()));
 }
 
-TEST(CallSigTests, Usage_IncompleteType_OutOfBoundsParamTypeConstIndex) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
+void CallSigTests::push_module_with_a1_a2_b_c_and_d() {
+    // a1 and a2 will be structurally the same, but will refer to two distinct callsigs
+    // (w/ this being to test compare by value)
 
-    auto x_consts =
+    // b will differ by having different number of params
+    // c will differ by having different param types
+    // d will differ by having different return types
+
+    // a1, a2       : fn(Int, Float, Char) -> Float
+    // b            : fn(Int, Float, Char, UInt) -> Float
+    // c            : fn(Int, UInt, Char) -> Float
+    // d            : fn(Int, Float, Char) -> UInt
+
+    auto constsinf =
         yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 7, 2 }, 1); // <- out-of-bounds link index 7
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::primitive_type_const>(1, b);
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_primitive_type("yama:UInt"_str);
 
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
+    auto a_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
+    auto b_callsiginf = yama::make_callsig_info({ 0, 1, 2, 3 }, 1);
+    auto c_callsiginf = yama::make_callsig_info({ 0, 3, 2 }, 1);
+    auto d_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 3);
 
-    
-    EXPECT_EQ(x_callsig.params(), 3);
+    yama::module_factory mf{};
+    mf.add_function_type("a1"_str, yama::const_table_info(constsinf), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("a2"_str, yama::const_table_info(constsinf), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("b"_str, yama::const_table_info(constsinf), yama::callsig_info(b_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("c"_str, yama::const_table_info(constsinf), yama::callsig_info(c_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("d"_str, yama::const_table_info(constsinf), yama::callsig_info(d_callsiginf), 10, yama::noop_call_fn);
 
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_FALSE(x_callsig.param_type(1)); // <- failed due to out-of-bounds link index
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-    
-    EXPECT_TRUE(x_callsig.return_type());
-
-    if (x_callsig.return_type()) EXPECT_EQ(x_callsig.return_type().value(), b);
+    parcel->push(""_str, std::move(mf.done()));
 }
 
-TEST(CallSigTests, Usage_IncompleteType_OutOfBoundsReturnTypeConstIndex) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
 
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 7); // <- out-of-bounds link index 7
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::primitive_type_const>(1, b);
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
+TEST_F(CallSigTests, Params) {
+    push_module_with_f();
+    auto f = dm->load("a:f"_str).value().callsig();
 
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
-
-
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_TRUE(x_callsig.param_type(1));
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(1)) EXPECT_EQ(x_callsig.param_type(1).value(), b);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-
-    EXPECT_FALSE(x_callsig.return_type()); // <- failed due to out-of-bounds link index
+    ASSERT_TRUE(f);
+    ASSERT_EQ(f->params(), 3);
 }
 
-TEST(CallSigTests, Usage_IncompleteType_ParamTypeIsStub) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
+TEST_F(CallSigTests, ParamType) {
+    push_module_with_f();
+    auto f = dm->load("a:f"_str).value().callsig();
 
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 0);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    //x_inst.put<yama::primitive_type_const>(1, b); <- stub
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
+    ASSERT_TRUE(f);
+    ASSERT_EQ(f->params(), 3);
 
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
-
-
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_FALSE(x_callsig.param_type(1)); // <- failed due to stub
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-
-    EXPECT_TRUE(x_callsig.return_type());
-
-    if (x_callsig.return_type()) EXPECT_EQ(x_callsig.return_type().value(), a);
+    EXPECT_EQ(f->param_type(0), std::make_optional(dm->load_int()));
+    EXPECT_EQ(f->param_type(1), std::make_optional(dm->load_float()));
+    EXPECT_EQ(f->param_type(2), std::make_optional(dm->load_char()));
 }
 
-TEST(CallSigTests, Usage_IncompleteType_ReturnTypeIsStub) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
+TEST_F(CallSigTests, ParamType_IndexOutOfBounds) {
+    push_module_with_f();
+    auto f = dm->load("a:f"_str).value().callsig();
 
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 0, 2 }, 1);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    //x_inst.put<yama::primitive_type_const>(1, b); <- stub
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
+    ASSERT_TRUE(f);
+    ASSERT_EQ(f->params(), 3);
 
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
-
-
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_TRUE(x_callsig.param_type(1));
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(1)) EXPECT_EQ(x_callsig.param_type(1).value(), a);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-
-    EXPECT_FALSE(x_callsig.return_type()); // <- failed due to stub
+    EXPECT_EQ(f->param_type(4), std::nullopt);
 }
 
-TEST(CallSigTests, Usage_IncompleteType_ParamTypeIsNotATypeConstant) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type c(c_inst);
-
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_int(31)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 0);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::int_const>(1, 31); // <- not a type constant!
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
-
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
-
-
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_FALSE(x_callsig.param_type(1)); // <- failed due to not a type constant
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-
-    EXPECT_TRUE(x_callsig.return_type());
-
-    if (x_callsig.return_type()) EXPECT_EQ(x_callsig.return_type().value(), a);
+TEST_F(CallSigTests, ParamType_RefsStubConst) {
+    // TODO: stub
 }
 
-TEST(CallSigTests, Usage_IncompleteType_ReturnTypeIsNotATypeConstant) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type c(c_inst);
+TEST_F(CallSigTests, ReturnType) {
+    push_module_with_f();
+    auto f = dm->load("a:f"_str).value().callsig();
 
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_int(31)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 0, 2 }, 1);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::int_const>(1, 31); // <- not a type constant!
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
-
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
-
-
-    EXPECT_EQ(x_callsig.params(), 3);
-
-    EXPECT_TRUE(x_callsig.param_type(0));
-    EXPECT_TRUE(x_callsig.param_type(1));
-    EXPECT_TRUE(x_callsig.param_type(2));
-    EXPECT_FALSE(x_callsig.param_type(3)); // <- out-of-bounds param index
-
-    if (x_callsig.param_type(0)) EXPECT_EQ(x_callsig.param_type(0).value(), a);
-    if (x_callsig.param_type(1)) EXPECT_EQ(x_callsig.param_type(1).value(), a);
-    if (x_callsig.param_type(2)) EXPECT_EQ(x_callsig.param_type(2).value(), c);
-
-    EXPECT_FALSE(x_callsig.return_type()); // <- failed due to not a type constant
+    ASSERT_TRUE(f);
+    ASSERT_EQ(f->return_type(), std::make_optional(dm->load_float()));
 }
 
-TEST(CallSigTests, Equality) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
-
-    // x1_callsig
-    auto x1_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x1_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    auto x1_inst = make_type_inst_2("x1"_str, x1_callsig_info, std::move(x1_consts));
-    x1_inst.put<yama::primitive_type_const>(0, a);
-    x1_inst.put<yama::primitive_type_const>(1, b);
-    x1_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x1(x1_inst);
-
-    // x2_callsig
-    auto x2_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x2_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    auto x2_inst = make_type_inst_2("x2"_str, x2_callsig_info, std::move(x2_consts));
-    x2_inst.put<yama::primitive_type_const>(0, a);
-    x2_inst.put<yama::primitive_type_const>(1, b);
-    x2_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x2(x2_inst);
-
-    // y_callsig
-    auto y_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str);
-    const auto y_callsig_info = yama::make_callsig_info({}, 0);
-    auto y_inst = make_type_inst_2("y"_str, y_callsig_info, std::move(y_consts));
-    y_inst.put<yama::primitive_type_const>(0, a);
-    const yama::type y(y_inst);
-
-    // z1_callsig
-    auto z1_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str);
-    const auto z1_callsig_info = yama::make_callsig_info({ 1 }, 1); // <- param/return type indices out-of-bounds!
-    auto z1_inst = make_type_inst_2("z1"_str, z1_callsig_info, std::move(z1_consts));
-    z1_inst.put<yama::primitive_type_const>(0, a);
-    const yama::type z1(z1_inst);
-
-    // z2_callsig
-    auto z2_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str);
-    const auto z2_callsig_info = yama::make_callsig_info({ 0 }, 0);
-    auto z2_inst = make_type_inst_2("z2"_str, z2_callsig_info, std::move(z2_consts));
-    //z2_inst.put<yama::primitive_type_const>(0, a); <- stub
-    const yama::type z2(z2_inst);
-
-    // x1_callsig and x2_callsig are referentially different, but structurally equal
-
-    // z1_callsig and z2 callsig are likewise, like the above two, but w/ the added
-    // nuance of their std::nullopt being different reasons
-
-    const yama::callsig x1_callsig(x1_callsig_info, x1.consts());
-    const yama::callsig x2_callsig(x2_callsig_info, x2.consts());
-    const yama::callsig y_callsig(y_callsig_info, y.consts());
-    const yama::callsig z1_callsig(z1_callsig_info, z1.consts());
-    const yama::callsig z2_callsig(z2_callsig_info, z2.consts());
-
-    EXPECT_EQ(x1_callsig, x1_callsig);
-    EXPECT_EQ(x1_callsig, x2_callsig);
-    EXPECT_NE(x1_callsig, y_callsig);
-    EXPECT_NE(x1_callsig, z1_callsig);
-    EXPECT_NE(x1_callsig, z2_callsig);
-
-    EXPECT_EQ(x2_callsig, x2_callsig);
-    EXPECT_NE(x2_callsig, y_callsig);
-    EXPECT_NE(x2_callsig, z1_callsig);
-    EXPECT_NE(x2_callsig, z2_callsig);
-
-    EXPECT_EQ(y_callsig, y_callsig);
-    EXPECT_NE(y_callsig, z1_callsig);
-    EXPECT_NE(y_callsig, z2_callsig);
-
-    EXPECT_EQ(z1_callsig, z1_callsig);
-    EXPECT_EQ(z1_callsig, z2_callsig);
-
-    EXPECT_EQ(z2_callsig, z2_callsig);
+TEST_F(CallSigTests, ReturnType_RefsStubConst) {
+    // TODO: stub
 }
 
-TEST(CallSigTests, Fmt) {
-    const auto a_inst = make_type_inst_1("a"_str, {});
-    const auto b_inst = make_type_inst_1("b"_str, {});
-    const auto c_inst = make_type_inst_1("c"_str, {});
-    const yama::type a(a_inst);
-    const yama::type b(b_inst);
-    const yama::type c(c_inst);
+TEST_F(CallSigTests, Equality) {
+    push_module_with_a1_a2_b_c_and_d();
+    auto a1 = dm->load("a:a1"_str).value().callsig();
+    auto a2 = dm->load("a:a2"_str).value().callsig();
+    auto b = dm->load("a:b"_str).value().callsig();
+    auto c = dm->load("a:c"_str).value().callsig();
+    auto d = dm->load("a:d"_str).value().callsig();
 
-    auto x_consts =
-        yama::const_table_info()
-        .add_primitive_type("a"_str)
-        .add_primitive_type("b"_str)
-        .add_primitive_type("c"_str);
-    const auto x_callsig_info = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    auto x_inst = make_type_inst_2("x"_str, x_callsig_info, std::move(x_consts));
-    x_inst.put<yama::primitive_type_const>(0, a);
-    x_inst.put<yama::primitive_type_const>(1, b);
-    x_inst.put<yama::primitive_type_const>(2, c);
-    const yama::type x(x_inst);
-    
-    const yama::callsig x_callsig(x_callsig_info, x.consts());
+    ASSERT_TRUE(a1);
+    ASSERT_TRUE(a2);
+    ASSERT_TRUE(b);
+    ASSERT_TRUE(c);
+    ASSERT_TRUE(d);
 
-    std::string expected = "fn(a, b, c) -> b";
-    std::string actual = x_callsig.fmt();
+    EXPECT_EQ(a1, a1);
+    EXPECT_EQ(a1, a2);
+    EXPECT_NE(a1, b);
+    EXPECT_NE(a1, c);
+    EXPECT_NE(a1, d);
 
-    std::cerr << expected << "\n" << actual << "\n";
+    EXPECT_EQ(a2, a1);
+    EXPECT_EQ(a2, a2);
+    EXPECT_NE(a2, b);
+    EXPECT_NE(a2, c);
+    EXPECT_NE(a2, d);
+
+    EXPECT_NE(b, a1);
+    EXPECT_NE(b, a2);
+    EXPECT_EQ(b, b);
+    EXPECT_NE(b, c);
+    EXPECT_NE(b, d);
+
+    EXPECT_NE(c, a1);
+    EXPECT_NE(c, a2);
+    EXPECT_NE(c, b);
+    EXPECT_EQ(c, c);
+    EXPECT_NE(c, d);
+
+    EXPECT_NE(d, a1);
+    EXPECT_NE(d, a2);
+    EXPECT_NE(d, b);
+    EXPECT_NE(d, c);
+    EXPECT_EQ(d, d);
+}
+
+TEST_F(CallSigTests, Fmt) {
+    push_module_with_f();
+    auto f = dm->load("a:f"_str).value().callsig();
+
+    ASSERT_TRUE(f);
+
+    std::string expected = "fn(yama:Int, yama:Float, yama:Char) -> yama:Float";
+    std::string actual = f->fmt();
+
+    yama::println("-- expected = {}", expected);
+    yama::println("-- actual   = {}", actual);
 
     EXPECT_EQ(expected, actual);
 }
