@@ -33,6 +33,7 @@ namespace yama {
     };
 
     struct function_info final {
+        std::vector<str>                param_names;    // the parameter names
         callsig_info                    callsig;        // the call signature
         call_fn                         call_fn;        // the call_fn encapsulating call behaviour
         size_t                          max_locals;     // the max local object stack height
@@ -66,6 +67,7 @@ namespace yama {
         kind kind() const noexcept;
 
         std::optional<ptype> ptype() const noexcept;
+        std::optional<std::span<const str>> param_names() const noexcept;
         const callsig_info* callsig() const noexcept;
         std::optional<call_fn> call_fn() const noexcept;
         size_t max_locals() const noexcept; // returns 0 if the type is not callable

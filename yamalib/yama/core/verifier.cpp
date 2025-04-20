@@ -165,7 +165,34 @@ void yama::verifier::_post_verify_cleanup() {
 }
 
 bool yama::verifier::_verify_type(const type_info& subject) {
+    if (!_verify_type_param_names(subject)) {
+        return false;
+    }
     if (!_verify_type_callsig(subject)) {
+        return false;
+    }
+    return true;
+}
+
+bool yama::verifier::_verify_type_param_names(const type_info& subject) {
+    const bool type_has_param_names = (bool)subject.param_names();
+    if (!type_has_param_names) {
+        // if no param names to check, succeed by default
+        return true;
+    }
+    const bool type_has_callsig = (bool)subject.callsig();
+    if (!type_has_callsig) {
+        // if no callsig to check w/, succeed by default
+        return true;
+    }
+    const size_t expected = subject.callsig()->params.size();
+    const size_t actual = subject.param_names()->size();
+    if (actual != expected) {
+        YAMA_RAISE(dbg(), dsignal::verif_param_name_count_mismatch);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} expected to have {} param names (due to callsig), but only has {}!",
+            subject.unqualified_name, expected, actual);
         return false;
     }
     return true;
@@ -174,7 +201,7 @@ bool yama::verifier::_verify_type(const type_info& subject) {
 bool yama::verifier::_verify_type_callsig(const type_info& subject) {
     const bool type_has_callsig = (bool)subject.callsig();
     if (!type_has_callsig) {
-        // if no callsig to check, default to returning successful
+        // if no callsig to check, succeed by default
         return true;
     }
     const auto report = gen_callsig_report(subject, subject.callsig());

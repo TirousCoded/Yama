@@ -35,7 +35,6 @@ namespace yama {
 
 
     private:
-
         struct _callsig_report final {
             bool param_type_indices_are_in_bounds           = true;
             bool param_type_indices_specify_type_consts     = true;
@@ -92,6 +91,7 @@ namespace yama {
         void _post_verify_cleanup();
 
         bool _verify_type(const type_info& subject);
+        bool _verify_type_param_names(const type_info& subject);
         bool _verify_type_callsig(const type_info& subject);
 
         bool _verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata);

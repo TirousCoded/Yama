@@ -16,6 +16,14 @@ std::string yama::internal::fmt_lookup_proc(lookup_proc x) {
     return result;
 }
 
+std::vector<yama::str> yama::internal::fn_csym::build_param_names_vec() const {
+    std::vector<str> result{};
+    for (const auto& I : params) {
+        result.push_back(I.name);
+    }
+    return result;
+}
+
 std::string yama::internal::fn_csym::fmt_params(const taul::source_code& src) const {
     std::string result{};
     result += "(";

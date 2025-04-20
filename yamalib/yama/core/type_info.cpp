@@ -22,6 +22,13 @@ std::optional<yama::ptype> yama::type_info::ptype() const noexcept {
         : std::nullopt;
 }
 
+std::optional<std::span<const yama::str>> yama::type_info::param_names() const noexcept {
+    return
+        std::holds_alternative<function_info>(info)
+        ? std::make_optional(std::span(std::get<function_info>(info).param_names))
+        : std::nullopt;
+}
+
 const yama::callsig_info* yama::type_info::callsig() const noexcept {
     return
         std::holds_alternative<function_info>(info)
@@ -78,11 +85,21 @@ bool yama::function_info::uses_bcode() const noexcept {
 
 std::string yama::function_info::fmt(const const_table_info& consts, const char* tab) const {
     YAMA_ASSERT(tab);
+    auto _fmt_param_names =
+        [&]() -> std::string {
+        std::string result{};
+        for (size_t i = 0; i < param_names.size(); i++) {
+            if (i >= 1) result += ", ";
+            result += param_names[i];
+        }
+        return result;
+        };
     std::string result{};
     result += "function_info";
-    result += std::format("\n{}callsig    : {}", tab, callsig.fmt(consts));
-    result += std::format("\n{}call_fn    : {}", tab, uses_bcode() ? "bcode" : "C++");
-    result += std::format("\n{}max_locals : {}", tab, max_locals);
+    result += std::format("\n{}param names : {}", tab, _fmt_param_names());
+    result += std::format("\n{}callsig     : {}", tab, callsig.fmt(consts));
+    result += std::format("\n{}call_fn     : {}", tab, uses_bcode() ? "bcode" : "C++");
+    result += std::format("\n{}max_locals  : {}", tab, max_locals);
     result += std::format("\n{}", bcode.fmt_disassembly(tab));
     return result;
 }

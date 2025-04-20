@@ -102,6 +102,7 @@ TEST_F(BCodeExecTests, Instr_Noop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -138,6 +139,7 @@ TEST_F(BCodeExecTests, Instr_Pop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -173,6 +175,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Zero) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -212,6 +215,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Many) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -248,6 +252,7 @@ TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -283,6 +288,7 @@ TEST_F(BCodeExecTests, Instr_PutNone) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -317,6 +323,7 @@ TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -352,6 +359,7 @@ TEST_F(BCodeExecTests, Instr_PutConst) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -386,6 +394,7 @@ TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -420,6 +429,7 @@ TEST_F(BCodeExecTests, Instr_PutArg) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -459,6 +469,7 @@ TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -502,6 +513,7 @@ TEST_F(BCodeExecTests, Instr_Copy) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -537,6 +549,7 @@ TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -577,6 +590,7 @@ TEST_F(BCodeExecTests, Instr_Call) {
         .unqualified_name = "plus"_str,
         .consts = plus_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = yama::make_callsig_info({ 0, 0, 0 }, 0),
             .call_fn = plus_fn,
             .max_locals = 1,
@@ -605,6 +619,7 @@ TEST_F(BCodeExecTests, Instr_Call) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -647,6 +662,7 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
         .unqualified_name = "plus"_str,
         .consts = plus_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = yama::make_callsig_info({ 0, 0, 0 }, 0),
             .call_fn = plus_fn,
             .max_locals = 1,
@@ -674,6 +690,7 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -711,6 +728,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         .unqualified_name = "panic"_str,
         .consts = panic_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = panic_fn,
             .max_locals = 1,
@@ -730,6 +748,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -754,6 +773,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -796,6 +816,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "panic"_str,
         .consts = panic_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = panic_fn,
             .max_locals = 2,
@@ -815,6 +836,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -839,6 +861,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -889,6 +912,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "dummy"_str,
         .consts = dummy_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = dummy_fn,
             .max_locals = 1,
@@ -914,6 +938,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "fail_safe"_str,
         .consts = fail_safe_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = fail_safe_fn,
             .max_locals = 1,
@@ -933,6 +958,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -970,6 +996,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1018,6 +1045,7 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         .unqualified_name = "plus"_str,
         .consts = plus_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = yama::make_callsig_info({ 0, 0, 0 }, 0),
             .call_fn = plus_fn,
             .max_locals = 1,
@@ -1047,6 +1075,7 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -1084,6 +1113,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         .unqualified_name = "panic"_str,
         .consts = panic_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = panic_fn,
             .max_locals = 1,
@@ -1103,6 +1133,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -1127,6 +1158,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1169,6 +1201,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "panic"_str,
         .consts = panic_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = panic_fn,
             .max_locals = 1,
@@ -1188,6 +1221,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -1212,6 +1246,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1262,6 +1297,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "dummy"_str,
         .consts = dummy_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = dummy_fn,
             .max_locals = 1,
@@ -1287,6 +1323,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "fail_safe"_str,
         .consts = fail_safe_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = fail_safe_fn,
             .max_locals = 1,
@@ -1306,6 +1343,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "never_reached"_str,
         .consts = never_reached_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = never_reached_fn,
             .max_locals = 1,
@@ -1343,6 +1381,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1392,6 +1431,7 @@ TEST_F(BCodeExecTests, Instr_Ret) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1432,6 +1472,7 @@ TEST_F(BCodeExecTests, Instr_Jump) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1474,6 +1515,7 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1522,6 +1564,7 @@ TEST_F(BCodeExecTests, Instr_JumpFalse) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1571,6 +1614,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .unqualified_name = "subtract"_str,
         .consts = subtract_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 0 }, 0),
             .call_fn = subtract_fn,
             .max_locals = 1,
@@ -1592,6 +1636,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .unqualified_name = "multiply"_str,
         .consts = multiply_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 0 }, 0),
             .call_fn = multiply_fn,
             .max_locals = 1,
@@ -1612,6 +1657,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .unqualified_name = "greaterThanZero"_str,
         .consts = greaterThanZero_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 1),
             .call_fn = greaterThanZero_fn,
             .max_locals = 1,
@@ -1660,6 +1706,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .unqualified_name = "factorial"_str,
         .consts = factorial_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 6,
@@ -1714,6 +1761,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
         .unqualified_name = "addOne"_str,
         .consts = addOne_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = addOne_fn,
             .max_locals = 1,
@@ -1736,6 +1784,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
         .unqualified_name = "lessThan"_str,
         .consts = lessThan_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 0 }, 1),
             .call_fn = lessThan_fn,
             .max_locals = 1,
@@ -1774,6 +1823,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
         .unqualified_name = "counter"_str,
         .consts = counter_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,

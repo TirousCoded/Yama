@@ -152,6 +152,7 @@ namespace {
         .unqualified_name = "observeNone"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -166,6 +167,7 @@ namespace {
         .unqualified_name = "observeInt"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -180,6 +182,7 @@ namespace {
         .unqualified_name = "observeUInt"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 2 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -194,6 +197,7 @@ namespace {
         .unqualified_name = "observeFloat"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 3 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -208,6 +212,7 @@ namespace {
         .unqualified_name = "observeBool"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 4 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -222,6 +227,7 @@ namespace {
         .unqualified_name = "observeChar"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 5 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -236,6 +242,7 @@ namespace {
         .unqualified_name = "doPanic"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -248,6 +255,7 @@ namespace {
         .unqualified_name = "doIncr"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 1),
             .call_fn =
                 [](yama::context& ctx) {
@@ -261,6 +269,7 @@ namespace {
         .unqualified_name = "isEqInt"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 1, 1 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -276,6 +285,7 @@ namespace {
         .unqualified_name = "isEqChar"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 5, 5 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -291,6 +301,7 @@ namespace {
         .unqualified_name = "isNotEqInt"_str,
         .consts = consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 1, 1 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -343,6 +354,7 @@ namespace {
                 mf.add_function_type(
                     "f"_str,
                     yama::const_table_info{},
+                    {},
                     yama::make_callsig_info({}, 10'000), // <- return type invalid! so .bad is also invalid!
                     1,
                     yama::noop_call_fn);
@@ -361,6 +373,7 @@ namespace {
         .unqualified_name = "acknowledge"_str,
         .consts = acknowledge_consts,
         .info = yama::function_info{
+            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn =
                 [](yama::context& ctx) {

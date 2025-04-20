@@ -192,6 +192,7 @@ namespace yama {
         compile_misplaced_import,
         compile_invalid_env,
 
+        verif_param_name_count_mismatch,
         verif_type_callsig_invalid,
         verif_constsym_qualified_name_invalid,
         verif_constsym_callsig_invalid,
@@ -242,7 +243,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 66);
+        static_assert(dsignals == 67);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -275,6 +276,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_misplaced_import);
             _YAMA_ENTRY_(compile_invalid_env);
 
+            _YAMA_ENTRY_(verif_param_name_count_mismatch);
             _YAMA_ENTRY_(verif_type_callsig_invalid);
             _YAMA_ENTRY_(verif_constsym_qualified_name_invalid);
             _YAMA_ENTRY_(verif_constsym_callsig_invalid);

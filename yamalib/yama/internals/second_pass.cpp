@@ -608,6 +608,7 @@ void yama::internal::second_pass::_begin_target(const str& unqualified_name) {
     yama::type_info new_type{
         .unqualified_name = unqualified_name,
         .info = yama::function_info{
+            .param_names = {}, // stub
             .callsig = callsig_info{}, // stub
             .call_fn = yama::bcode_call_fn,
             .max_locals = 0,
@@ -622,6 +623,8 @@ void yama::internal::second_pass::_begin_target(const str& unqualified_name) {
     auto new_callsig = tu->ctp.build_callsig_for_fn_type(tu->types.load(unqualified_name).value());
     // patch new_callsig onto our_type
     std::get<function_info>(our_type.info).callsig = std::move(new_callsig);
+    // build param names vector
+    std::get<function_info>(our_type.info).param_names = _target_csym().build_param_names_vec();
 }
 
 void yama::internal::second_pass::_end_target() {

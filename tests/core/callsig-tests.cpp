@@ -79,10 +79,11 @@ void CallSigTests::push_module_with_f() {
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str);
+    std::vector f_param_names = { "a"_str, "b"_str, "c"_str };
     auto f_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
 
     yama::module_factory mf{};
-    mf.add_function_type("f"_str, std::move(f_constsinf), std::move(f_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("f"_str, std::move(f_constsinf), std::move(f_param_names), std::move(f_callsiginf), 10, yama::noop_call_fn);
 
     parcel->push(""_str, std::move(mf.done()));
 }
@@ -107,17 +108,22 @@ void CallSigTests::push_module_with_a1_a2_b_c_and_d() {
         .add_primitive_type("yama:Char"_str)
         .add_primitive_type("yama:UInt"_str);
 
+    std::vector a_param_names = { "a"_str, "b"_str, "c"_str };
+    std::vector b_param_names = { "a"_str, "b"_str, "c"_str, "d"_str };
+    std::vector c_param_names = { "a"_str, "b"_str, "c"_str };
+    std::vector d_param_names = { "a"_str, "b"_str, "c"_str };
+
     auto a_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
     auto b_callsiginf = yama::make_callsig_info({ 0, 1, 2, 3 }, 1);
     auto c_callsiginf = yama::make_callsig_info({ 0, 3, 2 }, 1);
     auto d_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 3);
 
     yama::module_factory mf{};
-    mf.add_function_type("a1"_str, yama::const_table_info(constsinf), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
-    mf.add_function_type("a2"_str, yama::const_table_info(constsinf), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
-    mf.add_function_type("b"_str, yama::const_table_info(constsinf), yama::callsig_info(b_callsiginf), 10, yama::noop_call_fn);
-    mf.add_function_type("c"_str, yama::const_table_info(constsinf), yama::callsig_info(c_callsiginf), 10, yama::noop_call_fn);
-    mf.add_function_type("d"_str, yama::const_table_info(constsinf), yama::callsig_info(d_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("a1"_str, yama::const_table_info(constsinf), decltype(a_param_names)(a_param_names), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("a2"_str, yama::const_table_info(constsinf), decltype(a_param_names)(a_param_names), yama::callsig_info(a_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("b"_str, yama::const_table_info(constsinf), decltype(b_param_names)(b_param_names), yama::callsig_info(b_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("c"_str, yama::const_table_info(constsinf), decltype(c_param_names)(c_param_names), yama::callsig_info(c_callsiginf), 10, yama::noop_call_fn);
+    mf.add_function_type("d"_str, yama::const_table_info(constsinf), decltype(d_param_names)(d_param_names), yama::callsig_info(d_callsiginf), 10, yama::noop_call_fn);
 
     parcel->push(""_str, std::move(mf.done()));
 }

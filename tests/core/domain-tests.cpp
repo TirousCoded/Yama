@@ -432,6 +432,7 @@ namespace {
         .unqualified_name = "bad"_str,
         .consts = bad_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = bad_callsig,
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -546,6 +547,7 @@ namespace {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
+            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = f_callsig,
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
