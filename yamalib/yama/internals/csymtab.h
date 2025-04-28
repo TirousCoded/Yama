@@ -105,8 +105,6 @@ namespace yama::internal {
         std::optional<bool> is_none_returning;
 
 
-        std::vector<str> build_param_names_vec() const;
-
         std::string fmt_params(const taul::source_code& src) const;
 
 

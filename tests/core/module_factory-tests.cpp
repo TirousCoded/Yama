@@ -54,7 +54,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         .add_int(31)
         .add_primitive_type("Int"_str);
 
-    std::vector B_param_names = { "a"_str, "b"_str };
     auto B_callsig = yama::make_callsig_info({ 1, 1 }, 1);
 
     size_t B_max_locals = 13;
@@ -64,7 +63,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
     f.add_function_type(
         "B"_str,
         decltype(B_consts)(B_consts),
-        decltype(B_param_names)(B_param_names),
         decltype(B_callsig)(B_callsig),
         B_max_locals,
         B_call_fn);
@@ -76,7 +74,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         .add_int(31)
         .add_primitive_type("Int"_str);
 
-    std::vector C_param_names = { "a"_str, "b"_str };
     auto C_callsig = yama::make_callsig_info({ 1, 1 }, 1);
 
     size_t C_max_locals = 10;
@@ -98,7 +95,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
     f.add_function_type(
         "C"_str,
         decltype(C_consts)(C_consts),
-        decltype(C_param_names)(C_param_names),
         decltype(C_callsig)(C_callsig),
         C_max_locals,
         decltype(C_code)(C_code),
@@ -123,7 +119,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         .unqualified_name = "B"_str,
         .consts = B_consts,
         .info = yama::function_info{
-            .param_names = B_param_names,
             .callsig = B_callsig,
             .call_fn = B_call_fn,
             .max_locals = B_max_locals,
@@ -135,7 +130,6 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         .unqualified_name = "C"_str,
         .consts = C_consts,
         .info = yama::function_info{
-            .param_names = C_param_names,
             .callsig = C_callsig,
             .call_fn = yama::bcode_call_fn,
             .max_locals = C_max_locals,

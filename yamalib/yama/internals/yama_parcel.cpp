@@ -24,6 +24,7 @@ yama::res<yama::module_info> yama::internal::yama_parcel::_get_root_modinf() {
             .add_primitive_type("Float"_str, {}, yama::ptype::float0)
             .add_primitive_type("Bool"_str, {}, yama::ptype::bool0)
             .add_primitive_type("Char"_str, {}, yama::ptype::char0)
+            .add_primitive_type("Type"_str, {}, yama::ptype::type)
             .done();
         _root_modinf = std::make_shared<module_info>(std::move(our_root_modinf));
     }

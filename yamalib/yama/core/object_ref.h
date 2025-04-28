@@ -38,6 +38,7 @@ namespace yama {
             float_t f;
             bool_t b;
             char_t c;
+            type t;
         } v;
 
 
@@ -46,6 +47,7 @@ namespace yama {
         float_t as_float() const noexcept;
         bool_t as_bool() const noexcept;
         char_t as_char() const noexcept;
+        type as_type() const noexcept;
 
 
         bool operator==(const object_ref& other) const noexcept;

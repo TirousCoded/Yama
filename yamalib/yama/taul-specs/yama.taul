@@ -187,6 +187,10 @@ parser section:
     ContinueStmt                    : CONTINUE SEMI ;
     ReturnStmt                      : RETURN Expr? SEMI ;
 
+    # TODO: later, make ast_Expr take a list of 'suffixes', which includes ast_Args, rather
+    #       than accepting just a single ast_Args value, which won't be enough for when
+    #       we need it to be able to handle multiple *suffixes* in a row
+
     precedence Expr                 : Expr Args                         # call expr
                                     | PrimaryExpr                       # primary expr
                                     ;
@@ -212,5 +216,5 @@ parser section:
     Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
 
     TypeAnnot                       : COLON TypeSpec ;
-    TypeSpec                        : IDENTIFIER ( COLON IDENTIFIER )? ;
+    TypeSpec                        : Expr ;
 

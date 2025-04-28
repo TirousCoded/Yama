@@ -62,7 +62,6 @@ TEST_F(VerifierTests, Verify_TypeInfo) {
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 0),
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -80,7 +79,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_InvalidQualifiedName_Malformed) {
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -100,7 +98,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_InvalidQualifiedName_HeadNamesParcelN
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -112,27 +109,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_InvalidQualifiedName_HeadNamesParcelN
     EXPECT_EQ(dbg->count(yama::dsignal::verif_constsym_qualified_name_invalid), 1);
 }
 
-TEST_F(VerifierTests, Verify_TypeInfo_Fail_ParamNameCountDoesNotMatchCallSigParamCount) {
-    const auto a_consts =
-        yama::const_table_info()
-        .add_primitive_type("abc:b"_str);
-    yama::type_info a{
-        .unqualified_name = "a"_str,
-        .consts = a_consts,
-        .info = yama::function_info{
-            // expected 3 param names, but only have 2
-            .param_names = { "a"_str, "b"_str },
-            .callsig = yama::make_callsig_info({ 0, 0, 0 }, 0),
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
-        },
-    };
-
-    EXPECT_FALSE(verif->verify(a, get_md(), "abc"_str));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::verif_param_name_count_mismatch), 1);
-}
-
 TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_ParamType_ForTypeItself) {
     const auto a_consts =
         yama::const_table_info()
@@ -141,7 +117,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_ParamTyp
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             // illegal out-of-bounds constant index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
@@ -183,7 +158,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstIndexOutOfBounds_ReturnTy
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = {},
             // illegal out-of-bounds constant index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
@@ -226,7 +200,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ParamType_F
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             // illegal use of non-type constant index (for param type of a)
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn = yama::noop_call_fn,
@@ -270,7 +243,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_Fail_CallSigConstNotATypeConst_ReturnType_
         .unqualified_name = "a"_str,
         .consts = a_consts,
         .info = yama::function_info{
-            .param_names = {},
             // illegal use of non-type constant index (for return type of a)
             .callsig = yama::make_callsig_info({}, 1),
             .call_fn = yama::noop_call_fn,
@@ -316,7 +288,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_DisregardBCodeIfCallFnIsNotBCodeCall
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::noop_call_fn, // <- NOT bcode_call_fn
             .max_locals = 1,
@@ -350,7 +321,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_TolerateDeadCode) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -377,7 +347,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_TolerateAllControlPathsBeingCyclical
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -408,7 +377,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_RegisterReinitsOverwriteOneAnother) 
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -441,7 +409,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_NoBranch) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -475,7 +442,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_MultipleExitpoints) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -511,7 +477,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_ControlPathsMerge) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -550,7 +515,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_CyclicalControlPath) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -589,7 +553,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Branch_FallthroughDueToLastInstrOfBl
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -611,7 +574,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Fail_BinaryIsEmpty) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -643,7 +605,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Fail_FinalBlockFallthroughToOutOfBou
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -656,7 +617,7 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Fail_FinalBlockFallthroughToOutOfBou
     EXPECT_EQ(dbg->count(yama::dsignal::verif_fallthrough_puts_PC_out_of_bounds), 1);
 }
 
-static_assert(yama::bc::opcodes == 12);
+static_assert(yama::bc::opcodes == 13);
 
 TEST_F(VerifierTests, Verify_TypeInfo_BCode_Noop) {
     const auto f_bcode =
@@ -675,7 +636,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Noop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -703,7 +663,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -730,7 +689,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_Zero) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -762,7 +720,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_Many) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -790,7 +747,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Pop_MoreThanAreOnStack) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -820,7 +776,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -847,7 +802,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Reinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -873,7 +827,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -899,7 +852,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Newtop_MayBeMarkedReinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -928,7 +880,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -956,7 +907,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_IsNewtopButPushingOv
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -985,7 +935,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_RA_WrongType_AndNotRein
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1014,7 +963,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutNone_Fail_PushingMustNotOverflow)
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1044,7 +992,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1071,7 +1018,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Reinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1097,7 +1043,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1123,7 +1068,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Newtop_MayBeMarkedReinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1153,7 +1097,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1176,13 +1119,12 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_IsNewtopButPushingO
     yama::println("{}", f_bcode.fmt_disassembly());
     const auto f_consts =
         yama::const_table_info()
-        .add_primitive_type("yama:None"_str)
+        .add_primitive_type("yama:Int"_str)
         .add_int(10);
     yama::type_info f{
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1211,7 +1153,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1240,7 +1181,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_KoB_NotAnObjectConst) 
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1270,7 +1210,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_RA_And_KoB_TypesDiffer
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1300,7 +1239,283 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutConst_Fail_PushingMustNotOverflow
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 1) // inits R(0) (to Type yama:Bool)
+        .add_put_type_const(0, 2) // no reinit, so R(0) MUST be Type already
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str)
+        .add_primitive_type("yama:Char"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Reinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop) // inits R(0) (to None)
+        .add_put_type_const(0, 1, true) // reinits R(0) (to Type yama:Bool) via index
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Newtop) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 1) // inits R(0) (to Type yama:Bool) via newtop
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Newtop_MayBeMarkedReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 1, true) // inits R(0) (to Type yama:Bool) via newtop
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_TRUE(verif->verify(f, get_md(), "abc"_str));
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_RA_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) <- return value
+        // push then pop R(1) to better test impl robustness
+        .add_put_none(yama::newtop) // inits R(1) (to None)
+        .add_pop(1) // pops R(1)
+        .add_put_type_const(1, 2, true) // R(1) out-of-bounds
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:None"_str)
+        .add_int(10)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 2,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_RA_IsNewtopButPushingOverflows) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10) <- return value
+        .add_put_type_const(yama::newtop, 2) // overflow!
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_int(10)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_RA_WrongType_AndNotReinit) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1) // inits R(0) (to Int 10)
+        .add_put_type_const(0, 2) // R(0) not type yama:Type
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_int(10)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_wrong_type), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_KtB_OutOfBounds) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 1) // inits R(0) (to Type yama:Bool)
+        .add_put_type_const(0, 2) // Kt(2) out-of-bounds
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KtB_out_of_bounds), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_KtB_NotATypeConst) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 0) // inits R(0) (to Type yama:Type)
+        .add_put_type_const(0, 1) // Kt(1) not a type constant
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_int(10);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KtB_not_type_const), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutTypeConst_Fail_PushingMustNotOverflow) {
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_type_const(yama::newtop, 1) // inits R(0) (to Type yama:Bool)
+        .add_put_type_const(yama::newtop, 1) // overflow!
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str)
+        .add_primitive_type("yama:Bool"_str);
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1336,7 +1551,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1373,7 +1587,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Reinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1407,7 +1620,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1441,7 +1653,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Newtop_MayBeMarkedReinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1472,7 +1683,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1502,7 +1712,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_IsNewtopButPushingOve
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1532,7 +1741,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_ArgB_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1562,7 +1770,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_RA_And_ArgB_TypesDiffer)
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1592,7 +1799,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_PutArg_Fail_PushingMustNotOverflow) 
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 0, 1 }, 1),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1627,7 +1833,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -1656,7 +1861,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Reinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1684,7 +1888,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1712,7 +1915,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Newtop_MayBeMarkedReinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1744,7 +1946,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RA_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1778,7 +1979,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RB_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 3,
@@ -1808,7 +2008,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RB_IsNewtopButPushingOverf
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1839,7 +2038,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_RA_And_RB_TypesDiffer) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -1869,7 +2067,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Copy_Fail_PushingMustNotOverflow) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -1908,7 +2105,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -1945,7 +2141,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Reinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -1981,7 +2176,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Newtop) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2017,7 +2211,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Newtop_MayBeMarkedReinit) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2055,7 +2248,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -2086,7 +2278,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_ZeroObjects) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2125,7 +2316,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObject) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2165,7 +2355,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooMany) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 6,
@@ -2203,7 +2392,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooFew) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -2242,7 +2430,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_WrongTypes) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2280,7 +2467,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_RB_OutOfBounds_AfterTheCal
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 6,
@@ -2319,7 +2505,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_RB_WrongType) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2358,7 +2543,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 7),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -2397,7 +2581,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -2428,7 +2611,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_ZeroObjects) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2467,7 +2649,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObject)
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2507,7 +2688,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooMany) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 6,
@@ -2545,7 +2725,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_TooFew) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 4,
@@ -2584,7 +2763,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ParamArgRs_WrongTypes) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 2),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2612,7 +2790,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2639,7 +2816,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret_Fail_RA_OutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2667,7 +2843,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Ret_Fail_RA_WrongType) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2702,7 +2877,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2726,7 +2900,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump_Fail_PutsPCOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2765,7 +2938,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Jump_Fail_ViolatesRegisterCoherence)
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2800,7 +2972,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopOne) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -2832,7 +3003,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopZero) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2870,7 +3040,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopMany) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2908,7 +3077,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_PopMoreThanAreOnStack) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -2944,7 +3112,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_DoesNotExist) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -2980,7 +3147,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_RTop_WrongType) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3016,7 +3182,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_PutsPCOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3068,7 +3233,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpTrue_Fail_ViolatesRegisterCohere
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -3103,7 +3267,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopOne) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -3135,7 +3298,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopZero) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3173,7 +3335,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopMany) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -3211,7 +3372,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_PopMoreThanAreOnStack) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 5,
@@ -3247,7 +3407,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_DoesNotExist) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3283,7 +3442,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_RTop_WrongType) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3319,7 +3477,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_PutsPCOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 1,
@@ -3371,7 +3528,6 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_JumpFalse_Fail_ViolatesRegisterCoher
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
@@ -3416,7 +3572,6 @@ TEST_F(VerifierTests, Verify_ModuleInfo_Populated) {
     mf.add_function_type(
         "B"_str,
         std::move(B_consts),
-        { "a"_str, "b"_str, "c"_str },
         yama::make_callsig_info({ 0, 1, 2 }, 0),
         4,
         yama::noop_call_fn);
@@ -3437,7 +3592,6 @@ TEST_F(VerifierTests, Verify_ModuleInfo_Populated) {
     mf.add_function_type(
         "C"_str,
         std::move(C_consts),
-        {},
         yama::make_callsig_info({}, 0),
         2,
         std::move(C_bcode));
@@ -3476,7 +3630,6 @@ TEST_F(VerifierTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFailedVe
     mf.add_function_type(
         "B"_str,
         std::move(B_consts),
-        { "a"_str, "b"_str, "c"_str },
         yama::make_callsig_info({ 0, 1, 2 }, 0),
         4,
         yama::noop_call_fn);
@@ -3497,7 +3650,6 @@ TEST_F(VerifierTests, Verify_ModuleInfo_Populated_Fail_OneOrMoreTypeInfoFailedVe
     mf.add_function_type(
         "C"_str,
         std::move(C_consts),
-        {},
         yama::make_callsig_info({}, 0),
         2,
         std::move(C_bcode));

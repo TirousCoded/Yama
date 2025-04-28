@@ -47,47 +47,47 @@ std::shared_ptr<yama::parcel> yama::domain::get_installed(parcel_id id) const no
 }
 
 std::optional<yama::module> yama::domain::import(const str& import_path) {
-    std::optional<module> result{};
-    {
-        std::shared_lock lk(_dd.state_mtx); // <- releases before commit_or_discard
-        result = _dd.importer.import(_dd.installs.domain_env(), import_path, _dd.state);
-    }
+    std::shared_lock lk(_dd.state_mtx);
+    auto result = _dd.importer.import(_dd.installs.domain_env(), import_path, _dd.state);
+    lk.unlock(); // release before commit_or_discard
     _dd.importer.commit_or_discard(_dd.state_mtx); // can't forget
     return result;
 }
 
 std::optional<yama::type> yama::domain::load(const str& fullname) {
-    std::optional<type> result{};
-    {
-        std::shared_lock lk(_dd.state_mtx); // <- releases before commit_or_discard
-        result = _dd.loader.load(fullname);
-    }
+    std::shared_lock lk(_dd.state_mtx);
+    auto result = _dd.loader.load(fullname);
+    lk.unlock(); // release before commit_or_discard
     _dd.loader.commit_or_discard(_dd.state_mtx); // can't forget
     return result;
 }
 
-yama::type yama::domain::load_none() {
+yama::type yama::domain::none_type() {
     return deref_assert(_dd.quick_access).none;
 }
 
-yama::type yama::domain::load_int() {
+yama::type yama::domain::int_type() {
     return deref_assert(_dd.quick_access).int0;
 }
 
-yama::type yama::domain::load_uint() {
+yama::type yama::domain::uint_type() {
     return deref_assert(_dd.quick_access).uint;
 }
 
-yama::type yama::domain::load_float() {
+yama::type yama::domain::float_type() {
     return deref_assert(_dd.quick_access).float0;
 }
 
-yama::type yama::domain::load_bool() {
+yama::type yama::domain::bool_type() {
     return deref_assert(_dd.quick_access).bool0;
 }
 
-yama::type yama::domain::load_char() {
+yama::type yama::domain::char_type() {
     return deref_assert(_dd.quick_access).char0;
+}
+
+yama::type yama::domain::type_type() {
+    return deref_assert(_dd.quick_access).type;
 }
 
 void yama::domain::_finish_setup() {
@@ -111,6 +111,7 @@ void yama::domain::_preload_builtin_types() {
         .float0 = load("yama:Float"_str).value(),
         .bool0 = load("yama:Bool"_str).value(),
         .char0 = load("yama:Char"_str).value(),
+        .type = load("yama:Type"_str).value(),
     };
 }
 

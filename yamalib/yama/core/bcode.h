@@ -131,6 +131,22 @@ namespace yama::bc {
         //      - pushing must not overflow (unless not newtop)
 
         put_const,
+        
+        // put_type_const R(A) Kt(B)
+
+        // put_type_const performs put_type_const(R(A), Kt(B))
+
+        // panic conditions:
+        //      n/a
+
+        // static verif requires:
+        //      - R(A) must be in-bounds (unless newtop)
+        //      - R(A) and must be of type Type (unless reinit) (unless newtop)
+        //      - Kt(B) must be in-bounds
+        //      - Kt(B) must be a type constant
+        //      - pushing must not overflow (unless not newtop)
+
+        put_type_const,
 
         // put_arg R(A) Arg(B)
 
@@ -383,12 +399,13 @@ namespace yama::bc {
         std::string fmt_disassembly(const syms& syms, const char* tab = "    ") const;
 
 
-        static_assert(opcodes == 12);
+        static_assert(opcodes == 13);
 
         code& add_noop();
         code& add_pop(uint8_t A);
         code& add_put_none(uint8_t A, bool reinit = false);
         code& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
+        code& add_put_type_const(uint8_t A, uint8_t B, bool reinit = false);
         code& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code& add_copy(uint8_t A, uint8_t B, bool reinit = false);
         code& add_call(uint8_t A, uint8_t B, bool reinit = false);
@@ -441,12 +458,13 @@ namespace yama::bc {
         size_t count() const noexcept;
 
 
-        static_assert(opcodes == 12);
+        static_assert(opcodes == 13);
 
         code_writer& add_noop();
         code_writer& add_pop(uint8_t A);
         code_writer& add_put_none(uint8_t A, bool reinit = false);
         code_writer& add_put_const(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_put_type_const(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_copy(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_call(uint8_t A, uint8_t B, bool reinit = false);

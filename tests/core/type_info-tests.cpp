@@ -24,7 +24,6 @@ TEST(TypeInfoTests, PrimitiveType) {
     EXPECT_EQ(abc.kind(), yama::kind::primitive);
 
     EXPECT_EQ(abc.ptype(), yama::ptype::bool0);
-    EXPECT_EQ(abc.param_names(), std::nullopt);
     EXPECT_EQ(abc.callsig(), nullptr);
     EXPECT_EQ(abc.call_fn(), std::nullopt);
     EXPECT_EQ(abc.max_locals(), 0);
@@ -35,13 +34,10 @@ TEST(TypeInfoTests, PrimitiveType) {
 TEST(TypeInfoTests, FunctionType) {
     auto cf = [](yama::context&) {};
 
-    std::vector expected_param_names = { "a"_str, "b"_str, "c"_str };
-
     yama::type_info abc{
         .unqualified_name = "abc"_str,
         .consts = {},
         .info = yama::function_info{
-            .param_names = expected_param_names,
             .callsig = yama::make_callsig_info({ 0, 1, 2 }, 1),
             .call_fn = cf,
             .max_locals = 17,
@@ -51,11 +47,6 @@ TEST(TypeInfoTests, FunctionType) {
     EXPECT_EQ(abc.kind(), yama::kind::function);
 
     EXPECT_EQ(abc.ptype(), std::nullopt);
-    EXPECT_NE(abc.param_names(), std::nullopt);
-    if (const auto pn = abc.param_names()) {
-        EXPECT_EQ(pn->size(), expected_param_names.size());
-        EXPECT_TRUE(std::equal(pn->begin(), pn->end(), expected_param_names.begin()));
-    }
     EXPECT_EQ(abc.callsig(), &(std::get<yama::function_info>(abc.info).callsig));
     EXPECT_EQ(abc.call_fn(), cf);
     EXPECT_EQ(abc.max_locals(), 17);

@@ -77,7 +77,6 @@ namespace yama {
         module_factory& add_function_type(
             str unqualified_name,
             const_table_info&& consts,
-            std::vector<str>&& param_names,
             callsig_info&& callsig,
             size_t max_locals,
             call_fn call_fn);
@@ -85,7 +84,6 @@ namespace yama {
         module_factory& add_function_type(
             str unqualified_name,
             const_table_info&& consts,
-            std::vector<str>&& param_names,
             callsig_info&& callsig,
             size_t max_locals,
             bc::code&& code,

@@ -91,7 +91,6 @@ namespace yama {
         void _post_verify_cleanup();
 
         bool _verify_type(const type_info& subject);
-        bool _verify_type_param_names(const type_info& subject);
         bool _verify_type_callsig(const type_info& subject);
 
         bool _verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata);
@@ -134,6 +133,8 @@ namespace yama {
         bool _verify_RA_is_type_none(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_none_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_is_type_bool(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RA_is_type_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RA_is_type_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         // NOTE: 'this call' refers to the call the instruction is in, for verifying ret instrs
         bool _verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RB_in_bounds_for_copy_instr(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
@@ -142,6 +143,8 @@ namespace yama {
         bool _verify_RB_is_return_type_of_call_object_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_KoB_is_object_const(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_KtB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
+        bool _verify_KtB_is_type_const(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_ArgB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i);
         bool _verify_RA_and_RB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_RB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
@@ -164,6 +167,7 @@ namespace yama {
         
         str _none_type();
         str _bool_type();
+        str _type_type();
         str _R_type(const _cfg_block& block, size_t index);
         str _R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index);
         str _Ko_type(const type_info& subject, size_t index);

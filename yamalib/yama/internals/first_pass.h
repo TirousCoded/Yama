@@ -30,8 +30,7 @@ namespace yama::internal {
     //          - build symbol table(s)
     //              - detect name conflicts
     //              - load extern types from imported modules
-    //                  * which types to load is decided by which are referenced by type
-    //                    specifiers and/or identifier exprs
+    //                  * which types to load is decided by which are referenced by id exprs
     //                  * unqualified reference to extern type which could name a type in
     //                    one of multiple modules will be detected as a name conflict
     //                  * types declared in code shadow extern ones

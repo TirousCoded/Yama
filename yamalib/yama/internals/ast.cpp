@@ -626,6 +626,10 @@ void yama::internal::ast_ReturnStmt::do_give(res<ast_Expr> x) {
     expr = x;
 }
 
+std::optional<std::string> yama::internal::ast_Expr::fmt_name(const taul::source_code& src) const {
+    return primary ? primary->fmt_name(src) : std::nullopt;
+}
+
 void yama::internal::ast_Expr::fmt(ast_formatter& x) {
     x.open("Expr", low_pos(), high_pos(), id);
     if (primary) {
@@ -659,12 +663,13 @@ void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
     x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
 }
 
-std::string yama::internal::ast_PrimaryExpr::fmt_name(const taul::source_code& src) const {
-    if (!name) return "";
-    return
+std::optional<std::string> yama::internal::ast_PrimaryExpr::fmt_name(const taul::source_code& src) const {
+    if (!name) return std::nullopt;
+    std::optional result =
         qualifier
         ? std::format("{}:{}", qualifier->str(src).fmt(), name->str(src).fmt())
         : name->str(src).fmt();
+    return result;
 }
 
 void yama::internal::ast_PrimaryExpr::fmt(ast_formatter& x) {
@@ -891,39 +896,29 @@ void yama::internal::ast_TypeAnnot::do_give(res<ast_TypeSpec> x) {
     type = x;
 }
 
-std::string yama::internal::ast_TypeSpec::fmt_name(const taul::source_code& src) const {
-    if (!name) return "";
-    return
-        qualifier
-        ? std::format("{}:{}", qualifier->str(src).fmt(), name->str(src).fmt())
-        : name->str(src).fmt();
+std::optional<std::string> yama::internal::ast_TypeSpec::fmt_name(const taul::source_code& src) const {
+    return expr ? expr->fmt_name(src) : std::nullopt;
 }
 
 void yama::internal::ast_TypeSpec::fmt(ast_formatter& x) {
     x.open("TypeSpec", low_pos(), high_pos(), id);
-    if (qualifier) {
-        x.next("qualifier", *qualifier);
-    }
-    if (name) {
-        x.next("name", *name);
+    if (expr) {
+        x.next("expr");
+        expr->fmt(x);
     }
     x.close();
 }
 
 void yama::internal::ast_TypeSpec::accept(ast_visitor& x) {
     x.visit_begin(res<ast_TypeSpec>(shared_from_this()));
+    if (expr) {
+        expr->accept(x);
+    }
     x.visit_end(res<ast_TypeSpec>(shared_from_this()));
 }
 
-void yama::internal::ast_TypeSpec::do_give(taul::token x) {
-    if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
-        if (name) {
-            // if we encounter second identifier, then first one was actually
-            // for qualifier, not name
-            qualifier = name;
-        }
-        name = x;
-    }
+void yama::internal::ast_TypeSpec::do_give(res<ast_Expr> x) {
+    expr = x;
 }
 
 void yama::internal::ast_parser::listener::on_startup() {

@@ -94,12 +94,13 @@ namespace yama {
 
         // load builtins w/ minimal overhead
 
-        type load_none();
-        type load_int();
-        type load_uint();
-        type load_float();
-        type load_bool();
-        type load_char();
+        type none_type();
+        type int_type();
+        type uint_type();
+        type float_type();
+        type bool_type();
+        type char_type();
+        type type_type();
 
 
     private:

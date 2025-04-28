@@ -130,34 +130,21 @@ namespace yama {
 
     class context final : public api_component {
     public:
+        context(res<domain> dm, std::shared_ptr<debug> dbg = nullptr);
 
-        context(
-            res<domain> dm,
-            std::shared_ptr<debug> dbg = nullptr);
-
-
-        // get_domain returns the domain this context is associated w/
 
         res<domain> get_domain() const noexcept;
-
-        // dm provides summary access to the domain of the context
-
         domain& dm() const noexcept;
-
-
-        // load returns the type under fullname, if any
 
         std::optional<type> load(const str& fullname);
 
-        // load_# methods below provide quick access to preloaded 
-        // built-in Yama types, w/ as little overhead as possible
-
-        type load_none();
-        type load_int();
-        type load_uint();
-        type load_float();
-        type load_bool();
-        type load_char();
+        type none_type();
+        type int_type();
+        type uint_type();
+        type float_type();
+        type bool_type();
+        type char_type();
+        type type_type();
 
 
         // TODO: fmt_stacktrace has not been unit tested
@@ -223,10 +210,9 @@ namespace yama {
         std::optional<object_ref> clone_ref(std::optional<borrowed_ref> x);
 
         // IMPORTANT:
-        //      for all 'll_#' methods below, all ref count incr/decr 
-        //      relating to the passing of passing of objects into, or
-        //      out from, the methods, will be handled automatically
-        //      by said methods
+        //      for all methods below, all ref count incr/decr relating to
+        //      the passing of passing of objects into, or out from, the
+        //      methods, will be handled automatically by said methods
         //
         //      this means that if a returned object_ref is used to
         //      move-construct another object_ref variable, the variable's 
@@ -240,6 +226,7 @@ namespace yama {
         canonical_ref new_float(float_t v);
         canonical_ref new_bool(bool_t v);
         canonical_ref new_char(char_t v);
+        canonical_ref new_type(type v);
 
         std::optional<canonical_ref> new_fn(type f);        // new_fn returns std::nullopt if f is not a function type
 
@@ -289,6 +276,7 @@ namespace yama {
         cmd_status put_float(local_t x, float_t v);
         cmd_status put_bool(local_t x, bool v);
         cmd_status put_char(local_t x, char_t v);
+        cmd_status put_type(local_t x, type v);
 
         inline cmd_status push_none() { return put_none(newtop); }
         inline cmd_status push_int(int_t v) { return put_int(newtop, v); }
@@ -296,6 +284,7 @@ namespace yama {
         inline cmd_status push_float(float_t v) { return put_float(newtop, v); }
         inline cmd_status push_bool(bool v) { return put_bool(newtop, v); }
         inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
+        inline cmd_status push_type(type v) { return put_type(newtop, v); }
 
         // put_fn panics if f is not a function type
 
@@ -321,6 +310,26 @@ namespace yama {
         cmd_status put_const(local_t x, const_t c);
 
         inline cmd_status push_const(const_t c) { return put_const(newtop, c); }
+
+        // put_type_const loads a yama:Type object of the type constant at c, in the
+        // constant table of the current call, into the local object register at x
+        // (x may be newtop)
+
+        // put_type_const does not care what type the x object is, as it overwrites it
+
+        // put_type_const panics if in the user call frame
+
+        // put_type_const panics if x is out-of-bounds (unless newtop)
+
+        // put_type_const panics if (x == newtop, but) pushing would overflow
+
+        // put_type_const panics if c is out-of-bounds
+
+        // put_type_const panics if the constant at c is not a type constant
+
+        cmd_status put_type_const(local_t x, const_t c);
+
+        inline cmd_status push_type_const(const_t c) { return put_type_const(newtop, c); }
 
         // put_arg loads the argument at index arg into the local object
         // register at x (x may be newtop)
@@ -423,7 +432,6 @@ namespace yama {
 
 
     private:
-
         res<domain> _dm;
         std::allocator<void> _al;
 
@@ -514,6 +522,7 @@ namespace yama {
         std::string _fmt_R_no_preview(local_t x);
         std::string _fmt_R(local_t x);
         std::string _fmt_Ko(const_t x);
+        std::string _fmt_Kt(const_t x);
         std::string _fmt_Arg(arg_t x);
 
 
@@ -531,6 +540,12 @@ namespace yama {
         bool _put_const_err_in_user_call_frame();
         bool _put_const_err_c_out_of_bounds(const_t c);
         bool _put_const_err_c_is_not_object_constant(const_t c);
+        
+        cmd_status _put_type_const(local_t x, const_t c);
+
+        bool _put_type_const_err_in_user_call_frame();
+        bool _put_type_const_err_c_out_of_bounds(const_t c);
+        bool _put_type_const_err_c_is_not_type_constant(const_t c);
 
         cmd_status _put_arg(local_t x, arg_t arg);
 

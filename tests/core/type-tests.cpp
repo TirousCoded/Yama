@@ -206,7 +206,6 @@ TEST_F(TypeTests, PerKind_Primitive) {
 
 TEST_F(TypeTests, PerKind_Function) {
     auto abc_call_fn = [](yama::context&) {};
-    std::vector abc_param_names = { "a"_str, "b"_str, "c"_str };
     auto abc_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
     auto abc_constsinf =
         yama::const_table_info()
@@ -217,7 +216,6 @@ TEST_F(TypeTests, PerKind_Function) {
     mf.add_function_type(
         "abc"_str,
         decltype(abc_constsinf)(abc_constsinf),
-        decltype(abc_param_names)(abc_param_names),
         decltype(abc_callsiginf)(abc_callsiginf),
         17,
         abc_call_fn);

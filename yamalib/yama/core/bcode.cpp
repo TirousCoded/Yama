@@ -7,21 +7,22 @@
 
 std::string yama::bc::fmt_opcode(opcode x) {
     std::string result{};
-    static_assert(opcodes == 12);
+    static_assert(opcodes == 13);
     switch (x) {
-    case opcode::noop:          result = "noop";        break;
-    case opcode::pop:           result = "pop";         break;
-    case opcode::put_none:      result = "put_none";    break;
-    case opcode::put_const:     result = "put_const";   break;
-    case opcode::put_arg:       result = "put_arg";     break;
-    case opcode::copy:          result = "copy";        break;
-    case opcode::call:          result = "call";        break;
-    case opcode::call_nr:       result = "call_nr";     break;
-    case opcode::ret:           result = "ret";         break;
-    case opcode::jump:          result = "jump";        break;
-    case opcode::jump_true:     result = "jump_true";   break;
-    case opcode::jump_false:    result = "jump_false";  break;
-    default:                    YAMA_DEADEND;           break;
+    case opcode::noop:              result = "noop";            break;
+    case opcode::pop:               result = "pop";             break;
+    case opcode::put_none:          result = "put_none";        break;
+    case opcode::put_const:         result = "put_const";       break;
+    case opcode::put_type_const:    result = "put_type_const";  break;
+    case opcode::put_arg:           result = "put_arg";         break;
+    case opcode::copy:              result = "copy";            break;
+    case opcode::call:              result = "call";            break;
+    case opcode::call_nr:           result = "call_nr";         break;
+    case opcode::ret:               result = "ret";             break;
+    case opcode::jump:              result = "jump";            break;
+    case opcode::jump_true:         result = "jump_true";       break;
+    case opcode::jump_false:        result = "jump_false";      break;
+    default:                        YAMA_DEADEND;               break;
     }
     return result;
 }
@@ -97,6 +98,13 @@ yama::bc::code& yama::bc::code::add_put_const(uint8_t A, uint8_t B, bool reinit)
     return *this;
 }
 
+yama::bc::code& yama::bc::code::add_put_type_const(uint8_t A, uint8_t B, bool reinit) {
+    _instrs.push_back(instr{ .opc = opcode::put_type_const, .A = A });
+    _instrs.back().B = B;
+    _reinit_flags.push_back(reinit);
+    return *this;
+}
+
 yama::bc::code& yama::bc::code::add_put_arg(uint8_t A, uint8_t B, bool reinit) {
     _instrs.push_back(instr{ .opc = opcode::put_arg, .A = A });
     _instrs.back().B = B;
@@ -160,21 +168,22 @@ std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* t
             : std::format("{}", x);
         };
     std::string a{};
-    static_assert(opcodes == 12);
+    static_assert(opcodes == 13);
     switch (instr.opc) {
-    case opcode::noop:          a = std::format("{: <12}", ' ');                                break;
-    case opcode::pop:           a = std::format("{: <12}", instr.A);                            break;
-    case opcode::put_none:      a = std::format("{: <12}", maybe_nt(instr.A));                  break;
-    case opcode::put_const:     a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
-    case opcode::put_arg:       a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
-    case opcode::copy:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
-    case opcode::call:          a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
-    case opcode::call_nr:       a = std::format("{: <12}", instr.A);                            break;
-    case opcode::ret:           a = std::format("{: <12}", instr.A);                            break;
-    case opcode::jump:          a = std::format("{: <12}", instr.sBx);                          break;
-    case opcode::jump_true:     a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
-    case opcode::jump_false:    a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
-    default:                    YAMA_DEADEND;                                                   break;
+    case opcode::noop:              a = std::format("{: <12}", ' ');                                break;
+    case opcode::pop:               a = std::format("{: <12}", instr.A);                            break;
+    case opcode::put_none:          a = std::format("{: <12}", maybe_nt(instr.A));                  break;
+    case opcode::put_const:         a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
+    case opcode::put_type_const:    a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
+    case opcode::put_arg:           a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
+    case opcode::copy:              a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
+    case opcode::call:              a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
+    case opcode::call_nr:           a = std::format("{: <12}", instr.A);                            break;
+    case opcode::ret:               a = std::format("{: <12}", instr.A);                            break;
+    case opcode::jump:              a = std::format("{: <12}", instr.sBx);                          break;
+    case opcode::jump_true:         a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
+    case opcode::jump_false:        a = std::format("{: <4}{: <8}", instr.A, instr.sBx);            break;
+    default:                        YAMA_DEADEND;                                                   break;
     }
     std::string result = std::format("{}{: <5}{: <16}{}", tab, x, get(x).opc, a);
     if (syms) {
@@ -185,7 +194,7 @@ std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* t
     if (reinit_flag(x)) {
         result += "(reinit)";
     }
-    static_assert(opcodes == 12);
+    static_assert(opcodes == 13);
     if (
         get(x).opc == opcode::jump ||
         get(x).opc == opcode::jump_true ||
@@ -254,6 +263,11 @@ yama::bc::code_writer& yama::bc::code_writer::add_put_none(uint8_t A, bool reini
 
 yama::bc::code_writer& yama::bc::code_writer::add_put_const(uint8_t A, uint8_t B, bool reinit) {
     _result.add_put_const(A, B, reinit);
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_put_type_const(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_put_type_const(A, B, reinit);
     return *this;
 }
 

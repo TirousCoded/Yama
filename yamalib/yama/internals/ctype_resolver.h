@@ -33,15 +33,15 @@ namespace yama::internal {
         ctype_resolver(compiler& cs);
 
 
+        void add(translation_unit& tu, const ast_PrimaryExpr& x); // handles if x is not a type ref (ie. need-not check in first_pass)
         void add(translation_unit& tu, const ast_TypeSpec& x);
-        void add(translation_unit& tu, const ast_PrimaryExpr& x); // handles if x is not a type spec (ie. need-not check in first_pass)
 
         void resolve();
 
-        std::optional<ctype> get(const ast_TypeSpec* x) const noexcept; // fails quietly if x == nullptr
         std::optional<ctype> get(const ast_PrimaryExpr* x) const noexcept; // fails quietly if x == nullptr
-        inline auto operator[](const ast_TypeSpec* x) const noexcept { return get(x); }
+        std::optional<ctype> get(const ast_TypeSpec* x) const noexcept; // fails quietly if x == nullptr
         inline auto operator[](const ast_PrimaryExpr* x) const noexcept { return get(x); }
+        inline auto operator[](const ast_TypeSpec* x) const noexcept { return get(x); }
 
         void cleanup();
 
@@ -53,13 +53,13 @@ namespace yama::internal {
         };
 
 
-        std::unordered_map<const ast_TypeSpec*, _entry_t> _type_spec_mappings;
-        std::unordered_map<const ast_PrimaryExpr*, _entry_t> _primary_expr_mappings;
+        std::unordered_map<const ast_PrimaryExpr*, _entry_t> _mappings;
+        std::unordered_map<const ast_TypeSpec*, safeptr<translation_unit>> _type_specs;
 
 
-        void _resolve(translation_unit& tu, const ast_TypeSpec& x, std::optional<ctype>& target);
         void _resolve(translation_unit& tu, const ast_PrimaryExpr& x, std::optional<ctype>& target);
-        bool _is_type_spec_id_expr(translation_unit& tu, const ast_PrimaryExpr& x);
+        void _check(translation_unit& tu, const ast_TypeSpec& x);
+        bool _is_type_ref_id_expr(translation_unit& tu, const ast_PrimaryExpr& x);
         void _report(translation_unit& tu, bool ambiguous, bool bad_qualifier, const ast_node& where, std::optional<std::string_view> qualifier, const std::string& name);
     };
 }

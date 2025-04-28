@@ -652,6 +652,9 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
+        std::optional<std::string> fmt_name(const taul::source_code& src) const;
+
+
         inline void give_to(ast_node& target) override final { target.give(res<ast_Expr>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;
@@ -677,7 +680,7 @@ namespace yama::internal {
 
         // fmt_name fmts name w/ or w/out qualifier
 
-        std::string fmt_name(const taul::source_code& src) const;
+        std::optional<std::string> fmt_name(const taul::source_code& src) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_PrimaryExpr>(shared_from_this())); }
@@ -880,19 +883,14 @@ namespace yama::internal {
     
     class ast_TypeSpec final : public ast_node {
     public:
-        std::optional<taul::token> qualifier;
-        std::optional<taul::token> name;
+        std::shared_ptr<ast_Expr> expr;
 
 
         inline ast_TypeSpec(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
 
 
-        // TODO: maybe revise fmt_name if we add type args
-
-        // fmt_name fmts name w/ or w/out qualifier
-
-        std::string fmt_name(const taul::source_code& src) const;
+        std::optional<std::string> fmt_name(const taul::source_code& src) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_TypeSpec>(shared_from_this())); }
@@ -901,7 +899,7 @@ namespace yama::internal {
 
 
     protected:
-        void do_give(taul::token x) override final;
+        void do_give(res<ast_Expr> x) override final;
     };
 
 

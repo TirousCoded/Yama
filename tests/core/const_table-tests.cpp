@@ -353,10 +353,10 @@ TEST_F(ConstTableTests, Type_OutOfBounds) {
 }
 
 TEST_F(ConstTableTests, Equality) {
-    yama::const_table a1 = dm->load_int();
-    yama::const_table a2 = dm->load_int();
-    yama::const_table b = dm->load_uint();
-    yama::const_table c = dm->load_float();
+    yama::const_table a1 = dm->int_type();
+    yama::const_table a2 = dm->int_type();
+    yama::const_table b = dm->uint_type();
+    yama::const_table c = dm->float_type();
 
     // equality
 

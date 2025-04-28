@@ -51,8 +51,8 @@ protected:
 //          - each test in a section has a little preamble comment above it which describes
 //            the behaviour covered by the test, followed by the unit test itself
 //              * these preamble comments, and their corresponding unit tests, need not be 1-to-1
-//                w/ the exact wording of the header, just so long as the overall section test is
-//                properly comprehensive
+//                w/ the exact wording of the header, just so long as the overall section's tests
+//                are properly comprehensive
 // 
 //              * a bit redundant, but I like how these preamble comments make our unit tests
 //                more readable, rather than us having to stuff everything in the cramped name
@@ -101,9 +101,55 @@ protected:
 //      the above are in regards to tests of successful compilation, w/ failure
 //      tests simply asserting failed compilation and expected debug signals
 
+
 // IMPORTANT:
 //      the term 'extern type' refers to types which have been loaded from modules
 //      imported into the compilation
+
+
+// IMPORTANT:
+//      Yama lang exprs are 'constant exprs' or 'constexprs' if and only if:
+//          1) the expr's operation is constexpr eligible (ie. it's a pure fn)
+//          2) oprand exprs parameterizing them, if any, are also constexprs
+//
+//      the Yama lang impl is free to precompute constexprs
+
+
+// TODO: maybe mention in docs that Yama lvalues/rvalues differ quite a bit from C++ ones
+
+// IMPORTANT:
+//      Yama lang exprs each have a property called 'expr mode' which dictates the semantic
+//      role of the expr
+//
+//      the following expr modes exist:
+//
+//          lvalue      an expr which exists to be assigned a value
+//                          * expr must be assignable (see below)
+//          rvalue      an expr which exists to compute a value
+//          crvalue     a constexpr rvalue
+//                          * expr must be a constexpr
+// 
+//      the behaviour of an expr is dictated by if it's a lvalue or rvalue:
+//
+//          - rvalue exprs have a 'compute' behaviour, which computes a value
+//              * herein, when describing what an expr *does*, the description of its
+//                behaviour upon evaluation is implicitly talking about its compute
+//                behaviour
+//
+//          - lvalue exprs have an 'assignment' behaviour, which accepts a value and
+//            (presumably) uses it to assign something
+//              * whether an expr has a defined assignment behaviour dictates whether
+//                it is 'assignable' or not
+
+
+// IMPORTANT:
+//      all exprs must have unit tests for the following:
+//          - the compute behaviour of the expr
+//          - if it is/isn't assignable
+//              * must cover assignment behaviour
+//              * multiple if conditionally assignable
+//          - if it is/isn't constexpr
+//              * multiple if conditionally constexpr
 
 
 namespace {
@@ -152,7 +198,6 @@ namespace {
         .unqualified_name = "observeNone"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 0 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -167,7 +212,6 @@ namespace {
         .unqualified_name = "observeInt"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -182,7 +226,6 @@ namespace {
         .unqualified_name = "observeUInt"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 2 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -197,7 +240,6 @@ namespace {
         .unqualified_name = "observeFloat"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 3 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -212,7 +254,6 @@ namespace {
         .unqualified_name = "observeBool"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 4 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -227,7 +268,6 @@ namespace {
         .unqualified_name = "observeChar"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 5 }, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -242,7 +282,6 @@ namespace {
         .unqualified_name = "doPanic"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -255,7 +294,6 @@ namespace {
         .unqualified_name = "doIncr"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str },
             .callsig = yama::make_callsig_info({ 1 }, 1),
             .call_fn =
                 [](yama::context& ctx) {
@@ -269,7 +307,6 @@ namespace {
         .unqualified_name = "isEqInt"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 1, 1 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -285,7 +322,6 @@ namespace {
         .unqualified_name = "isEqChar"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 5, 5 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -301,7 +337,6 @@ namespace {
         .unqualified_name = "isNotEqInt"_str,
         .consts = consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str },
             .callsig = yama::make_callsig_info({ 1, 1 }, 4),
             .call_fn =
                 [](yama::context& ctx) {
@@ -354,7 +389,6 @@ namespace {
                 mf.add_function_type(
                     "f"_str,
                     yama::const_table_info{},
-                    {},
                     yama::make_callsig_info({}, 10'000), // <- return type invalid! so .bad is also invalid!
                     1,
                     yama::noop_call_fn);
@@ -373,7 +407,6 @@ namespace {
         .unqualified_name = "acknowledge"_str,
         .consts = acknowledge_consts,
         .info = yama::function_info{
-            .param_names = {},
             .callsig = yama::make_callsig_info({}, 0),
             .call_fn =
                 [](yama::context& ctx) {
@@ -1706,10 +1739,12 @@ fn ddd() {
 // 
 //      - when looking up an identifier via an unqualified name, the lookup occurs w/
 //        either 'normal lookup procedure' or 'qualifier lookup procedure'
-//      - normal lookup procedure is the default, and is used to lookup types, parameters
-//        and local vars, ignoring imports
-//      - qualifier lookup procedure is used to lookup imports used to qualify type
-//        specifiers or identifier exprs, and ignores all decls except imports
+// 
+//          - normal lookup procedure is the default, and is used to lookup types,
+//            parameters and local vars, ignoring imports
+// 
+//          - qualifier lookup procedure is used to lookup imports used to qualify
+//            identifier exprs, and ignores all decls except imports
 // 
 //      - decls may 'shadow' one another
 // 
@@ -1951,7 +1986,7 @@ fn observeInt() -> Char { // shares unqualified name w/ fns.abc:observeInt
 
 // IMPORTANT: this test mainly covers the coexistence between *shadower* and *shadowed*
 //            decls, w/ the behaviour of shadowing in regards to referencing behaviour
-//            being deferred to tests for 'type specifiers' and 'identifier exprs'
+//            being deferred to tests for identifier exprs
 
 // tolerance of type/parameter/local var decls having common names so
 // long as they're in different blocks
@@ -2012,7 +2047,7 @@ fn f(a: Int) {
 }
 
 // IMPORTANT: like w/ shadowing, coexistence is tested here, but the particulars of referencing
-//            are left to type specifier and identifier expr tests
+//            are left to identifier expr tests
 
 // test that given a type decl and an import decl w/ a common unqualified name, that
 // the two can coexist w/out a name conflict arising
@@ -2231,27 +2266,21 @@ fn f() {
 
 
 // type specifier
-//
-//      - specifies Yama types by name
 // 
-//      - type specifiers exist relative to some block, and their ability to reference
-//        decls respects the scope and shadowing rules of decls
+//      - accepts a yama:Type crvalue to resolve something's type
 //
-//      - type specifiers w/ import decl name qualifiers lookup the import to use via
-//        qualifier lookup procedure
+//      - if crvalue is a fn type, this will be *ad hoc* implicit converted into a yama:Type
+//          TODO: replace this w/ proper implicit convert later
 
-// specify extern type via unqualified type specifier
+// type spec w/ yama:Type crvalue
 
-TEST_F(CompilationTests, TypeSpecifier_SpecifyExternType_UnqualifiedTypeSpecifier) {
+TEST_F(CompilationTests, TypeSpecifier_ExprIsTypeType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
-import fns.abc;
-
-fn f() {
-    var a: Int = 10; // 'Int' specifies extern yama:Int
-    observeInt(a); // 'observeInt' specifies extern fns.abc:observeInt
+fn f() -> Int { // <- yama:Type crvalue
+    return 100;
 }
 
 )";
@@ -2263,286 +2292,67 @@ fn f() {
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(100));
 
     // expected side effects
     sidefx_t expected{};
-    expected.observe_int(10);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// specify extern type via qualified type specifier
+// type spec w/ fn type crvalue (ad hoc implicit convert)
 
-TEST_F(CompilationTests, TypeSpecifier_SpecifyExternType_QualifiedTypeSpecifier) {
+TEST_F(CompilationTests, TypeSpecifier_ExprIsFnType_AdHocImplicitConvert) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
-import other: fns.abc;
-
-fn f() {
-    var a: yama:Int = 10; // 'yama:Int' specifies extern yama:Int
-    other:observeInt(a); // 'other:observeInt' specifies extern fns.abc:observeInt
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// specify type in Yama code
-
-TEST_F(CompilationTests, TypeSpecifier_SpecifyTypeInYamaCode) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g() {}
-
-fn f() -> g {
+fn f() -> g { // <- fn type crvalue
     return g;
 }
 
+fn g() {}
+
 )";
 
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
+    const auto f = dm->load("a:f"_str);
     const auto g = dm->load("a:g"_str);
-    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
     ASSERT_TRUE(g);
-    ASSERT_TRUE(f);
 
+    ASSERT_EQ(f->kind(), yama::kind::function);
     ASSERT_EQ(g->kind(), yama::kind::function);
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g).value());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
     sidefx_t expected{};
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// specify type in Yama code which shadows an extern type
+// illegal type spec due to expr not yama:Type or fn type
 
-TEST_F(CompilationTests, TypeSpecifier_SpecifyTypeInYamaCode_WhichShadowsExternType) {
+TEST_F(CompilationTests, TypeSpecifier_Fail_ExprTypeIsNotTypeTypeNorFnType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
-import fns.abc;
-
-fn observeInt(x: Char) { // shadows fns.abc:observeInt
-    observeChar(x); // will observe fns.abc:observeChar behaviour
-}
-
-fn f() {
-    observeInt('a'); // ref our observeInt
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto observeInt = dm->load("a:observeInt"_str);
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(observeInt);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(observeInt->kind(), yama::kind::function);
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(observeInt->callsig().value().fmt(), "fn(yama:Char) -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    expected.observe_char(U'a');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// specify type via qualifier which names an import which shares an unqualified name
-// w/ a type in Yama code
-
-TEST_F(CompilationTests, TypeSpecifier_QualifierNameAlsoUsedByType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import a: fns.abc;
-
-fn a() {}
-
-fn g(x: a:observeInt) {} // <- type spec (ie. not an id expr)
-
-fn f() {
-    g(observeInt);
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// type specified twice, once w/ qualifier, and once w/out, both refer to same type
-
-TEST_F(CompilationTests, TypeSpecifier_TypeSpecifiedTwice_OnceWithQualifier_OnceWithNoQualifier_BothRefSameType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import a: fns.abc;
-
-fn g(x: observeInt) {} // <- type spec (ie. not an id expr)
-fn h(x: a:observeInt) {} // <- type spec (ie. not an id expr)
-
-fn f() {
-    // observeInt and a:observeInt are same type
-    g(observeInt);
-    h(observeInt);
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// illegal for type spec to specify non-type
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_IfSpecifyUndeclaredName_NoQualifier) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: T; // error! no type named T
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
-}
-
-// illegal for type spec to have undeclared qualifier
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_UndeclaredQualifier) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: missing:T; // error! no type named missing:T
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_qualifier), 1);
-}
-
-// illegal ambiguous unqualified name type specify (between two or more extern types)
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_IfAmbiguousUnqualifiedNameTypeSpecify_BetweenTwoOrMoreExternTypes) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc; // imports 'observeInt'
-import fns2.abc; // imports 'observeInt'
-
-fn f() {
-    observeInt(10); // error! could be fns.abc:observeInt or fns2.abc:observeInt, ambiguous!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_ambiguous_name), 1);
-}
-
-// cannot (unqualified name) reference type which has been shadowed by parameter
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_IfTypeShadowedByParam) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f(Int: Float) { // <- shadows Int type
-    var a: Int; // error! Int refers to param, not yama:Int!
+fn f() -> 100 { // <- '100' is valid crvalue, but is not yama:Type nor fn type
+    //
 }
 
 )";
@@ -2552,23 +2362,12 @@ fn f(Int: Float) { // <- shadows Int type
     EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
 }
 
-// cannot (unqualified name) reference type which has been shadowed by local var
+// illegal type spec due to expr not constexpr
 
-TEST_F(CompilationTests, TypeSpecifier_Fail_IfTypeShadowedByLocalVar) {
+TEST_F(CompilationTests, TypeSpecifier_Fail_ExprIsNonConstExpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-fn f() {
-    var Int = 10; // shadows Int type (ironically)
-    var a: Int; // error! Int refers to local var, not yama:Int!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
+    // TODO: stub
 }
 
 
@@ -3976,14 +3775,8 @@ TEST_F(CompilationTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 // assignment stmt
 // 
 //      - performs assignment of the expr value to an assignable expr
+// 
 //      - the expr value assigned and the assignable expr must agree on type
-//
-//      - exprs may have a property called 'assignability' which dictates if they can be assigned to
-//          * all assignable exprs must have a test covering this
-//          * all non-assignable exprs must have a test covering this
-//          * each assignable expr must specify what behaviour occurs upon assignment
-//          * each assignable expr must specify what type can be assigned to them
-//          * the above four will be in the sections of each expr, not here
 
 // basic usage
 
@@ -4942,69 +4735,60 @@ fn f() -> Int {
 }
 
 
+static_assert(yama::kinds == 2); // reminder
+
 // identifier expr
 // 
-//      - specifies a reference to a function, parameter, or local var, for sake of either
-//        accessing a value, or (in case of local vars) assigning it
+//      - specifies a reference to a type, parameter or local var, for sake of either
+//        computing a value or assigning something
+// 
+//      - identifier exprs exist relative to some block, and their ability to reference
+//        decls respects the scope and shadowing rules of decls
 //
 //      - identifier exprs w/ import decl name qualifiers lookup the import to use via
 //        qualifier lookup procedure
 // 
-//      - if referring to a function, the identifier expr corresponds to the instantiation
-//        of a stateless object of the function type specified
+//      - compute behaviour:
 // 
-//      - non-assignable if referring to a function
-//      - non-assignable if referring to a parameter
-//      - assignable if referring to a local var
-//          * assigned value is put into the local var
+//          primitive type      yama:Type value
+//          fn type             fn value
+//          parameter           parameter value
+//          local var           local var value
 // 
-//      - identifier exprs exist relative to some block, and their ability to reference decls
-//        respects the scope and shadowing rules of decls
+//      - assignability & assignment behaviour:
+// 
+//          primitive type      illegal                             (non-assignable)
+//          fn type             illegal                             (non-assignable)
+//          parameter           illegal                             (non-assignable)
+//          local var           assigns local var                   (assignable)
+// 
+//      - constexpr status:
+// 
+//          primitive type      constexpr
+//          fn type             constexpr
+//          parameter           non-constexpr
+//          local var           non-constexpr
 //
-//      - illegal if referring to a non-function type
+//      - illegal to compute value of non-fn type outside of type specifier
+//          * TODO: remove this later
 
-// access value of function reference, w/out import decl qualifier
+// IMPORTANT:
+//      below 'IdentifierExpr_Compute_[KIND]Type' tests do the following:
+//          - compute value of id expr w/ qualifier (check if correct)
+//          - compute value of id expr w/out qualifier (check if correct)
+//          - check that above two are equal
 
-TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn_WithNoQualifier) {
+// compute value of primitive type reference
+
+TEST_F(CompilationTests, IdentifierExpr_Compute_PrimitiveType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-fn f() -> g {
-    return g;
+    // TODO: stub
 }
 
-fn g() {} // make sure impl can handle fn not declared until AFTER first use!
+// compute value of fn type reference
 
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto g = dm->load("a:g"_str);
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(g);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(g->kind(), yama::kind::function);
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// access value of function reference, w/ import decl qualifier
-
-TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn_WithQualifier) {
+TEST_F(CompilationTests, IdentifierExpr_Compute_FnType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5012,7 +4796,11 @@ TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Fn_WithQualifier) {
 import abc: fns.abc;
 
 fn f() -> observeInt {
-    return abc:observeInt;
+    return abc:observeInt; // w/ qualifier
+}
+
+fn g() -> observeInt {
+    return observeInt; // w/out qualifier
 }
 
 )";
@@ -5022,28 +4810,35 @@ fn f() -> observeInt {
 
     const auto observeInt = dm->load("fns.abc:observeInt"_str);
     const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
     ASSERT_TRUE(observeInt);
     ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
 
     ASSERT_EQ(observeInt->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(observeInt->callsig().value().fmt(), "fn(yama:Int) -> yama:None");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> fns.abc:observeInt");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> fns.abc:observeInt");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*g).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*observeInt));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_fn(*observeInt));
 
     // expected side effects
     sidefx_t expected{};
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// access value of parameter reference
+// compute value of parameter reference
 
-TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_Param) {
+TEST_F(CompilationTests, IdentifierExpr_Compute_Param) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5079,9 +4874,9 @@ fn f(a: Int) -> Int {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// access value of local var reference
+// compute value of local var reference
 
-TEST_F(CompilationTests, IdentifierExpr_AccessValueOf_LocalVar) {
+TEST_F(CompilationTests, IdentifierExpr_Compute_LocalVar) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5117,9 +4912,13 @@ fn f() -> Int {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// extern fn shadowed by fn defined in Yama code
+// TODO: since fn types resolve to objects w/ fn type instead of yama:Type, should
+//       we have tests for that shadowing can properly discern the correct return
+//       type? as right now we're not really testing for that
 
-TEST_F(CompilationTests, IdentifierExpr_FnDefinedInYamaCodeShadowsExternFn) {
+// extern type shadowed by type defined in Yama code
+
+TEST_F(CompilationTests, IdentifierExpr_TypeDefinedInYamaCodeShadowsExternType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5158,9 +4957,9 @@ fn f() -> observeInt { // return fn value to see if it works
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// function shadowed by parameter
+// type shadowed by parameter
 
-TEST_F(CompilationTests, IdentifierExpr_ParamShadowsFn) {
+TEST_F(CompilationTests, IdentifierExpr_ParamShadowsType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5201,9 +5000,9 @@ fn f(g: Int) {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// function shadowed by local var
+// type shadowed by local var
 
-TEST_F(CompilationTests, IdentifierExpr_LocalVarShadowsFn) {
+TEST_F(CompilationTests, IdentifierExpr_LocalVarShadowsType) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5327,24 +5126,18 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// reference fn twice, once w/ qualifier, and once w/out, both refer to same type
+// reference something w/ id expr which is not declared until later in module
 
-TEST_F(CompilationTests, IdentifierExpr_RefFnTwice_OnceWithQualifier_OnceWithNoQualifier_BothRefSameType) {
+TEST_F(CompilationTests, IdentifierExpr_CanRefSomethingNotDeclaredUntilLaterInModule) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
-import a: fns.abc;
-
-fn g(x: observeInt) {
-    x(100);
+fn f() -> g {
+    return g;
 }
 
-fn f() {
-    // observeInt and a:observeInt are same type
-    g(observeInt); // <- id expr (ie. not a type spec)
-    g(a:observeInt); // <- id expr (ie. not a type spec)
-}
+fn g() {} // <- not declared until AFTER first reference to it
 
 )";
 
@@ -5352,51 +5145,37 @@ fn f() {
     ASSERT_TRUE(result);
 
     const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
     ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(g->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
     sidefx_t expected{};
-    expected.observe_int(100);
-    expected.observe_int(100);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// illegal reference to non-function type, w/ no qualifier
+// TODO: remove this later (also maybe remove dsignal value too)
 
-TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnType_WithNoQualifier) {
+// illegal reference to non-fn type outside of type spec
+
+TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnTypeOutsideOfTypeSpec) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 fn f() {
     var a = Int; // 'Int' is not a fn type
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
-}
-
-// illegal reference to non-function type, w/ qualifier
-
-TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnType_WithQualifier) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a = yama:Int; // 'yama:Int' is not a fn type
 }
 
 )";
@@ -5483,9 +5262,17 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
 }
 
-// identifier expr is non-assignable, if function reference
+// primitive type identifier expr is non-assignable
 
-TEST_F(CompilationTests, IdentifierExpr_NonAssignable_IfFn) {
+TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
+// fn type identifier expr is non-assignable
+
+TEST_F(CompilationTests, IdentifierExpr_FnType_NonAssignable) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5493,11 +5280,7 @@ TEST_F(CompilationTests, IdentifierExpr_NonAssignable_IfFn) {
 fn g() {}
 
 fn f() {
-    // below uses '10', as we can't really give the assigned value a
-    // *correct type*, as that would imply fn decl 'g' has a notion
-    // of itself having an object type, which it doesn't really...
-
-    g = 10; // 'g' is not assignable
+    g = g; // 'g' is not assignable
 }
 
 )";
@@ -5507,9 +5290,9 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// identifier expr is non-assignable, if parameter reference
+// parameter identifier expr is non-assignable
 
-TEST_F(CompilationTests, IdentifierExpr_NonAssignable_IfParam) {
+TEST_F(CompilationTests, IdentifierExpr_Param_NonAssignable) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5525,9 +5308,9 @@ fn f(a: Int) {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// identifier expr is assignable, if local var reference
+// local var identifier expr is assignable
 
-TEST_F(CompilationTests, IdentifierExpr_Assignable_IfLocalVar) {
+TEST_F(CompilationTests, IdentifierExpr_LocalVar_Assignable) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5564,12 +5347,45 @@ fn f() -> Int {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// primitive type identifier expr is constexpr
+
+TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
+// fn type identifier expr is constexpr
+
+TEST_F(CompilationTests, IdentifierExpr_FnType_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
+// parameter identifier expr is non-constexpr
+
+TEST_F(CompilationTests, IdentifierExpr_Param_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
+// local var identifier expr is non-constexpr
+
+TEST_F(CompilationTests, IdentifierExpr_LocalVar_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // Int literal expr
 //
 //      - returns a Int value specified by a literal
 // 
 //      - non-assignable
+//      - constexpr
 // 
 //      - illegal if Int literal overflows
 //      - illegal if Int literal underflows
@@ -5702,12 +5518,21 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// Int literal is constexpr
+
+TEST_F(CompilationTests, IntLiteralExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // UInt literal expr
 //
 //      - returns a UInt value specified by a literal
 // 
 //      - non-assignable
+//      - constexpr
 // 
 //      - illegal if UInt literal overflows
 
@@ -5801,12 +5626,22 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// UInt literal is constexpr
+
+TEST_F(CompilationTests, UIntLiteralExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // Float literal expr
 //
 //      - returns a Float value specified by a literal, including inf/nan keywords
 // 
 //      - non-assignable
+//      - non-constexpr
+//          * TODO: look into changing this later
 // 
 //      - out-of-bounds Float literals resolve to inf/-inf values
 
@@ -5881,8 +5716,8 @@ fn f6() -> Float { return nan; }
         // expected return value
         const auto lhs = ctx->local(0).value();
         const auto rhs = ctx->new_float(v);
-        EXPECT_TRUE(lhs.t == ctx->load_float());
-        if (lhs.t == ctx->load_float()) EXPECT_DOUBLE_EQ(lhs.as_float(), rhs.as_float());
+        EXPECT_TRUE(lhs.t == ctx->float_type());
+        if (lhs.t == ctx->float_type()) EXPECT_DOUBLE_EQ(lhs.as_float(), rhs.as_float());
 
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
@@ -5898,8 +5733,8 @@ fn f6() -> Float { return nan; }
 
         // expected return value
         const auto lhs = ctx->local(0).value();
-        EXPECT_TRUE(lhs.t == dm->load_float());
-        if (lhs.t == dm->load_float()) EXPECT_TRUE(std::isnan(lhs.as_float()));
+        EXPECT_TRUE(lhs.t == dm->float_type());
+        if (lhs.t == dm->float_type()) EXPECT_TRUE(std::isnan(lhs.as_float()));
 
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
@@ -5933,8 +5768,8 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 
     // expected return value
     const auto lhs = ctx->local(0).value();
-    EXPECT_TRUE(lhs.t == dm->load_float());
-    if (lhs.t == dm->load_float()) {
+    EXPECT_TRUE(lhs.t == dm->float_type());
+    if (lhs.t == dm->float_type()) {
         EXPECT_TRUE(std::isinf(lhs.as_float()));
         EXPECT_FALSE(std::signbit(lhs.as_float()));
     }
@@ -5969,8 +5804,8 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 
     // expected return value
     const auto lhs = ctx->local(0).value();
-    EXPECT_TRUE(lhs.t == dm->load_float());
-    if (lhs.t == dm->load_float()) {
+    EXPECT_TRUE(lhs.t == dm->float_type());
+    if (lhs.t == dm->float_type()) {
         EXPECT_TRUE(std::isinf(lhs.as_float()));
         EXPECT_TRUE(std::signbit(lhs.as_float()));
     }
@@ -5998,12 +5833,21 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// Float literal is non-constexpr
+
+TEST_F(CompilationTests, FloatLiteralExpr_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // Bool literal expr
 //
 //      - returns a Bool value specified by a literal
 // 
 //      - non-assignable
+//      - constexpr
 
 // basic usage
 
@@ -6061,12 +5905,21 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// Bool literal is constexpr
+
+TEST_F(CompilationTests, BoolLiteralExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // Char literal expr
 //
 //      - returns a Char value specified by a literal
 // 
 //      - non-assignable
+//      - constexpr
 
 // basic usage
 
@@ -6238,6 +6091,14 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// Char literal is constexpr
+
+TEST_F(CompilationTests, CharLiteralExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
+}
+
 
 // call expr
 //
@@ -6250,6 +6111,7 @@ fn f() {
 //        call expr
 // 
 //      - non-assignable
+//      - non-constexpr
 // 
 //      - illegal if the call object expr specifies a call object of a non-callable type
 // 
@@ -6521,5 +6383,13 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// call expr is non-constexpr
+
+TEST_F(CompilationTests, CallExpr_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    // TODO: stub
 }
 

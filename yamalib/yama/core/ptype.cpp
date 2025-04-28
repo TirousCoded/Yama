@@ -6,7 +6,7 @@
 
 
 std::string yama::fmt_ptype(ptype x) {
-    static_assert(ptypes == 6);
+    static_assert(ptypes == 7);
     std::string result{};
     switch (x) {
     case ptype::none:       result = "none";    break;
@@ -15,6 +15,7 @@ std::string yama::fmt_ptype(ptype x) {
     case ptype::float0:     result = "float";   break;
     case ptype::bool0:      result = "bool";    break;
     case ptype::char0:      result = "char";    break;
+    case ptype::type:       result = "type";    break;
     default:                YAMA_DEADEND;       break;
     }
     return result;

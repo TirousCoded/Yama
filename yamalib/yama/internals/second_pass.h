@@ -66,7 +66,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_Assign> x) override final;
         //void visit_begin(res<ast_Args> x) override final;
         //void visit_begin(res<ast_TypeAnnot> x) override final;
-        //void visit_begin(res<ast_TypeSpec> x) override final;
+        void visit_begin(res<ast_TypeSpec> x) override final;
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
@@ -96,7 +96,7 @@ namespace yama::internal {
         //void visit_end(res<ast_Assign> x) override final;
         void visit_end(res<ast_Args> x) override final;
         //void visit_end(res<ast_TypeAnnot> x) override final;
-        //void visit_end(res<ast_TypeSpec> x) override final;
+        void visit_end(res<ast_TypeSpec> x) override final;
 
 
     private:
@@ -225,6 +225,14 @@ namespace yama::internal {
         inline bool _is_in_lvalue() const noexcept { return _lvalue_scopes >= 1; }
         inline void _push_lvalue() { _lvalue_scopes++; }
         inline void _pop_lvalue() { YAMA_ASSERT(_is_in_lvalue()); _lvalue_scopes--; }
+
+        // this disabling of eval semantics also extends to type specs
+
+        size_t _type_spec_ctx_scopes = 0;
+
+        inline bool _is_in_type_spec_ctx() const noexcept { return _type_spec_ctx_scopes >= 1; }
+        inline void _push_type_spec_ctx() { _type_spec_ctx_scopes++; }
+        inline void _pop_type_spec_ctx() { YAMA_ASSERT(_is_in_type_spec_ctx()); _type_spec_ctx_scopes--; }
 
 
         struct _if_stmt_t final {

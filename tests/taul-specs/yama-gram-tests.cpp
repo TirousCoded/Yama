@@ -2886,7 +2886,7 @@ TEST_F(YamaGramTests, TypeAnnot) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, TypeSpec_NoQualifier) {
+TEST_F(YamaGramTests, TypeSpec) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2899,32 +2899,7 @@ TEST_F(YamaGramTests, TypeSpec_NoQualifier) {
     taul::parse_tree_pattern pattern(*gram);
     {
         auto node0 = pattern.syntactic_autoclose("TypeSpec"_str, cntr);
-        pattern.lexical("IDENTIFIER"_str, cntr, 5);
-    }
-
-    auto result = parser->parse("TypeSpec"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
-
-    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
-}
-
-TEST_F(YamaGramTests, TypeSpec_Qualifier) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "yama:Float"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    taul::source_pos_counter cntr{};
-    taul::parse_tree_pattern pattern(*gram);
-    {
-        auto node0 = pattern.syntactic_autoclose("TypeSpec"_str, cntr);
-        pattern.lexical("IDENTIFIER"_str, cntr, 4);
-        pattern.lexical("COLON"_str, cntr, 1);
-        pattern.lexical("IDENTIFIER"_str, cntr, 5);
+        pattern.loose_syntactic("Expr"_str, cntr, 5);
     }
 
     auto result = parser->parse("TypeSpec"_str);

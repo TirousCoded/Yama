@@ -276,12 +276,10 @@ std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const 
     // guarantee ambiguous and bad_qualifier always gets set
     ambiguous = false;
     bad_qualifier = false;
-    // attempt load based on if qualified
-    const auto name = x.name.value().str(tu->src);
-    return
-        x.qualifier
-        ? load(x.qualifier->str(tu->src), name, bad_qualifier)
-        : load(name, ambiguous);
+    if (const auto& p = deref_assert(x.expr).primary) {
+        return load(*p, ambiguous, bad_qualifier);
+    }
+    else return std::nullopt;
 }
 
 std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const ast_TypeSpec& x) {

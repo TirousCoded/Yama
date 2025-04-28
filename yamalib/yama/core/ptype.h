@@ -26,6 +26,7 @@ namespace yama {
         float0,
         bool0,
         char0,
+        type,
 
         num,        // this is not a valid type of primitive
     };

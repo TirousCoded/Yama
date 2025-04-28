@@ -42,6 +42,7 @@ TEST_F(DomainTests, Builtins) {
     const auto _Float = dm->load("yama:Float"_str);
     const auto _Bool = dm->load("yama:Bool"_str);
     const auto _Char = dm->load("yama:Char"_str);
+    const auto _Type = dm->load("yama:Type"_str);
 
     ASSERT_TRUE(_None);
     ASSERT_TRUE(_Int);
@@ -49,13 +50,15 @@ TEST_F(DomainTests, Builtins) {
     ASSERT_TRUE(_Float);
     ASSERT_TRUE(_Bool);
     ASSERT_TRUE(_Char);
+    ASSERT_TRUE(_Type);
 
-    EXPECT_EQ(_None, dm->load_none());
-    EXPECT_EQ(_Int, dm->load_int());
-    EXPECT_EQ(_UInt, dm->load_uint());
-    EXPECT_EQ(_Float, dm->load_float());
-    EXPECT_EQ(_Bool, dm->load_bool());
-    EXPECT_EQ(_Char, dm->load_char());
+    EXPECT_EQ(_None, dm->none_type());
+    EXPECT_EQ(_Int, dm->int_type());
+    EXPECT_EQ(_UInt, dm->uint_type());
+    EXPECT_EQ(_Float, dm->float_type());
+    EXPECT_EQ(_Bool, dm->bool_type());
+    EXPECT_EQ(_Char, dm->char_type());
+    EXPECT_EQ(_Type, dm->type_type());
 
     EXPECT_EQ(_None->fullname(), "yama:None"_str);
     EXPECT_EQ(_Int->fullname(), "yama:Int"_str);
@@ -63,6 +66,7 @@ TEST_F(DomainTests, Builtins) {
     EXPECT_EQ(_Float->fullname(), "yama:Float"_str);
     EXPECT_EQ(_Bool->fullname(), "yama:Bool"_str);
     EXPECT_EQ(_Char->fullname(), "yama:Char"_str);
+    EXPECT_EQ(_Type->fullname(), "yama:Type"_str);
 
     EXPECT_EQ(_None->kind(), yama::kind::primitive);
     EXPECT_EQ(_Int->kind(), yama::kind::primitive);
@@ -70,6 +74,7 @@ TEST_F(DomainTests, Builtins) {
     EXPECT_EQ(_Float->kind(), yama::kind::primitive);
     EXPECT_EQ(_Bool->kind(), yama::kind::primitive);
     EXPECT_EQ(_Char->kind(), yama::kind::primitive);
+    EXPECT_EQ(_Type->kind(), yama::kind::primitive);
 
     EXPECT_EQ(_None->ptype(), std::make_optional(yama::ptype::none));
     EXPECT_EQ(_Int->ptype(), std::make_optional(yama::ptype::int0));
@@ -77,6 +82,7 @@ TEST_F(DomainTests, Builtins) {
     EXPECT_EQ(_Float->ptype(), std::make_optional(yama::ptype::float0));
     EXPECT_EQ(_Bool->ptype(), std::make_optional(yama::ptype::bool0));
     EXPECT_EQ(_Char->ptype(), std::make_optional(yama::ptype::char0));
+    EXPECT_EQ(_Type->ptype(), std::make_optional(yama::ptype::type));
 }
 
 
@@ -432,7 +438,6 @@ namespace {
         .unqualified_name = "bad"_str,
         .consts = bad_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = bad_callsig,
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -547,7 +552,6 @@ namespace {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .param_names = { "a"_str, "b"_str, "c"_str },
             .callsig = f_callsig,
             .call_fn = yama::noop_call_fn,
             .max_locals = 4,
@@ -879,11 +883,12 @@ TEST_F(DomainTests, Load_FailDueToLoadingError) {
 
 
 TEST_F(DomainTests, QuickAccessLoadMethods) {
-    EXPECT_EQ(dm->load_none(), dm->load("yama:None"_str).value());
-    EXPECT_EQ(dm->load_int(), dm->load("yama:Int"_str).value());
-    EXPECT_EQ(dm->load_uint(), dm->load("yama:UInt"_str).value());
-    EXPECT_EQ(dm->load_float(), dm->load("yama:Float"_str).value());
-    EXPECT_EQ(dm->load_bool(), dm->load("yama:Bool"_str).value());
-    EXPECT_EQ(dm->load_char(), dm->load("yama:Char"_str).value());
+    EXPECT_EQ(dm->none_type(), dm->load("yama:None"_str).value());
+    EXPECT_EQ(dm->int_type(), dm->load("yama:Int"_str).value());
+    EXPECT_EQ(dm->uint_type(), dm->load("yama:UInt"_str).value());
+    EXPECT_EQ(dm->float_type(), dm->load("yama:Float"_str).value());
+    EXPECT_EQ(dm->bool_type(), dm->load("yama:Bool"_str).value());
+    EXPECT_EQ(dm->char_type(), dm->load("yama:Char"_str).value());
+    EXPECT_EQ(dm->type_type(), dm->load("yama:Type"_str).value());
 }
 

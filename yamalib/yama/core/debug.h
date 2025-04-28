@@ -192,7 +192,6 @@ namespace yama {
         compile_misplaced_import,
         compile_invalid_env,
 
-        verif_param_name_count_mismatch,
         verif_type_callsig_invalid,
         verif_constsym_qualified_name_invalid,
         verif_constsym_callsig_invalid,
@@ -209,6 +208,8 @@ namespace yama {
         verif_RB_wrong_type,
         verif_KoB_out_of_bounds,
         verif_KoB_not_object_const,
+        verif_KtB_out_of_bounds,
+        verif_KtB_not_type_const,
         verif_ArgB_out_of_bounds,
         verif_RA_and_RB_types_differ,
         verif_RA_and_KoB_types_differ,
@@ -243,7 +244,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 67);
+        static_assert(dsignals == 68);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -276,7 +277,6 @@ namespace yama {
             _YAMA_ENTRY_(compile_misplaced_import);
             _YAMA_ENTRY_(compile_invalid_env);
 
-            _YAMA_ENTRY_(verif_param_name_count_mismatch);
             _YAMA_ENTRY_(verif_type_callsig_invalid);
             _YAMA_ENTRY_(verif_constsym_qualified_name_invalid);
             _YAMA_ENTRY_(verif_constsym_callsig_invalid);
@@ -293,6 +293,8 @@ namespace yama {
             _YAMA_ENTRY_(verif_RB_wrong_type);
             _YAMA_ENTRY_(verif_KoB_out_of_bounds);
             _YAMA_ENTRY_(verif_KoB_not_object_const);
+            _YAMA_ENTRY_(verif_KtB_out_of_bounds);
+            _YAMA_ENTRY_(verif_KtB_not_type_const);
             _YAMA_ENTRY_(verif_ArgB_out_of_bounds);
             _YAMA_ENTRY_(verif_RA_and_RB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_KoB_types_differ);

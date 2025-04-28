@@ -30,28 +30,32 @@ std::optional<yama::type> yama::context::load(const str& fullname) {
     return _dm->load(fullname);
 }
 
-yama::type yama::context::load_none() {
-    return _dm->load_none();
+yama::type yama::context::none_type() {
+    return _dm->none_type();
 }
 
-yama::type yama::context::load_int() {
-    return _dm->load_int();
+yama::type yama::context::int_type() {
+    return _dm->int_type();
 }
 
-yama::type yama::context::load_uint() {
-    return _dm->load_uint();
+yama::type yama::context::uint_type() {
+    return _dm->uint_type();
 }
 
-yama::type yama::context::load_float() {
-    return _dm->load_float();
+yama::type yama::context::float_type() {
+    return _dm->float_type();
 }
 
-yama::type yama::context::load_bool() {
-    return _dm->load_bool();
+yama::type yama::context::bool_type() {
+    return _dm->bool_type();
 }
 
-yama::type yama::context::load_char() {
-    return _dm->load_char();
+yama::type yama::context::char_type() {
+    return _dm->char_type();
+}
+
+yama::type yama::context::type_type() {
+    return _dm->type_type();
 }
 
 std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
@@ -125,63 +129,65 @@ yama::object_ref yama::context::clone_ref(borrowed_ref x) {
 }
 
 std::optional<yama::object_ref> yama::context::clone_ref(std::optional<borrowed_ref> x) {
-    return
-        x
-        ? std::make_optional(clone_ref(*x))
-        : std::nullopt;
+    if (!x) return std::nullopt;
+    return clone_ref(*x);
 }
 
 yama::canonical_ref yama::context::new_none() {
     return canonical_ref{
-        .t = load_none(),
+        .t = none_type(),
         .v{ .i = 0 },
     };
 }
 
 yama::canonical_ref yama::context::new_int(int_t v) {
     return canonical_ref{
-        .t = load_int(),
+        .t = int_type(),
         .v{ .i = v },
     };
 }
 
 yama::canonical_ref yama::context::new_uint(uint_t v) {
     return canonical_ref{
-        .t = load_uint(),
+        .t = uint_type(),
         .v{ .ui = v },
     };
 }
 
 yama::canonical_ref yama::context::new_float(float_t v) {
     return canonical_ref{
-        .t = load_float(),
+        .t = float_type(),
         .v{ .f = v },
     };
 }
 
 yama::canonical_ref yama::context::new_bool(bool_t v) {
     return canonical_ref{
-        .t = load_bool(),
+        .t = bool_type(),
         .v{ .b = v },
     };
 }
 
 yama::canonical_ref yama::context::new_char(char_t v) {
     return canonical_ref{
-        .t = load_char(),
+        .t = char_type(),
         .v{ .c = v },
     };
 }
 
+yama::canonical_ref yama::context::new_type(type v) {
+    return canonical_ref{
+        .t = type_type(),
+        .v{ .t = v },
+    };
+}
+
 std::optional<yama::canonical_ref> yama::context::new_fn(type f) {
-    canonical_ref result{
+    if (!is_function(f.kind())) return std::nullopt;
+    return canonical_ref{
         .t = f,
         .v{ .i = 0 },
     };
-    return
-        is_function(f.kind())
-        ? std::make_optional(result)
-        : std::nullopt;
 }
 
 size_t yama::context::panics() noexcept {
@@ -281,6 +287,10 @@ yama::cmd_status yama::context::put_char(local_t x, char_t v) {
     return put(x, new_char(v));
 }
 
+yama::cmd_status yama::context::put_type(local_t x, type v) {
+    return put(x, new_type(v));
+}
+
 yama::cmd_status yama::context::put_fn(local_t x, type f) {
     return _put_fn(x, f);
 }
@@ -288,6 +298,11 @@ yama::cmd_status yama::context::put_fn(local_t x, type f) {
 yama::cmd_status yama::context::put_const(local_t x, const_t c) {
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Ko(c));
     return _put_const(x, c);
+}
+
+yama::cmd_status yama::context::put_type_const(local_t x, const_t c) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Kt(c));
+    return _put_type_const(x, c);
 }
 
 yama::cmd_status yama::context::put_arg(local_t x, arg_t arg) {
@@ -522,9 +537,16 @@ std::string yama::context::_fmt_R(local_t x) {
 
 std::string yama::context::_fmt_Ko(const_t x) {
     return
-        _has_curr_type()
+        _has_curr_type() // <- current call has consts for us to use
         ? std::format("Ko({})={}", x, consts().fmt_const(x))
         : std::format("Ko({})=*error*", x);
+}
+
+std::string yama::context::_fmt_Kt(const_t x) {
+    return
+        _has_curr_type() // <- current call has consts for us to use
+        ? std::format("Kt({})={}", x, consts().fmt_const(x))
+        : std::format("Kt({})=*error*", x);
 }
 
 std::string yama::context::_fmt_Arg(arg_t x) {
@@ -610,8 +632,8 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     }
     return _put(x,
         [&]() -> canonical_ref {
-            const auto& cc = consts();
             static_assert(const_types == 7);
+            const auto& cc = consts();
             if (const auto r = cc.get<int_const>(c))                return new_int(*r);
             else if (const auto r = cc.get<uint_const>(c))          return new_uint(*r);
             else if (const auto r = cc.get<float_const>(c))         return new_float(*r);
@@ -646,6 +668,66 @@ bool yama::context::_put_const_err_c_is_not_object_constant(const_t c) {
     }
     _panic(
         "error: panic from attempt to load object constant from constant index {}, but the constant is not an object constant!",
+        c);
+    return true;
+}
+
+yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
+    static_assert(
+        []() constexpr -> bool {
+            static_assert(yama::const_types == 7); // reminder
+            return
+                !yama::is_type_const(yama::int_const) &&
+                !yama::is_type_const(yama::uint_const) &&
+                !yama::is_type_const(yama::float_const) &&
+                !yama::is_type_const(yama::bool_const) &&
+                !yama::is_type_const(yama::char_const) &&
+                yama::is_type_const(yama::primitive_type_const) &&
+                yama::is_type_const(yama::function_type_const);
+        }());
+    if (_put_type_const_err_in_user_call_frame()) {
+        return cmd_status::init(false);
+    }
+    if (_put_type_const_err_c_out_of_bounds(c)) {
+        return cmd_status::init(false);
+    }
+    if (_put_type_const_err_c_is_not_type_constant(c)) {
+        return cmd_status::init(false);
+    }
+    return _put(x, new_type(
+        [&]() -> type {
+            static_assert(const_types == 7);
+            const auto& cc = consts();
+            if (const auto r = cc.get<primitive_type_const>(c))     return r.value();
+            else if (const auto r = cc.get<function_type_const>(c)) return r.value();
+            else                                                    YAMA_DEADEND;
+            return none_type(); // dummy
+        }()));
+}
+
+bool yama::context::_put_type_const_err_in_user_call_frame() {
+    if (!is_user()) return false;
+    _panic(
+        "error: panic from attempt to load type constant from the user call frame!");
+    return true;
+}
+
+bool yama::context::_put_type_const_err_c_out_of_bounds(const_t c) {
+    if (c < consts().size()) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from out-of-bounds constant index {}!",
+        c);
+    return true;
+}
+
+bool yama::context::_put_type_const_err_c_is_not_type_constant(const_t c) {
+    if (is_type_const(consts().const_type(c).value())) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from constant index {}, but the constant is not a type constant!",
         c);
     return true;
 }
@@ -893,7 +975,7 @@ yama::bc::instr yama::context::_bcode_fetch_instr() {
 
 void yama::context::_bcode_exec_instr(bc::instr x) {
     YAMA_LOG(dbg(), bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
-    static_assert(bc::opcodes == 12);
+    static_assert(bc::opcodes == 13);
     switch (x.opc) {
     case bc::opcode::noop:
     {
@@ -913,6 +995,11 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
     case bc::opcode::put_const:
     {
         if (put_const(_maybe_newtop(x.A), x.B).bad()) return;
+    }
+    break;
+    case bc::opcode::put_type_const:
+    {
+        if (put_type_const(_maybe_newtop(x.A), x.B).bad()) return;
     }
     break;
     case bc::opcode::put_arg:

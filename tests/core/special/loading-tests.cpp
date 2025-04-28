@@ -129,7 +129,6 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
         .add_primitive_type("b0"_str, {}, yama::ptype::bool0)
         .add_function_type(
             "b1"_str, decltype(a_consts)(a_consts),
-            {},
             yama::make_callsig_info({}, 5), // ie. fn() -> b0
             10,
             yama::noop_call_fn);
@@ -519,7 +518,6 @@ TEST_F(LoadingTests, Fail_KindMismatch) {
         .add_primitive_type("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
         .add_function_type(
             "b"_str, decltype(b_consts)(b_consts),
-            { "a"_str },
             yama::make_callsig_info({ 0 }, 0),
             10,
             yama::noop_call_fn)
@@ -579,13 +577,11 @@ TEST_F(LoadingTests, Fail_CallSigMismatch) {
     mf
         .add_function_type(
             "a"_str, decltype(a_consts)(a_consts),
-            { "a"_str },
             decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
             10,
             yama::noop_call_fn)
         .add_function_type(
             "b"_str, decltype(b_consts)(b_consts),
-            { "a"_str },
             decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
             10,
             yama::noop_call_fn)
