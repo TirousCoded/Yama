@@ -180,6 +180,7 @@ namespace yama {
         compile_invalid_local_var,
         compile_invalid_param_list,
         compile_nonassignable_expr,
+        compile_nonconstexpr_expr,
         compile_not_in_loop,
         compile_no_return_stmt,
         compile_malformed_literal,
@@ -244,7 +245,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 68);
+        static_assert(dsignals == 69);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -265,6 +266,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_invalid_local_var);
             _YAMA_ENTRY_(compile_invalid_param_list);
             _YAMA_ENTRY_(compile_nonassignable_expr);
+            _YAMA_ENTRY_(compile_nonconstexpr_expr);
             _YAMA_ENTRY_(compile_not_in_loop);
             _YAMA_ENTRY_(compile_no_return_stmt);
             _YAMA_ENTRY_(compile_malformed_literal);

@@ -730,6 +730,7 @@ fn f() {
 //          - Float
 //          - Bool
 //          - Char
+//          - Type
 //
 //      - None default initializes to the stateless None object
 //      - Int default initializes to 0
@@ -737,6 +738,7 @@ fn f() {
 //      - Float default initializes to 0.0
 //      - Bool default initializes to false
 //      - Char default initializes to '\0'
+//      - Type default initializes to yama:None type object
 //
 //      - functions default initialize to their sole stateless object
 // 
@@ -746,6 +748,7 @@ fn f() {
 //      - Float is non-callable
 //      - Bool is non-callable
 //      - Char is non-callable
+//      - Type is non-callable
 // 
 //      - functions are callable (obviously)
 //
@@ -768,6 +771,7 @@ fn f() {
     var a4: Float;
     var a5: Bool;
     var a6: Char;
+    var a7: Type;
 }
 
 )";
@@ -996,6 +1000,40 @@ fn f() -> Char {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// default init Type
+
+TEST_F(CompilationTests, General_DefaultInit_Type) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() -> Type {
+    var a: Type; // default inits a
+    return a;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Type");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_type(ctx->none_type()));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // default init function
 
 TEST_F(CompilationTests, General_DefaultInit_Fn) {
@@ -1137,6 +1175,24 @@ TEST_F(CompilationTests, General_Char_IsNonCallable) {
 
 fn f() {
     'a'(); // not callable
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+// Type is non-callable
+
+TEST_F(CompilationTests, General_Type_IsNonCallable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    None(); // not callable
 }
 
 )";
@@ -2367,7 +2423,21 @@ fn f() -> 100 { // <- '100' is valid crvalue, but is not yama:Type nor fn type
 TEST_F(CompilationTests, TypeSpecifier_Fail_ExprIsNonConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn g() -> Type {
+    return None;
+}
+
+fn f() -> g() { // <- valid Type value, but not constexpr
+    //
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
 
@@ -3767,6 +3837,8 @@ TEST_F(CompilationTests, FunctionDecl_Fail_IfParamTypesAreNotObjectTypes) {
 
 TEST_F(CompilationTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
     ASSERT_TRUE(ready);
+    // TODO: what do we do w/ this test + semantic?
+    // TODO: will Yama even EVER have non-object types? or is this distinction meaningless?
 
     // TODO: stub until we add non-object types
 }
@@ -4757,10 +4829,10 @@ static_assert(yama::kinds == 2); // reminder
 // 
 //      - assignability & assignment behaviour:
 // 
-//          primitive type      illegal                             (non-assignable)
-//          fn type             illegal                             (non-assignable)
-//          parameter           illegal                             (non-assignable)
-//          local var           assigns local var                   (assignable)
+//          primitive type      illegal                 (non-assignable)
+//          fn type             illegal                 (non-assignable)
+//          parameter           illegal                 (non-assignable)
+//          local var           assigns local var       (assignable)
 // 
 //      - constexpr status:
 // 
@@ -4768,9 +4840,6 @@ static_assert(yama::kinds == 2); // reminder
 //          fn type             constexpr
 //          parameter           non-constexpr
 //          local var           non-constexpr
-//
-//      - illegal to compute value of non-fn type outside of type specifier
-//          * TODO: remove this later
 
 // IMPORTANT:
 //      below 'IdentifierExpr_Compute_[KIND]Type' tests do the following:
@@ -4783,7 +4852,43 @@ static_assert(yama::kinds == 2); // reminder
 TEST_F(CompilationTests, IdentifierExpr_Compute_PrimitiveType) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() -> Type {
+    return yama:Int; // w/ qualifier
+}
+
+fn g() -> Type {
+    return Int; // w/out qualifier
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(g->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Type");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:Type");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*g).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_type(ctx->int_type()));
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_type(ctx->int_type()));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 // compute value of fn type reference
@@ -5165,26 +5270,6 @@ fn g() {} // <- not declared until AFTER first reference to it
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// TODO: remove this later (also maybe remove dsignal value too)
-
-// illegal reference to non-fn type outside of type spec
-
-TEST_F(CompilationTests, IdentifierExpr_Fail_RefsNonFnTypeOutsideOfTypeSpec) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a = Int; // 'Int' is not a fn type
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_not_an_expr), 1);
-}
-
 // illegal reference to undeclared name
 
 TEST_F(CompilationTests, IdentifierExpr_Fail_RefsUndeclaredName) {
@@ -5267,7 +5352,17 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    Int = Int; // 'Int' is not assignable
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
 // fn type identifier expr is non-assignable
@@ -5352,7 +5447,33 @@ fn f() -> Int {
 TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(Int)' MUST be constexpr
+    const(Int);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 // fn type identifier expr is constexpr
@@ -5360,7 +5481,35 @@ TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_ConstExpr) {
 TEST_F(CompilationTests, IdentifierExpr_FnType_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn g() {}
+
+fn f() {
+    // enforce 'const(g)' MUST be constexpr
+    const(g);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 // parameter identifier expr is non-constexpr
@@ -5368,7 +5517,17 @@ TEST_F(CompilationTests, IdentifierExpr_FnType_ConstExpr) {
 TEST_F(CompilationTests, IdentifierExpr_Param_NonConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f(a: Int) {
+    const(a);
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
 // local var identifier expr is non-constexpr
@@ -5376,7 +5535,18 @@ TEST_F(CompilationTests, IdentifierExpr_Param_NonConstExpr) {
 TEST_F(CompilationTests, IdentifierExpr_LocalVar_NonConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    var a: Int = 0;
+    const(a);
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
 
@@ -5523,7 +5693,33 @@ fn f() {
 TEST_F(CompilationTests, IntLiteralExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(10)' MUST be constexpr
+    const(10);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 
@@ -5631,17 +5827,46 @@ fn f() {
 TEST_F(CompilationTests, UIntLiteralExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(10u)' MUST be constexpr
+    const(10u);
 }
 
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+
+// TODO: not 100% sure how I feel about floats being constexpr, w/ me feeling that
+//       later, when we add more complex operations in constexprs, that floats should
+//       probably be excluded, restricted more-or-less only to literals for constants
 
 // Float literal expr
 //
 //      - returns a Float value specified by a literal, including inf/nan keywords
 // 
 //      - non-assignable
-//      - non-constexpr
-//          * TODO: look into changing this later
+//      - constexpr
 // 
 //      - out-of-bounds Float literals resolve to inf/-inf values
 
@@ -5833,12 +6058,38 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// Float literal is non-constexpr
+// Float literal is constexpr
 
-TEST_F(CompilationTests, FloatLiteralExpr_NonConstExpr) {
+TEST_F(CompilationTests, FloatLiteralExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(3.14159)' MUST be constexpr
+    const(3.14159);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 
@@ -5910,7 +6161,33 @@ fn f() {
 TEST_F(CompilationTests, BoolLiteralExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(true)' MUST be constexpr
+    const(true);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 
@@ -6096,7 +6373,33 @@ fn f() {
 TEST_F(CompilationTests, CharLiteralExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const('y')' MUST be constexpr
+    const('y');
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
 
@@ -6390,6 +6693,211 @@ fn f() {
 TEST_F(CompilationTests, CallExpr_NonConstExpr) {
     ASSERT_TRUE(ready);
 
-    // TODO: stub
+    std::string txt = R"(
+
+fn g(a, b: Int) -> Int { return 0; }
+
+fn f() {
+    const(g(3, 2));
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+
+// constexpr guarantee expr
+//
+//      - given some form 'const(x)', where x is a crvalue, the constexpr
+//        guarantee expr evaluates x, returning its result
+//          * this expr exists to enforce that an expr must be constexpr
+// 
+//      - non-assignable
+//      - constexpr
+//
+//      - illegal if x is not constexpr
+//
+//      - illegal if multiple or zero args are provided for x
+
+// basic usage
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn g() {}
+
+fn f0() {
+    observeInt(const(10));
+    observeUInt(const(10u));
+    observeBool(const(true));
+    observeChar(const('y'));
+}
+
+fn f1() -> g {
+    return const(g);
+}
+
+fn f2() -> Type {
+    return const(Int);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto g = dm->load("a:g"_str);
+    const auto f0 = dm->load("a:f0"_str);
+    const auto f1 = dm->load("a:f1"_str);
+    const auto f2 = dm->load("a:f2"_str);
+    ASSERT_TRUE(g);
+    ASSERT_TRUE(f0);
+    ASSERT_TRUE(f1);
+    ASSERT_TRUE(f2);
+
+    ASSERT_EQ(g->kind(), yama::kind::function);
+    ASSERT_EQ(f0->kind(), yama::kind::function);
+    ASSERT_EQ(f1->kind(), yama::kind::function);
+    ASSERT_EQ(f2->kind(), yama::kind::function);
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f0->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f1->callsig().value().fmt(), "fn() -> a:g");
+    ASSERT_EQ(f2->callsig().value().fmt(), "fn() -> yama:Type");
+
+    ASSERT_TRUE(ctx->push_fn(*f0).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f1).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f2).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_fn(*g).value());
+    EXPECT_EQ(ctx->local(2).value(), ctx->new_type(ctx->int_type()));
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    expected.observe_uint(10);
+    expected.observe_bool(true);
+    expected.observe_char(U'y');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// constexpr guarantee expr is non-assignable
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // can't really test 'const(x)' w/ an assignable x as it's a crvalue,
+    // not an lvalue
+    const(3) = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// constexpr guarantee expr is constexpr
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(10)' MUST be constexpr
+    var a: Int = const(const(10));
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal due to non-constexpr subexpr
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_SubExprNotAConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = 10;
+    const(a); // expr 'a' is not constexpr!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal due to too many args
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_Args_TooMany) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    const(3, 10);
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// illegal due to too few args
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_Args_TooFew) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    const();
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 

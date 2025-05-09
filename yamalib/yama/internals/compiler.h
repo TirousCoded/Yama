@@ -14,10 +14,13 @@
 #include "env.h"
 #include "ast.h"
 #include "error_reporter.h"
+#include "codegen_target.h"
 #include "csymtab.h"
 #include "ctypesys.h"
 #include "ctype_resolver.h"
+#include "constexpr_solver.h"
 #include "const_table_populator.h"
+#include "register_stk.h"
 #include "first_pass.h"
 #include "second_pass.h"
 
@@ -38,6 +41,7 @@ namespace yama::internal {
         specifier_provider sp;
         ctypesys types;
         ctype_resolver resolver;
+        constexpr_solver solver;
 
         std::vector<res<translation_unit>> units;
 
@@ -59,6 +63,7 @@ namespace yama::internal {
         bool second_pass(translation_unit& unit);
 
         void push_new_unit(const res<translation_unit>& unit);
+        void resolve_and_solve();
     };
 
 
@@ -69,10 +74,12 @@ namespace yama::internal {
         const taul::source_code src;
         import_path src_path;
 
-        error_reporter er;
+        error_reporter err;
+        codegen_target cgt;
         csymtab_group syms;
         ctypesys_local types;
         const_table_populator ctp;
+        register_stk rs;
         first_pass fp;
         second_pass sp;
 

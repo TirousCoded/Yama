@@ -10,7 +10,8 @@ yama::internal::compiler::compiler(const std::shared_ptr<debug>& dbg, domain_dat
     dd(dd),
     sp(),
     types(*this),
-    resolver(*this) {}
+    resolver(*this),
+    solver(*this) {}
 
 bool yama::internal::compiler::compile(const taul::source_code& src, const import_path& src_path) {
     push_new_unit(make_res<translation_unit>(*this, taul::source_code(src), src_path));
@@ -34,7 +35,7 @@ bool yama::internal::compiler::first_passes() {
 }
 
 bool yama::internal::compiler::second_passes() {
-    resolver.resolve(); // <- before doing second passes
+    resolve_and_solve(); // before doing second passes
     bool success = true;
     for (const auto& unit : units) {
         if (second_pass(*unit)) continue;
@@ -46,6 +47,7 @@ bool yama::internal::compiler::second_passes() {
 void yama::internal::compiler::cleanup() {
     types.cleanup();
     resolver.cleanup();
+    solver.cleanup();
     units.clear();
 }
 
@@ -61,14 +63,21 @@ void yama::internal::compiler::push_new_unit(const res<translation_unit>& unit) 
     units.push_back(unit);
 }
 
+void yama::internal::compiler::resolve_and_solve() {
+    resolver.resolve();
+    solver.solve(); // only after resolving
+}
+
 yama::internal::translation_unit::translation_unit(compiler& cs, taul::source_code&& src, const import_path& src_path)
     : cs(cs),
     src(std::forward<taul::source_code>(src)),
     src_path(src_path),
-    er(*this),
+    err(*this),
+    cgt(*this),
     syms(),
     types(*this),
     ctp(*this),
+    rs(*this),
     ast(),
     fp(*this),
     sp(*this) {}
@@ -76,7 +85,7 @@ yama::internal::translation_unit::translation_unit(compiler& cs, taul::source_co
 bool yama::internal::translation_unit::first_pass() {
     if (!parse_ast()) return false;
     root().accept(fp);
-    return er.good();
+    return err.good();
 }
 
 bool yama::internal::translation_unit::second_pass() {
@@ -91,7 +100,7 @@ bool yama::internal::translation_unit::second_pass() {
 bool yama::internal::translation_unit::parse_ast() {
     const auto result = ast_parser().parse(src);
     if (const auto syntax_error = result.syntax_error) {
-        er.error(
+        err.error(
             *syntax_error,
             dsignal::compile_syntax_error,
             "syntax error!");
@@ -104,7 +113,7 @@ bool yama::internal::translation_unit::parse_ast() {
 }
 
 bool yama::internal::translation_unit::upload() {
-    if (er.is_fatal()) return false;
+    if (err.is_fatal()) return false;
     return cs->dd->importer.upload_compiled_module(src_path, make_res<module_info>(output.done()));
 }
 

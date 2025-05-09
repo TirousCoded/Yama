@@ -79,6 +79,7 @@ lexer section:
     FALSE                           : 'false' EOW ;
     INF                             : 'inf' EOW ;
     NAN                             : 'nan' EOW ;
+    CONST                           : 'const' EOW ;
     VAR                             : 'var' EOW ;
     FN                              : 'fn' EOW ;
     IF                              : 'if' EOW ;
@@ -192,9 +193,10 @@ parser section:
     #       we need it to be able to handle multiple *suffixes* in a row
 
     precedence Expr                 : Expr Args                         # call expr
+                                    | CONST Args                        # constexpr guarantee expr
                                     | PrimaryExpr                       # primary expr
                                     ;
-                                    
+
     PrimaryExpr                     : IDENTIFIER ( COLON IDENTIFIER )?  # identifier expr
                                     | Lit                               # literal expr
                                     ;

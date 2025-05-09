@@ -645,6 +645,7 @@ namespace yama::internal {
     public:
         std::shared_ptr<ast_PrimaryExpr> primary;
         std::vector<res<ast_Args>> args;
+        bool has_const_kw = false;
         bool is_assign_stmt_lvalue = false;
 
 
@@ -661,6 +662,7 @@ namespace yama::internal {
 
 
     protected:
+        void do_give(taul::token x) override final;
         void do_give(res<ast_PrimaryExpr> x) override final;
         void do_give(res<ast_Args> x) override final;
     };
@@ -847,11 +849,16 @@ namespace yama::internal {
     class ast_Args final : public ast_node {
     public:
         std::weak_ptr<ast_Expr> expr; // back-ref to the expr this Args exists within
+        size_t index = 0; // the index of this node in suffix array of expr
         std::vector<res<ast_Expr>> args;
 
 
         inline ast_Args(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
+
+
+        res<ast_Expr> get_expr() const noexcept;
+        bool is_constexpr_guarantee_expr_args() const noexcept;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_Args>(shared_from_this())); }

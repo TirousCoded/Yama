@@ -53,12 +53,13 @@ TEST_F(YamaGramTests, GrammarLoads) {
 TEST_F(YamaGramTests, LPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->nonsupport_lprs(), 35);
+    EXPECT_EQ(gram->nonsupport_lprs(), 36);
 
     ASSERT_TRUE(gram->has_lpr("TRUE"_str));
     ASSERT_TRUE(gram->has_lpr("FALSE"_str));
     ASSERT_TRUE(gram->has_lpr("INF"_str));
     ASSERT_TRUE(gram->has_lpr("NAN"_str));
+    ASSERT_TRUE(gram->has_lpr("CONST"_str));
     ASSERT_TRUE(gram->has_lpr("VAR"_str));
     ASSERT_TRUE(gram->has_lpr("FN"_str));
     ASSERT_TRUE(gram->has_lpr("IF"_str));
@@ -73,6 +74,7 @@ TEST_F(YamaGramTests, LPRs) {
     EXPECT_EQ(gram->lpr("FALSE"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("INF"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("NAN"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("CONST"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("VAR"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("FN"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("IF"_str)->qualifier(), taul::qualifier::none);
@@ -217,6 +219,7 @@ _KW_TEST(TRUE, "true", 4);
 _KW_TEST(FALSE, "false", 5);
 _KW_TEST(INF, "inf", 3);
 _KW_TEST_ALT(NAN, "nan", 3);
+_KW_TEST(CONST, "const", 5);
 _KW_TEST(VAR, "var", 3);
 _KW_TEST(FN, "fn", 2);
 _KW_TEST(IF, "if", 2);
@@ -1099,6 +1102,7 @@ TEST_F(YamaGramTests, Chunk_Empty) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1155,6 +1159,7 @@ TEST_F(YamaGramTests, Chunk_NonEmpty) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1191,6 +1196,7 @@ TEST_F(YamaGramTests, Decl_ImportDecl) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1220,6 +1226,7 @@ TEST_F(YamaGramTests, Decl_VarDecl) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1251,6 +1258,7 @@ TEST_F(YamaGramTests, Decl_FnDecl) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1277,6 +1285,7 @@ TEST_F(YamaGramTests, ImportDecl_Unnamed_NoRelativePath) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1310,6 +1319,7 @@ TEST_F(YamaGramTests, ImportDecl_Unnamed_RelativePath) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1339,6 +1349,7 @@ TEST_F(YamaGramTests, ImportDecl_Named_NoRelativePath) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1375,6 +1386,7 @@ TEST_F(YamaGramTests, ImportDecl_Named_RelativePath) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1401,6 +1413,7 @@ TEST_F(YamaGramTests, RelativePath) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1427,6 +1440,7 @@ TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_NoAssign) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1454,6 +1468,7 @@ TEST_F(YamaGramTests, VarDecl_TypeAnnot_NoAssign) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1482,6 +1497,7 @@ TEST_F(YamaGramTests, VarDecl_NoTypeAnnot_Assign) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1511,6 +1527,7 @@ TEST_F(YamaGramTests, VarDecl_TypeAnnot_Assign) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1539,6 +1556,7 @@ TEST_F(YamaGramTests, FnDecl) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1563,6 +1581,7 @@ TEST_F(YamaGramTests, CallSig_NoParams_NoResult) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1589,6 +1608,7 @@ TEST_F(YamaGramTests, CallSig_NoParams_Result) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1623,6 +1643,7 @@ TEST_F(YamaGramTests, CallSig_Params_NoResult) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1659,6 +1680,7 @@ TEST_F(YamaGramTests, CallSig_Params_Result) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1679,6 +1701,7 @@ TEST_F(YamaGramTests, ParamDecl_NoTypeAnnot) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1703,6 +1726,7 @@ TEST_F(YamaGramTests, ParamDecl_TypeAnnot) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1728,6 +1752,7 @@ TEST_F(YamaGramTests, Result) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1752,6 +1777,7 @@ TEST_F(YamaGramTests, Block_NoStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1781,6 +1807,7 @@ TEST_F(YamaGramTests, Block_Stmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1807,6 +1834,7 @@ TEST_F(YamaGramTests, Stmt_Decl) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1834,6 +1862,7 @@ TEST_F(YamaGramTests, Stmt_ExprStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1866,6 +1895,7 @@ TEST_F(YamaGramTests, Stmt_IfStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1894,6 +1924,7 @@ TEST_F(YamaGramTests, Stmt_LoopStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1921,6 +1952,7 @@ TEST_F(YamaGramTests, Stmt_BreakStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1948,6 +1980,7 @@ TEST_F(YamaGramTests, Stmt_ContinueStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1975,6 +2008,7 @@ TEST_F(YamaGramTests, Stmt_ReturnStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -1999,6 +2033,7 @@ TEST_F(YamaGramTests, ExprStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2025,6 +2060,7 @@ TEST_F(YamaGramTests, ExprStmt_AssignStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2054,6 +2090,7 @@ TEST_F(YamaGramTests, IfStmt_NoElse) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2087,6 +2124,7 @@ TEST_F(YamaGramTests, IfStmt_Else) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2120,6 +2158,7 @@ TEST_F(YamaGramTests, IfStmt_ElseIf) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2145,6 +2184,7 @@ TEST_F(YamaGramTests, LoopStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2169,6 +2209,7 @@ TEST_F(YamaGramTests, BreakStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2193,6 +2234,7 @@ TEST_F(YamaGramTests, ContinueStmt) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2217,6 +2259,7 @@ TEST_F(YamaGramTests, ReturnStmt_NoExpr) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2243,6 +2286,7 @@ TEST_F(YamaGramTests, ReturnStmt_Expr) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2266,6 +2310,7 @@ TEST_F(YamaGramTests, Expr_PrimaryExpr) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2290,6 +2335,32 @@ TEST_F(YamaGramTests, Expr_CallExpr) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, Expr_ConstExprGuaranteeExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "const()"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.lexical("CONST"_str, cntr, 5);
+        pattern.loose_syntactic("Args"_str, cntr, 2);
+    }
+
+    auto result = parser->parse("Expr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2316,6 +2387,7 @@ TEST_F(YamaGramTests, Expr_SuffixNesting) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2339,6 +2411,7 @@ TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr_NoQualifier) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2364,6 +2437,7 @@ TEST_F(YamaGramTests, PrimaryExpr_IdentifierExpr_Qualifier) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2387,6 +2461,7 @@ TEST_F(YamaGramTests, PrimaryExpr_LitExpr) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2410,6 +2485,7 @@ TEST_F(YamaGramTests, Lit_IntLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2433,6 +2509,7 @@ TEST_F(YamaGramTests, Lit_UIntLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2456,6 +2533,7 @@ TEST_F(YamaGramTests, Lit_FloatLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2479,6 +2557,7 @@ TEST_F(YamaGramTests, Lit_BoolLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2502,6 +2581,7 @@ TEST_F(YamaGramTests, Lit_CharLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2525,6 +2605,7 @@ TEST_F(YamaGramTests, IntLit_Dec) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2548,6 +2629,7 @@ TEST_F(YamaGramTests, IntLit_Hex) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2571,6 +2653,7 @@ TEST_F(YamaGramTests, IntLit_Bin) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2594,6 +2677,7 @@ TEST_F(YamaGramTests, UIntLit_Dec) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2617,6 +2701,7 @@ TEST_F(YamaGramTests, UIntLit_Hex) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2640,6 +2725,7 @@ TEST_F(YamaGramTests, UIntLit_Bin) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2663,6 +2749,7 @@ TEST_F(YamaGramTests, FloatLit_FLOAT) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2686,6 +2773,7 @@ TEST_F(YamaGramTests, FloatLit_INF) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2709,6 +2797,7 @@ TEST_F(YamaGramTests, FloatLit_NAN) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2732,6 +2821,7 @@ TEST_F(YamaGramTests, BoolLit_True) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2755,6 +2845,7 @@ TEST_F(YamaGramTests, BoolLit_False) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2778,6 +2869,7 @@ TEST_F(YamaGramTests, CharLit) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2803,6 +2895,7 @@ TEST_F(YamaGramTests, Assign) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2827,6 +2920,7 @@ TEST_F(YamaGramTests, Args_Empty) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2858,6 +2952,7 @@ TEST_F(YamaGramTests, Args_NonEmpty) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2883,6 +2978,7 @@ TEST_F(YamaGramTests, TypeAnnot) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
@@ -2906,6 +3002,7 @@ TEST_F(YamaGramTests, TypeSpec) {
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
+    ASSERT_TRUE(result.is_sealed());
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 

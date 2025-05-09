@@ -32,7 +32,7 @@ namespace yama::internal {
 
     class compiler_services;
 
-    class ctype_resolver;
+    class constexpr_solver;
 
     class ctype;
     class cmodule;
@@ -55,8 +55,8 @@ namespace yama::internal {
         kind kind() const noexcept;
 
         size_t param_count() const noexcept;
-        std::optional<ctype> param_type(size_t param_index, const ctype_resolver& resolver) const;
-        std::optional<ctype> return_type(const ctype_resolver& resolver) const;
+        std::optional<ctype> param_type(size_t param_index, const constexpr_solver& solver) const;
+        std::optional<ctype> return_type(const constexpr_solver& solver) const;
 
         inline bool operator==(const ctype& other) const noexcept { return fullname() == other.fullname(); }
         inline bool operator!=(const ctype& other) const noexcept { return !(*this == other); }
@@ -200,6 +200,7 @@ namespace yama::internal {
         ctype float_type();
         ctype bool_type();
         ctype char_type();
+        ctype type_type();
 
 
     private:
@@ -207,7 +208,7 @@ namespace yama::internal {
 
 
         struct _builtin_cache final {
-            ctype none, int0, uint, float0, bool0, char0;
+            ctype none, int0, uint, float0, bool0, char0, type;
         };
         std::optional<_builtin_cache> _builtin_cache_v;
 

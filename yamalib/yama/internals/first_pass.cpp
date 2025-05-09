@@ -62,12 +62,16 @@ void yama::internal::first_pass::visit_begin(res<ast_ReturnStmt> x) {
     _cfg.return_stmt();
 }
 
+void yama::internal::first_pass::visit_begin(res<ast_Expr> x) {
+    _enter_expr(x);
+}
+
 void yama::internal::first_pass::visit_begin(res<ast_PrimaryExpr> x) {
     tu->cs->resolver.add(*tu, *x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_TypeSpec> x) {
-    tu->cs->resolver.add(*tu, *x);
+    _enter_type_spec(x);
 }
 
 void yama::internal::first_pass::visit_end(res<ast_FnDecl> x) {
@@ -87,6 +91,14 @@ void yama::internal::first_pass::visit_end(res<ast_LoopStmt> x) {
     _cfg.end_loop_stmt();
 }
 
+void yama::internal::first_pass::visit_end(res<ast_Expr> x) {
+    _exit_expr(x);
+}
+
+void yama::internal::first_pass::visit_end(res<ast_TypeSpec> x) {
+    _exit_type_spec(x);
+}
+
 void yama::internal::first_pass::_add_csymtab(res<ast_node> x) {
     tu->syms.acquire(x->id); // begin new block
 }
@@ -95,7 +107,7 @@ void yama::internal::first_pass::_implicitly_import_yama_module() {
     YAMA_ASSERT(_import_decls_are_legal());
     const auto import_path = tu->cs->sp.pull_ip(tu->e(), "yama"_str);
     if (!import_path) {
-        tu->er.error(
+        tu->err.error(
             tu->root(),
             dsignal::compile_invalid_env,
             "compilation env has no available 'yama' module!");
@@ -106,7 +118,7 @@ void yama::internal::first_pass::_implicitly_import_yama_module() {
         _insert_importdecl_for_implicit_yama_import(*import_path);
     }
     else {
-        tu->er.error(
+        tu->err.error(
             tu->root(),
             dsignal::compile_invalid_env,
             "compilation env has no available 'yama' module!");
@@ -118,7 +130,7 @@ void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportD
         const str import_path_s = str(x->path(tu->src).value());
         const auto import_path = tu->cs->sp.pull_ip(tu->e(), import_path_s);
         if (!import_path) {
-            tu->er.error(
+            tu->err.error(
                 *x,
                 dsignal::compile_invalid_import,
                 "cannot import {}!",
@@ -130,7 +142,7 @@ void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportD
             _insert_importdecl(x, *import_path);
         }
         else {
-            tu->er.error(
+            tu->err.error(
                 *x,
                 dsignal::compile_invalid_import,
                 "cannot import {}!",
@@ -139,13 +151,13 @@ void yama::internal::first_pass::_explicitly_import_module(const res<ast_ImportD
     }
     else {
         if (_is_in_fn()) {
-            tu->er.error(
+            tu->err.error(
                 *x,
                 dsignal::compile_misplaced_import,
                 "illegal local import!");
         }
         else {
-            tu->er.error(
+            tu->err.error(
                 *x,
                 dsignal::compile_misplaced_import,
                 "illegal import appearing after first type decl!");
@@ -171,7 +183,7 @@ void yama::internal::first_pass::_insert_importdecl(res<ast_ImportDecl> x, const
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_name_conflict,
             // add the 'import' bit as only other import decls can conflict w/ this
@@ -198,7 +210,7 @@ void yama::internal::first_pass::_insert_importdecl_for_implicit_yama_import(con
     YAMA_ASSERT(!no_table_found);
     // NOTE: below failure should NEVER occur, but is here for *completeness*
     if (!success) { // if failed insert, report name conflict
-        tu->er.error(
+        tu->err.error(
             tu->root(),
             dsignal::compile_name_conflict,
             // add the 'import' bit as only other import decls can conflict w/ this
@@ -225,7 +237,7 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -276,7 +288,7 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -297,7 +309,7 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     };
     // report if no type annotation
     if (!sym.type) {
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_invalid_param_list,
             "param {} has no type annotation!",
@@ -314,7 +326,7 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
         &no_table_found);
     YAMA_ASSERT(!no_table_found);
     if (!success) { // if failed insert, report name conflict
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
@@ -335,14 +347,14 @@ yama::internal::first_pass::_fn_decl& yama::internal::first_pass::_current_fn() 
 void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
     const auto name = x->name.str(tu->src);
     if (_is_in_fn()) {
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_local_fn,
             "illegal local fn {}!",
             name);
     }
     if (x->callsig->params.size() > 24) {
-        tu->er.error(
+        tu->err.error(
             *x,
             dsignal::compile_invalid_param_list,
             "illegal fn {} with >24 params!",
@@ -381,7 +393,7 @@ bool yama::internal::first_pass::_import_decls_are_legal() const noexcept {
 
 void yama::internal::first_pass::_check_var_is_local(res<ast_VarDecl> x) {
     if (_is_in_fn()) return;
-    tu->er.error(
+    tu->err.error(
         *x,
         dsignal::compile_nonlocal_var,
         "illegal non-local var {}!",
@@ -390,7 +402,7 @@ void yama::internal::first_pass::_check_var_is_local(res<ast_VarDecl> x) {
 
 void yama::internal::first_pass::_check_break_is_in_loop_stmt(const res<ast_BreakStmt>& x) {
     if (_cfg.is_in_loop()) return;
-    tu->er.error(
+    tu->err.error(
         *x,
         dsignal::compile_not_in_loop,
         "cannot use break outside of a loop stmt!");
@@ -398,9 +410,71 @@ void yama::internal::first_pass::_check_break_is_in_loop_stmt(const res<ast_Brea
 
 void yama::internal::first_pass::_check_continue_is_in_loop_stmt(const res<ast_ContinueStmt>& x) {
     if (_cfg.is_in_loop()) return;
-    tu->er.error(
+    tu->err.error(
         *x,
         dsignal::compile_not_in_loop,
         "cannot use continue outside of a loop stmt!");
+}
+
+void yama::internal::first_pass::_enter_expr(const res<ast_Expr>& x) {
+    const bool can_output_constexpr = !already_in_solved_constexpr && !x->is_assign_stmt_lvalue;
+    if (x->has_const_kw) {
+        YAMA_ASSERT(x->args.size() != 0);
+        if (size_t args = x->args[0]->args.size(); args != 1) {
+            tu->err.error(
+                *x,
+                dsignal::compile_wrong_arg_count,
+                "constexpr guarantee expr given {} args, but expected {}!",
+                args,
+                1);
+        }
+        else if (can_output_constexpr) {
+            // to add the constexpr guarantee expr itself, we want to add
+            // the ast_Args suffix used by it
+            tu->cs->solver.add(*tu, *x->args[0], true);
+        }
+        already_in_solved_constexpr.push();
+    }
+    else {
+        YAMA_ASSERT(x->primary);
+        // if primary expr is not a ref to a param or local var, then add it as a constexpr
+        auto _should_be_constexpr = [&]() -> bool {
+            if (x->primary->name) {
+                const auto name = x->primary->name->str(tu->src);
+                const auto symbol = tu->syms.lookup(*x, name, x->low_pos());
+                return
+                    symbol &&
+                    !symbol->is<param_csym>() &&
+                    !symbol->is<var_csym>();
+            }
+            else if (x->primary->lit) {
+                return true;
+            }
+            else return false;
+            };
+        if (can_output_constexpr && _should_be_constexpr()) {
+            // TODO: we don't have any suffixes at the moment that can be constexpr,
+            //       except for constexpr guarantee expr
+            if (x->args.size() == 0) {
+                tu->cs->solver.add(*tu, *x, false);
+            }
+            else {
+                tu->cs->solver.add(*tu, *x->primary, false);
+            }
+        }
+    }
+}
+
+void yama::internal::first_pass::_exit_expr(const res<ast_Expr>& x) {
+    already_in_solved_constexpr.pop_if(x->has_const_kw);
+}
+
+void yama::internal::first_pass::_enter_type_spec(const res<ast_TypeSpec>& x) {
+    tu->cs->solver.add(*tu, deref_assert(x->expr), true);
+    already_in_solved_constexpr.push();
+}
+
+void yama::internal::first_pass::_exit_type_spec(const res<ast_TypeSpec>& x) {
+    already_in_solved_constexpr.pop();
 }
 

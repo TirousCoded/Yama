@@ -274,7 +274,7 @@ namespace yama {
         cmd_status put_int(local_t x, int_t v);
         cmd_status put_uint(local_t x, uint_t v);
         cmd_status put_float(local_t x, float_t v);
-        cmd_status put_bool(local_t x, bool v);
+        cmd_status put_bool(local_t x, bool_t v);
         cmd_status put_char(local_t x, char_t v);
         cmd_status put_type(local_t x, type v);
 
@@ -282,7 +282,7 @@ namespace yama {
         inline cmd_status push_int(int_t v) { return put_int(newtop, v); }
         inline cmd_status push_uint(uint_t v) { return put_uint(newtop, v); }
         inline cmd_status push_float(float_t v) { return put_float(newtop, v); }
-        inline cmd_status push_bool(bool v) { return put_bool(newtop, v); }
+        inline cmd_status push_bool(bool_t v) { return put_bool(newtop, v); }
         inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
         inline cmd_status push_type(type v) { return put_type(newtop, v); }
 

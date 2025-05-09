@@ -654,13 +654,20 @@ void yama::internal::ast_Expr::accept(ast_visitor& x) {
     x.visit_end(res<ast_Expr>(shared_from_this()));
 }
 
+void yama::internal::ast_Expr::do_give(taul::token x) {
+    if (x.is_normal() && x.lpr->name() == "CONST"_str) {
+        has_const_kw = true;
+    }
+}
+
 void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
     primary = x;
 }
 
 void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
-    args.push_back(x);
     x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
+    x->index = args.size();
+    args.push_back(x);
 }
 
 std::optional<std::string> yama::internal::ast_PrimaryExpr::fmt_name(const taul::source_code& src) const {
@@ -852,6 +859,14 @@ void yama::internal::ast_Assign::accept(ast_visitor& x) {
 
 void yama::internal::ast_Assign::do_give(res<ast_Expr> x) {
     expr = x;
+}
+
+yama::res<yama::internal::ast_Expr> yama::internal::ast_Args::get_expr() const noexcept {
+    return res(expr.lock());
+}
+
+bool yama::internal::ast_Args::is_constexpr_guarantee_expr_args() const noexcept {
+    return index == 0 && get_expr()->has_const_kw;
 }
 
 void yama::internal::ast_Args::fmt(ast_formatter& x) {

@@ -24,9 +24,6 @@ namespace yama::internal {
         const_table_populator(translation_unit& tu);
 
 
-        void bind(yama::type_info& new_target);
-
-
         // TODO: I'm not 100% on our whole thing of not avoiding duplicates for floats, so maybe
         //       scrap that in the future, or make it configurable or something
 
@@ -34,7 +31,7 @@ namespace yama::internal {
         //            the same parcel env as the compilation, so it's super straightforward
         //            to keep names correct
 
-        // these methods populate the current code gen target w/ constants, populating it in a
+        // these methods populate the current codegen target w/ constants, populating it in a
         // pull-based manner, w/ these methods also doing things like trying to avoid having
         // duplicates
 
@@ -56,11 +53,6 @@ namespace yama::internal {
 
 
     private:
-        yama::type_info* _target = nullptr;
-
-        inline auto& _get_target() noexcept { return yama::deref_assert(_target); }
-
-
         template<const_type C>
         inline std::optional<const_t> _find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept;
     };

@@ -57,12 +57,13 @@ size_t yama::internal::ctype::param_count() const noexcept {
     }
 }
 
-std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, const ctype_resolver& resolver) const {
+std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, const constexpr_solver& solver) const {
     if (_csymtab_entry_not_typeinf()) {
         if (!_csymtab_entry()->is<fn_csym>()) return std::nullopt;
         const auto& our_csym = _csymtab_entry()->as<fn_csym>();
         if (param_index >= our_csym.params.size()) return std::nullopt; // out-of-bounds
-        return resolver[our_csym.params[param_index].type];
+        const auto& our_param_type = deref_assert(our_csym.params[param_index].type);
+        return solver[our_param_type.expr.get()].value().to_type();
     }
     else {
         const auto& our_params = deref_assert(_typeinf().callsig()).params;
@@ -73,12 +74,16 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
     }
 }
 
-std::optional<yama::internal::ctype> yama::internal::ctype::return_type(const ctype_resolver& resolver) const {
+std::optional<yama::internal::ctype> yama::internal::ctype::return_type(const constexpr_solver& solver) const {
     if (_csymtab_entry_not_typeinf()) {
-        return
-            _csymtab_entry()->is<fn_csym>()
-            ? resolver[_csymtab_entry()->as<fn_csym>().return_type]
-            : std::nullopt;
+        if (_csymtab_entry()->is<fn_csym>()) {
+            if (const auto return_type = _csymtab_entry()->as<fn_csym>().return_type) {
+                if (const auto result = solver[return_type->expr.get()] ) {
+                    return result->to_type();
+                }
+            }
+        }
+        return std::nullopt;
     }
     else {
         const auto& our_const = deref_assert(_typeinf().callsig()).ret;
@@ -341,6 +346,10 @@ yama::internal::ctype yama::internal::ctypesys_local::char_type() {
     return _get_builtin_cache().char0;
 }
 
+yama::internal::ctype yama::internal::ctypesys_local::type_type() {
+    return _get_builtin_cache().type;
+}
+
 const yama::internal::ctypesys_local::_builtin_cache& yama::internal::ctypesys_local::_get_builtin_cache() {
     if (!_builtin_cache_v) {
         auto load_builtin = [&](const str& x) -> ctype {
@@ -353,6 +362,7 @@ const yama::internal::ctypesys_local::_builtin_cache& yama::internal::ctypesys_l
             .float0 = load_builtin("yama:Float"_str),
             .bool0  = load_builtin("yama:Bool"_str),
             .char0  = load_builtin("yama:Char"_str),
+            .type   = load_builtin("yama:Type"_str),
         };
     }
     return _builtin_cache_v.value();
