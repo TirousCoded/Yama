@@ -12,6 +12,10 @@
 namespace yama::internal {
 
 
+    class compiler;
+    class translation_unit;
+
+
     // IMPORTANT: symbols are mutable so that during compilation their state can be ammended
     //            w/ new info if it wasn't available previously
 
@@ -70,16 +74,19 @@ namespace yama::internal {
 
         static constexpr lookup_proc lp = lookup_proc::normal;
     };
-    
+
     struct var_csym final {
         const ast_TypeSpec* annot_type; // type specified by annotation, if any
-        std::optional<ctype> deduced_type; // type deduced from initializer, if any (resolved in second_pass)
+        const ast_Expr* initializer; // explicit initializer, if any
         std::optional<size_t> reg; // register index of local var (resolved in second_pass)
 
 
         // var_csym is recognized as a 'local var symbol' only once reg has been assigned
 
-        inline bool is_localvar() const noexcept { return reg.has_value(); }
+        //inline bool is_localvar() const noexcept { return reg.has_value(); }
+
+
+        std::optional<ctype> get_type(compiler& cs) const; // returns deduced type of the var, if any
 
 
         static constexpr lookup_proc lp = lookup_proc::normal;
@@ -89,6 +96,9 @@ namespace yama::internal {
         struct param final {
             str name;
             const ast_TypeSpec* type;
+            
+            
+            std::optional<ctype> get_type(compiler& cs) const;
         };
 
 
@@ -105,7 +115,10 @@ namespace yama::internal {
         std::optional<bool> is_none_returning;
 
 
-        std::string fmt_params(const taul::source_code& src) const;
+        std::optional<ctype> get_return_type(compiler& cs) const;
+        ctype get_return_type_or_none(translation_unit& tu) const;
+
+        std::string fmt_params(compiler& cs) const;
 
 
         static constexpr lookup_proc lp = lookup_proc::normal;
@@ -113,6 +126,9 @@ namespace yama::internal {
 
     struct param_csym final {
         const ast_TypeSpec* type;
+
+
+        std::optional<ctype> get_type(compiler& cs) const;
 
 
         static constexpr lookup_proc lp = lookup_proc::normal;
@@ -163,7 +179,7 @@ namespace yama::internal {
         }
 
 
-        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
     };
 
     // csymtab defines Yama's internal repr for a symbol table
@@ -202,7 +218,7 @@ namespace yama::internal {
                 : nullptr;
         }
 
-        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
 
 
     private:
@@ -295,7 +311,7 @@ namespace yama::internal {
             return false;
         }
 
-        std::string fmt(const taul::source_code& src, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
 
 
     private:

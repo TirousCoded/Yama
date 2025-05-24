@@ -356,6 +356,27 @@ namespace yama::bc {
     static_assert(alignof(instr) <= alignof(int32_t));
 
 
+    struct sym final {
+        size_t  index;  // the index of the instr this symbol
+        str     origin; // the string (eg. a file path) describing where the contents referenced by the symbol resides
+        size_t  ch;     // the character number (indexes from 1)
+        size_t  ln;     // the line number (indexes from 1)
+
+
+        bool operator==(const sym&) const noexcept = default;
+
+
+        std::string fmt() const;
+    };
+}
+
+
+YAMA_SETUP_FORMAT(yama::bc::sym, x.fmt());
+
+
+namespace yama::bc {
+
+
     class code;
     class syms;
 
@@ -443,7 +464,9 @@ namespace yama::bc {
         using label_id_t = uint32_t;
 
 
-        code_writer() = default;
+        code_writer(); // no bound autosym target
+        code_writer(syms& autosym_target);
+
         code_writer(const code_writer&) = delete;
         code_writer(code_writer&&) noexcept = default;
         ~code_writer() noexcept = default;
@@ -503,10 +526,22 @@ namespace yama::bc {
         std::optional<code> done(bool* label_not_found = nullptr);
 
 
+        // TODO: this has not been unit tested
+
+        // the 'autosym' feature of code_writer to be specified a sym to place automatically
+        // after every instr write, if a syms target is available to output to
+
+        void autosym(str origin, size_t ch, size_t ln);
+        void autosym(const sym& x); // index field is replaced during sym output
+        void drop_autosym() noexcept; // fails quietly if no autosym is bound
+
+
     private:
         code _result;
         std::unordered_map<label_id_t, size_t> _label_id_map; // maps label IDs to instr indices
         std::unordered_map<size_t, label_id_t> _label_id_user_map; // maps branch instr indices to IDs of labels they use
+        syms* _syms;
+        std::optional<sym> _autosym;
 
 
         size_t _write_pos() const noexcept;
@@ -518,28 +553,9 @@ namespace yama::bc {
 
         void _reset();
         bool _resolve(bool* label_not_found);
+
+        void _autosym_output();
     };
-
-
-    struct sym final {
-        size_t  index;  // the index of the instr this symbol
-        str     origin; // the string (eg. a file path) describing where the contents referenced by the symbol resides
-        size_t  ch;     // the character number (indexes from 1)
-        size_t  ln;     // the line number (indexes from 1)
-
-
-        bool operator==(const sym&) const noexcept = default;
-
-
-        std::string fmt() const;
-    };
-}
-
-
-YAMA_SETUP_FORMAT(yama::bc::sym, x.fmt());
-
-
-namespace yama::bc {
 
 
     class syms final {

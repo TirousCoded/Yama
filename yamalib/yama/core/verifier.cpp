@@ -1117,10 +1117,11 @@ bool yama::verifier::_verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type
 bool yama::verifier::_verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
     const auto callobj_type = _R_type(block, args_index);
-    const auto callobj_type_index = _find_type_const(subject, callobj_type).value();
-    const auto callobj_type_kind = subject.consts.kind(callobj_type_index).value();
-    const auto callobj_is_legal_call_object_type = is_callable(callobj_type_kind);
-    if (!callobj_is_legal_call_object_type) {
+    // TODO: if we ever get a crash from there being a way to have callobj_type be a type which
+    //       (A) is not in the const table, and (B) is not a built-in primitive type, then we'll
+    //       need to revise below code, maybe putting _find_type_kind in an if stmt
+    const bool callobj_is_legal_callobj_type = is_callable(_find_type_kind(subject, callobj_type).value());
+    if (!callobj_is_legal_callobj_type) {
         YAMA_RAISE(dbg(), dsignal::verif_ArgRs_illegal_callobj);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -1240,8 +1241,24 @@ yama::str yama::verifier::_none_type() {
     return "yama:None"_str;
 }
 
+yama::str yama::verifier::_int_type() {
+    return "yama:Int"_str;
+}
+
+yama::str yama::verifier::_uint_type() {
+    return "yama:UInt"_str;
+}
+
+yama::str yama::verifier::_float_type() {
+    return "yama:Float"_str;
+}
+
 yama::str yama::verifier::_bool_type() {
     return "yama:Bool"_str;
+}
+
+yama::str yama::verifier::_char_type() {
+    return "yama:Char"_str;
 }
 
 yama::str yama::verifier::_type_type() {
@@ -1262,11 +1279,11 @@ yama::str yama::verifier::_R_call_object_type_return_type(const type_info& subje
 yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
     static_assert(const_types == 7);
     switch (subject.consts.const_type(index).value()) {
-    case const_type::int0:          return "yama:Int"_str;                                  break;
-    case const_type::uint:          return "yama:UInt"_str;                                 break;
-    case const_type::float0:        return "yama:Float"_str;                                break;
-    case const_type::bool0:         return "yama:Bool"_str;                                 break;
-    case const_type::char0:         return "yama:Char"_str;                                 break;
+    case const_type::int0:          return _int_type();                                     break;
+    case const_type::uint:          return _uint_type();                                    break;
+    case const_type::float0:        return _float_type();                                   break;
+    case const_type::bool0:         return _bool_type();                                    break;
+    case const_type::char0:         return _char_type();                                    break;
     case const_type::function_type: return subject.consts.qualified_name(index).value();    break;
     default:                        YAMA_DEADEND;                                           break;
     }
@@ -1294,6 +1311,18 @@ bool yama::verifier::_jump_dest_in_bounds(const bc::code& bcode, size_t i, int16
     return _calc_jump_dest(i, sBx) < bcode.count();
 }
 
+bool yama::verifier::_is_builtin_prim_type(const str& x) {
+    static_assert(ptypes == 7); // reminder
+    return
+        x == _none_type() ||
+        x == _int_type() ||
+        x == _uint_type() ||
+        x == _float_type() ||
+        x == _bool_type() ||
+        x == _char_type() ||
+        x == _type_type();
+}
+
 std::optional<size_t> yama::verifier::_find_type_const(const type_info& subject, const str& x) {
     // NOTE: need to do a O(n)-time search of the constant table
     for (size_t i = 0; i < subject.consts.size(); i++) {
@@ -1302,6 +1331,12 @@ std::optional<size_t> yama::verifier::_find_type_const(const type_info& subject,
         }
     }
     return std::nullopt;
+}
+
+std::optional<yama::kind> yama::verifier::_find_type_kind(const type_info& subject, const str& x) {
+    if (const auto index = _find_type_const(subject, x))    return subject.consts.kind(index.value());
+    else if (_is_builtin_prim_type(x))                      return kind::primitive;
+    else                                                    return std::nullopt;
 }
 
 bool yama::verifier::_is_newtop(uint8_t x) const noexcept {

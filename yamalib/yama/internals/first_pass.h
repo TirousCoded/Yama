@@ -9,7 +9,6 @@
 #include "ast.h"
 #include "csymtab.h"
 #include "ctypesys.h"
-#include "ctype_resolver.h"
 #include "error_reporter.h"
 #include "cfg_analyzer.h"
 
@@ -37,6 +36,9 @@ namespace yama::internal {
     //                  * types declared in code shadow extern ones
     //              - resolution of explicitly annotated type info
     //                  * type deduction is performed in second pass
+    //          - build expr analyzer data
+    //              - acknowledging expr nodes
+    //              - adding roots
     //          - detect non-local vars
     //          - detect local fns
     //          - detect unannotated trailing param decls (ie. the 'd' in 'a, b, c: Int, d')
@@ -47,8 +49,6 @@ namespace yama::internal {
     //            punctuated by return stmts, and which do not enter infinite loops
     //              * only control-flow analysis part is done here, w/ type info requiring part,
     //                and error raising, being deferred to second_pass
-    //          - detect constexpr guarantee exprs w/ >1 args
-    //          - detect constexpr guarantee exprs w/ <1 args
 
 
     class first_pass final : public ast_visitor {
@@ -70,7 +70,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_Result> x) override final;
         void visit_begin(res<ast_Block> x) override final;
         //void visit_begin(res<ast_Stmt> x) override final;
-        //void visit_begin(res<ast_ExprStmt> x) override final;
+        void visit_begin(res<ast_ExprStmt> x) override final;
         void visit_begin(res<ast_IfStmt> x) override final;
         void visit_begin(res<ast_LoopStmt> x) override final;
         void visit_begin(res<ast_BreakStmt> x) override final;
@@ -84,8 +84,8 @@ namespace yama::internal {
         //void visit_begin(res<ast_FloatLit> x) override final;
         //void visit_begin(res<ast_BoolLit> x) override final;
         //void visit_begin(res<ast_CharLit> x) override final;
-        //void visit_begin(res<ast_Assign> x) override final;
-        //void visit_begin(res<ast_Args> x) override final;
+        void visit_begin(res<ast_Assign> x) override final;
+        void visit_begin(res<ast_Args> x) override final;
         //void visit_begin(res<ast_TypeAnnot> x) override final;
         void visit_begin(res<ast_TypeSpec> x) override final;
 
@@ -106,7 +106,7 @@ namespace yama::internal {
         //void visit_end(res<ast_BreakStmt> x) override final;
         //void visit_end(res<ast_ContinueStmt> x) override final;
         //void visit_end(res<ast_ReturnStmt> x) override final;
-        void visit_end(res<ast_Expr> x) override final;
+        //void visit_end(res<ast_Expr> x) override final;
         //void visit_end(res<ast_PrimaryExpr> x) override final;
         //void visit_end(res<ast_Lit> x) override final;
         //void visit_end(res<ast_IntLit> x) override final;
@@ -117,7 +117,7 @@ namespace yama::internal {
         //void visit_end(res<ast_Assign> x) override final;
         //void visit_end(res<ast_Args> x) override final;
         //void visit_end(res<ast_TypeAnnot> x) override final;
-        void visit_end(res<ast_TypeSpec> x) override final;
+        //void visit_end(res<ast_TypeSpec> x) override final;
 
 
     private:
@@ -135,6 +135,12 @@ namespace yama::internal {
         void _insert_vardecl(res<ast_VarDecl> x);
         bool _insert_fndecl(res<ast_FnDecl> x);
         void _insert_paramdecl(res<ast_ParamDecl> x);
+        var_csym _mk_var_csym(const ast_VarDecl& x);
+        fn_csym _mk_fn_csym(const ast_FnDecl& x);
+        param_csym _mk_param_csym(const ast_ParamDecl& x);
+        taul::source_pos _vardecl_intro_point(const ast_VarDecl& x);
+        taul::source_pos _fndecl_intro_point(const ast_FnDecl& x);
+        taul::source_pos _paramdecl_intro_point(const ast_ParamDecl& x);
 
 
         // this stack maintains what fn decl is currently being evaluated
@@ -143,11 +149,9 @@ namespace yama::internal {
         struct _fn_decl final {
             res<ast_FnDecl> node;
             std::shared_ptr<csymtab_entry> symbol; // nullptr if error
-            size_t param_index = 0; // used to help params discern their index
-
-
-            inline size_t next_param_index() { return param_index++; }
         };
+
+        // TODO: maybe replace std::vector w/ scope_stack
 
         std::vector<_fn_decl> _fn_decl_stk;
 
@@ -170,19 +174,6 @@ namespace yama::internal {
         void _check_var_is_local(res<ast_VarDecl> x);
         void _check_break_is_in_loop_stmt(const res<ast_BreakStmt>& x);
         void _check_continue_is_in_loop_stmt(const res<ast_ContinueStmt>& x);
-
-
-        // things like constexpr guarantee exprs nested within other constexpr
-        // guarantee exprs need-not be added to the solver, as the outer-most
-        // one will cover the inner ones
-
-        scope_counter already_in_solved_constexpr;
-
-
-        void _enter_expr(const res<ast_Expr>& x);
-        void _exit_expr(const res<ast_Expr>& x);
-        void _enter_type_spec(const res<ast_TypeSpec>& x);
-        void _exit_type_spec(const res<ast_TypeSpec>& x);
     };
 }
 

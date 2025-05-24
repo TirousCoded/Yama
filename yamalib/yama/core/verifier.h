@@ -164,10 +164,16 @@ namespace yama {
         bool _verify_program_counter_valid_after_fallthrough(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         
         _reg_set_state _make_entrypoint_initial_reg_set(const type_info& subject);
-        
+
+        static_assert(ptypes == 7); // reminder
         str _none_type();
+        str _int_type();
+        str _uint_type();
+        str _float_type();
         str _bool_type();
+        str _char_type();
         str _type_type();
+
         str _R_type(const _cfg_block& block, size_t index);
         str _R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index);
         str _Ko_type(const type_info& subject, size_t index);
@@ -176,7 +182,10 @@ namespace yama {
         size_t _calc_jump_dest(size_t i, int16_t sBx);
         bool _jump_dest_in_bounds(const bc::code& bcode, size_t i, int16_t sBx);
 
+        bool _is_builtin_prim_type(const str& x);
+
         std::optional<size_t> _find_type_const(const type_info& subject, const str& x);
+        std::optional<kind> _find_type_kind(const type_info& subject, const str& x);
 
         bool _is_newtop(uint8_t x) const noexcept;
 

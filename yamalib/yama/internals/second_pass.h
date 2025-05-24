@@ -3,7 +3,6 @@
 #pragma once
 
 
-
 #include "safeptr.h"
 #include "scope_counter.h"
 #include "scope_stack.h"
@@ -102,9 +101,10 @@ namespace yama::internal {
         // IMPORTANT: if fatal error, the compilation is not to perform further codegen
 
 
-        std::optional<ctype> _query_type(const ast_TypeSpec* x);
-        ctype _query_type_or_none(const ast_TypeSpec* x);
+        cvalue _default_init_rvalue(const ctype& type);
 
+
+        // TODO: maybe delete later
 
         // for ast_ExprStmt(s) w/ an assignment, the expr on the left-hand-side of this assignment
         // is called the 'lvalue', and is special in that normal eval semantics don't apply to it

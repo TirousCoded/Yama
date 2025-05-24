@@ -32,8 +32,6 @@ namespace yama::internal {
 
     class compiler_services;
 
-    class constexpr_solver;
-
     class ctype;
     class cmodule;
     class ctypesys;
@@ -55,8 +53,8 @@ namespace yama::internal {
         kind kind() const noexcept;
 
         size_t param_count() const noexcept;
-        std::optional<ctype> param_type(size_t param_index, const constexpr_solver& solver) const;
-        std::optional<ctype> return_type(const constexpr_solver& solver) const;
+        std::optional<ctype> param_type(size_t param_index, compiler& cs) const;
+        std::optional<ctype> return_type(compiler& cs) const;
 
         inline bool operator==(const ctype& other) const noexcept { return fullname() == other.fullname(); }
         inline bool operator!=(const ctype& other) const noexcept { return !(*this == other); }

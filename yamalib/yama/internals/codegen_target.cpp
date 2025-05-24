@@ -6,7 +6,8 @@
 
 
 yama::internal::codegen_target::codegen_target(translation_unit& tu)
-    : tu(tu) {}
+    : tu(tu),
+    cw(syms) {}
 
 bool yama::internal::codegen_target::has_target() const noexcept {
     return (bool)_current_target;
@@ -61,10 +62,25 @@ void yama::internal::codegen_target::upload_target(const ast_node& where) {
     syms = bc::syms{};
 }
 
-void yama::internal::codegen_target::add_sym(taul::source_pos pos) {
+void yama::internal::codegen_target::autosym(taul::source_pos pos) {
     YAMA_ASSERT(has_target());
     const auto loc = tu->src.location_at(pos);
-    syms.add(cw.count() - 1, loc.origin, loc.chr, loc.line);
+    cw.autosym(loc.origin, loc.chr, loc.line);
+}
+
+void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cvalue& x) {
+    if (x.is(tu->types.none_type()))            tu->cgt.cw.add_put_none(reg);
+    else if (const auto v = x.as<int_t>())      tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_int(*v)));
+    else if (const auto v = x.as<uint_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_uint(*v)));
+    else if (const auto v = x.as<float_t>())    tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_float(*v)));
+    else if (const auto v = x.as<bool_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_bool(*v)));
+    else if (const auto v = x.as<char_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_char(*v)));
+    else if (const auto v = x.to_type()) {
+        if (v->kind() == kind::primitive)       tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)));
+        else if (v->kind() == kind::function)   tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)));
+        else                                    YAMA_DEADEND;
+    }
+    else                                        YAMA_DEADEND;
 }
 
 void yama::internal::codegen_target::_apply_bcode_to_target(const ast_node& where) {

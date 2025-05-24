@@ -1811,6 +1811,8 @@ fn ddd() {
 //            unqualified name, unqualified name access of this name will select the
 //            type defined in Yama code, shadowing the extern type
 // 
+//          - qualified identifier exprs bypass shadowing
+// 
 //      - the different scopes decls have are as follows:
 // 
 //          - import decls exist in the global block, w/ their scope beginning/ending
@@ -1827,12 +1829,19 @@ fn ddd() {
 //                to the decl itself
 //          
 //          - parameter decls exist in the local block of their function's body,
-//            w/ their scope beginning/ending at the start/end of this block
+//            w/ their scope beginning immediately after their decl (which here includes
+//            the type annot bound to it, if any), and ending at the end of this block
+//              * this means parameter's type annot expr cannot reference the parameter
+// 
+//              * TODO: maybe expand tests for this to include success & shadowing
 // 
 //          - local var decls exist in the local block they are declared in,
 //            w/ their scope beginning immediately after their decl, and ending
 //            at the end of their block
+//              * this means local var's type annot expr cannot reference the local var
 //              * this means local var's init expr cannot reference the local var
+// 
+//              * TODO: maybe expand tests for this to include success & shadowing
 // 
 //      - dead code (ie. code not reachable from entrypoint) is still subject to
 //        error checking
@@ -2150,11 +2159,51 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// test to ensure impl properly impls parameter scope not starting until after the
+// decl itself, w/ this meaning that the type annot exprs of the parameter cannot
+// reference itself
+
+TEST_F(CompilationTests, DeclAndScope_ParamScopeBeginsWhenExpected_ForTypeAnnotExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+// param 'a' won't come into scope until at least 'd'
+
+fn f(a, b, c: a, d: Int) {}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
+}
+
+// test to ensure impl properly impls local var scope not starting until after the
+// decl itself, w/ this meaning that the type annot exprs of the local var cannot
+// reference itself
+
+TEST_F(CompilationTests, DeclAndScope_LocalVarScopeBeginsWhenExpected_ForTypeAnnotExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: a; // <- local var 'a' hasn't come into scope yet!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
+}
+
 // test to ensure impl properly impls local var scope not starting until after the
 // decl itself, w/ this meaning that the init exprs of the local var cannot reference
 // itself
 
-TEST_F(CompilationTests, DeclAndScope_LocalVarScopeBeginsWhenExpected) {
+TEST_F(CompilationTests, DeclAndScope_LocalVarScopeBeginsWhenExpected_ForInitExpr) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -5189,6 +5238,123 @@ fn f() {
     expected.observe_int(101);
     expected.observe_int(-21);
     expected.observe_int(101);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// qualified id expr bypasses shadowing by type defined in Yama code
+
+TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByTypeDefinedInYamaCode) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn observeInt(x: Int) {
+    //
+}
+
+fn f() {
+    a:observeInt(10); // bypasses shadowing
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// qualified id expr bypasses shadowing by parameter
+
+TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByParameter) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn g(observeInt: Int) {
+    a:observeInt(10); // bypasses shadowing
+}
+
+fn f() {
+    g(0);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// qualified id expr bypasses shadowing by local var
+
+TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByLocalVar) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import a: fns.abc;
+
+fn f() {
+    var observeInt: Int = 0;
+    a:observeInt(10); // bypasses shadowing
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(10);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 

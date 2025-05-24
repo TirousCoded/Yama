@@ -9,6 +9,7 @@
 #include "safeptr.h"
 #include "ast.h"
 #include "csymtab.h"
+#include "cvalue.h"
 
 
 namespace yama::internal {
@@ -44,8 +45,11 @@ namespace yama::internal {
         void upload_target(const ast_node& where); // uploads target to module, unbinding it
 
 
-        void add_sym(taul::source_pos pos); // call this AFTER cw.add_# method call
+        void autosym(taul::source_pos pos); // binds new cw autosym
         inline auto gen_label() noexcept { return _next_label++; } // used to gen code_writer label IDs
+
+
+        void add_cvalue_put_instr(uint8_t reg, const cvalue& x);
 
 
     private:

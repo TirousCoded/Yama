@@ -19,6 +19,10 @@
 namespace yama::internal {
 
 
+    class ctype;
+    class compiler;
+
+
     // quick-n'-dirty Yama syntax AST
 
     // later on we may clean-up/replace this w/ something more *official*
@@ -444,12 +448,17 @@ namespace yama::internal {
     
     class ast_ParamDecl final : public ast_node {
     public:
+        std::weak_ptr<ast_CallSig> callsig; // back-ref
+        size_t index = 0; // index of param in callsig
         taul::token name;
         std::shared_ptr<ast_TypeAnnot> type;
 
 
         inline ast_ParamDecl(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
+
+
+        res<ast_CallSig> get_callsig() const noexcept;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_ParamDecl>(shared_from_this())); }
@@ -464,11 +473,15 @@ namespace yama::internal {
     
     class ast_Result final : public ast_node {
     public:
+        std::weak_ptr<ast_CallSig> callsig; // back-ref
         std::shared_ptr<ast_TypeSpec> type;
 
 
         inline ast_Result(taul::source_pos pos, ast_id_t id)
             : ast_node(pos, id) {}
+
+
+        res<ast_CallSig> get_callsig() const noexcept;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_Result>(shared_from_this())); }
@@ -646,6 +659,7 @@ namespace yama::internal {
         std::shared_ptr<ast_PrimaryExpr> primary;
         std::vector<res<ast_Args>> args;
         bool has_const_kw = false;
+        bool is_type_spec_crvalue = false;
         bool is_assign_stmt_lvalue = false;
 
 
@@ -653,7 +667,7 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
-        std::optional<std::string> fmt_name(const taul::source_code& src) const;
+        std::optional<ctype> get_type(compiler& cs) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_Expr>(shared_from_this())); }
@@ -669,6 +683,7 @@ namespace yama::internal {
     
     class ast_PrimaryExpr final : public ast_node {
     public:
+        std::weak_ptr<ast_Expr> expr; // back-ref to the expr this PrimaryExpr exists within
         std::optional<taul::token> qualifier;
         std::optional<taul::token> name;
         std::shared_ptr<ast_Lit> lit;
@@ -678,11 +693,10 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
-        // TODO: maybe revise fmt_name if we add type args
+        std::optional<ctype> get_type(compiler& cs) const;
 
-        // fmt_name fmts name w/ or w/out qualifier
-
-        std::optional<std::string> fmt_name(const taul::source_code& src) const;
+        res<ast_Expr> get_expr() const noexcept;
+        std::optional<std::string> fmt_name(const taul::source_code& src) const; // fmts name w/ or w/out qualifier
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_PrimaryExpr>(shared_from_this())); }
@@ -857,6 +871,8 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
+        std::optional<ctype> get_type(compiler& cs) const;
+
         res<ast_Expr> get_expr() const noexcept;
         bool is_constexpr_guarantee_expr_args() const noexcept;
 
@@ -897,7 +913,7 @@ namespace yama::internal {
             : ast_node(pos, id) {}
 
 
-        std::optional<std::string> fmt_name(const taul::source_code& src) const;
+        std::optional<ctype> get_type(compiler& cs) const;
 
 
         inline void give_to(ast_node& target) override final { target.give(res<ast_TypeSpec>(shared_from_this())); }

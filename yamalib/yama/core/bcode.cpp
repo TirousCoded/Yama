@@ -242,75 +242,94 @@ std::string yama::bc::syms::fmt_sym(size_t index) const {
     }
 }
 
+yama::bc::code_writer::code_writer()
+    : _syms(nullptr) {}
+
+yama::bc::code_writer::code_writer(syms& autosym_target)
+    : _syms(&autosym_target) {}
+
 size_t yama::bc::code_writer::count() const noexcept {
     return _result.count();
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_noop() {
     _result.add_noop();
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_pop(uint8_t A) {
     _result.add_pop(A);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_put_none(uint8_t A, bool reinit) {
     _result.add_put_none(A, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_put_const(uint8_t A, uint8_t B, bool reinit) {
     _result.add_put_const(A, B, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_put_type_const(uint8_t A, uint8_t B, bool reinit) {
     _result.add_put_type_const(A, B, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_put_arg(uint8_t A, uint8_t B, bool reinit) {
     _result.add_put_arg(A, B, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_copy(uint8_t A, uint8_t B, bool reinit) {
     _result.add_copy(A, B, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_call(uint8_t A, uint8_t B, bool reinit) {
     _result.add_call(A, B, reinit);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_call_nr(uint8_t A) {
     _result.add_call_nr(A);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_ret(uint8_t A) {
     _result.add_ret(A);
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_jump(label_id_t label_id) {
     _bind_label_id_user(label_id);
     _result.add_jump(0); // stub
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_jump_true(uint8_t A, label_id_t label_id) {
     _bind_label_id_user(label_id);
     _result.add_jump_true(A, 0); // stub
+    _autosym_output();
     return *this;
 }
 
 yama::bc::code_writer& yama::bc::code_writer::add_jump_false(uint8_t A, label_id_t label_id) {
     _bind_label_id_user(label_id);
     _result.add_jump_false(A, 0); // stub
+    _autosym_output();
     return *this;
 }
 
@@ -326,6 +345,18 @@ std::optional<yama::bc::code> yama::bc::code_writer::done(bool* label_not_found)
         _reset();
     }
     return result;
+}
+
+void yama::bc::code_writer::autosym(str origin, size_t ch, size_t ln) {
+    autosym(sym{ .index = 0, .origin = origin, .ch = ch, .ln = ln });
+}
+
+void yama::bc::code_writer::autosym(const sym& x) {
+    _autosym = x;
+}
+
+void yama::bc::code_writer::drop_autosym() noexcept {
+    _autosym.reset();
 }
 
 size_t yama::bc::code_writer::_write_pos() const noexcept {
@@ -402,6 +433,13 @@ bool yama::bc::code_writer::_resolve(bool* label_not_found) {
         }
     }
     return true;
+}
+
+void yama::bc::code_writer::_autosym_output() {
+    if (_syms && _autosym) {
+        _autosym->index = count() - 1; // update index
+        _syms->add(*_autosym); // output copy
+    }
 }
 
 bool yama::bc::instr::operator==(const instr& other) const noexcept {

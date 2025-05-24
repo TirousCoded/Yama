@@ -117,10 +117,10 @@ yama::callsig_info yama::internal::const_table_populator::build_callsig_for_fn_t
     callsig_info result{};
     // resolve parameter types
     for (size_t i = 0; i < t.param_count(); i++) {
-        result.params.push_back(pull_type(t.param_type(i, tu->cs->solver).value()));
+        result.params.push_back(pull_type(t.param_type(i, *tu->cs).value()));
     }
     // resolve return type
-    result.ret = pull_type(tu->types.default_none(t.return_type(tu->cs->solver)));
+    result.ret = pull_type(tu->types.default_none(t.return_type(*tu->cs)));
     return result;
 }
 

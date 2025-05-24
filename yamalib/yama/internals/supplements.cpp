@@ -83,7 +83,7 @@ yama::module_info yama::internal::make_supplements() {
         mf.add_type(std::move(t));
         };
 
-#define _ADD_0IN1OUT_PROMPT_FN(name, return_type_short, return_type, parse_expr, put_fn) \
+#define _ADD_0IN1OUT_PROMPT_FN(name, return_type_short, return_type, parse_expr, put_fn, result_access_expr) \
 add_0in1out( \
     name, return_type, \
     [](context& ctx) { \
@@ -92,14 +92,14 @@ add_0in1out( \
             std::string input{}; \
             std::cin >> input; \
             if (const auto result = ( parse_expr )) { \
-                if (ctx. put_fn (yama::newtop, result.value().v).bad()) return; \
+                if (ctx. put_fn (yama::newtop, ( result_access_expr )).bad()) return; \
                 break; \
             } \
             std::cerr << "input invalid!\n"; \
         } \
         if (ctx.ret(0).bad()) return; \
     })
-
+    
 #define _ADD_1IN0OUT(name, param_type, expr, as_method) \
 add_1in0out( \
     name, param_type, \
@@ -151,13 +151,23 @@ _ADD_1IN1OUT("i" suffix, "yama:Int"_str, expr, as_int, put_int); \
 _ADD_1IN1OUT("u" suffix, "yama:UInt"_str, expr, as_uint, put_uint); \
 _ADD_1IN1OUT("c" suffix, "yama:Char"_str, expr, as_char, put_char)
 
+// below, 'COMMON_R' stands for 'common return type'
+
 #define _ADD_2IN1OUTS_COMMON_R(suffix, return_type, expr, put_fn) \
 _ADD_2IN1OUT("i" suffix, "yama:Int"_str, return_type, expr, as_int, put_fn); \
 _ADD_2IN1OUT("u" suffix, "yama:UInt"_str, return_type, expr, as_uint, put_fn); \
 _ADD_2IN1OUT("f" suffix, "yama:Float"_str, return_type, expr, as_float, put_fn); \
 _ADD_2IN1OUT("b" suffix, "yama:Bool"_str, return_type, expr, as_bool, put_fn); \
+_ADD_2IN1OUT("c" suffix, "yama:Char"_str, return_type, expr, as_char, put_fn); \
+_ADD_2IN1OUT("t" suffix, "yama:Type"_str, return_type, expr, as_type, put_fn)
+
+#define _ADD_2IN1OUTS_COMMON_R_IUFBC(suffix, return_type, expr, put_fn) \
+_ADD_2IN1OUT("i" suffix, "yama:Int"_str, return_type, expr, as_int, put_fn); \
+_ADD_2IN1OUT("u" suffix, "yama:UInt"_str, return_type, expr, as_uint, put_fn); \
+_ADD_2IN1OUT("f" suffix, "yama:Float"_str, return_type, expr, as_float, put_fn); \
+_ADD_2IN1OUT("b" suffix, "yama:Bool"_str, return_type, expr, as_bool, put_fn); \
 _ADD_2IN1OUT("c" suffix, "yama:Char"_str, return_type, expr, as_char, put_fn)
-    
+
 #define _ADD_2IN1OUTS(suffix, expr) \
 _ADD_2IN1OUT("i" suffix, "yama:Int"_str, "yama:Int"_str, expr, as_int, put_int); \
 _ADD_2IN1OUT("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr, as_uint, put_uint); \
@@ -188,10 +198,10 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     // comparison ops
     _ADD_2IN1OUTS_COMMON_R("eq"_str, "yama:Bool"_str, a == b, put_bool);
     _ADD_2IN1OUTS_COMMON_R("ne"_str, "yama:Bool"_str, a != b, put_bool);
-    _ADD_2IN1OUTS_COMMON_R("gt"_str, "yama:Bool"_str, a > b, put_bool);
-    _ADD_2IN1OUTS_COMMON_R("lt"_str, "yama:Bool"_str, a < b, put_bool);
-    _ADD_2IN1OUTS_COMMON_R("ge"_str, "yama:Bool"_str, a >= b, put_bool);
-    _ADD_2IN1OUTS_COMMON_R("le"_str, "yama:Bool"_str, a <= b, put_bool);
+    _ADD_2IN1OUTS_COMMON_R_IUFBC("gt"_str, "yama:Bool"_str, a > b, put_bool);
+    _ADD_2IN1OUTS_COMMON_R_IUFBC("lt"_str, "yama:Bool"_str, a < b, put_bool);
+    _ADD_2IN1OUTS_COMMON_R_IUFBC("ge"_str, "yama:Bool"_str, a >= b, put_bool);
+    _ADD_2IN1OUTS_COMMON_R_IUFBC("le"_str, "yama:Bool"_str, a <= b, put_bool);
 
     // arithmetic ops
     _ADD_2IN1OUTS_IUF("add"_str, a + b);
@@ -311,13 +321,15 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     _ADD_1IN0OUT("fprint"_str, "yama:Float"_str, (std::cerr << " > " << yama::fmt_float(a) << "\n"), as_float);
     _ADD_1IN0OUT("bprint"_str, "yama:Bool"_str, (std::cerr << " > " << yama::fmt_bool(a) << "\n"), as_bool);
     _ADD_1IN0OUT("cprint"_str, "yama:Char"_str, (std::cerr << " > " << yama::fmt_char(a) << "\n"), as_char);
+    _ADD_1IN0OUT("tprint"_str, "yama:Type"_str, (std::cerr << " > " << a.fmt() << "\n"), as_type);
 
     // prompt fns (which await valid user input)
-    _ADD_0IN1OUT_PROMPT_FN("iprompt"_str, "Int"_str, "yama:Int"_str, yama::parse_int(input), put_int);
-    _ADD_0IN1OUT_PROMPT_FN("uprompt"_str, "UInt"_str, "yama:UInt"_str, yama::parse_uint(input), put_uint);
-    _ADD_0IN1OUT_PROMPT_FN("fprompt"_str, "Float"_str, "yama:Float"_str, yama::parse_float(input), put_float);
-    _ADD_0IN1OUT_PROMPT_FN("bprompt"_str, "Bool"_str, "yama:Bool"_str, yama::parse_bool(input), put_bool);
-    _ADD_0IN1OUT_PROMPT_FN("cprompt"_str, "Char"_str, "yama:Char"_str, yama::parse_char(input), put_char);
+    _ADD_0IN1OUT_PROMPT_FN("iprompt"_str, "Int"_str, "yama:Int"_str, yama::parse_int(input), put_int, result.value().v);
+    _ADD_0IN1OUT_PROMPT_FN("uprompt"_str, "UInt"_str, "yama:UInt"_str, yama::parse_uint(input), put_uint, result.value().v);
+    _ADD_0IN1OUT_PROMPT_FN("fprompt"_str, "Float"_str, "yama:Float"_str, yama::parse_float(input), put_float, result.value().v);
+    _ADD_0IN1OUT_PROMPT_FN("bprompt"_str, "Bool"_str, "yama:Bool"_str, yama::parse_bool(input), put_bool, result.value().v);
+    _ADD_0IN1OUT_PROMPT_FN("cprompt"_str, "Char"_str, "yama:Char"_str, yama::parse_char(input), put_char, result.value().v);
+    _ADD_0IN1OUT_PROMPT_FN("tprompt"_str, "Type"_str, "yama:Type"_str, ctx.load(str(input)), put_type, result.value());
 
     // panic fn
     {
@@ -360,7 +372,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     mf.add_type(std::move(t)); \
 } (void)0
 
-#define _ADD_CONV_FNS(in_letter, in_type, in_as_method) \
+#define _ADD_CONV_FNS_IUFBC(in_letter, in_type, in_as_method) \
 _ADD_CONV_FN(in_letter, "i", in_type, "yama:Int"_str, yama::int_t, in_as_method, put_int); \
 _ADD_CONV_FN(in_letter, "u", in_type, "yama:UInt"_str, yama::uint_t, in_as_method, put_uint); \
 _ADD_CONV_FN(in_letter, "f", in_type, "yama:Float"_str, yama::float_t, in_as_method, put_float); \
@@ -368,11 +380,11 @@ _ADD_CONV_FN(in_letter, "b", in_type, "yama:Bool"_str, yama::bool_t, in_as_metho
 _ADD_CONV_FN(in_letter, "c", in_type, "yama:Char"_str, yama::char_t, in_as_method, put_char)
 
     // conversion fns
-    _ADD_CONV_FNS("i", "yama:Int"_str, as_int);
-    _ADD_CONV_FNS("u", "yama:UInt"_str, as_uint);
-    _ADD_CONV_FNS("f", "yama:Float"_str, as_float);
-    _ADD_CONV_FNS("b", "yama:Bool"_str, as_bool);
-    _ADD_CONV_FNS("c", "yama:Char"_str, as_char);
+    _ADD_CONV_FNS_IUFBC("i", "yama:Int"_str, as_int);
+    _ADD_CONV_FNS_IUFBC("u", "yama:UInt"_str, as_uint);
+    _ADD_CONV_FNS_IUFBC("f", "yama:Float"_str, as_float);
+    _ADD_CONV_FNS_IUFBC("b", "yama:Bool"_str, as_bool);
+    _ADD_CONV_FNS_IUFBC("c", "yama:Char"_str, as_char);
 
     return mf.done();
 }

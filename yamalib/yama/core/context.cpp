@@ -279,7 +279,7 @@ yama::cmd_status yama::context::put_float(local_t x, float_t v) {
     return put(x, new_float(v));
 }
 
-yama::cmd_status yama::context::put_bool(local_t x, bool v) {
+yama::cmd_status yama::context::put_bool(local_t x, bool_t v) {
     return put(x, new_bool(v));
 }
 

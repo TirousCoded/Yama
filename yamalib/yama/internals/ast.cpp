@@ -9,6 +9,8 @@
 
 #include "../core/yama_gram.h"
 
+#include "compiler.h"
+
 
 using namespace yama::string_literals;
 
@@ -338,11 +340,18 @@ void yama::internal::ast_CallSig::accept(ast_visitor& x) {
 }
 
 void yama::internal::ast_CallSig::do_give(res<ast_ParamDecl> x) {
+    x->callsig = std::static_pointer_cast<ast_CallSig>(shared_from_this());
+    x->index = params.size();
     params.push_back(x);
 }
 
 void yama::internal::ast_CallSig::do_give(res<ast_Result> x) {
+    x->callsig = std::static_pointer_cast<ast_CallSig>(shared_from_this());
     result = x;
+}
+
+yama::res<yama::internal::ast_CallSig> yama::internal::ast_ParamDecl::get_callsig() const noexcept {
+    return res(callsig.lock());
 }
 
 void yama::internal::ast_ParamDecl::fmt(ast_formatter& x) {
@@ -371,6 +380,10 @@ void yama::internal::ast_ParamDecl::do_give(taul::token x) {
 
 void yama::internal::ast_ParamDecl::do_give(res<ast_TypeAnnot> x) {
     type = x;
+}
+
+yama::res<yama::internal::ast_CallSig> yama::internal::ast_Result::get_callsig() const noexcept {
+    return res(callsig.lock());
 }
 
 void yama::internal::ast_Result::fmt(ast_formatter& x) {
@@ -626,8 +639,8 @@ void yama::internal::ast_ReturnStmt::do_give(res<ast_Expr> x) {
     expr = x;
 }
 
-std::optional<std::string> yama::internal::ast_Expr::fmt_name(const taul::source_code& src) const {
-    return primary ? primary->fmt_name(src) : std::nullopt;
+std::optional<yama::internal::ctype> yama::internal::ast_Expr::get_type(compiler& cs) const {
+    return cs.ea[*this].type;
 }
 
 void yama::internal::ast_Expr::fmt(ast_formatter& x) {
@@ -661,6 +674,7 @@ void yama::internal::ast_Expr::do_give(taul::token x) {
 }
 
 void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
+    x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
     primary = x;
 }
 
@@ -668,6 +682,14 @@ void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
     x->expr = std::static_pointer_cast<ast_Expr>(shared_from_this());
     x->index = args.size();
     args.push_back(x);
+}
+
+std::optional<yama::internal::ctype> yama::internal::ast_PrimaryExpr::get_type(compiler& cs) const {
+    return cs.ea[*this].type;
+}
+
+yama::res<yama::internal::ast_Expr> yama::internal::ast_PrimaryExpr::get_expr() const noexcept {
+    return res(expr.lock());
 }
 
 std::optional<std::string> yama::internal::ast_PrimaryExpr::fmt_name(const taul::source_code& src) const {
@@ -861,6 +883,10 @@ void yama::internal::ast_Assign::do_give(res<ast_Expr> x) {
     expr = x;
 }
 
+std::optional<yama::internal::ctype> yama::internal::ast_Args::get_type(compiler& cs) const {
+    return cs.ea[*this].type;
+}
+
 yama::res<yama::internal::ast_Expr> yama::internal::ast_Args::get_expr() const noexcept {
     return res(expr.lock());
 }
@@ -911,8 +937,8 @@ void yama::internal::ast_TypeAnnot::do_give(res<ast_TypeSpec> x) {
     type = x;
 }
 
-std::optional<std::string> yama::internal::ast_TypeSpec::fmt_name(const taul::source_code& src) const {
-    return expr ? expr->fmt_name(src) : std::nullopt;
+std::optional<yama::internal::ctype> yama::internal::ast_TypeSpec::get_type(compiler& cs) const {
+    return cs.ea.crvalue_to_type(*this);
 }
 
 void yama::internal::ast_TypeSpec::fmt(ast_formatter& x) {
@@ -933,6 +959,7 @@ void yama::internal::ast_TypeSpec::accept(ast_visitor& x) {
 }
 
 void yama::internal::ast_TypeSpec::do_give(res<ast_Expr> x) {
+    x->is_type_spec_crvalue = true;
     expr = x;
 }
 

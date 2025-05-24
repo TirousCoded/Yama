@@ -57,13 +57,13 @@ size_t yama::internal::ctype::param_count() const noexcept {
     }
 }
 
-std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, const constexpr_solver& solver) const {
+std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
         if (!_csymtab_entry()->is<fn_csym>()) return std::nullopt;
         const auto& our_csym = _csymtab_entry()->as<fn_csym>();
         if (param_index >= our_csym.params.size()) return std::nullopt; // out-of-bounds
         const auto& our_param_type = deref_assert(our_csym.params[param_index].type);
-        return solver[our_param_type.expr.get()].value().to_type();
+        return cs.ea.crvalue_to_type(deref_assert(our_param_type.expr));
     }
     else {
         const auto& our_params = deref_assert(_typeinf().callsig()).params;
@@ -74,13 +74,11 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
     }
 }
 
-std::optional<yama::internal::ctype> yama::internal::ctype::return_type(const constexpr_solver& solver) const {
+std::optional<yama::internal::ctype> yama::internal::ctype::return_type(compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
         if (_csymtab_entry()->is<fn_csym>()) {
             if (const auto return_type = _csymtab_entry()->as<fn_csym>().return_type) {
-                if (const auto result = solver[return_type->expr.get()] ) {
-                    return result->to_type();
-                }
+                return cs.ea.crvalue_to_type(deref_assert(return_type->expr));
             }
         }
         return std::nullopt;

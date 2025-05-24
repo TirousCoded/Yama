@@ -17,8 +17,7 @@
 #include "codegen_target.h"
 #include "csymtab.h"
 #include "ctypesys.h"
-#include "ctype_resolver.h"
-#include "constexpr_solver.h"
+#include "expr_analyzer.h"
 #include "const_table_populator.h"
 #include "register_stk.h"
 #include "first_pass.h"
@@ -40,8 +39,7 @@ namespace yama::internal {
 
         specifier_provider sp;
         ctypesys types;
-        ctype_resolver resolver;
-        constexpr_solver solver;
+        expr_analyzer ea;
 
         std::vector<res<translation_unit>> units;
 
@@ -63,7 +61,6 @@ namespace yama::internal {
         bool second_pass(translation_unit& unit);
 
         void push_new_unit(const res<translation_unit>& unit);
-        void resolve_and_solve();
     };
 
 

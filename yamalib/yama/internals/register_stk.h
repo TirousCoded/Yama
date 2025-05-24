@@ -79,10 +79,10 @@ namespace yama::internal {
         //            instr pushing the temporary
 
         void push_temp(const ast_node& x, ctype type);
-        void pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos = 0);
+        void pop_temp(size_t n, bool write_pop_instr); // expects autosym will add correct instr sym
 
         void push_scope();
-        void pop_scope(const ast_Block& x, bool write_pop_instr); // unwinds local vars
+        void pop_scope(bool write_pop_instr); // unwinds local vars, expects autosym will add correct instr sym
 
         void reinit_temp(ssize_t index, ctype new_type); // changes type of existing temporaries/local vars
         void promote_to_localvar(ast_VarDecl& x); // *promotes* top temporary to a local var, updating its symbol table entry

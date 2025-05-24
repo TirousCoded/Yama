@@ -70,11 +70,10 @@ void yama::internal::register_stk::push_temp(const ast_node& x, ctype type) {
 #endif
 }
 
-void yama::internal::register_stk::pop_temp(size_t n, bool write_pop_instr, taul::source_pos pop_instr_pos) {
+void yama::internal::register_stk::pop_temp(size_t n, bool write_pop_instr) {
     if (n > regs()) n = regs(); // <- avoid undefined behaviour for pop_back
     if (write_pop_instr && n >= 1) { // don't write pop instr w/ 0 oprand
         tu->cgt.cw.add_pop(uint8_t(n));
-        tu->cgt.add_sym(pop_instr_pos);
     }
     for (auto nn = n; nn >= 1; nn--) {
         _regstk.pop_back();
@@ -108,9 +107,9 @@ void yama::internal::register_stk::push_scope() {
 #endif
 }
 
-void yama::internal::register_stk::pop_scope(const ast_Block& x, bool write_pop_instr) {
+void yama::internal::register_stk::pop_scope(bool write_pop_instr) {
     const size_t regs_to_pop = regs() - top_scope().first_reg;
-    pop_temp(regs_to_pop, write_pop_instr, x.high_pos()); // unwind temporaries and local vars
+    pop_temp(regs_to_pop, write_pop_instr); // unwind temporaries and local vars
     _scopestk.pop_back();
 #if _LOG_REG_AND_SCOPE_STK_MANIP == 1
     YAMA_LOG(tu->cs->dbg(), general_c, "\n*exit* scope #{}\n", _scopestk.size() + 1);
@@ -127,14 +126,11 @@ void yama::internal::register_stk::reinit_temp(ssize_t index, ctype new_type) {
 void yama::internal::register_stk::promote_to_localvar(ast_VarDecl& x) {
     YAMA_ASSERT(top_reg().is_temp());
     const auto localvar_name = x.name.str(tu->src);
-    const ctype localvar_type = top_reg().type; // *deduce* local var type from type of temporary
     top_reg().localvar = true; // tell the register it's now a local var
     // update symbol table entry
     if (const auto symbol = tu->syms.lookup(x, localvar_name, x.high_pos())) {
         if (symbol->is<var_csym>()) {
             auto& info = symbol->as<var_csym>();
-            // update symbol w/ info about deduced type
-            if (!info.deduced_type) info.deduced_type = localvar_type;
             // when we promote a temporary to a local var, its symbol is expected to not
             // yet have an associated register index, w/ this assigning one
             YAMA_ASSERT(!info.reg);

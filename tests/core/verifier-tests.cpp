@@ -2328,6 +2328,51 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObject) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
 }
 
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ArgRs_IllegalCallObject_AttemptedCallObjectTypeIsNotInConstTable) {
+    // IMPORTANT: this test exists as the verifier relies on const table for type info
+    //            about things like attempted call object types, and so impl must be
+    //            able to handle if this type info is missing
+    // TODO: this testing need was found from a bug in our impl where it would
+    //       crash if it couldn't find a const table entry for attempted call object
+    //       type, w/ me feeling their may be other similar problems in our impl
+    //       which our unit tests aren't catching
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 7) // inits R(0) to type of return value
+        .add_put_const(yama::newtop, 3) // inits R(1) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(2) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(3) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(4) to type of arg #3
+        .add_call(4, 0) // R(1) cannot be used as call object
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str) // <- no type yama:Int in this const table
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_int(50) // <- cannot be used as call object + yama:Int is not in const table
+        .add_int(10)
+        .add_float(0.05)
+        .add_int(-4)
+        .add_char(U'y');
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 2),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
+}
+
 TEST_F(VerifierTests, Verify_TypeInfo_BCode_Call_Fail_ParamArgRs_TooMany) {
     const auto f_bcode =
         yama::bc::code()
@@ -2641,6 +2686,51 @@ TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObject)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str)
         .add_int(50) // <- cannot be used as call object
+        .add_int(10)
+        .add_float(0.05)
+        .add_int(-4)
+        .add_char(U'y');
+    yama::type_info f{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 2),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 5,
+            .bcode = f_bcode,
+        },
+    };
+
+    EXPECT_FALSE(verif->verify(f, get_md(), "abc"_str));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_ArgRs_illegal_callobj), 1);
+}
+
+TEST_F(VerifierTests, Verify_TypeInfo_BCode_CallNR_Fail_ArgRs_IllegalCallObject_AttemptedCallObjectTypeIsNotInConstTable) {
+    // IMPORTANT: this test exists as the verifier relies on const table for type info
+    //            about things like attempted call object types, and so impl must be
+    //            able to handle if this type info is missing
+    // TODO: this testing need was found from a bug in our impl where it would
+    //       crash if it couldn't find a const table entry for attempted call object
+    //       type, w/ me feeling their may be other similar problems in our impl
+    //       which our unit tests aren't catching
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 3) // inits R(0) to type of call object
+        .add_put_const(yama::newtop, 4) // inits R(1) to type of arg #1
+        .add_put_const(yama::newtop, 5) // inits R(2) to type of arg #2
+        .add_put_const(yama::newtop, 6) // inits R(3) to type of arg #3
+        .add_call_nr(4) // R(0) cannot be used as call object
+        .add_put_none(0, true)
+        .add_ret(0);
+    yama::println("{}", f_bcode.fmt_disassembly());
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Type"_str) // <- no type yama:Int in this const table
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str)
+        .add_int(50) // <- cannot be used as call object + yama:Int is not in const table
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
