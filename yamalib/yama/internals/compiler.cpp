@@ -84,7 +84,7 @@ bool yama::internal::translation_unit::first_pass() {
 bool yama::internal::translation_unit::second_pass() {
 #if 0
     println("{}", ast->fmt_tree(src));
-    println("{}", syms.fmt(src));
+    println("{}", syms.fmt(*cs));
 #endif
     root().accept(sp);
     return upload();

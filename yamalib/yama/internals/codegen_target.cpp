@@ -58,7 +58,7 @@ void yama::internal::codegen_target::upload_target(const ast_node& where) {
     tu->output.add_type(std::move(target()));
     _current_target.reset();
     // reset cw and syms
-    cw = bc::code_writer{};
+    cw = bc::code_writer(syms); // <- don't forget to reassociate w/ syms
     syms = bc::syms{};
 }
 

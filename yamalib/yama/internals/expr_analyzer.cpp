@@ -280,7 +280,15 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
         }
         const auto name = x.name->str(md.tu->src);
         const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        md.type = symbol->as<param_csym>().get_type(*cs).value();
+        const auto t = symbol->as<param_csym>().get_type(*cs);
+        // TODO: we don't really have unit tests covering the below case of
+        //       undeclared name error arising here specifically
+        //       (ie. removing below error check doesn't result in unit tests
+        //       failing, but has resulted in program crashing)
+        if (_raise_undeclared_name_if(!t, md, name)) {
+            return false;
+        }
+        md.type = t.value();
         md.crvalue = _runtime_only;
     }
     break;
@@ -288,7 +296,15 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
     {
         const auto name = x.name->str(md.tu->src);
         const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        md.type = symbol->as<var_csym>().get_type(*cs).value();
+        const auto t = symbol->as<var_csym>().get_type(*cs);
+        // TODO: we don't really have unit tests covering the below case of
+        //       undeclared name error arising here specifically
+        //       (ie. removing below error check doesn't result in unit tests
+        //       failing, but has resulted in program crashing)
+        if (_raise_undeclared_name_if(!t, md, name)) {
+            return false;
+        }
+        md.type = t.value();
         md.crvalue = _runtime_only;
     }
     break;
