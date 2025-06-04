@@ -22,16 +22,25 @@ void yama::internal::first_pass::visit_begin(res<ast_ImportDecl> x) {
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_VarDecl> x) {
-    _check_var_is_local(x);
-    _insert_vardecl(x);
+    _process_decl(x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_FnDecl> x) {
-    _begin_fn(x);
+    bool no_name_conflict{};
+    _process_decl(x, no_name_conflict);
+    _begin_fn(x, no_name_conflict);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_StructDecl> x) {
+    _process_decl(x);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_ParamDecl> x) {
-    _insert_paramdecl(x);
+    _process_decl(x);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_Result> x) {
+    tu->cs->ea.add_root(*deref_assert(x->type).expr);
 }
 
 void yama::internal::first_pass::visit_begin(res<ast_Block> x) {
@@ -86,8 +95,8 @@ void yama::internal::first_pass::visit_begin(res<ast_Args> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
-void yama::internal::first_pass::visit_begin(res<ast_TypeSpec> x) {
-    tu->cs->ea.add_root(deref_assert(x->expr));
+void yama::internal::first_pass::visit_begin(res<ast_TypeAnnot> x) {
+    tu->cs->ea.add_root(*deref_assert(x->type).expr);
 }
 
 void yama::internal::first_pass::visit_end(res<ast_FnDecl> x) {
@@ -250,7 +259,8 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
     }
 }
 
-bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
+void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x, bool& no_name_conflict) {
+    // NOTE: no_name_conflict must ALWAYS be set
     const auto unqualified_name = x->name.str(tu->src);
     // prepare symbol
     fn_csym sym = _mk_fn_csym(*x);
@@ -271,7 +281,7 @@ bool yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x) {
             "name {} already in use by another decl!",
             unqualified_name);
     }
-    return success;
+    no_name_conflict = success;
 }
 
 void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
@@ -302,6 +312,29 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
             dsignal::compile_name_conflict,
             "name {} already in use by another decl!",
             name);
+    }
+}
+
+void yama::internal::first_pass::_insert_structdecl(res<ast_StructDecl> x) {
+    const auto unqualified_name = x->name.str(tu->src);
+    // prepare symbol
+    struct_csym sym = _mk_struct_csym(*x);
+    // insert symbol
+    bool no_table_found = false;
+    const bool success = tu->syms.insert(
+        *x,
+        unqualified_name,
+        x,
+        _structdecl_intro_point(*x),
+        sym,
+        &no_table_found);
+    YAMA_ASSERT(!no_table_found);
+    if (!success) { // if failed insert, report name conflict
+        tu->err.error(
+            *x,
+            dsignal::compile_name_conflict,
+            "name {} already in use by another decl!",
+            unqualified_name);
     }
 }
 
@@ -359,6 +392,10 @@ yama::internal::param_csym yama::internal::first_pass::_mk_param_csym(const ast_
     };
 }
 
+yama::internal::struct_csym yama::internal::first_pass::_mk_struct_csym(const ast_StructDecl& x) {
+    return struct_csym{};
+}
+
 taul::source_pos yama::internal::first_pass::_vardecl_intro_point(const ast_VarDecl& x) {
     return x.high_pos(); // only valid AFTER fully introduced
 }
@@ -385,6 +422,55 @@ taul::source_pos yama::internal::first_pass::_paramdecl_intro_point(const ast_Pa
         : x.high_pos(); // we'll use x.high_pos() in edge case of no type annot
 }
 
+taul::source_pos yama::internal::first_pass::_structdecl_intro_point(const ast_StructDecl& x) {
+    // TODO: if we ever add local structs, this'll need to conditionally be either '0' or 'x.high_pos()'
+    return 0;
+}
+
+void yama::internal::first_pass::_process_decl(const res<ast_VarDecl>& x) {
+    _check_var_is_local(x);
+    _insert_vardecl(x);
+}
+
+void yama::internal::first_pass::_process_decl(const res<ast_FnDecl>& x, bool& no_name_conflict) {
+    // NOTE: no_name_conflict must ALWAYS be set
+    const auto name = x->name.str(tu->src);
+    if (_is_in_fn()) {
+        tu->err.error(
+            *x,
+            dsignal::compile_local_fn,
+            "illegal local fn {}!",
+            name);
+        
+    }
+    if (x->callsig->params.size() > 24) {
+        tu->err.error(
+            *x,
+            dsignal::compile_invalid_param_list,
+            "illegal fn {} with >24 params!",
+            name);
+    }
+    _acknowledge_type_decl();
+    _insert_fndecl(x, no_name_conflict);
+}
+
+void yama::internal::first_pass::_process_decl(const res<ast_StructDecl>& x) {
+    const auto name = x->name.str(tu->src);
+    if (_is_in_fn()) {
+        tu->err.error(
+            *x,
+            dsignal::compile_local_struct,
+            "illegal local struct {}!",
+            name);
+    }
+    _acknowledge_type_decl();
+    _insert_structdecl(x);
+}
+
+void yama::internal::first_pass::_process_decl(const res<ast_ParamDecl>& x) {
+    _insert_paramdecl(x);
+}
+
 bool yama::internal::first_pass::_is_in_fn() {
     //YAMA_ASSERT(_cfg.is_in_fn() == !_fn_decl_stk.empty());
     return _cfg.is_in_fn();
@@ -395,25 +481,9 @@ yama::internal::first_pass::_fn_decl& yama::internal::first_pass::_current_fn() 
     return _fn_decl_stk.back();
 }
 
-void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
+void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x, bool no_name_conflict) {
     const auto name = x->name.str(tu->src);
-    if (_is_in_fn()) {
-        tu->err.error(
-            *x,
-            dsignal::compile_local_fn,
-            "illegal local fn {}!",
-            name);
-    }
-    if (x->callsig->params.size() > 24) {
-        tu->err.error(
-            *x,
-            dsignal::compile_invalid_param_list,
-            "illegal fn {} with >24 params!",
-            name);
-    }
-    _acknowledge_type_decl();
     _cfg.begin_fn();
-    const bool no_name_conflict = _insert_fndecl(x);
     // for fn decls, since we need to have params and local vars be in the same
     // block, we add the csymtab to the fn decl, and suppress adding one for the
     // body block AST node
@@ -421,7 +491,7 @@ void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x) {
     _fn_decl details{
         .node = x,
         // if name conflict arose, then should be nullptr
-        .symbol = no_name_conflict ? tu->syms.lookup(tu->root(), name, 0) : nullptr,
+        .symbol = no_name_conflict ? tu->syms.lookup(*x, name, 0) : nullptr,
     };
     _fn_decl_stk.push_back(std::move(details));
 }

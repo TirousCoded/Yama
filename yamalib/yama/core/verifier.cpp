@@ -43,7 +43,7 @@ std::string yama::verifier::_cfg_block::fmt() const {
 }
 
 bool yama::verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 13);
+    static_assert(bc::opcodes == 14);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
     case bc::opcode::jump:          return true;
@@ -54,7 +54,7 @@ bool yama::verifier::_cfg_block::final_instr_has_jump(const bc::code& bcode) con
 }
 
 bool yama::verifier::_cfg_block::final_instr_has_fallthrough(const bc::code& bcode) const noexcept {
-    static_assert(bc::opcodes == 13);
+    static_assert(bc::opcodes == 14);
     switch (bcode[final_instr_index()].opc) {
     case bc::opcode::ret:           return false;
     case bc::opcode::jump:          return false;
@@ -382,7 +382,7 @@ void yama::verifier::_build_cfg_division_points(const bc::code& bcode) {
     _add_start_and_end_division_points(bcode);
     for (size_t i = 0; i < bcode.count(); i++) {
         const auto instr = bcode[i];
-        static_assert(bc::opcodes == 13);
+        static_assert(bc::opcodes == 14);
         if (instr.opc == bc::opcode::ret) {
             _add_end_of_instr_division_point(bcode, i);
         }
@@ -601,7 +601,7 @@ bool yama::verifier::_symbolic_exec_step(const type_info& subject, const bc::cod
             "\n{}",
             bcode.fmt_instr(i));
 #endif
-    static_assert(bc::opcodes == 13);
+    static_assert(bc::opcodes == 14);
     switch (instr.opc) {
     case bc::opcode::noop:
     {
@@ -739,6 +739,33 @@ bool yama::verifier::_symbolic_exec_step(const type_info& subject, const bc::cod
             }
             // NOTE: for copy, R(B) is the one that gets mutated by R(A), not the other way around
             _put(_R_type(block, instr.A), instr.B, block);
+        }
+    }
+    break;
+    case bc::opcode::default_init:
+    {
+        const bool valid0 =
+            _verify_KtB_in_bounds(subject, bcode, i) &&
+            _verify_KtB_is_type_const(subject, bcode, i);
+        if (!valid0) {
+            return false;
+        }
+        if (_is_newtop(instr.A)) {
+            const bool valid =
+                _verify_pushing_does_not_overflow(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _push(_Kt_type(subject, instr.B), block);
+        }
+        else {
+            const bool valid =
+                _verify_RA_in_bounds(subject, bcode, block, i) &&
+                _verify_RA_and_KtB_agree_on_type_skip_if_reinit(subject, bcode, block, i);
+            if (!valid) {
+                return false;
+            }
+            _put(_Kt_type(subject, instr.B), instr.A, block);
         }
     }
     break;
@@ -1093,6 +1120,27 @@ bool yama::verifier::_verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_
         : _verify_RA_and_KoB_agree_on_type(subject, bcode, block, i);
 }
 
+bool yama::verifier::_verify_RA_and_KtB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    const auto _RA = _R_type(block, bcode[i].A);
+    const auto _KtB = _Kt_type(subject, bcode[i].B);
+    if (_RA != _KtB) {
+        YAMA_RAISE(dbg(), dsignal::verif_RA_and_KtB_types_differ);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} {} bcode instr {}: R(A) (A == {}) and Kt(B) (B == {}) do not agree on type ({} != {})!",
+            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _KtB);
+        return false;
+    }
+    return true;
+}
+
+bool yama::verifier::_verify_RA_and_KtB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
+    return
+        bcode.reinit_flag(i)
+        ? true
+        : _verify_RA_and_KtB_agree_on_type(subject, bcode, block, i);
+}
+
 bool yama::verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto _RA = _R_type(block, bcode[i].A);
     const auto _ArgB = _Arg_type(subject, bcode[i].B);
@@ -1277,7 +1325,7 @@ yama::str yama::verifier::_R_call_object_type_return_type(const type_info& subje
 }
 
 yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
     switch (subject.consts.const_type(index).value()) {
     case const_type::int0:          return _int_type();                                     break;
     case const_type::uint:          return _uint_type();                                    break;
@@ -1288,6 +1336,10 @@ yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
     default:                        YAMA_DEADEND;                                           break;
     }
     return str();
+}
+
+yama::str yama::verifier::_Kt_type(const type_info& subject, size_t index) {
+    return subject.consts.qualified_name(index).value();
 }
 
 yama::str yama::verifier::_Arg_type(const type_info& subject, size_t index) {

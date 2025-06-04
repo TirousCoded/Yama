@@ -7,10 +7,11 @@
 
 
 yama::kind yama::type_info::kind() const noexcept {
-    static_assert(kinds == 2);
+    static_assert(kinds == 3);
     yama::kind result{};
     if (std::holds_alternative<primitive_info>(info))       result = kind::primitive;
     else if (std::holds_alternative<function_info>(info))   result = kind::function;
+    else if (std::holds_alternative<struct_info>(info))     result = kind::struct0;
     else                                                    YAMA_DEADEND;
     return result;
 }
@@ -87,29 +88,28 @@ std::string yama::function_info::fmt(const const_table_info& consts, const char*
     return result;
 }
 
+std::string yama::struct_info::fmt(const char* tab) const {
+    YAMA_ASSERT(tab);
+    std::string result{};
+    result += "struct_info";
+    return result;
+}
+
 std::string yama::type_info::fmt(const char* tab) const {
     YAMA_ASSERT(tab);
     std::string result{};
     result += "type_info";
     result += std::format("\n{}unqualified-name: {}", tab, unqualified_name);
-    if (kind() == kind::primitive) {
-        result += std::format("\n{}", std::get<primitive_info>(info).fmt(tab));
-    }
-    else if (kind() == kind::function) {
-        result += std::format("\n{}", std::get<function_info>(info).fmt(consts, tab));
-    }
-    else YAMA_DEADEND;
+    if (kind() == kind::primitive)      result += std::format("\n{}", std::get<primitive_info>(info).fmt(tab));
+    else if (kind() == kind::function)  result += std::format("\n{}", std::get<function_info>(info).fmt(consts, tab));
+    else if (kind() == kind::struct0)   result += std::format("\n{}", std::get<struct_info>(info).fmt(tab));
+    else                                YAMA_DEADEND;
     result += std::format("\n{}", consts.fmt(tab));
     return result;
 }
 
 std::string yama::type_info::fmt_sym(size_t index) const {
-    if (const auto syms = bsyms()) {
-        return syms->fmt_sym(index);
-    }
-    else {
-        // ensure valid fmt string even if we don't have bc::syms to use
-        return internal::fmt_no_sym(index);
-    }
+    if (const auto syms = bsyms())  return syms->fmt_sym(index);
+    else                            return internal::fmt_no_sym(index); // ensures valid result even if no bc::syms to use
 }
 

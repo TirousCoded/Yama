@@ -82,6 +82,7 @@ lexer section:
     CONST                           : 'const' EOW ;
     VAR                             : 'var' EOW ;
     FN                              : 'fn' EOW ;
+    STRUCT                          : 'struct' EOW ;
     IF                              : 'if' EOW ;
     ELSE                            : 'else' EOW ;
     LOOP                            : 'loop' EOW ;
@@ -153,7 +154,8 @@ parser section:
 
     Decl                            : ImportDecl
                                     | VarDecl
-                                    | FnDecl ;
+                                    | FnDecl
+                                    | StructDecl ;
 
     ImportDecl                      : IMPORT IDENTIFIER ( COLON IDENTIFIER )? RelativePath? SEMI ;
     RelativePath                    : ( DOT IDENTIFIER )+ ;
@@ -162,6 +164,7 @@ parser section:
 
     VarDecl                         : VAR IDENTIFIER TypeAnnot? Assign? SEMI ;
     FnDecl                          : FN IDENTIFIER CallSig Block ;
+    StructDecl                      : STRUCT IDENTIFIER L_CURLY R_CURLY ;
 
     CallSig                         : L_ROUND ( ParamDecl ( COMMA ParamDecl )* )? R_ROUND Result? ;
     ParamDecl                       : IDENTIFIER TypeAnnot? ;
@@ -188,11 +191,10 @@ parser section:
     ContinueStmt                    : CONTINUE SEMI ;
     ReturnStmt                      : RETURN Expr? SEMI ;
 
-    # TODO: later, make ast_Expr take a list of 'suffixes', which includes ast_Args, rather
-    #       than accepting just a single ast_Args value, which won't be enough for when
-    #       we need it to be able to handle multiple *suffixes* in a row
+    # TODO: if we ever add features which make the 'x' in 'x()' unable to form either a call or
+    #       a default init expr, we'll need to add compilation-tests.cpp unit tests covering this
 
-    precedence Expr                 : Expr Args                         # call expr
+    precedence Expr                 : Expr Args                         # call/default init expr
                                     | CONST Args                        # constexpr guarantee expr
                                     | PrimaryExpr                       # primary expr
                                     ;

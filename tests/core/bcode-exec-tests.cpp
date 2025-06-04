@@ -80,9 +80,9 @@ protected:
 
 // PER-INSTRUCTION TESTS
 
-static_assert(yama::bc::opcodes == 13);
+static_assert(yama::bc::opcodes == 14);
 
-TEST_F(BCodeExecTests, Instr_Noop) {
+TEST_F(BCodeExecTests, Noop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -119,7 +119,7 @@ TEST_F(BCodeExecTests, Instr_Noop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
-TEST_F(BCodeExecTests, Instr_Pop) {
+TEST_F(BCodeExecTests, Pop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -155,7 +155,7 @@ TEST_F(BCodeExecTests, Instr_Pop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
-TEST_F(BCodeExecTests, Instr_Pop_Zero) {
+TEST_F(BCodeExecTests, Pop_Zero) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -190,7 +190,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Zero) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
-TEST_F(BCodeExecTests, Instr_Pop_Many) {
+TEST_F(BCodeExecTests, Pop_Many) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -229,7 +229,7 @@ TEST_F(BCodeExecTests, Instr_Pop_Many) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
-TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
+TEST_F(BCodeExecTests, Pop_MoreThanAreOnStack) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -265,7 +265,7 @@ TEST_F(BCodeExecTests, Instr_Pop_MoreThanAreOnStack) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
-TEST_F(BCodeExecTests, Instr_PutNone) {
+TEST_F(BCodeExecTests, PutNone) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -300,7 +300,7 @@ TEST_F(BCodeExecTests, Instr_PutNone) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
-TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
+TEST_F(BCodeExecTests, PutNone_Newtop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -334,7 +334,7 @@ TEST_F(BCodeExecTests, Instr_PutNone_Newtop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
-TEST_F(BCodeExecTests, Instr_PutConst) {
+TEST_F(BCodeExecTests, PutConst) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -369,7 +369,7 @@ TEST_F(BCodeExecTests, Instr_PutConst) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_float(1.01));
 }
 
-TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
+TEST_F(BCodeExecTests, PutConst_Newtop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -403,7 +403,7 @@ TEST_F(BCodeExecTests, Instr_PutConst_Newtop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_float(1.01));
 }
 
-TEST_F(BCodeExecTests, Instr_PutTypeConst) {
+TEST_F(BCodeExecTests, PutTypeConst) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -438,7 +438,7 @@ TEST_F(BCodeExecTests, Instr_PutTypeConst) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_type(ctx->bool_type()));
 }
 
-TEST_F(BCodeExecTests, Instr_PutTypeConst_Newtop) {
+TEST_F(BCodeExecTests, PutTypeConst_Newtop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -472,7 +472,7 @@ TEST_F(BCodeExecTests, Instr_PutTypeConst_Newtop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_type(ctx->bool_type()));
 }
 
-TEST_F(BCodeExecTests, Instr_PutArg) {
+TEST_F(BCodeExecTests, PutArg) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -512,7 +512,7 @@ TEST_F(BCodeExecTests, Instr_PutArg) {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_float(-0.765));
 }
 
-TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
+TEST_F(BCodeExecTests, PutArg_Newtop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -551,7 +551,7 @@ TEST_F(BCodeExecTests, Instr_PutArg_Newtop) {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_float(-0.765));
 }
 
-TEST_F(BCodeExecTests, Instr_Copy) {
+TEST_F(BCodeExecTests, Copy) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -588,7 +588,7 @@ TEST_F(BCodeExecTests, Instr_Copy) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 }
 
-TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
+TEST_F(BCodeExecTests, Copy_Newtop) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -623,10 +623,84 @@ TEST_F(BCodeExecTests, Instr_Copy_Newtop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(101));
 }
 
+// TODO: currently, our default_init unit tests don't properly cover ALL the different
+//       return values default_init could result in, instead just presuming that we
+//       can just test that it forwards to a context::default_init call
+//
+//       I don't like how it makes this assumption, so at some point revise our tests
+//       to properly test each particular return value for each type kind/ptype
+
+TEST_F(BCodeExecTests, DefaultInit) {
+    ASSERT_TRUE(ready);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop)
+        .add_default_init(0, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str);
+    yama::type_info f_info{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    upload(yama::type_info(f_info));
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(0));
+}
+
+TEST_F(BCodeExecTests, DefaultInit_Newtop) {
+    ASSERT_TRUE(ready);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_default_init(yama::newtop, 0)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str);
+    yama::type_info f_info{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({}, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 1,
+            .bcode = f_bcode,
+        },
+    };
+
+    upload(yama::type_info(f_info));
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(0));
+}
+
 static bool was_called_0 = false;
 static bool was_called_1 = false;
 
-TEST_F(BCodeExecTests, Instr_Call) {
+TEST_F(BCodeExecTests, Call) {
     ASSERT_TRUE(ready);
 
     auto plus_fn = 
@@ -696,7 +770,7 @@ TEST_F(BCodeExecTests, Instr_Call) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(149));
 }
 
-TEST_F(BCodeExecTests, Instr_Call_Newtop) {
+TEST_F(BCodeExecTests, Call_Newtop) {
     ASSERT_TRUE(ready);
 
     auto plus_fn = 
@@ -765,7 +839,7 @@ TEST_F(BCodeExecTests, Instr_Call_Newtop) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(149));
 }
 
-TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
+TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourPanics) {
     ASSERT_TRUE(ready);
 
     auto panic_fn = 
@@ -850,7 +924,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourPanics) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
+TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourDoesNotReturnAnything) {
     ASSERT_TRUE(ready);
 
     auto panic_fn = 
@@ -935,7 +1009,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallBehaviourDoesNotReturnAnything) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
+TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
     ASSERT_TRUE(ready);
 
     ctx->dbg()->remove_cat(yama::bcode_exec_c); // make output easier to read
@@ -1067,7 +1141,7 @@ TEST_F(BCodeExecTests, Instr_Call_PanicIfCallStackWouldOverflow) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_CallNR) {
+TEST_F(BCodeExecTests, CallNR) {
     ASSERT_TRUE(ready);
 
     auto plus_fn =
@@ -1138,7 +1212,7 @@ TEST_F(BCodeExecTests, Instr_CallNR) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 }
 
-TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
+TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourPanics) {
     ASSERT_TRUE(ready);
 
     auto panic_fn =
@@ -1223,7 +1297,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourPanics) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
+TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
     ASSERT_TRUE(ready);
 
     auto panic_fn =
@@ -1308,7 +1382,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
+TEST_F(BCodeExecTests, CallNR_PanicIfCallStackWouldOverflow) {
     ASSERT_TRUE(ready);
 
     ctx->dbg()->remove_cat(yama::bcode_exec_c); // make output easier to read
@@ -1440,7 +1514,7 @@ TEST_F(BCodeExecTests, Instr_CallNR_PanicIfCallStackWouldOverflow) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, Instr_Ret) {
+TEST_F(BCodeExecTests, Ret) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -1478,7 +1552,7 @@ TEST_F(BCodeExecTests, Instr_Ret) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_uint(4));
 }
 
-TEST_F(BCodeExecTests, Instr_Jump) {
+TEST_F(BCodeExecTests, Jump) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -1518,7 +1592,7 @@ TEST_F(BCodeExecTests, Instr_Jump) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-7));
 }
 
-TEST_F(BCodeExecTests, Instr_JumpTrue) {
+TEST_F(BCodeExecTests, JumpTrue) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =
@@ -1566,7 +1640,7 @@ TEST_F(BCodeExecTests, Instr_JumpTrue) {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_int(-10));
 }
 
-TEST_F(BCodeExecTests, Instr_JumpFalse) {
+TEST_F(BCodeExecTests, JumpFalse) {
     ASSERT_TRUE(ready);
 
     const auto f_bcode =

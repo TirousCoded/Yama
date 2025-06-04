@@ -80,3 +80,13 @@ yama::module_factory& yama::module_factory::add_function_type(str unqualified_na
     return add_type(std::move(new_info));
 }
 
+yama::module_factory& yama::module_factory::add_struct_type(str unqualified_name, const_table_info&& consts) {
+    type_info new_info{
+        .unqualified_name = unqualified_name,
+        .consts = std::forward<decltype(consts)>(consts),
+        .info = yama::struct_info{
+        },
+    };
+    return add_type(std::move(new_info));
+}
+

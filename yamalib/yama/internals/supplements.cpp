@@ -2,6 +2,8 @@
 
 #include "supplements.h"
 
+#include <cmath>
+
 #include "../core/scalars.h"
 #include "../core/callsig_info.h"
 #include "../core/context.h"
@@ -150,6 +152,9 @@ _ADD_1IN1OUT("c" suffix, "yama:Char"_str, expr, as_char, put_char)
 _ADD_1IN1OUT("i" suffix, "yama:Int"_str, expr, as_int, put_int); \
 _ADD_1IN1OUT("u" suffix, "yama:UInt"_str, expr, as_uint, put_uint); \
 _ADD_1IN1OUT("c" suffix, "yama:Char"_str, expr, as_char, put_char)
+    
+#define _ADD_1IN1OUTS_F_NOPREFIX(name, expr) \
+_ADD_1IN1OUT(name, "yama:Float"_str, expr, as_float, put_float)
 
 // below, 'COMMON_R' stands for 'common return type'
 
@@ -185,6 +190,9 @@ _ADD_2IN1OUT("c" suffix, "yama:Char"_str, "yama:Char"_str, expr, as_char, put_ch
 _ADD_2IN1OUT("i" suffix, "yama:Int"_str, "yama:Int"_str, expr, as_int, put_int); \
 _ADD_2IN1OUT("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr, as_uint, put_uint); \
 _ADD_2IN1OUT("f" suffix, "yama:Float"_str, "yama:Float"_str, expr, as_float, put_float)
+    
+#define _ADD_2IN1OUTS_F_NOPREFIX(name, expr) \
+_ADD_2IN1OUT(name, "yama:Float"_str, "yama:Float"_str, expr, as_float, put_float)
     
 #define _ADD_2IN1OUTS_IUF_PANIC_IF_B_IS_0(suffix, expr) \
 _ADD_2IN1OUT_PANIC_IF_B_IS_0("i" suffix, "yama:Int"_str, "yama:Int"_str, expr, as_int, put_int); \
@@ -314,6 +322,20 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
         };
         mf.add_type(std::move(t));
     }
+
+    // power fns
+    _ADD_2IN1OUTS_F_NOPREFIX("pow"_str, pow(a, b));
+    _ADD_1IN1OUTS_F_NOPREFIX("sqrt"_str, sqrt(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("cbrt"_str, cbrt(a));
+
+    // trigonometric fns
+    _ADD_1IN1OUTS_F_NOPREFIX("sin"_str, sin(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("cos"_str, cos(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("tan"_str, tan(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("asin"_str, asin(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("acos"_str, acos(a));
+    _ADD_1IN1OUTS_F_NOPREFIX("atan"_str, atan(a));
+    _ADD_2IN1OUTS_F_NOPREFIX("atan2"_str, atan2(a, b));
 
     // print fns
     _ADD_1IN0OUT("iprint"_str, "yama:Int"_str, (std::cerr << " > " << yama::fmt_int(a) << "\n"), as_int);

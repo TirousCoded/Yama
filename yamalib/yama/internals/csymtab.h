@@ -134,6 +134,13 @@ namespace yama::internal {
         static constexpr lookup_proc lp = lookup_proc::normal;
     };
 
+    struct struct_csym final {
+        //
+
+
+        static constexpr lookup_proc lp = lookup_proc::normal;
+    };
+
 
     struct csymtab_entry final {
         using info_t = std::variant<
@@ -141,7 +148,8 @@ namespace yama::internal {
             prim_csym,
             var_csym,
             fn_csym,
-            param_csym
+            param_csym,
+            struct_csym
         >;
 
 
@@ -164,12 +172,13 @@ namespace yama::internal {
 
 
         inline bool is_type() const noexcept {
-            static_assert(std::variant_size_v<info_t> == 5); // reminder
+            static_assert(std::variant_size_v<info_t> == 6); // reminder
             if (is<import_csym>())      return false;
             else if (is<prim_csym>())   return true;
             else if (is<var_csym>())    return false;
             else if (is<fn_csym>())     return true;
             else if (is<param_csym>())  return false;
+            else if (is<struct_csym>()) return true;
             else                        YAMA_DEADEND;
             return bool{};
         }
@@ -264,7 +273,7 @@ namespace yama::internal {
                 return x.shared_from_this();
             }
             // below code will recursively skip past interim parent nodes w/out symbol tables
-            else if (const auto upstream = x.parent.lock()) {
+            else if (const auto upstream = x.try_parent()) {
                 return node_of_inner_most(*upstream);
             }
             else {
@@ -286,7 +295,7 @@ namespace yama::internal {
                     }
                 }
             }
-            const auto upstream = x.parent.lock();
+            const auto upstream = x.try_parent();
             return
                 upstream
                 ? lookup(*upstream, name, src_pos, lp)

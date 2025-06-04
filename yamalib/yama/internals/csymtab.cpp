@@ -59,7 +59,7 @@ std::optional<yama::internal::ctype> yama::internal::param_csym::get_type(compil
 std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const char* tab) {
     const auto _tabs = fmt_tabs(tabs, tab);
     std::string result{};
-    static_assert(std::variant_size_v<info_t> == 5); // reminder
+    static_assert(std::variant_size_v<info_t> == 6); // reminder
     if (is<import_csym>()) {
         result += std::format("{0}import-decl {{\n", _tabs);
         result += std::format("{0}{1}name        : {2}\n", _tabs, tab, name);
@@ -104,6 +104,14 @@ std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const 
         result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
         result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
         result += std::format("{0}{1}type        : {2}\n", _tabs, tab, as<param_csym>().type ? as<param_csym>().type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
+        result += std::format("{0}}}\n", _tabs);
+    }
+    else if (is<struct_csym>()) {
+        result += std::format("{0}struct-decl {{\n", _tabs);
+        result += std::format("{0}{1}name        : {2}\n", _tabs, tab, name);
+        result += std::format("{0}{1}lp          : {2}\n", _tabs, tab, fmt_lookup_proc(lp));
+        result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
+        result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
         result += std::format("{0}}}\n", _tabs);
     }
     else YAMA_DEADEND;

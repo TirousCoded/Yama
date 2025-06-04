@@ -209,9 +209,7 @@ TEST_F(ConstTableTests, IsStub_OutOfBounds) {
     EXPECT_TRUE(a.is_stub(4)); // out-of-bounds == (pseudo-)stub
 }
 
-// NOTE: the '0' below is used to avoid conflict w/ GoogleTest
-
-TEST_F(ConstTableTests, Get0) {
+TEST_F(ConstTableTests, Get) {
     auto abc_constsinf =
         yama::const_table_info()
         .add_float(3.21)
@@ -231,7 +229,7 @@ TEST_F(ConstTableTests, Get0) {
     EXPECT_EQ(a.get<yama::uint_const>(3), std::make_optional(13u));
 }
 
-TEST_F(ConstTableTests, Get) {
+TEST_F(ConstTableTests, Get_OutOfBounds) {
     auto abc_constsinf =
         yama::const_table_info()
         .add_float(3.21)

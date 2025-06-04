@@ -176,6 +176,7 @@ namespace {
         void observe_float(yama::float_t) { seq += std::format("float n/a\n"); }
         void observe_bool(yama::bool_t x) { seq += std::format("bool {}\n", yama::fmt_bool(x)); }
         void observe_char(yama::char_t x) { seq += std::format("char {}\n", yama::fmt_char(x)); }
+        void observe_type(yama::type x) { seq += std::format("type {}\n", x); }
 
         void observe_misc(std::string_view msg) { seq += std::format("misc {}\n", msg); }
     };
@@ -192,7 +193,8 @@ namespace {
         .add_primitive_type("yama:UInt"_str)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Bool"_str)
-        .add_primitive_type("yama:Char"_str);
+        .add_primitive_type("yama:Char"_str)
+        .add_primitive_type("yama:Type"_str);
 
     yama::type_info observeNone_info{
         .unqualified_name = "observeNone"_str,
@@ -278,6 +280,20 @@ namespace {
             .max_locals = 1,
         },
     };
+    yama::type_info observeType_info{
+        .unqualified_name = "observeType"_str,
+        .consts = consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 6 }, 0),
+            .call_fn =
+                [](yama::context& ctx) {
+                    sidefx.observe_type(ctx.arg(1).value().as_type());
+                    if (ctx.push_none().bad()) return;
+                    if (ctx.ret(0).bad()) return;
+                },
+            .max_locals = 1,
+        },
+    };
     yama::type_info doPanic_info{
         .unqualified_name = "doPanic"_str,
         .consts = consts,
@@ -349,7 +365,16 @@ namespace {
         },
     };
 
-    yama::module_info make_fns() {
+    // need this to better test w/ structs, so we'll just quick-n'-dirty bundle this
+    // w/ our helper test fns
+
+    yama::type_info SomeStruct_info{
+        .unqualified_name = "SomeStruct"_str,
+        .consts = yama::const_table_info{},
+        .info = yama::struct_info{},
+    };
+
+    yama::module_info make_fns_module() {
         return
             yama::module_factory()
             .add_type(yama::type_info(observeNone_info))
@@ -358,11 +383,13 @@ namespace {
             .add_type(yama::type_info(observeFloat_info))
             .add_type(yama::type_info(observeBool_info))
             .add_type(yama::type_info(observeChar_info))
+            .add_type(yama::type_info(observeType_info))
             .add_type(yama::type_info(doPanic_info))
             .add_type(yama::type_info(doIncr_info))
             .add_type(yama::type_info(isEqInt_info))
             .add_type(yama::type_info(isEqChar_info))
             .add_type(yama::type_info(isNotEqInt_info))
+            .add_type(yama::type_info(SomeStruct_info))
             .done();
     }
 
@@ -381,7 +408,7 @@ namespace {
         }
         std::optional<yama::import_result> import(const yama::str& relative_path) override final {
             if (relative_path == ".abc"_str) {
-                return yama::make_res<yama::module_info>(make_fns());
+                return yama::make_res<yama::module_info>(make_fns_module());
             }
             // .bad is used to test 
             else if (relative_path == ".bad"_str) {
@@ -714,6 +741,9 @@ fn f() {
 }
 
 
+static_assert(yama::ptypes == 7); // reminder
+static_assert(yama::kinds == 3); // reminder
+
 // general
 // 
 //      - there will exist a 'yama' module available for import (otherwise
@@ -739,8 +769,10 @@ fn f() {
 //      - Bool default initializes to false
 //      - Char default initializes to '\0'
 //      - Type default initializes to yama:None type object
-//
+// 
 //      - functions default initialize to their sole stateless object
+//      - structs default initialize to their sole stateless object
+//          * TODO: when we add struct properties, this'll need to change
 // 
 //      - None is non-callable
 //      - Int is non-callable
@@ -751,6 +783,10 @@ fn f() {
 //      - Type is non-callable
 // 
 //      - functions are callable (obviously)
+//      - structs are non-callable
+// 
+//      - expression precedence order:
+//          * TODO: add when needed
 //
 //      - when a panic occurs, the system is to act as expected (halting
 //        program behaviour and unwinding the call stack)
@@ -1074,6 +1110,45 @@ fn f() -> g {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
+// default init struct
+
+TEST_F(CompilationTests, General_DefaultInit_Struct) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct G {}
+
+fn f() -> G {
+    var a: G; // default inits a
+    return a;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto G = dm->load("a:G"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(G);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(G->kind(), yama::kind::struct0);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:G");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value().t, *G);
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
 // None is non-callable
 
 TEST_F(CompilationTests, General_None_IsNonCallable) {
@@ -1192,14 +1267,18 @@ TEST_F(CompilationTests, General_Type_IsNonCallable) {
     std::string txt = R"(
 
 fn f() {
-    None(); // not callable
+    // gotta use an arg '10' to avoid forming default init expr
+
+    None(10); // not callable
 }
 
 )";
 
     EXPECT_FALSE(perform_compile(txt));
 
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+    // we also gotta check for 'compile_wrong_arg_count', instead of 'compile_invalid_operation'
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 
 // functions are callable
@@ -1244,6 +1323,14 @@ fn f() {
     sidefx_t expected{};
     expected.observe_int(10);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// expr precedence order
+
+TEST_F(CompilationTests, General_ExprPrecedenceOrder) {
+    ASSERT_TRUE(ready);
+
+    // TODO
 }
 
 // panic behaviour
@@ -3009,7 +3096,7 @@ import fns.abc; // error! illegal after first type decl
 // variable decl
 //
 //      - defines non-local var if appears in global block
-//          * illegal in MVP version of Yama
+//          * illegal in current version of Yama
 // 
 //      - defines local var if appears in local block
 // 
@@ -3250,7 +3337,7 @@ fn f() {
 //      - defines non-local function if appears in global block
 // 
 //      - defines local function if appears in local block
-//          * illegal in MVP version of Yama
+//          * illegal in current version of Yama
 // 
 //      - forms w/ explicit return type explicitly specify their return type
 //      - forms w/out explicit return type have None as their return type implicitly
@@ -3893,6 +3980,75 @@ TEST_F(CompilationTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 }
 
 
+// TODO: when we add properties to structs, we'll need to expand below to include tests
+//       covering things like the scope of the body of the struct (see equiv for 'function
+//       decl' above as a reference)
+
+// struct decl
+//
+//      - defines non-local struct if appears in global block
+// 
+//      - defines local struct if appears in local block
+//          * illegal in current version of Yama
+
+// basic usage
+
+TEST_F(CompilationTests, StructDecl_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct G {}
+
+fn f(x: G) -> G {
+    return x;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto G = dm->load("a:G"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(G);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(G->kind(), yama::kind::struct0);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn(a:G) -> a:G");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->default_init(yama::newtop, *G).good());
+    ASSERT_TRUE(ctx->call(2, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value().t, *G);
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal to declare local struct
+
+TEST_F(CompilationTests, StructDecl_Fail_IfLocalStruct) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    struct G {}
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_local_struct), 1);
+}
+
+
 // assignment stmt
 // 
 //      - performs assignment of the expr value to an assignable expr
@@ -4312,7 +4468,7 @@ fn f(a: Char) {
 
 // illegal if stmt w/ expr not type Bool
 
-TEST_F(CompilationTests, IfStmt_Fail_IfTypeMismatch) {
+TEST_F(CompilationTests, IfStmt_Fail_TypeMismatch) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -4856,7 +5012,7 @@ fn f() -> Int {
 }
 
 
-static_assert(yama::kinds == 2); // reminder
+static_assert(yama::kinds == 3); // reminder
 
 // identifier expr
 // 
@@ -4873,6 +5029,7 @@ static_assert(yama::kinds == 2); // reminder
 // 
 //          primitive type      yama:Type value
 //          fn type             fn value
+//          struct type         yama:Type value
 //          parameter           parameter value
 //          local var           local var value
 // 
@@ -4880,6 +5037,7 @@ static_assert(yama::kinds == 2); // reminder
 // 
 //          primitive type      illegal                 (non-assignable)
 //          fn type             illegal                 (non-assignable)
+//          struct type         illegal                 (non-assignable)
 //          parameter           illegal                 (non-assignable)
 //          local var           assigns local var       (assignable)
 // 
@@ -4887,6 +5045,7 @@ static_assert(yama::kinds == 2); // reminder
 // 
 //          primitive type      constexpr
 //          fn type             constexpr
+//          struct type         constexpr
 //          parameter           non-constexpr
 //          local var           non-constexpr
 
@@ -4984,6 +5143,55 @@ fn g() -> observeInt {
     // expected return value
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*observeInt));
     EXPECT_EQ(ctx->local(1).value(), ctx->new_fn(*observeInt));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// compute value of struct type reference
+
+TEST_F(CompilationTests, IdentifierExpr_Compute_StructType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import abc: fns.abc;
+
+fn f() -> Type {
+    return abc:SomeStruct; // w/ qualifier
+}
+
+fn g() -> Type {
+    return SomeStruct; // w/out qualifier
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto SomeStruct = dm->load("fns.abc:SomeStruct"_str);
+    const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
+    ASSERT_TRUE(SomeStruct);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
+
+    ASSERT_EQ(SomeStruct->kind(), yama::kind::struct0);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(g->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Type");
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:Type");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*g).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value().as_type(), *SomeStruct);
+    EXPECT_EQ(ctx->local(1).value().as_type(), *SomeStruct);
 
     // expected side effects
     sidefx_t expected{};
@@ -5551,6 +5759,26 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
+// struct type identifier expr is non-assignable
+
+TEST_F(CompilationTests, IdentifierExpr_StructType_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct Dummy {}
+
+fn f() {
+    Dummy = Dummy; // 'Dummy' is not assignable
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
 // parameter identifier expr is non-assignable
 
 TEST_F(CompilationTests, IdentifierExpr_Param_NonAssignable) {
@@ -5654,6 +5882,42 @@ fn g() {}
 fn f() {
     // enforce 'const(g)' MUST be constexpr
     const(g);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// struct type identifier expr is constexpr
+
+TEST_F(CompilationTests, IdentifierExpr_StructType_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct Dummy {}
+
+fn f() {
+    // enforce 'const(Dummy)' MUST be constexpr
+    const(Dummy);
 }
 
 )";
@@ -6571,7 +6835,7 @@ fn f() {
 
 // call expr
 //
-//      - given some form 'f(a0, a1, ..., an)', where f is the call object expr, and a0, a1, 
+//      - given some form 'f(a0, a1, ..., an)', where f is a callable object expr, and a0, a1, 
 //        and other args (ie. the '..., an' part), the call expr describes a call site, first
 //        evaluating the f expr to acquire the call object, then evaluating the arg exprs,
 //        going from left-to-right, then performing the call, returning its return value
@@ -6583,6 +6847,7 @@ fn f() {
 //      - non-constexpr
 // 
 //      - illegal if the call object expr specifies a call object of a non-callable type
+//          * and isn't able to form something like a default init expr
 // 
 //      - illegal if the args passed to the call are the wrong number/types for a call to
 //        the specified call object
@@ -6872,6 +7137,227 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+
+static_assert(yama::ptypes == 7); // reminder
+static_assert(yama::kinds == 3); // reminder
+
+// default init expr
+// 
+//      - given some form 'x()', where x is a crvalue of type yama:Type,
+//        the default init expr evaluates to an object of this type, w/
+//        whatever value that type default initializes w/
+//          * the default values of types are specified in 'general'
+//
+//      - non-assignable
+// 
+//      - constexpr status:
+// 
+//          primitive type      constexpr
+//          fn type             n/a
+//          struct type         non-constexpr
+//
+//      - illegal if x is not constexpr
+//      - illegal if x is not yama:Type
+//          * and isn't able to form something like a call expr
+//      - illegal if arg count is >=1
+
+// basic usage
+
+TEST_F(CompilationTests, DefaultInitExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct SomeStruct {}
+
+fn get_SomeStruct() -> SomeStruct {
+    return SomeStruct();
+}
+
+fn f() {
+    observeNone(None());
+    observeInt(Int());
+    observeUInt(UInt());
+    observeFloat(Float());
+    observeBool(Bool());
+    observeChar(Char());
+    observeType(Type());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto SomeStruct = dm->load("a:SomeStruct"_str);
+    const auto get_SomeStruct = dm->load("a:get_SomeStruct"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(SomeStruct);
+    ASSERT_TRUE(get_SomeStruct);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(SomeStruct->kind(), yama::kind::struct0);
+    ASSERT_EQ(get_SomeStruct->kind(), yama::kind::function);
+    ASSERT_EQ(get_SomeStruct->callsig().value().fmt(), "fn() -> a:SomeStruct");
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*get_SomeStruct).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return values
+    EXPECT_EQ(ctx->local(0).value().t, *SomeStruct);
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_none();
+    expected.observe_int(0);
+    expected.observe_uint(0);
+    expected.observe_float(0.0);
+    expected.observe_bool(false);
+    expected.observe_char(U'\0');
+    expected.observe_type(ctx->none_type());
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// default init expr is non-assignable
+
+TEST_F(CompilationTests, DefaultInitExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    Int() = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// default init expr is constexpr, if primitive type
+
+TEST_F(CompilationTests, DefaultInitExpr_ConstExpr_IfPrimitiveType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(<TYPE>())' MUST be constexpr
+    const(None());
+    const(Int());
+    const(UInt());
+    const(Float());
+    const(Bool());
+    const(Char());
+    const(Type());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// default init expr is non-constexpr, if struct type
+
+TEST_F(CompilationTests, DefaultInitExpr_NonConstExpr_IfStructType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct G {}
+
+fn f() {
+    const(G());
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if x is not constexpr
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotAConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = Int;
+    var b = a(); // error! 'a' is Type, but it's not constexpr!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if x is not yama:Type
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotTypeType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    300(); // <- Int is not Type (and can't form something like a call expr)
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+// illegal if arg count >=1
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ArgCountIsNonZero) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    Int(10); // error! cannot have '10'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 
 

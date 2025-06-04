@@ -50,10 +50,20 @@ namespace yama {
         std::string fmt(const const_table_info& consts, const char* tab = "    ") const;
     };
 
+    struct struct_info final {
+        //
+
+
+        bool operator==(const struct_info&) const noexcept = default;
+
+        std::string fmt(const char* tab = "    ") const;
+    };
+
     struct type_info final {
         using info_t = std::variant<
             primitive_info,
-            function_info>;
+            function_info,
+            struct_info>;
 
         static_assert(std::variant_size_v<info_t> == kinds);
 

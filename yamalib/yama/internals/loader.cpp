@@ -158,7 +158,7 @@ bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instan
 }
 
 bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
     switch (info->consts.const_type(index).value()) {
     case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);                 break;
     case uint_const:            return _resolve_scalar_const<uint_const>(instance, info, index);                break;
@@ -167,6 +167,7 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
     case char_const:            return _resolve_scalar_const<char_const>(instance, info, index);                break;
     case primitive_type_const:  return _resolve_type_const<primitive_type_const>(e, instance, info, index);     break;
     case function_type_const:   return _resolve_type_const<function_type_const>(e, instance, info, index);      break;
+    case struct_type_const:     return _resolve_type_const<struct_type_const>(e, instance, info, index);        break;
     default:                    YAMA_DEADEND;                                                                   break;
     }
     YAMA_DEADEND;
@@ -192,7 +193,7 @@ bool yama::internal::loader::_check_consts(const env& e, type_instance& instance
 }
 
 bool yama::internal::loader::_check_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
     switch (info->consts.const_type(index).value()) {
     case int_const:             return _check_scalar_const<int_const>(instance, info, index);               break;
     case uint_const:            return _check_scalar_const<uint_const>(instance, info, index);              break;
@@ -201,6 +202,7 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
     case char_const:            return _check_scalar_const<char_const>(instance, info, index);              break;
     case primitive_type_const:  return _check_type_const<primitive_type_const>(e, instance, info, index);   break;
     case function_type_const:   return _check_type_const<function_type_const>(e, instance, info, index);    break;
+    case struct_type_const:     return _check_type_const<struct_type_const>(e, instance, info, index);      break;
     default:                    YAMA_DEADEND;                                                               break;
     }
     YAMA_DEADEND;

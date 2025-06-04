@@ -178,6 +178,22 @@ namespace yama::bc {
 
         copy,
 
+        // default_init R(A) Kt(B)
+
+        // default_init performs default_init(R(A), Kt(B))
+
+        // panic conditions:
+        //      n/a
+
+        // static verif requires:
+        //      - R(A) must be in-bounds (unless newtop)
+        //      - Kt(B) must be in-bounds
+        //      - Kt(B) must be a type constant
+        //      - R(A) and Kt(B) must agree on type (unless reinit) (unless newtop)
+        //      - pushing must not overflow (unless not newtop)
+
+        default_init,
+
         // call A R(B)
 
         // call performs call(A, R(B))
@@ -420,7 +436,7 @@ namespace yama::bc {
         std::string fmt_disassembly(const syms& syms, const char* tab = "    ") const;
 
 
-        static_assert(opcodes == 13);
+        static_assert(opcodes == 14);
 
         code& add_noop();
         code& add_pop(uint8_t A);
@@ -429,6 +445,7 @@ namespace yama::bc {
         code& add_put_type_const(uint8_t A, uint8_t B, bool reinit = false);
         code& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code& add_copy(uint8_t A, uint8_t B, bool reinit = false);
+        code& add_default_init(uint8_t A, uint8_t B, bool reinit = false);
         code& add_call(uint8_t A, uint8_t B, bool reinit = false);
         code& add_call_nr(uint8_t A);
         code& add_ret(uint8_t A);
@@ -481,7 +498,7 @@ namespace yama::bc {
         size_t count() const noexcept;
 
 
-        static_assert(opcodes == 13);
+        static_assert(opcodes == 14);
 
         code_writer& add_noop();
         code_writer& add_pop(uint8_t A);
@@ -490,6 +507,7 @@ namespace yama::bc {
         code_writer& add_put_type_const(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_put_arg(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_copy(uint8_t A, uint8_t B, bool reinit = false);
+        code_writer& add_default_init(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_call(uint8_t A, uint8_t B, bool reinit = false);
         code_writer& add_call_nr(uint8_t A);
         code_writer& add_ret(uint8_t A);

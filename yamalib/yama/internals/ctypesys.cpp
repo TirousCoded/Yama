@@ -35,9 +35,10 @@ yama::internal::fullname yama::internal::ctype::fullname() const {
 yama::kind yama::internal::ctype::kind() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
         yama::kind result{};
-        static_assert(kinds == 2);
-        if (_csymtab_entry()->is<prim_csym>())      result = yama::kind::primitive;
-        else if (_csymtab_entry()->is<fn_csym>())   result = yama::kind::function;
+        static_assert(kinds == 3);
+        if (_csymtab_entry()->is<prim_csym>())          result = yama::kind::primitive;
+        else if (_csymtab_entry()->is<fn_csym>())       result = yama::kind::function;
+        else if (_csymtab_entry()->is<struct_csym>())   result = yama::kind::struct0;
         return result;
     }
     else {
@@ -279,7 +280,7 @@ std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const 
     // guarantee ambiguous and bad_qualifier always gets set
     ambiguous = false;
     bad_qualifier = false;
-    if (const auto& p = deref_assert(x.expr).primary) {
+    if (const auto p = deref_assert(x.expr).as<ast_PrimaryExpr>()) {
         return load(*p, ambiguous, bad_qualifier);
     }
     else return std::nullopt;

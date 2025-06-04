@@ -315,6 +315,17 @@ yama::cmd_status yama::context::copy(local_t src, local_t dest) {
     return _copy(src, dest);
 }
 
+yama::cmd_status yama::context::default_init(local_t x, type t) {
+    auto obj = _gen_default_initialized(t);
+    YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), obj);
+    return _default_init(x, obj);
+}
+
+yama::cmd_status yama::context::default_init(local_t x, const_t c) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Kt(c));
+    return _default_init(x, c);
+}
+
 yama::cmd_status yama::context::call(size_t args_n, local_t ret) {
     const size_t args_start = locals() - args_n;
     if (args_n == 0) {
@@ -611,7 +622,7 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     static_assert(
         []() constexpr -> bool {
             // NOTE: extend this each time we add a new loadable object constant
-            static_assert(yama::const_types == 7);
+            static_assert(yama::const_types == 8);
             return
                 yama::is_object_const(yama::int_const) &&
                 yama::is_object_const(yama::uint_const) &&
@@ -619,7 +630,8 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
                 yama::is_object_const(yama::bool_const) &&
                 yama::is_object_const(yama::char_const) &&
                 !yama::is_object_const(yama::primitive_type_const) &&
-                yama::is_object_const(yama::function_type_const);
+                yama::is_object_const(yama::function_type_const) &&
+                !yama::is_object_const(yama::struct_type_const);
         }());
     if (_put_const_err_in_user_call_frame()) {
         return cmd_status::init(false);
@@ -632,7 +644,7 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     }
     return _put(x,
         [&]() -> canonical_ref {
-            static_assert(const_types == 7);
+            static_assert(const_types == 8);
             const auto& cc = consts();
             if (const auto r = cc.get<int_const>(c))                return new_int(*r);
             else if (const auto r = cc.get<uint_const>(c))          return new_uint(*r);
@@ -675,7 +687,7 @@ bool yama::context::_put_const_err_c_is_not_object_constant(const_t c) {
 yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
     static_assert(
         []() constexpr -> bool {
-            static_assert(yama::const_types == 7); // reminder
+            static_assert(yama::const_types == 8); // reminder
             return
                 !yama::is_type_const(yama::int_const) &&
                 !yama::is_type_const(yama::uint_const) &&
@@ -683,7 +695,8 @@ yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
                 !yama::is_type_const(yama::bool_const) &&
                 !yama::is_type_const(yama::char_const) &&
                 yama::is_type_const(yama::primitive_type_const) &&
-                yama::is_type_const(yama::function_type_const);
+                yama::is_type_const(yama::function_type_const) &&
+                yama::is_type_const(yama::struct_type_const);
         }());
     if (_put_type_const_err_in_user_call_frame()) {
         return cmd_status::init(false);
@@ -696,10 +709,11 @@ yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
     }
     return _put(x, new_type(
         [&]() -> type {
-            static_assert(const_types == 7);
+            static_assert(const_types == 8);
             const auto& cc = consts();
             if (const auto r = cc.get<primitive_type_const>(c))     return r.value();
             else if (const auto r = cc.get<function_type_const>(c)) return r.value();
+            else if (const auto r = cc.get<struct_type_const>(c))   return r.value();
             else                                                    YAMA_DEADEND;
             return none_type(); // dummy
         }()));
@@ -770,6 +784,67 @@ bool yama::context::_copy_err_src_out_of_bounds(local_t src) {
     _panic(
         "error: panic from attempt to copy object from out-of-bounds register index {}!",
         src);
+    return true;
+}
+
+yama::cmd_status yama::context::_default_init(local_t x, stolen_ref obj) {
+    return _put(x, obj, "default initialize");
+}
+
+yama::cmd_status yama::context::_default_init(local_t x, const_t c) {
+    if (_default_init_err_in_user_call_frame()) {
+        return cmd_status::init(false);
+    }
+    if (_default_init_err_c_out_of_bounds(c)) {
+        return cmd_status::init(false);
+    }
+    if (_default_init_err_c_is_not_type_constant(c)) {
+        return cmd_status::init(false);
+    }
+    return _default_init(x, _gen_default_initialized(deref_assert(consts().type(c))));
+}
+
+yama::object_ref yama::context::_gen_default_initialized(type t) {
+    if (is_primitive(t.kind())) {
+        if (t.ptype() == ptype::none)           return new_none();
+        else if (t.ptype() == ptype::int0)      return new_int(0);
+        else if (t.ptype() == ptype::uint)      return new_uint(0);
+        else if (t.ptype() == ptype::float0)    return new_float(0.0);
+        else if (t.ptype() == ptype::bool0)     return new_bool(false);
+        else if (t.ptype() == ptype::char0)     return new_char(U'\0');
+        else if (t.ptype() == ptype::type)      return new_type(none_type());
+        else YAMA_DEADEND;
+    }
+    else if (is_function(t.kind()))             return new_fn(t).value();
+    else if (is_struct(t.kind()))               return object_ref{ .t = t, .v{ .i = 0 } }; // TODO: not 100% sure about this
+    else YAMA_DEADEND;
+    return object_ref{ .t = t }; // dummy
+}
+
+bool yama::context::_default_init_err_in_user_call_frame() {
+    if (!is_user()) return false;
+    _panic(
+        "error: panic from attempt to load type constant from the user call frame!");
+    return true;
+}
+
+bool yama::context::_default_init_err_c_out_of_bounds(const_t c) {
+    if (c < consts().size()) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from out-of-bounds constant index {}!",
+        c);
+    return true;
+}
+
+bool yama::context::_default_init_err_c_is_not_type_constant(const_t c) {
+    if (is_type_const(consts().const_type(c).value())) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from constant index {}, but the constant is not a type constant!",
+        c);
     return true;
 }
 
@@ -975,7 +1050,7 @@ yama::bc::instr yama::context::_bcode_fetch_instr() {
 
 void yama::context::_bcode_exec_instr(bc::instr x) {
     YAMA_LOG(dbg(), bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
-    static_assert(bc::opcodes == 13);
+    static_assert(bc::opcodes == 14);
     switch (x.opc) {
     case bc::opcode::noop:
     {
@@ -1010,6 +1085,11 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
     case bc::opcode::copy:
     {
         if (copy(x.A, _maybe_newtop(x.B)).bad()) return;
+    }
+    break;
+    case bc::opcode::default_init:
+    {
+        if (default_init(_maybe_newtop(x.A), x.B).bad()) return;
     }
     break;
     case bc::opcode::call:

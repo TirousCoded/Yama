@@ -99,6 +99,7 @@ public:
     void upload_f();
     void upload_g();
     void upload_h();
+    void upload_SomeStruct();
 
 
 protected:
@@ -123,6 +124,89 @@ protected:
         //
     }
 };
+
+void ContextTests::upload_f() {
+    const yama::const_table_info f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str);
+    auto f_call_fn =
+        [](yama::context& ctx) {
+        globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
+        globals.snapshot_0 = CallStateSnapshot::make(ctx);
+
+        if (ctx.push_arg(1).bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+    yama::type_info f_info{
+        .unqualified_name = "f"_str,
+        .consts = f_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn = f_call_fn,
+            .max_locals = 6,
+        },
+    };
+    upload(std::move(f_info));
+}
+
+void ContextTests::upload_g() {
+    const yama::const_table_info g_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
+    auto g_call_fn =
+        [](yama::context& ctx) {
+        if (ctx.push_fn(ctx.consts().type(1).value()).bad()) return; // f
+        if (ctx.push_arg(1).bad()) return; // argument
+        if (ctx.call(2, yama::newtop).bad()) return; // call f
+        if (ctx.ret(0).bad()) return; // return result of call f
+        };
+    yama::type_info g_info{
+        .unqualified_name = "g"_str,
+        .consts = g_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn = g_call_fn,
+            .max_locals = 4,
+        },
+    };
+    upload(std::move(g_info));
+}
+
+void ContextTests::upload_h() {
+    const auto h_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1)
+        .add_put_arg(yama::newtop, 1)
+        .add_call(2, yama::newtop, true)
+        .add_ret(0);
+    std::cerr << h_bcode.fmt_disassembly() << "\n";
+    const yama::const_table_info h_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
+    yama::type_info h_info{
+        .unqualified_name = "h"_str,
+        .consts = h_consts,
+        .info = yama::function_info{
+            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .call_fn = yama::bcode_call_fn,
+            .max_locals = 2,
+            .bcode = h_bcode,
+        },
+    };
+    upload(std::move(h_info));
+}
+
+void ContextTests::upload_SomeStruct() {
+    yama::type_info SomeStruct_info{
+        .unqualified_name = "SomeStruct"_str,
+        .consts = yama::const_table_info{},
+        .info = yama::struct_info{},
+    };
+    upload(std::move(SomeStruct_info));
+}
 
 
 TEST_F(ContextTests, GetDomain) {
@@ -331,7 +415,6 @@ TEST_F(ContextTests, ObjectRef_Equality_InequalityIfTypesDiffer) {
     const auto _Char = ctx->new_char(U'\0');
     const auto _Type = ctx->new_type(ctx->float_type());
 
-    // just quick-n'-dirty use this to get types f and g
     upload_f();
     upload_g();
     ASSERT_TRUE(dm->load("abc:f"_str));
@@ -1124,7 +1207,7 @@ TEST_F(ContextTests, PutConst) {
     static_assert(
         []() constexpr -> bool {
             // NOTE: extend this each time we add a new loadable object constant
-            static_assert(yama::const_types == 7);
+            static_assert(yama::const_types == 8);
             return
                 yama::is_object_const(yama::int_const) &&
                 yama::is_object_const(yama::uint_const) &&
@@ -1132,9 +1215,11 @@ TEST_F(ContextTests, PutConst) {
                 yama::is_object_const(yama::bool_const) &&
                 yama::is_object_const(yama::char_const) &&
                 !yama::is_object_const(yama::primitive_type_const) &&
-                yama::is_object_const(yama::function_type_const);
+                yama::is_object_const(yama::function_type_const) &&
+                !yama::is_object_const(yama::struct_type_const);
         }());
-    constexpr size_t loadable_object_constant_types = yama::const_types - 1;
+    constexpr size_t nonobject_constant_types = 2;
+    constexpr size_t loadable_object_constant_types = yama::const_types - nonobject_constant_types;
     const yama::const_table_info f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
@@ -1369,7 +1454,7 @@ TEST_F(ContextTests, PutTypeConst) {
 
     static_assert(
         []() constexpr -> bool {
-            static_assert(yama::const_types == 7); // reminder
+            static_assert(yama::const_types == 8); // reminder
             return
                 !yama::is_type_const(yama::int_const) &&
                 !yama::is_type_const(yama::uint_const) &&
@@ -1377,7 +1462,8 @@ TEST_F(ContextTests, PutTypeConst) {
                 !yama::is_type_const(yama::bool_const) &&
                 !yama::is_type_const(yama::char_const) &&
                 yama::is_type_const(yama::primitive_type_const) &&
-                yama::is_type_const(yama::function_type_const);
+                yama::is_type_const(yama::function_type_const) &&
+                yama::is_type_const(yama::struct_type_const);
         }());
     constexpr size_t type_constant_types = 2; // <- don't forget to update this!
     const yama::const_table_info f_consts =
@@ -1861,78 +1947,377 @@ TEST_F(ContextTests, Copy_PanicIfPushingOverflows) {
     EXPECT_EQ(ctx->panics(), 1);
 }
 
-void ContextTests::upload_f() {
-    const yama::const_table_info f_consts =
-        yama::const_table_info()
-        .add_primitive_type("yama:Int"_str);
-    auto f_call_fn =
-        [](yama::context& ctx) {
-        globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
-        globals.snapshot_0 = CallStateSnapshot::make(ctx);
+static_assert(yama::kinds == 3); // reminder
+static_assert(yama::ptypes == 7); // reminder
 
-        if (ctx.push_arg(1).bad()) return;
+namespace default_init_helpers {
+    // have tests for each ptype, plus others as needed, such as for
+    // struct types, fn types, etc.
+    constexpr size_t unique_cases = yama::ptypes + 2;
+    constexpr size_t total_cases = unique_cases * 2;
+
+    yama::const_table_info mk_testfn_consts() {
+        return
+            yama::const_table_info()
+            .add_primitive_type("yama:None"_str)
+            .add_primitive_type("yama:Int"_str)
+            .add_primitive_type("yama:UInt"_str)
+            .add_primitive_type("yama:Float"_str)
+            .add_primitive_type("yama:Bool"_str)
+            .add_primitive_type("yama:Char"_str)
+            .add_primitive_type("yama:Type"_str)
+            .add_function_type("self:f"_str, yama::make_callsig_info({ 1 }, 1))
+            .add_struct_type("self:SomeStruct"_str);
+    }
+    
+    yama::type_info mk_testfn(yama::call_fn call_fn, yama::const_table_info consts = mk_testfn_consts()) {
+        return yama::type_info{
+            .unqualified_name = "testfn"_str,
+            .consts = std::move(consts),
+            .info = yama::function_info{
+                .callsig = yama::make_callsig_info({}, 0),
+                .call_fn = call_fn,
+                .max_locals = default_init_helpers::total_cases,
+            },
+        };
+    }
+
+    // the const_t overload has its testfn code directly in the unit test, w/
+    // it using the const table itself instead of a case_types array
+
+    void default_init_tester_for_type_overload(yama::context& ctx, yama::type f, yama::type SomeStruct) {
+        std::array<yama::type, unique_cases> case_types{
+            ctx.none_type(),
+            ctx.int_type(),
+            ctx.uint_type(),
+            ctx.float_type(),
+            ctx.bool_type(),
+            ctx.char_type(),
+            ctx.type_type(),
+            f, // fn type
+            SomeStruct, // struct type
+        };
+
+        // via newtop
+        for (const auto& t : case_types) {
+            ASSERT_TRUE(ctx.default_init(yama::newtop, t).good()) << "t == " << t;
+        }
+
+        // push dummy Int 10 objects for us to overwrite
+        for (size_t i = 0; i < unique_cases; i++) {
+            // we use Int 10 instead of None objects so default init of none
+            // will be properly differentiatable
+            ASSERT_TRUE(ctx.push_int(10).good());
+        }
+
+        // via index
+        size_t index = unique_cases; // start after last 'via newtop' obj
+        for (const auto& t : case_types) {
+            ASSERT_TRUE(ctx.default_init(index++, t).good()) << "t == " << t << ", index == " << index - 1;
+        }
+
+        // so we don't miss anything
+        ASSERT_EQ(ctx.locals(), total_cases);
+
+        // check state
+
+        // prepare + check non-empty
+        std::array<std::optional<yama::object_ref>, total_cases> objs{};
+        for (size_t i = 0; i < total_cases; i++) {
+            objs[i] = ctx.local(i);
+            ASSERT_TRUE(objs[i].has_value());
+        }
+
+        // check types (this presumes non-empty)
+        for (size_t i = 0; i < unique_cases; i++) {
+            // modulo to account for having two unique_cases length halfs
+            ASSERT_EQ(objs[i]->t, case_types[i % unique_cases]);
+        }
+
+        // check values (this presumes correct types)
+        for (size_t i = 0; i < total_cases; i += unique_cases) {
+            // skip None (ie. i + 0)
+            ASSERT_EQ(objs[i + 1]->as_int(), 0);
+            ASSERT_EQ(objs[i + 2]->as_uint(), 0u);
+            ASSERT_EQ(objs[i + 3]->as_float(), 0.0);
+            ASSERT_EQ(objs[i + 4]->as_bool(), false);
+            ASSERT_EQ(objs[i + 5]->as_char(), '\0');
+            ASSERT_EQ(objs[i + 6]->as_type(), ctx.none_type());
+            // skip f (ie. i + 7)
+            // skip SomeStruct (ie. i + 8)
+        }
+    }
+    void default_init_tester_for_const_overload(yama::context& ctx) {
+        // via newtop
+        for (yama::const_t c = 0; c < unique_cases; c++) {
+            ASSERT_TRUE(ctx.default_init(yama::newtop, c).good()) << "c == " << c;
+        }
+
+        // push dummy Int 10 objects for us to overwrite
+        for (size_t i = 0; i < unique_cases; i++) {
+            // we use Int 10 instead of None objects so default init of none
+            // will be properly differentiatable
+            ASSERT_TRUE(ctx.push_int(10).good());
+        }
+
+        // via index
+        size_t index = unique_cases; // start after last 'via newtop' obj
+        for (yama::const_t c = 0; c < unique_cases; c++) {
+            ASSERT_TRUE(ctx.default_init(index++, c).good()) << "c == " << c << ", index == " << index - 1;
+        }
+
+        // so we don't miss anything
+        ASSERT_EQ(ctx.locals(), total_cases);
+
+        // check state
+
+        // prepare + check non-empty
+        std::array<std::optional<yama::object_ref>, total_cases> objs{};
+        for (size_t i = 0; i < total_cases; i++) {
+            objs[i] = ctx.local(i);
+            ASSERT_TRUE(objs[i].has_value());
+        }
+
+        // check types (this presumes non-empty)
+        for (size_t i = 0; i < unique_cases; i++) {
+            // modulo to account for having two unique_cases length halfs
+            ASSERT_EQ(objs[i]->t, ctx.consts().type(i % unique_cases).value());
+        }
+
+        // check values (this presumes correct types)
+        for (size_t i = 0; i < total_cases; i += unique_cases) {
+            // skip None (ie. i + 0)
+            ASSERT_EQ(objs[i + 1]->as_int(), 0);
+            ASSERT_EQ(objs[i + 2]->as_uint(), 0u);
+            ASSERT_EQ(objs[i + 3]->as_float(), 0.0);
+            ASSERT_EQ(objs[i + 4]->as_bool(), false);
+            ASSERT_EQ(objs[i + 5]->as_char(), '\0');
+            ASSERT_EQ(objs[i + 6]->as_type(), ctx.none_type());
+            // skip f (ie. i + 7)
+            // skip SomeStruct (ie. i + 8)
+        }
+    }
+}
+
+TEST_F(ContextTests, DefaultInit_TypeOverload_UserCall) {
+    ASSERT_TRUE(ready);
+
+    upload_f();
+    upload_SomeStruct();
+    ASSERT_TRUE(dm->load("abc:f"_str));
+    ASSERT_TRUE(dm->load("abc:SomeStruct"_str));
+    const yama::type f = dm->load("abc:f"_str).value();
+    const yama::type SomeStruct = dm->load("abc:SomeStruct"_str).value();
+    default_init_helpers::default_init_tester_for_type_overload(*ctx, f, SomeStruct);
+}
+
+TEST_F(ContextTests, DefaultInit_TypeOverload_NonUserCall) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_call_fn =
+        [](yama::context& ctx) {
+        const yama::type f = ctx.consts().type(7).value();
+        const yama::type SomeStruct = ctx.consts().type(8).value();
+        default_init_helpers::default_init_tester_for_type_overload(ctx, f, SomeStruct);
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 6,
-        },
-    };
-    upload(std::move(f_info));
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).good());
 }
 
-void ContextTests::upload_g() {
-    const yama::const_table_info g_consts =
-        yama::const_table_info()
-        .add_primitive_type("yama:Int"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
-    auto g_call_fn =
+TEST_F(ContextTests, DefaultInit_TypeOverload_PanicIfXIsOutOfBounds) {
+    ASSERT_TRUE(ready);
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->default_init(70, ctx->none_type()).bad()); // 70 is out-of-bounds!
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_TypeOverload_PanicIfPushingOverflows) {
+    ASSERT_TRUE(ready);
+
+    // saturate the stack
+    for (size_t i = 0; i < yama::user_max_locals; i++) {
+        ASSERT_TRUE(ctx->push_none().good()) << "i == " << i << "\n";
+    }
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->default_init(yama::newtop, ctx->none_type()).bad()); // overflow!
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_ConstOverload_NonUserCall) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_call_fn =
         [](yama::context& ctx) {
-        if (ctx.push_fn(ctx.consts().type(1).value()).bad()) return; // f
-        if (ctx.push_arg(1).bad()) return; // argument
-        if (ctx.call(2, yama::newtop).bad()) return; // call f
-        if (ctx.ret(0).bad()) return; // return result of call f
+        default_init_helpers::default_init_tester_for_const_overload(ctx);
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
         };
-    yama::type_info g_info{
-        .unqualified_name = "g"_str,
-        .consts = g_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
-            .call_fn = g_call_fn,
-            .max_locals = 4,
-        },
-    };
-    upload(std::move(g_info));
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).good());
 }
 
-void ContextTests::upload_h() {
-    const auto h_bcode =
-        yama::bc::code()
-        // block #1
-        .add_put_const(yama::newtop, 1)
-        .add_put_arg(yama::newtop, 1)
-        .add_call(2, yama::newtop, true)
-        .add_ret(0);
-    std::cerr << h_bcode.fmt_disassembly() << "\n";
-    const yama::const_table_info h_consts =
+TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfInUserCallFrame) {
+    ASSERT_TRUE(ready);
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->default_init(yama::newtop, 0).bad()); // illegal in user call frame!
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfXIsOutOfBounds) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_call_fn =
+        [](yama::context& ctx) {
+        // panic! 70 is out-of-bounds!
+        if (ctx.default_init(70, 0).bad()) return;
+
+        FAIL() << "default_init didn't panic!";
+
+        // *proper* exit
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).bad()); // should panic
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfPushingOverflows) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_call_fn =
+        [](yama::context& ctx) {
+        // saturate the stack
+        for (size_t i = 0; i < ctx.max_locals(); i++) {
+            ASSERT_TRUE(ctx.push_none().good()) << "i == " << i << "\n";
+        }
+
+        // panic! overflow!
+        if (ctx.default_init(yama::newtop, 0).bad()) return;
+
+        FAIL() << "default_init didn't panic!";
+
+        // *proper* exit
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).bad()); // should panic
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfCIsOutOfBounds) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_call_fn =
+        [](yama::context& ctx) {
+        // panic! 70 is out-of-bounds!
+        if (ctx.default_init(yama::newtop, 70).bad()) return;
+
+        FAIL() << "default_init didn't panic!";
+
+        // *proper* exit
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).bad()); // should panic
+
+    EXPECT_EQ(ctx->panics(), 1);
+}
+
+TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfCIsNotIndexOfATypeConstant) {
+    ASSERT_TRUE(ready);
+
+    auto testfn_consts =
         yama::const_table_info()
-        .add_primitive_type("yama:Int"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
-    yama::type_info h_info{
-        .unqualified_name = "h"_str,
-        .consts = h_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
-            .call_fn = yama::bcode_call_fn,
-            .max_locals = 2,
-            .bcode = h_bcode,
-        },
-    };
-    upload(std::move(h_info));
+        .add_primitive_type("yama:None"_str)
+        .add_float(3.14159);
+
+    auto testfn_call_fn =
+        [](yama::context& ctx) {
+        // panic! Float (3.14159) is not type constant!
+        if (ctx.default_init(yama::newtop, 1).bad()) return;
+
+        FAIL() << "default_init didn't panic!";
+
+        // *proper* exit
+        if (ctx.pop(size_t(-1)).bad()) return;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+
+    upload_f();
+    upload_SomeStruct();
+    upload(default_init_helpers::mk_testfn(testfn_call_fn, testfn_consts));
+    ASSERT_TRUE(dm->load("abc:testfn"_str));
+    const yama::type testfn = dm->load("abc:testfn"_str).value();
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->push_fn(testfn).good()); // call object
+    ASSERT_TRUE(ctx->call_nr(1).bad()); // should panic
+
+    EXPECT_EQ(ctx->panics(), 1);
 }
 
 TEST_F(ContextTests, Call_ViaIndex) {

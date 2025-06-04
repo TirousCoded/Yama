@@ -34,7 +34,7 @@ TEST(ModuleFactoryTests, DoneResetsFactory) {
 TEST(ModuleFactoryTests, PopulatedModule) {
     yama::module_factory f{};
 
-    static_assert(yama::kinds == 2);
+    static_assert(yama::kinds == 3);
 
     // primitive type
 
@@ -100,13 +100,24 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         decltype(C_code)(C_code),
         decltype(C_syms)(C_syms));
 
+    // struct type
+
+    yama::const_table_info D_consts{};
+    D_consts
+        .add_int(31);
+
+    f.add_struct_type(
+        "D"_str,
+        decltype(D_consts)(D_consts));
+
     auto m = f.done();
 
-    ASSERT_EQ(m.size(), 3);
+    ASSERT_EQ(m.size(), 4);
 
     ASSERT_TRUE(m.contains("A"_str));
     ASSERT_TRUE(m.contains("B"_str));
     ASSERT_TRUE(m.contains("C"_str));
+    ASSERT_TRUE(m.contains("D"_str));
 
     yama::type_info A_expected{
         .unqualified_name = "A"_str,
@@ -137,9 +148,16 @@ TEST(ModuleFactoryTests, PopulatedModule) {
             .bsyms = C_syms,
         },
     };
+    yama::type_info D_expected{
+        .unqualified_name = "D"_str,
+        .consts = D_consts,
+        .info = yama::struct_info{
+        },
+    };
 
     EXPECT_EQ(m["A"_str], A_expected);
     EXPECT_EQ(m["B"_str], B_expected);
     EXPECT_EQ(m["C"_str], C_expected);
+    EXPECT_EQ(m["D"_str], D_expected);
 }
 

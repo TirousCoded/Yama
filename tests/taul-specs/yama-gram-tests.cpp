@@ -53,7 +53,7 @@ TEST_F(YamaGramTests, GrammarLoads) {
 TEST_F(YamaGramTests, LPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->nonsupport_lprs(), 36);
+    EXPECT_EQ(gram->nonsupport_lprs(), 37);
 
     ASSERT_TRUE(gram->has_lpr("TRUE"_str));
     ASSERT_TRUE(gram->has_lpr("FALSE"_str));
@@ -62,6 +62,7 @@ TEST_F(YamaGramTests, LPRs) {
     ASSERT_TRUE(gram->has_lpr("CONST"_str));
     ASSERT_TRUE(gram->has_lpr("VAR"_str));
     ASSERT_TRUE(gram->has_lpr("FN"_str));
+    ASSERT_TRUE(gram->has_lpr("STRUCT"_str));
     ASSERT_TRUE(gram->has_lpr("IF"_str));
     ASSERT_TRUE(gram->has_lpr("ELSE"_str));
     ASSERT_TRUE(gram->has_lpr("LOOP"_str));
@@ -77,6 +78,7 @@ TEST_F(YamaGramTests, LPRs) {
     EXPECT_EQ(gram->lpr("CONST"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("VAR"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("FN"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("STRUCT"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("IF"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("ELSE"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("LOOP"_str)->qualifier(), taul::qualifier::none);
@@ -222,6 +224,7 @@ _KW_TEST_ALT(NAN, "nan", 3);
 _KW_TEST(CONST, "const", 5);
 _KW_TEST(VAR, "var", 3);
 _KW_TEST(FN, "fn", 2);
+_KW_TEST(STRUCT, "struct", 6);
 _KW_TEST(IF, "if", 2);
 _KW_TEST(ELSE, "else", 4);
 _KW_TEST(LOOP, "loop", 4);
@@ -1024,7 +1027,7 @@ static bool pprs_ready = false;
 TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->pprs(), 29);
+    EXPECT_EQ(gram->pprs(), 30);
 
     EXPECT_TRUE(gram->has_ppr("Chunk"_str));
 
@@ -1035,6 +1038,7 @@ TEST_F(YamaGramTests, PPRs) {
 
     EXPECT_TRUE(gram->has_ppr("VarDecl"_str));
     EXPECT_TRUE(gram->has_ppr("FnDecl"_str));
+    EXPECT_TRUE(gram->has_ppr("StructDecl"_str));
 
     ASSERT_TRUE(gram->has_ppr("CallSig"_str));
     ASSERT_TRUE(gram->has_ppr("ParamDecl"_str));
@@ -1052,11 +1056,9 @@ TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram->has_ppr("ReturnStmt"_str));
 
     ASSERT_TRUE(gram->has_ppr("Expr"_str));
-
     ASSERT_TRUE(gram->has_ppr("PrimaryExpr"_str));
     
     ASSERT_TRUE(gram->has_ppr("Lit"_str));
-
     ASSERT_TRUE(gram->has_ppr("IntLit"_str));
     ASSERT_TRUE(gram->has_ppr("UIntLit"_str));
     ASSERT_TRUE(gram->has_ppr("FloatLit"_str));
@@ -1553,6 +1555,35 @@ TEST_F(YamaGramTests, FnDecl) {
     }
 
     auto result = parser->parse("FnDecl"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, StructDecl) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "struct abc {}"_str);
+    
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node1 = pattern.syntactic_autoclose("StructDecl"_str, cntr);
+        pattern.lexical("STRUCT"_str, cntr, 6);
+        pattern.skip(" ", cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        pattern.skip(" ", cntr);
+        pattern.lexical("L_CURLY"_str, cntr, 1);
+        pattern.lexical("R_CURLY"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("StructDecl"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 

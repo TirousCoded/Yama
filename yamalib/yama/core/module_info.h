@@ -66,7 +66,7 @@ namespace yama {
 
         module_factory& add_type(type_info&& x);
 
-        static_assert(kinds == 2);
+        static_assert(kinds == 3);
 
         module_factory& add_primitive_type(
             str unqualified_name,
@@ -88,6 +88,10 @@ namespace yama {
             size_t max_locals,
             bc::code&& code,
             bc::syms&& syms = bc::syms{});
+
+        module_factory& add_struct_type(
+            str unqualified_name,
+            const_table_info&& consts);
 
 
     private:

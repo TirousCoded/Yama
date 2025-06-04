@@ -7,7 +7,7 @@
 
 std::string yama::bc::fmt_opcode(opcode x) {
     std::string result{};
-    static_assert(opcodes == 13);
+    static_assert(opcodes == 14);
     switch (x) {
     case opcode::noop:              result = "noop";            break;
     case opcode::pop:               result = "pop";             break;
@@ -16,6 +16,7 @@ std::string yama::bc::fmt_opcode(opcode x) {
     case opcode::put_type_const:    result = "put_type_const";  break;
     case opcode::put_arg:           result = "put_arg";         break;
     case opcode::copy:              result = "copy";            break;
+    case opcode::default_init:      result = "default_init";    break;
     case opcode::call:              result = "call";            break;
     case opcode::call_nr:           result = "call_nr";         break;
     case opcode::ret:               result = "ret";             break;
@@ -119,6 +120,13 @@ yama::bc::code& yama::bc::code::add_copy(uint8_t A, uint8_t B, bool reinit) {
     return *this;
 }
 
+yama::bc::code& yama::bc::code::add_default_init(uint8_t A, uint8_t B, bool reinit) {
+    _instrs.push_back(instr{ .opc = opcode::default_init, .A = A });
+    _instrs.back().B = B;
+    _reinit_flags.push_back(reinit);
+    return *this;
+}
+
 yama::bc::code& yama::bc::code::add_call(uint8_t A, uint8_t B, bool reinit) {
     _instrs.push_back(instr{ .opc = opcode::call, .A = A });
     _instrs.back().B = B;
@@ -168,7 +176,7 @@ std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* t
             : std::format("{}", x);
         };
     std::string a{};
-    static_assert(opcodes == 13);
+    static_assert(opcodes == 14);
     switch (instr.opc) {
     case opcode::noop:              a = std::format("{: <12}", ' ');                                break;
     case opcode::pop:               a = std::format("{: <12}", instr.A);                            break;
@@ -177,6 +185,7 @@ std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* t
     case opcode::put_type_const:    a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
     case opcode::put_arg:           a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
     case opcode::copy:              a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
+    case opcode::default_init:      a = std::format("{: <4}{: <8}", maybe_nt(instr.A), instr.B);    break;
     case opcode::call:              a = std::format("{: <4}{: <8}", instr.A, maybe_nt(instr.B));    break;
     case opcode::call_nr:           a = std::format("{: <12}", instr.A);                            break;
     case opcode::ret:               a = std::format("{: <12}", instr.A);                            break;
@@ -194,7 +203,7 @@ std::string yama::bc::code::_fmt_instr(size_t x, const syms* syms, const char* t
     if (reinit_flag(x)) {
         result += "(reinit)";
     }
-    static_assert(opcodes == 13);
+    static_assert(opcodes == 14);
     if (
         get(x).opc == opcode::jump ||
         get(x).opc == opcode::jump_true ||
@@ -290,6 +299,12 @@ yama::bc::code_writer& yama::bc::code_writer::add_put_arg(uint8_t A, uint8_t B, 
 
 yama::bc::code_writer& yama::bc::code_writer::add_copy(uint8_t A, uint8_t B, bool reinit) {
     _result.add_copy(A, B, reinit);
+    _autosym_output();
+    return *this;
+}
+
+yama::bc::code_writer& yama::bc::code_writer::add_default_init(uint8_t A, uint8_t B, bool reinit) {
+    _result.add_default_init(A, B, reinit);
     _autosym_output();
     return *this;
 }

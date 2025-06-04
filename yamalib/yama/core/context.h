@@ -175,6 +175,9 @@ namespace yama {
         //
         //       should remove_ref return cmd_status?
 
+        // TODO: if we have finalizers instead of destructors, I don't think
+        //       above TODO should be an issue
+
         // these perform ref count incr/decr for x, w/ associated cleanup 
         // of x in the event of it's ref count reaching 0
 
@@ -260,9 +263,9 @@ namespace yama {
 
         // put does not care what type the x object is, as it overwrites it
 
-        // put panics if x is out-of-bounds (unless newtop)
-
-        // put panics if (x == newtop, but) pushing would overflow
+        // panic conditions:
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
 
         cmd_status put(local_t x, borrowed_ref v);
 
@@ -286,7 +289,12 @@ namespace yama {
         inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
         inline cmd_status push_type(type v) { return put_type(newtop, v); }
 
-        // put_fn panics if f is not a function type
+        // put_fn loads fn object of type f into the local object register at x (x may be newtop)
+
+        // panic conditions:
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
+        //      - if f is not a function type
 
         cmd_status put_fn(local_t x, type f);
 
@@ -297,15 +305,12 @@ namespace yama {
 
         // put_const does not care what type the x object is, as it overwrites it
 
-        // put_const panics if in the user call frame
-
-        // put_const panics if x is out-of-bounds (unless newtop)
-
-        // put_const panics if (x == newtop, but) pushing would overflow
-
-        // put_const panics if c is out-of-bounds
-
-        // put_const panics if the constant at c is not an object constant
+        // panic conditions:
+        //      - if in the user call frame
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
+        //      - if c is out-of-bounds
+        //      - if the constant at c is not an object constant
 
         cmd_status put_const(local_t x, const_t c);
 
@@ -317,15 +322,12 @@ namespace yama {
 
         // put_type_const does not care what type the x object is, as it overwrites it
 
-        // put_type_const panics if in the user call frame
-
-        // put_type_const panics if x is out-of-bounds (unless newtop)
-
-        // put_type_const panics if (x == newtop, but) pushing would overflow
-
-        // put_type_const panics if c is out-of-bounds
-
-        // put_type_const panics if the constant at c is not a type constant
+        // panic conditions:
+        //      - if in the user call frame
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
+        //      - if c is out-of-bounds
+        //      - if the constant at c is not a type constant
 
         cmd_status put_type_const(local_t x, const_t c);
 
@@ -336,13 +338,11 @@ namespace yama {
 
         // put_arg does not care what type the x object is, as it overwrites it
 
-        // put_arg panics if in the user call frame
-
-        // put_arg panics if x is out-of-bounds (unless newtop)
-
-        // put_arg panics if (x == newtop, but) pushing would overflow
-
-        // put_arg panics if arg is out-of-bounds
+        // panic conditions:
+        //      - if in the user call frame
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
+        //      - if arg is out-of-bounds
 
         cmd_status put_arg(local_t x, arg_t arg);
 
@@ -352,13 +352,36 @@ namespace yama {
 
         // copy does not care what type the dest object is, as it overwrites it
 
-        // copy panics if src is out-of-bounds
-
-        // copy panics if dest is out-of-bounds (unless newtop)
-
-        // copy panics if (dest == newtop, but) pushing would overflow
+        // panic conditions:
+        //      - if src is out-of-bounds
+        //      - if dest is out-of-bounds (unless newtop)
+        //      - if (dest == newtop, but) pushing would overflow
 
         cmd_status copy(local_t src, local_t dest = newtop);
+
+        // TODO: add a 'explicit_init' command method later on when we add the ability to
+        //       construct things like structs w/ stored properties which need to be initialized
+
+        // TODO: be sure to, when we add types which cannot be default initialized, make it
+        //       so default_init panics
+
+        // default_init loads a default initialized object of type t into the local
+        // object register at x (x may be newtop)
+
+        // the const_t overload initializes w/ type from the type constant at c
+
+        // panic conditions:
+        //      - if in the user call frame
+        //          * const_t overload
+        //      - if x is out-of-bounds (unless newtop)
+        //      - if (x == newtop, but) pushing would overflow
+        //      - if c is out-of-bounds
+        //          * const_t overload
+        //      - if the constant at c is not a type constant
+        //          * const_t overload
+
+        cmd_status default_init(local_t x, type t);
+        cmd_status default_init(local_t x, const_t c);
 
         // NOTE: due to the existence of the callobj, plus the limit to only one return value
         //       object, it's not possible for callobj to overflow when ret == newtop
@@ -375,21 +398,15 @@ namespace yama {
 
         // call does not check if args types are correct to use in a callobj call
 
-        // call panics if args provides no callobj (ie. if args_n == 0)
-
-        // call panics if args index range is out-of-bounds
-
-        // call panics if ret will be out-of-bounds after the call (unless newtop)
-
-        // call panics if callobj is not of a callable type
-
-        // call panics if args_n-1 is not equal to the argument count expected
-        // for a call to callobj (here, the -1 excludes callobj from argument count)
-
-        // call panics if the call stack would overflow
-
-        // call panics if, after call behaviour has completed execution, no return
-        // value object has been provided
+        // panic conditions:
+        //      - if args provides no callobj (ie. if args_n == 0)
+        //      - if args index range is out-of-bounds
+        //      - if ret will be out-of-bounds after the call (unless newtop)
+        //      - if callobj is not of a callable type
+        //      - if args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
+        //        excludes callobj from argument count)
+        //      - if the call stack would overflow
+        //      - if, after call behaviour has completed execution, no return value object has been provided
 
         cmd_status call(size_t args_n, local_t ret);
 
@@ -400,19 +417,14 @@ namespace yama {
 
         // call_nr does not check if args types are correct to use in a callobj call
 
-        // call_nr panics if args provides no callobj (ie. if args_n == 0)
-
-        // call_nr panics if args index range is out-of-bounds
-
-        // call_nr panics if callobj is not of a callable type
-
-        // call_nr panics if args_n-1 is not equal to the argument count expected
-        // for a call to callobj (here, the -1 excludes callobj from argument count)
-
-        // call_nr panics if the call stack would overflow
-
-        // call_nr panics if, after call behaviour has completed execution, no 
-        // return value object has been provided
+        // panic conditions:
+        //      - if args provides no callobj (ie. if args_n == 0)
+        //      - if args index range is out-of-bounds
+        //      - if callobj is not of a callable type
+        //      - if args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
+        //        excludes callobj from argument count)
+        //      - if the call stack would overflow
+        //      - if, after call behaviour has completed execution, no return value object has been provided
 
         cmd_status call_nr(size_t args_n);
 
@@ -422,11 +434,10 @@ namespace yama {
         // ret does not check if the type of the return value object returned
         // is correct for a call to the call object in question
 
-        // ret panics if in the user call frame
-
-        // ret panics if x is out-of-bounds
-
-        // ret panics if called multiple times
+        // panic conditions:
+        //      - if in the user call frame
+        //      - if x is out-of-bounds
+        //      - if called multiple times
 
         cmd_status ret(local_t x);
 
@@ -556,6 +567,16 @@ namespace yama {
         cmd_status _copy(local_t src, local_t dest);
 
         bool _copy_err_src_out_of_bounds(local_t src);
+
+
+        cmd_status _default_init(local_t x, stolen_ref obj);
+        cmd_status _default_init(local_t x, const_t c);
+
+        object_ref _gen_default_initialized(type t);
+
+        bool _default_init_err_in_user_call_frame();
+        bool _default_init_err_c_out_of_bounds(const_t c);
+        bool _default_init_err_c_is_not_type_constant(const_t c);
 
 
         std::optional<object_ref> _call(size_t args_n);

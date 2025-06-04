@@ -30,6 +30,7 @@ namespace yama {
 
         primitive_type,     // primitive type ref constant
         function_type,      // function type ref constant
+        struct_type,        // struct type ref constant
 
         num,                // this is not a valid constant type
     };
@@ -39,7 +40,7 @@ namespace yama {
 
     // these special constants are used to make usage of const_type more *aesthetic*
 
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
 
     constexpr auto int_const                = const_type::int0;
     constexpr auto uint_const               = const_type::uint;
@@ -48,10 +49,11 @@ namespace yama {
     constexpr auto char_const               = const_type::char0;
     constexpr auto primitive_type_const     = const_type::primitive_type;
     constexpr auto function_type_const      = const_type::function_type;
+    constexpr auto struct_type_const        = const_type::struct_type;
 
 
     inline std::string fmt_const_type(const_type x) {
-        static_assert(const_types == 7);
+        static_assert(const_types == 8);
         std::string result{};
         switch (x) {
         case int_const:             result = "int";             break;
@@ -61,6 +63,7 @@ namespace yama {
         case char_const:            result = "char";            break;
         case primitive_type_const:  result = "primitive-type";  break;
         case function_type_const:   result = "function-type";   break;
+        case struct_type_const:     result = "struct-type";     break;
         default:                    YAMA_DEADEND;               break;
         }
         return result;
@@ -80,7 +83,7 @@ namespace yama {
     // used as references to types (loaded or otherwise)
 
     constexpr bool is_type_const(const_type x) noexcept {
-        static_assert(const_types == 7);
+        static_assert(const_types == 8);
         switch (x) {
         case int_const:             return false;   break;
         case uint_const:            return false;   break;
@@ -89,6 +92,7 @@ namespace yama {
         case char_const:            return false;   break;
         case primitive_type_const:  return true;    break;
         case function_type_const:   return true;    break;
+        case struct_type_const:     return true;    break;
         default:                    return bool{};  break;
         }
     }
@@ -102,7 +106,7 @@ namespace yama {
     //       object consts in order to load stateless objects of said types
 
     constexpr bool is_object_const(const_type x) noexcept {
-        static_assert(const_types == 7);
+        static_assert(const_types == 8);
         switch (x) {
         case int_const:             return true;    break;
         case uint_const:            return true;    break;
@@ -111,6 +115,7 @@ namespace yama {
         case char_const:            return true;    break;
         case primitive_type_const:  return false;   break;
         case function_type_const:   return true;    break;
+        case struct_type_const:     return false;   break;
         default:                    return bool{};  break;
         }
     }
@@ -137,7 +142,7 @@ namespace yama {
     using const_data_of_t = typename const_data_of<C>::type;
 
 
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
 
     template<>
     struct const_data_of<int_const> final {
@@ -165,6 +170,10 @@ namespace yama {
     };
     template<>
     struct const_data_of<function_type_const> final {
+        using type = yama::type;
+    };
+    template<>
+    struct const_data_of<struct_type_const> final {
         using type = yama::type;
     };
 }

@@ -41,6 +41,7 @@ namespace yama::internal {
     //              - adding roots
     //          - detect non-local vars
     //          - detect local fns
+    //          - detect local structs
     //          - detect unannotated trailing param decls (ie. the 'd' in 'a, b, c: Int, d')
     //          - detect fns w/ >24 params
     //          - detect break stmts used outside of loop stmt blocks
@@ -59,15 +60,18 @@ namespace yama::internal {
         first_pass(translation_unit& tu);
 
 
+        static_assert(ast_types == 30); // reminder
+
         void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_Decl> x) override final;
         void visit_begin(res<ast_ImportDecl> x) override final;
         //void visit_begin(res<ast_RelativePath> x) override final;
         void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
+        void visit_begin(res<ast_StructDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
         void visit_begin(res<ast_ParamDecl> x) override final;
-        //void visit_begin(res<ast_Result> x) override final;
+        void visit_begin(res<ast_Result> x) override final;
         void visit_begin(res<ast_Block> x) override final;
         //void visit_begin(res<ast_Stmt> x) override final;
         void visit_begin(res<ast_ExprStmt> x) override final;
@@ -86,8 +90,10 @@ namespace yama::internal {
         //void visit_begin(res<ast_CharLit> x) override final;
         void visit_begin(res<ast_Assign> x) override final;
         void visit_begin(res<ast_Args> x) override final;
-        //void visit_begin(res<ast_TypeAnnot> x) override final;
-        void visit_begin(res<ast_TypeSpec> x) override final;
+        void visit_begin(res<ast_TypeAnnot> x) override final;
+        //void visit_begin(res<ast_TypeSpec> x) override final;
+
+        static_assert(ast_types == 30); // reminder
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
@@ -95,6 +101,7 @@ namespace yama::internal {
         //void visit_end(res<ast_RelativePath> x) override final;
         //void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
+        //void visit_end(res<ast_StructDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;
         //void visit_end(res<ast_ParamDecl> x) override final;
         //void visit_end(res<ast_Result> x) override final;
@@ -133,14 +140,22 @@ namespace yama::internal {
         void _insert_importdecl(res<ast_ImportDecl> x, const import_path& path);
         void _insert_importdecl_for_implicit_yama_import(const import_path& path);
         void _insert_vardecl(res<ast_VarDecl> x);
-        bool _insert_fndecl(res<ast_FnDecl> x);
+        void _insert_fndecl(res<ast_FnDecl> x, bool& no_name_conflict);
         void _insert_paramdecl(res<ast_ParamDecl> x);
+        void _insert_structdecl(res<ast_StructDecl> x);
         var_csym _mk_var_csym(const ast_VarDecl& x);
         fn_csym _mk_fn_csym(const ast_FnDecl& x);
         param_csym _mk_param_csym(const ast_ParamDecl& x);
+        struct_csym _mk_struct_csym(const ast_StructDecl& x);
         taul::source_pos _vardecl_intro_point(const ast_VarDecl& x);
         taul::source_pos _fndecl_intro_point(const ast_FnDecl& x);
         taul::source_pos _paramdecl_intro_point(const ast_ParamDecl& x);
+        taul::source_pos _structdecl_intro_point(const ast_StructDecl& x);
+
+        void _process_decl(const res<ast_VarDecl>& x);
+        void _process_decl(const res<ast_FnDecl>& x, bool& no_name_conflict);
+        void _process_decl(const res<ast_StructDecl>& x);
+        void _process_decl(const res<ast_ParamDecl>& x);
 
 
         // this stack maintains what fn decl is currently being evaluated
@@ -158,7 +173,7 @@ namespace yama::internal {
         bool _is_in_fn();
         _fn_decl& _current_fn();
         
-        void _begin_fn(res<ast_FnDecl> x);
+        void _begin_fn(res<ast_FnDecl> x, bool no_name_conflict);
         void _end_fn();
 
 

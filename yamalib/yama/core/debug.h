@@ -177,6 +177,7 @@ namespace yama {
         compile_not_an_expr,
         compile_nonlocal_var,
         compile_local_fn,
+        compile_local_struct,
         compile_invalid_local_var,
         compile_invalid_param_list,
         compile_nonassignable_expr,
@@ -214,6 +215,7 @@ namespace yama {
         verif_ArgB_out_of_bounds,
         verif_RA_and_RB_types_differ,
         verif_RA_and_KoB_types_differ,
+        verif_RA_and_KtB_types_differ,
         verif_RA_and_ArgB_types_differ,
         verif_ArgRs_out_of_bounds,
         verif_ArgRs_zero_objects,
@@ -245,7 +247,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 69);
+        static_assert(dsignals == 71);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -263,6 +265,7 @@ namespace yama {
             _YAMA_ENTRY_(compile_not_an_expr);
             _YAMA_ENTRY_(compile_nonlocal_var);
             _YAMA_ENTRY_(compile_local_fn);
+            _YAMA_ENTRY_(compile_local_struct);
             _YAMA_ENTRY_(compile_invalid_local_var);
             _YAMA_ENTRY_(compile_invalid_param_list);
             _YAMA_ENTRY_(compile_nonassignable_expr);
@@ -300,6 +303,7 @@ namespace yama {
             _YAMA_ENTRY_(verif_ArgB_out_of_bounds);
             _YAMA_ENTRY_(verif_RA_and_RB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_KoB_types_differ);
+            _YAMA_ENTRY_(verif_RA_and_KtB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_ArgB_types_differ);
             _YAMA_ENTRY_(verif_ArgRs_out_of_bounds);
             _YAMA_ENTRY_(verif_ArgRs_zero_objects);

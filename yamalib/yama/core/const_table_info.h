@@ -33,7 +33,7 @@ namespace yama {
     // these define the 'symbol' structs used to populate a const_table_info
     // w/ data about the consts described by the table
 
-    static_assert(const_types == 7);
+    static_assert(const_types == 8);
 
     struct int_const_info final {
         int_t           v;
@@ -96,8 +96,18 @@ namespace yama {
         std::string fmt(const const_table_info& consts) const;
     };
 
+    struct struct_type_const_info final {
+        str             qualified_name;
 
-    static_assert(const_types == 7);
+
+        kind kind() const noexcept;
+
+        bool operator==(const struct_type_const_info&) const noexcept = default;
+        std::string fmt(const const_table_info&) const;
+    };
+
+
+    static_assert(const_types == 8);
 
     template<>
     struct const_info_of<int_const> final {
@@ -127,6 +137,10 @@ namespace yama {
     struct const_info_of<function_type_const> final {
         using type = function_type_const_info;
     };
+    template<>
+    struct const_info_of<struct_type_const> final {
+        using type = struct_type_const_info;
+    };
 
 
     struct const_table_info final {
@@ -137,7 +151,8 @@ namespace yama {
             bool_const_info,
             char_const_info,
             primitive_type_const_info,
-            function_type_const_info>;
+            function_type_const_info,
+            struct_type_const_info>;
 
         static std::string fmt_info(const info& x, const const_table_info& consts);
 
@@ -146,7 +161,7 @@ namespace yama {
 
         static_assert(const_types == std::variant_size_v<info>);
 
-        static_assert(const_types == 7);
+        static_assert(const_types == 8);
         static_assert(std::is_same_v<info_t<int_const>, int_const_info>);
         static_assert(std::is_same_v<info_t<uint_const>, uint_const_info>);
         static_assert(std::is_same_v<info_t<float_const>, float_const_info>);
@@ -154,6 +169,7 @@ namespace yama {
         static_assert(std::is_same_v<info_t<char_const>, char_const_info>);
         static_assert(std::is_same_v<info_t<primitive_type_const>, primitive_type_const_info>);
         static_assert(std::is_same_v<info_t<function_type_const>, function_type_const_info>);
+        static_assert(std::is_same_v<info_t<struct_type_const>, struct_type_const_info>);
 
 
         std::vector<info> consts;
@@ -203,7 +219,7 @@ namespace yama {
 
         // these methods add new entries into consts
 
-        static_assert(const_types == 7);
+        static_assert(const_types == 8);
 
         const_table_info& add_int(int_t v);
         const_table_info& add_uint(uint_t v);
@@ -212,6 +228,7 @@ namespace yama {
         const_table_info& add_char(char_t v);
         const_table_info& add_primitive_type(const str& qualified_name);
         const_table_info& add_function_type(const str& qualified_name, callsig_info callsig);
+        const_table_info& add_struct_type(const str& qualified_name);
 
 
     private:

@@ -36,12 +36,15 @@ namespace yama::internal {
         second_pass(translation_unit& tu);
 
 
+        static_assert(ast_types == 30); // reminder
+
         //void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_Decl> x) override final;
         //void visit_begin(res<ast_ImportDecl> x) override final;
         //void visit_begin(res<ast_RelativePath> x) override final;
         //void visit_begin(res<ast_VarDecl> x) override final;
         void visit_begin(res<ast_FnDecl> x) override final;
+        void visit_begin(res<ast_StructDecl> x) override final;
         //void visit_begin(res<ast_CallSig> x) override final;
         //void visit_begin(res<ast_ParamDecl> x) override final;
         //void visit_begin(res<ast_Result> x) override final;
@@ -53,7 +56,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_BreakStmt> x) override final;
         //void visit_begin(res<ast_ContinueStmt> x) override final;
         //void visit_begin(res<ast_ReturnStmt> x) override final;
-        void visit_begin(res<ast_Expr> x) override final;
+        //void visit_begin(res<ast_Expr> x) override final;
         //void visit_begin(res<ast_PrimaryExpr> x) override final;
         //void visit_begin(res<ast_Lit> x) override final;
         //void visit_begin(res<ast_IntLit> x) override final;
@@ -66,12 +69,15 @@ namespace yama::internal {
         //void visit_begin(res<ast_TypeAnnot> x) override final;
         void visit_begin(res<ast_TypeSpec> x) override final;
 
+        static_assert(ast_types == 30); // reminder
+
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
         //void visit_end(res<ast_ImportDecl> x) override final;
         //void visit_end(res<ast_RelativePath> x) override final;
         void visit_end(res<ast_VarDecl> x) override final;
         void visit_end(res<ast_FnDecl> x) override final;
+        void visit_end(res<ast_StructDecl> x) override final;
         //void visit_end(res<ast_CallSig> x) override final;
         //void visit_end(res<ast_ParamDecl> x) override final;
         //void visit_end(res<ast_Result> x) override final;
@@ -83,7 +89,7 @@ namespace yama::internal {
         void visit_end(res<ast_BreakStmt> x) override final;
         void visit_end(res<ast_ContinueStmt> x) override final;
         void visit_end(res<ast_ReturnStmt> x) override final;
-        void visit_end(res<ast_Expr> x) override final;
+        //void visit_end(res<ast_Expr> x) override final;
         //void visit_end(res<ast_PrimaryExpr> x) override final;
         //void visit_end(res<ast_Lit> x) override final;
         //void visit_end(res<ast_IntLit> x) override final;
@@ -92,26 +98,13 @@ namespace yama::internal {
         //void visit_end(res<ast_BoolLit> x) override final;
         //void visit_end(res<ast_CharLit> x) override final;
         //void visit_end(res<ast_Assign> x) override final;
-        void visit_end(res<ast_Args> x) override final;
+        //void visit_end(res<ast_Args> x) override final;
         //void visit_end(res<ast_TypeAnnot> x) override final;
-        void visit_end(res<ast_TypeSpec> x) override final;
+        //void visit_end(res<ast_TypeSpec> x) override final;
 
 
     private:
         // IMPORTANT: if fatal error, the compilation is not to perform further codegen
-
-
-        cvalue _default_init_rvalue(const ctype& type);
-
-
-        // TODO: maybe delete later
-
-        // for ast_ExprStmt(s) w/ an assignment, the expr on the left-hand-side of this assignment
-        // is called the 'lvalue', and is special in that normal eval semantics don't apply to it
-
-        // this disabling of eval semantics also extends to type specs
-
-        scope_counter _lvalue_scope, _type_spec_scope;
 
 
         struct _if_stmt_t final {

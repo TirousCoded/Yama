@@ -2,12 +2,14 @@
 
 #include "expr_analyzer.h"
 
+#include "../core/kind-features.h"
+
 #include "util.h"
 #include "compiler.h"
 
 
 std::string yama::internal::expr_analyzer::fmt_category(category x) {
-    static_assert(categories == 10);
+    static_assert(categories == 11);
     switch (x) {
     case category::param_id:            return "param id expr";
     case category::var_id:              return "local var id expr";
@@ -18,6 +20,7 @@ std::string yama::internal::expr_analyzer::fmt_category(category x) {
     case category::bool_lit:            return "bool literal expr";
     case category::char_lit:            return "char literal expr";
     case category::call:                return "call expr";
+    case category::default_init:        return "default initialize expr";
     case category::constexpr_guarantee: return "constexpr guarantee expr";
     default: YAMA_DEADEND; break;
     }
@@ -27,16 +30,8 @@ std::string yama::internal::expr_analyzer::fmt_category(category x) {
 yama::internal::expr_analyzer::expr_analyzer(compiler& cs)
     : cs(cs) {}
 
-void yama::internal::expr_analyzer::acknowledge(translation_unit& tu, const ast_PrimaryExpr& x) {
-    _tu_map.insert({ safeptr<const ast_node>(x), safeptr(tu) });
-}
-
-void yama::internal::expr_analyzer::acknowledge(translation_unit& tu, const ast_Args& x) {
-    _tu_map.insert({ safeptr<const ast_node>(x), safeptr(tu) });
-}
-
-void yama::internal::expr_analyzer::acknowledge(translation_unit& tu, const ast_Expr& x) {
-    _tu_map.insert({ safeptr<const ast_node>(x), safeptr(tu) });
+void yama::internal::expr_analyzer::acknowledge(translation_unit& tu, const ast_expr& x) {
+    _tu_map.insert({ safeptr<const ast_expr>(x), safeptr(tu) });
 }
 
 void yama::internal::expr_analyzer::add_root(const ast_Expr& x) {
@@ -46,31 +41,15 @@ void yama::internal::expr_analyzer::add_root(const ast_Expr& x) {
     };
 }
 
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::operator[](const ast_PrimaryExpr& x) {
-    return _pull(x);
-}
-
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::operator[](const ast_Args& x) {
-    return _pull(x);
-}
-
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::operator[](const ast_Expr& x) {
+yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::operator[](const ast_expr& x) {
     return _pull(x);
 }
 
 yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::operator[](const ast_TypeSpec& x) {
-    return _pull(deref_assert(x.expr));
+    return _pull(x);
 }
 
-std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::crvalue(const ast_PrimaryExpr& x) {
-    return _pull(x).crvalue;
-}
-
-std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::crvalue(const ast_Args& x) {
-    return _pull(x).crvalue;
-}
-
-std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::crvalue(const ast_Expr& x) {
+std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::crvalue(const ast_expr& x) {
     return _pull(x).crvalue;
 }
 
@@ -78,21 +57,7 @@ std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::crvalue(con
     return x.expr ? crvalue(*x.expr) : std::nullopt;
 }
 
-std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_type(const ast_PrimaryExpr& x) {
-    if (const auto result = crvalue(x)) {
-        return result->to_type();
-    }
-    return std::nullopt;
-}
-
-std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_type(const ast_Args& x) {
-    if (const auto result = crvalue(x)) {
-        return result->to_type();
-    }
-    return std::nullopt;
-}
-
-std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_type(const ast_Expr& x) {
+std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_type(const ast_expr& x) {
     if (const auto result = crvalue(x)) {
         return result->to_type();
     }
@@ -100,7 +65,10 @@ std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_t
 }
 
 std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_type(const ast_TypeSpec& x) {
-    return x.expr ? crvalue_to_type(*x.expr) : std::nullopt;
+    return
+        x.expr
+        ? crvalue_to_type(*x.expr)
+        : std::nullopt;
 }
 
 void yama::internal::expr_analyzer::codegen(const ast_Expr& root, size_t ret) {
@@ -130,44 +98,30 @@ bool yama::internal::expr_analyzer::_is_root_and_must_be_constexpr(const ast_Exp
     else return false;
 }
 
-yama::internal::translation_unit& yama::internal::expr_analyzer::_tu(const ast_node& x) const noexcept {
+yama::internal::translation_unit& yama::internal::expr_analyzer::_tu(const ast_expr& x) const noexcept {
     YAMA_ASSERT(_tu_map.contains(x));
     return *_tu_map.at(x);
 }
 
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const ast_PrimaryExpr& x) {
+yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const ast_expr& x) {
     _resolve(x);
     return _fetch(x);
 }
 
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const ast_Args& x) {
-    _resolve(x);
-    return _fetch(x);
+yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const ast_TypeSpec& x) {
+    return _pull(deref_assert(x.expr));
 }
 
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const ast_Expr& x) {
-    _resolve(x);
-    return _fetch(x);
-}
-
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_pull(const _first_nested_info& x) {
-    YAMA_ASSERT(x.t == _ast_node_type::primary_expr || x.t == _ast_node_type::args);
-    return
-        x.t == _ast_node_type::primary_expr
-        ? _pull(*x.as<ast_PrimaryExpr>())
-        : _pull(*x.as<ast_Args>());
-}
-
-yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_fetch(const ast_node& x) {
+yama::internal::expr_analyzer::metadata& yama::internal::expr_analyzer::_fetch(const ast_expr& x) {
     YAMA_ASSERT(_is_resolved(x));
     return _metadata.at(x);
 }
 
-bool yama::internal::expr_analyzer::_is_resolved(const ast_node& x) const noexcept {
+bool yama::internal::expr_analyzer::_is_resolved(const ast_expr& x) const noexcept {
     return _metadata.contains(x);
 }
 
-void yama::internal::expr_analyzer::_gen_metadata(const ast_node& x, taul::source_pos where, category category, mode mode) {
+void yama::internal::expr_analyzer::_gen_metadata(const ast_expr& x, taul::source_pos where, category category, mode mode) {
     if (_is_resolved(x)) return;
     metadata new_md{
         .tu = _tu(x),
@@ -178,18 +132,27 @@ void yama::internal::expr_analyzer::_gen_metadata(const ast_node& x, taul::sourc
     _metadata.insert({ safeptr(x), std::move(new_md) });
 }
 
+bool yama::internal::expr_analyzer::_resolve(const ast_expr& x) {
+    if (_is_resolved(x)) {
+        return _fetch(x).good();
+    }
+    if (const auto r = x.as<ast_PrimaryExpr>()) return _resolve(*r);
+    else if (const auto r = x.as<ast_Args>())   return _resolve(*r);
+    else if (const auto r = x.as<ast_Expr>())   return _resolve(*r);
+    else                                        YAMA_DEADEND;
+    return bool();
+}
+
 bool yama::internal::expr_analyzer::_resolve(const ast_PrimaryExpr& x) {
-    if (_is_resolved(x)) return _fetch(x).good();
     _gen_metadata(x, x.low_pos(), _discern_category(x), _discern_mode(x));
     return _resolve_expr(x);
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
-    if (_is_resolved(x)) return _fetch(x).good();
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
-    _gen_metadata(x, x.get_expr()->low_pos(), _discern_category(x), _discern_mode(x));
+    _gen_metadata(x, x.root_expr()->low_pos(), _discern_category(x), _discern_mode(x));
     return
         can_resolve_expr
         ? _resolve_expr(x)
@@ -197,7 +160,6 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
-    if (_is_resolved(x)) return _fetch(x).good();
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
@@ -210,11 +172,9 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
 
 bool yama::internal::expr_analyzer::_resolve_children(const ast_Args& x) {
     bool success = true;
-    // below, we put the '&& success' AFTER _resolve as I don't want short-circuiting to skip it
-    if (const auto prior = _first_nested_subexpr(x)) { // resolve prior suffix or primary expr, if any
-        if (prior->t == _ast_node_type::primary_expr)   success = _resolve(*prior->as<ast_PrimaryExpr>()) && success;
-        else if (prior->t == _ast_node_type::args)      success = _resolve(*prior->as<ast_Args>()) && success;
-        else                                            YAMA_DEADEND;
+    // using '&& success' ensures short-circuiting doesn't skip method call
+    if (const auto prior = x.get_primary_subexpr()) { // skip if we're constexpr guarantee expr
+        success = _resolve(*prior) && success;
     }
     for (const auto& arg : x.args) { // resolve args, sequentially
         success = _resolve(*arg) && success;
@@ -223,13 +183,8 @@ bool yama::internal::expr_analyzer::_resolve_children(const ast_Args& x) {
 }
 
 bool yama::internal::expr_analyzer::_resolve_children(const ast_Expr& x) {
-    if (const auto prior = _first_nested_subexpr(x)) { // resolve prior suffix or primary expr, if any
-        if (prior->t == _ast_node_type::primary_expr)   return _resolve(*prior->as<ast_PrimaryExpr>());
-        else if (prior->t == _ast_node_type::args)      return _resolve(*prior->as<ast_Args>());
-        else                                            YAMA_DEADEND;
-    }
-    else YAMA_DEADEND; // no primary expr
-    return bool();
+    // resolve prior base/suffix expr (at least a base expr MUST be present)
+    return _resolve(*res(x.get_primary_subexpr()));
 }
 
 yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_PrimaryExpr& x) {
@@ -257,17 +212,19 @@ yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_
 }
 
 yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_Args& x) {
-    return
-        x.is_constexpr_guarantee_expr_args()
-        ? category::constexpr_guarantee
-        : category::call;
+    if (x.is_constexpr_guarantee_expr_args()) {
+        return category::constexpr_guarantee;
+    }
+    else if ((*this)[deref_assert(x.get_primary_subexpr())].type == _tu(x).types.type_type()) {
+        return category::default_init;
+    }
+    else {
+        return category::call;
+    }
 }
 
 yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_Expr& x) {
-    return
-        x.args.empty()
-        ? _pull(*res(x.primary)).category
-        : _pull(*x.args.back()).category;
+    return _pull(*res(x.get_primary_subexpr())).category;
 }
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
@@ -328,7 +285,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
             return false;
         }
         const ctype& our_t = deref_assert(t);
-        static_assert(kinds == 2); // reminder
+        static_assert(kinds == 3); // reminder
         if (our_t.kind() == kind::function) { // output if fn typed
             md.type = our_t;
             md.crvalue = cvalue::fn_v(our_t);
@@ -425,7 +382,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
             return false;
         }
-        const ctype callobj_type = _pull(_first_nested_subexpr(x).value()).type.value();
+        const ctype callobj_type = _pull(*res(x.get_primary_subexpr())).type.value();
         const bool callobj_is_callable_type = callobj_type.kind() == kind::function;
         if (_raise_invalid_operation_due_to_noncallable_type_if(!callobj_is_callable_type, md, callobj_type)) {
             return false;
@@ -439,7 +396,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         for (size_t i = 0; i < actual_args; i++) { // type check the args
             const ctype expected_type = callobj_type.param_type(i, *cs).value();
             const ctype actual_type = _pull(*x.args[i]).type.value();
-            (void)_raise_type_mismatch_for_arg_if(actual_type != expected_type, md, i + 1, actual_type, expected_type);
+            (void)_raise_type_mismatch_for_arg_if(actual_type, expected_type, md, i + 1);
         }
         if (md.tu->err.is_fatal()) { // if arg type check failed
             return false;
@@ -447,6 +404,24 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         const ctype return_type = md.tu->types.default_none(callobj_type.return_type(*cs));
         md.type = return_type;
         md.crvalue = _runtime_only;
+    }
+    break;
+    case category::default_init:
+    {
+        if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
+            return false;
+        }
+        const metadata& initialized_type_md = _pull(deref_assert(x.get_primary_subexpr()));
+        YAMA_ASSERT(initialized_type_md.type == _tu(x).types.type_type());
+        if (_raise_nonconstexpr_expr_if(!initialized_type_md.is_constexpr(), md)) {
+            return false;
+        }
+        const ctype initialized_type = initialized_type_md.crvalue.value().to_type().value();
+        if (_raise_wrong_arg_count_if(x.args.size() >= 1, md, 0)) {
+            return false;
+        }
+        md.type = initialized_type;
+        md.crvalue = _default_init_crvalue(initialized_type, md);
     }
     break;
     case category::constexpr_guarantee:
@@ -473,10 +448,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_Expr& x) {
     metadata& md = _fetch(x);
-    const auto& child_md =
-        x.args.empty()
-        ? _pull(*res(x.primary)) // primary expr
-        : _pull(*x.args.back()); // last suffix
+    const auto& child_md = _pull(*res(x.get_primary_subexpr()));
     const bool must_be_constexpr_but_isnt =
         _is_root_and_must_be_constexpr(x) &&
         !child_md.is_constexpr();
@@ -495,6 +467,12 @@ void yama::internal::expr_analyzer::_codegen(const ast_Expr& root, std::optional
     _codegen_step(root, ret);
 }
 
+void yama::internal::expr_analyzer::_codegen_step(const ast_expr& x, std::optional<size_t> ret) {
+    if (const auto r = x.as<ast_PrimaryExpr>())    _codegen_step(*r, ret);
+    else if (const auto r = x.as<ast_Args>())           _codegen_step(*r, ret);
+    else                                                YAMA_DEADEND;
+}
+
 void yama::internal::expr_analyzer::_codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret) {
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
@@ -507,7 +485,7 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_PrimaryExpr& x, std:
     }
     // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto crvalue = md.crvalue;
+    const auto& crvalue = md.crvalue;
     // if newtop, push a temporary
     if (ret == size_t(newtop)) {
         tu.rs.push_temp(x, type);
@@ -554,18 +532,18 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
     auto& tu = _tu(x);
     // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto crvalue = md.crvalue;
+    const auto& crvalue = md.crvalue;
     switch (md.category) {
     case category::call:
     {
         // perform prior steps
         // (gotta do these BEFORE our autosym, as _codegen_step will overwrite it)
-        _codegen_step(_first_nested_subexpr(x).value(), size_t(newtop));
-        for (const auto& I : x.args) {
+        _codegen_step(*res(x.get_primary_subexpr()), size_t(newtop));
+        for (const auto& I : x.args) { // codegen arg exprs
             _codegen_step(*I, size_t(newtop));
         }
         // autosym w/ expr this is a suffix of
-        tu.cgt.autosym(x.get_expr()->low_pos());
+        tu.cgt.autosym(x.root_expr()->low_pos());
         // on the register stack will be the temporaries corresponding to the callobj
         // and args of the call this code will resolve
         const size_t param_args = x.args.size();
@@ -600,6 +578,44 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
         }
     }
     break;
+    case category::default_init:
+    {
+        // autosym w/ expr this is a suffix of
+        tu.cgt.autosym(x.root_expr()->low_pos());
+        if (crvalue) { // constexpr
+            // if expr is not even gonna be used for its return value, then this expr is
+            // 100% transparent, and codegen can just be forwent altogether
+            if (!ret) {
+                return;
+            }
+            const uint8_t output_reg = uint8_t(deref_assert(ret));
+            // if newtop, push a temporary
+            if (ret == size_t(newtop)) {
+                tu.rs.push_temp(x, type);
+            }
+            // just write an instr outputting its value
+            tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value());
+        }
+        else { // non-constexpr
+            // TODO: later on, when we add default initializers which actually involve
+            //       a ctor call, we'll in that scenario STILL be able to forgo codegen in
+            //       situations where (1) this ctor call is transparent, and (2) the result
+            //       of this default init expr isn't needed
+            //
+            //       not gonna add this now, as I don't have a way to distinguish between
+            //       these different types of initializers, and I don't wanna risk creating
+            //       bugs if later, when we add these initializers, I forget about this
+            //       part of our code
+            const uint8_t output_reg = uint8_t(deref_assert(ret));
+            // if newtop, push a temporary
+            if (ret == size_t(newtop)) {
+                tu.rs.push_temp(x, type);
+            }
+            // write default_init instr to initialize the object
+            tu.cgt.cw.add_default_init(output_reg, uint8_t(tu.ctp.pull_type(type)));
+        }
+    }
+    break;
     case category::constexpr_guarantee:
     {
         // if expr is not even gonna be used for its return value, then this expr is
@@ -629,7 +645,7 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::option
     auto& tu = _tu(x);
     // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto crvalue = md.crvalue;
+    const auto& crvalue = md.crvalue;
     if (crvalue) { // constexpr
         // if expr is not even gonna be used for its return value, then this expr is
         // 100% transparent, and codegen can just be forwent altogether
@@ -646,57 +662,16 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::option
     }
     else { // non-constexpr
         // forward to nested, including forwarding ret
-        _codegen_step(_first_nested_subexpr(x).value(), ret);
-    }
-}
-
-void yama::internal::expr_analyzer::_codegen_step(const _first_nested_info& x, std::optional<size_t> ret) {
-    if (x.t == _ast_node_type::primary_expr)    _codegen_step(*x.as<ast_PrimaryExpr>(), ret);
-    else if (x.t == _ast_node_type::args)       _codegen_step(*x.as<ast_Args>(), ret);
-    else                                        YAMA_DEADEND;
-}
-
-std::optional<yama::internal::expr_analyzer::_first_nested_info> yama::internal::expr_analyzer::_first_nested_subexpr(const ast_Args& x) {
-    if (x.index == 0) {
-        const auto& primary = x.get_expr()->primary;
-        if (!primary) return std::nullopt;
-        return _first_nested_info{
-            .t = _ast_node_type::primary_expr,
-            .node = res(primary),
-        };
-    }
-    else {
-        YAMA_ASSERT(x.get_expr()->args.size() > x.index - 1);
-        return _first_nested_info{
-            .t = _ast_node_type::args,
-            .node = x.get_expr()->args[x.index - 1],
-        };
-    }
-}
-
-std::optional<yama::internal::expr_analyzer::_first_nested_info> yama::internal::expr_analyzer::_first_nested_subexpr(const ast_Expr& x) {
-    if (x.args.empty()) {
-        const auto& primary = x.primary;
-        if (!primary) return std::nullopt;
-        return _first_nested_info{
-            .t = _ast_node_type::primary_expr,
-            .node = res(primary),
-        };
-    }
-    else {
-        return _first_nested_info{
-            .t = _ast_node_type::args,
-            .node = x.args.back(),
-        };
+        _codegen_step(*res(x.get_primary_subexpr()), ret);
     }
 }
 
 yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_PrimaryExpr& x) const noexcept {
-    return _discern_mode(*x.get_expr());
+    return _discern_mode(*x.root_expr());
 }
 
 yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_Args& x) const noexcept {
-    return _discern_mode(*x.get_expr());
+    return _discern_mode(*x.root_expr());
 }
 
 yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_Expr& x) const noexcept {
@@ -704,6 +679,23 @@ yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode
         x.is_assign_stmt_lvalue
         ? mode::lvalue
         : mode::rvalue;
+}
+
+std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::_default_init_crvalue(const ctype& type, metadata& md) {
+    auto& tu = *md.tu;
+    if (is_primitive(type.kind())) {
+        if (type == tu.types.none_type())       return cvalue::none_v(tu.types);
+        else if (type == tu.types.int_type())   return cvalue::int_v(0, tu.types);
+        else if (type == tu.types.uint_type())  return cvalue::uint_v(0u, tu.types);
+        else if (type == tu.types.float_type()) return cvalue::float_v(0.0, tu.types);
+        else if (type == tu.types.bool_type())  return cvalue::bool_v(false, tu.types);
+        else if (type == tu.types.char_type())  return cvalue::char_v(U'\0', tu.types);
+        else if (type == tu.types.type_type())  return cvalue::type_v(tu.types.none_type(), tu.types);
+        else                                    YAMA_DEADEND;
+    }
+    else if (is_function(type.kind()))          return cvalue::fn_v(type);
+    else                                        return _runtime_only;
+    return std::nullopt; // dummy
 }
 
 bool yama::internal::expr_analyzer::_is_type_ref_id_expr(const ast_PrimaryExpr& x) {
@@ -850,8 +842,9 @@ bool yama::internal::expr_analyzer::_raise_invalid_operation_due_to_noncallable_
     return x;
 }
 
-bool yama::internal::expr_analyzer::_raise_type_mismatch_for_arg_if(bool x, metadata& md, size_t arg_display_number, ctype actual, ctype expected) {
-    if (x) {
+bool yama::internal::expr_analyzer::_raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number) {
+    const bool result = actual != expected;
+    if (result) {
         md.tu->err.error(
             md.where,
             dsignal::compile_type_mismatch,
@@ -860,7 +853,20 @@ bool yama::internal::expr_analyzer::_raise_type_mismatch_for_arg_if(bool x, meta
             actual.fmt(md.tu->e()),
             expected.fmt(md.tu->e()));
     }
-    return x;
+    return result;
+}
+
+bool yama::internal::expr_analyzer::_raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md) {
+    const bool result = actual != expected;
+    if (result) {
+        md.tu->err.error(
+            md.where,
+            dsignal::compile_type_mismatch,
+            "initialized type expr is type {0}, but expected {1}!",
+            actual.fmt(md.tu->e()),
+            expected.fmt(md.tu->e()));
+    }
+    return result;
 }
 
 yama::str yama::internal::expr_analyzer::_remove_quotes(const str& x) noexcept {

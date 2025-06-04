@@ -95,7 +95,7 @@ TEST(BCodeTests, ReinitFlag) {
 TEST(BCodeTests, Construction) {
     yama::bc::code a{};
 
-    static_assert(yama::bc::opcodes == 13);
+    static_assert(yama::bc::opcodes == 14);
 
     a
         .add_noop()
@@ -109,6 +109,8 @@ TEST(BCodeTests, Construction) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
+        .add_default_init(10, 11)
+        .add_default_init(10, 11, true)
         .add_call(11, 12)
         .add_call(11, 12, true)
         .add_call_nr(11)
@@ -117,7 +119,7 @@ TEST(BCodeTests, Construction) {
         .add_jump_true(10, -6)
         .add_jump_false(10, -6);
 
-    ASSERT_EQ(a.count(), 18);
+    ASSERT_EQ(a.count(), 20);
 
     std::cerr << a.fmt_disassembly() << "\n";
 
@@ -193,6 +195,20 @@ TEST(BCodeTests, Construction) {
     EXPECT_EQ(a[i].A, 10);
     EXPECT_EQ(a[i].B, 11);
     EXPECT_TRUE(a.reinit_flag(i));
+    
+    i++;
+
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::default_init);
+    EXPECT_EQ(a[i].A, 10);
+    EXPECT_EQ(a[i].B, 11);
+    EXPECT_FALSE(a.reinit_flag(i));
+
+    i++;
+
+    EXPECT_EQ(a[i].opc, yama::bc::opcode::default_init);
+    EXPECT_EQ(a[i].A, 10);
+    EXPECT_EQ(a[i].B, 11);
+    EXPECT_TRUE(a.reinit_flag(i));
 
     i++;
 
@@ -251,7 +267,7 @@ TEST(BCodeTests, CodeWriter_DefaultInit) {
 
 TEST(BCodeTests, CodeWriter_Usage) {
 
-    static_assert(yama::bc::opcodes == 13);
+    static_assert(yama::bc::opcodes == 14);
 
     const auto expected =
         yama::bc::code()
@@ -266,6 +282,8 @@ TEST(BCodeTests, CodeWriter_Usage) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
+        .add_default_init(10, 11)
+        .add_default_init(10, 11, true)
         .add_call(11, 12)
         .add_call(11, 12, true)
         .add_call_nr(11)
@@ -291,6 +309,8 @@ TEST(BCodeTests, CodeWriter_Usage) {
         .add_put_arg(10, 11, true)
         .add_copy(10, 11)
         .add_copy(10, 11, true)
+        .add_default_init(10, 11)
+        .add_default_init(10, 11, true)
         .add_call(11, 12)
         .add_call(11, 12, true)
         .add_call_nr(11)

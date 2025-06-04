@@ -150,6 +150,8 @@ namespace yama {
         bool _verify_RA_and_RB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_KoB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_KoB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RA_and_KtB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
+        bool _verify_RA_and_KtB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
         bool _verify_ArgRs_legal_call_object(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i);
@@ -177,6 +179,7 @@ namespace yama {
         str _R_type(const _cfg_block& block, size_t index);
         str _R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index);
         str _Ko_type(const type_info& subject, size_t index);
+        str _Kt_type(const type_info& subject, size_t index); // for _Kt_type, it's the type named in the constant
         str _Arg_type(const type_info& subject, size_t index);
 
         size_t _calc_jump_dest(size_t i, int16_t sBx);

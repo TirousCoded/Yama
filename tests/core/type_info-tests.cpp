@@ -10,9 +10,9 @@
 using namespace yama::string_literals;
 
 
-static_assert(yama::kinds == 2);
+static_assert(yama::kinds == 3);
 
-TEST(TypeInfoTests, PrimitiveType) {
+TEST(TypeInfoTests, Primitive) {
     yama::type_info abc{
         .unqualified_name = "abc"_str,
         .consts = {},
@@ -31,7 +31,7 @@ TEST(TypeInfoTests, PrimitiveType) {
     EXPECT_EQ(abc.bsyms(), nullptr);
 }
 
-TEST(TypeInfoTests, FunctionType) {
+TEST(TypeInfoTests, Function) {
     auto cf = [](yama::context&) {};
 
     yama::type_info abc{
@@ -52,5 +52,25 @@ TEST(TypeInfoTests, FunctionType) {
     EXPECT_EQ(abc.max_locals(), 17);
     EXPECT_EQ(abc.bcode(), &(std::get<yama::function_info>(abc.info).bcode));
     EXPECT_EQ(abc.bsyms(), &(std::get<yama::function_info>(abc.info).bsyms));
+}
+
+TEST(TypeInfoTests, Struct) {
+    auto cf = [](yama::context&) {};
+
+    yama::type_info abc{
+        .unqualified_name = "abc"_str,
+        .consts = {},
+        .info = yama::struct_info{
+        },
+    };
+
+    EXPECT_EQ(abc.kind(), yama::kind::struct0);
+
+    EXPECT_EQ(abc.ptype(), std::nullopt);
+    EXPECT_EQ(abc.callsig(), nullptr);
+    EXPECT_EQ(abc.call_fn(), std::nullopt);
+    EXPECT_EQ(abc.max_locals(), 0);
+    EXPECT_EQ(abc.bcode(), nullptr);
+    EXPECT_EQ(abc.bsyms(), nullptr);
 }
 

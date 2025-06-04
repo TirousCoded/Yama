@@ -37,11 +37,21 @@ namespace yama::internal {
         bool has_target() const noexcept;
         yama::type_info& target() noexcept;
 
-        const fn_csym& target_csym();
+        std::shared_ptr<csymtab_entry> try_target_csym_entry();
+        res<csymtab_entry> target_csym_entry();
+        template<typename T>
+        inline T& target_csym() {
+            return target_csym_entry()->as<T>();
+        }
+
         std::optional<size_t> target_param_index(const str& name);
 
 
-        void gen_new_target(const str& unqualified_name); // generates and binds new target
+        static_assert(kinds == 3); // reminder
+
+        void gen_target_fn(const str& unqualified_name);
+        void gen_target_struct(const str& unqualified_name);
+
         void upload_target(const ast_node& where); // uploads target to module, unbinding it
 
 
@@ -57,6 +67,7 @@ namespace yama::internal {
         label_id_t _next_label = 0;
 
 
+        void _bind_bare_bones_type_info(const str& unqualified_name, type_info::info_t&& info);
         void _apply_bcode_to_target(const ast_node& where);
     };
 }

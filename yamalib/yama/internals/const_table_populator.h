@@ -47,6 +47,7 @@ namespace yama::internal {
 
         const_t pull_prim_type(const ctype& t);
         const_t pull_fn_type(const ctype& t);
+        const_t pull_struct_type(const ctype& t);
 
 
         callsig_info build_callsig_for_fn_type(const ctype& t);
@@ -55,13 +56,26 @@ namespace yama::internal {
     private:
         template<const_type C>
         inline std::optional<const_t> _find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept;
+        template<const_type C>
+        inline std::optional<const_t> _find_existing_type_c(const const_table_info& consts, const str& qualified_name) const noexcept;
     };
 
     template<const_type C>
     inline std::optional<const_t> const_table_populator::_find_existing_c(const const_table_info& consts, const const_data_of_t<C>& x) const noexcept {
         for (const_t i = 0; i < consts.consts.size(); i++) {
             if (const auto c = consts.get<C>(i)) {
-                if (c->v == x) return i;
+                if (c->v != x) continue;
+                return i;
+            }
+        }
+        return std::nullopt;
+    }
+    template<const_type C>
+    inline std::optional<const_t> const_table_populator::_find_existing_type_c(const const_table_info& consts, const str& qualified_name) const noexcept {
+        for (const_t i = 0; i < consts.consts.size(); i++) {
+            if (const auto c = consts.get<C>(i)) {
+                if (c->qualified_name != qualified_name) continue;
+                return i;
             }
         }
         return std::nullopt;
