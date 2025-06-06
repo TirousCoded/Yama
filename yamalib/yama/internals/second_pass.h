@@ -107,6 +107,39 @@ namespace yama::internal {
         // IMPORTANT: if fatal error, the compilation is not to perform further codegen
 
 
+        void _localvar(ast_VarDecl& x);
+        void _localvar_with_init(ast_VarDecl& x);
+        void _localvar_with_no_init(ast_VarDecl& x);
+
+        void _begin_fn(ast_FnDecl& x);
+        void _end_fn(ast_FnDecl& x);
+
+        void _begin_struct(ast_StructDecl& x);
+        void _end_struct(ast_StructDecl& x);
+
+        void _begin_block(ast_Block& x);
+        void _end_block(ast_Block& x);
+
+        void _expr_or_assign_stmt(ast_ExprStmt& x);
+        void _assign_stmt(ast_ExprStmt& x);
+        void _expr_stmt(ast_ExprStmt& x);
+
+        void _begin_if_stmt(ast_IfStmt& x);
+        void _end_if_stmt(ast_IfStmt& x);
+
+        void _begin_loop_stmt(ast_LoopStmt& x);
+        void _end_loop_stmt(ast_LoopStmt& x);
+
+        void _break_stmt(ast_BreakStmt& x);
+        void _continue_stmt(ast_ContinueStmt& x);
+
+        void _return_stmt(ast_ReturnStmt& x);
+        void _return_stmt_with_val(ast_ReturnStmt& x);
+        void _return_stmt_with_no_val(ast_ReturnStmt& x);
+
+        void _type_spec(ast_TypeSpec& x);
+
+
         struct _if_stmt_t final {
             // TODO: cond_reg_index is currently unused, so maybe remove it?
             std::optional<size_t> cond_reg_index = std::nullopt;

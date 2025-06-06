@@ -30,6 +30,9 @@ namespace yama {
         bool operator==(const primitive_info&) const noexcept = default;
 
         std::string fmt(const char* tab = "    ") const;
+
+
+        static primitive_info create(yama::ptype ptype);
     };
 
     struct function_info final {
@@ -48,6 +51,10 @@ namespace yama {
         bool operator==(const function_info&) const noexcept = default;
 
         std::string fmt(const const_table_info& consts, const char* tab = "    ") const;
+
+
+        static function_info create(callsig_info callsig, size_t max_locals, yama::call_fn call_fn);
+        static function_info create(callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms);
     };
 
     struct struct_info final {
@@ -57,6 +64,9 @@ namespace yama {
         bool operator==(const struct_info&) const noexcept = default;
 
         std::string fmt(const char* tab = "    ") const;
+
+
+        static struct_info create();
     };
 
     struct type_info final {
@@ -90,9 +100,13 @@ namespace yama {
 
         std::string fmt(const char* tab = "    ") const;
         std::string fmt_sym(size_t index) const;
+
+
+        static type_info create(const str& unqualified_name, const_table_info consts, info_t info);
     };
 }
 
 YAMA_SETUP_FORMAT(yama::primitive_info, x.fmt());
+YAMA_SETUP_FORMAT(yama::struct_info, x.fmt());
 YAMA_SETUP_FORMAT(yama::type_info, x.fmt());
 

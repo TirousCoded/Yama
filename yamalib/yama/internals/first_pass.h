@@ -143,10 +143,12 @@ namespace yama::internal {
         void _insert_fndecl(res<ast_FnDecl> x, bool& no_name_conflict);
         void _insert_paramdecl(res<ast_ParamDecl> x);
         void _insert_structdecl(res<ast_StructDecl> x);
+        
         var_csym _mk_var_csym(const ast_VarDecl& x);
         fn_csym _mk_fn_csym(const ast_FnDecl& x);
         param_csym _mk_param_csym(const ast_ParamDecl& x);
         struct_csym _mk_struct_csym(const ast_StructDecl& x);
+
         taul::source_pos _vardecl_intro_point(const ast_VarDecl& x);
         taul::source_pos _fndecl_intro_point(const ast_FnDecl& x);
         taul::source_pos _paramdecl_intro_point(const ast_ParamDecl& x);

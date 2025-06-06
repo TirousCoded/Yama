@@ -73,6 +73,12 @@ std::string yama::primitive_info::fmt(const char* tab) const {
     return result;
 }
 
+yama::primitive_info yama::primitive_info::create(yama::ptype ptype) {
+    return primitive_info{
+        .ptype = ptype,
+    };
+}
+
 bool yama::function_info::uses_bcode() const noexcept {
     return call_fn == bcode_call_fn;
 }
@@ -88,11 +94,33 @@ std::string yama::function_info::fmt(const const_table_info& consts, const char*
     return result;
 }
 
+yama::function_info yama::function_info::create(callsig_info callsig, size_t max_locals, yama::call_fn call_fn) {
+    return function_info{
+        .callsig = std::move(callsig),
+        .call_fn = call_fn,
+        .max_locals = max_locals,
+    };
+}
+
+yama::function_info yama::function_info::create(callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms) {
+    return function_info{
+        .callsig = std::move(callsig),
+        .call_fn = bcode_call_fn,
+        .max_locals = max_locals,
+        .bcode = std::move(bcode),
+        .bsyms = std::move(bsyms),
+    };
+}
+
 std::string yama::struct_info::fmt(const char* tab) const {
     YAMA_ASSERT(tab);
     std::string result{};
     result += "struct_info";
     return result;
+}
+
+yama::struct_info yama::struct_info::create() {
+    return struct_info{};
 }
 
 std::string yama::type_info::fmt(const char* tab) const {
@@ -111,5 +139,13 @@ std::string yama::type_info::fmt(const char* tab) const {
 std::string yama::type_info::fmt_sym(size_t index) const {
     if (const auto syms = bsyms())  return syms->fmt_sym(index);
     else                            return internal::fmt_no_sym(index); // ensures valid result even if no bc::syms to use
+}
+
+yama::type_info yama::type_info::create(const str& unqualified_name, const_table_info consts, info_t info) {
+    return type_info{
+        .unqualified_name = unqualified_name,
+        .consts = std::move(consts),
+        .info = std::move(info),
+    };
 }
 
