@@ -93,7 +93,7 @@ public:
     //            uploading once first loaded
 
     void upload(yama::type_info&& info) {
-        our_parcel->mf.add_type(std::forward<yama::type_info>(info));
+        our_parcel->mf.add(std::forward<yama::type_info>(info));
     }
 
     void upload_f();
@@ -141,7 +141,7 @@ void ContextTests::upload_f() {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .callsig = yama::make_callsig({ 0 }, 0),
             .call_fn = f_call_fn,
             .max_locals = 6,
         },
@@ -153,7 +153,7 @@ void ContextTests::upload_g() {
     const yama::const_table_info g_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({ 0 }, 0));
     auto g_call_fn =
         [](yama::context& ctx) {
         if (ctx.push_fn(ctx.consts().type(1).value()).bad()) return; // f
@@ -165,7 +165,7 @@ void ContextTests::upload_g() {
         .unqualified_name = "g"_str,
         .consts = g_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .callsig = yama::make_callsig({ 0 }, 0),
             .call_fn = g_call_fn,
             .max_locals = 4,
         },
@@ -185,12 +185,12 @@ void ContextTests::upload_h() {
     const yama::const_table_info h_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({ 0 }, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({ 0 }, 0));
     yama::type_info h_info{
         .unqualified_name = "h"_str,
         .consts = h_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .callsig = yama::make_callsig({ 0 }, 0),
             .call_fn = yama::bcode_call_fn,
             .max_locals = 2,
             .bcode = h_bcode,
@@ -492,7 +492,7 @@ TEST_F(ContextTests, InitialState_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 13,
         },
@@ -659,7 +659,7 @@ TEST_F(ContextTests, Arg_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0, 1 }, 0),
+            .callsig = yama::make_callsig({ 0, 1 }, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -720,7 +720,7 @@ TEST_F(ContextTests, Local_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
+            .callsig = yama::make_callsig({ 0 }, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -764,7 +764,7 @@ TEST_F(ContextTests, Panic) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -837,7 +837,7 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
     const yama::const_table_info fa_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
-        .add_function_type("self:fb"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("self:fb"_str, yama::make_callsig({}, 0));
     auto fa_call_fn =
         [](yama::context& ctx) {
         if (ctx.put_fn(yama::newtop, ctx.consts().type(1).value()).bad()) return;
@@ -851,7 +851,7 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
         .unqualified_name = "fa"_str,
         .consts = fa_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = fa_call_fn,
             .max_locals = 4,
         },
@@ -872,7 +872,7 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
         .unqualified_name = "fb"_str,
         .consts = fb_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = fb_call_fn,
             .max_locals = 1,
         },
@@ -964,7 +964,7 @@ TEST_F(ContextTests, Pop_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -1028,7 +1028,7 @@ TEST_F(ContextTests, Put_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1228,7 +1228,7 @@ TEST_F(ContextTests, PutConst) {
         .add_float(3.14159)
         .add_bool(true)
         .add_char(U'y')
-        .add_function_type("self:f"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({}, 0));
     auto f_call_fn =
         [](yama::context& ctx) {
         for (size_t i = 0; i < loadable_object_constant_types; i++) {
@@ -1258,7 +1258,7 @@ TEST_F(ContextTests, PutConst) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = yama::const_types * 2,
         },
@@ -1324,7 +1324,7 @@ TEST_F(ContextTests, PutConst_PanicIfXIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1360,7 +1360,7 @@ TEST_F(ContextTests, PutConst_PanicIfPushingOverflows) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -1394,7 +1394,7 @@ TEST_F(ContextTests, PutConst_PanicIfCIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1430,7 +1430,7 @@ TEST_F(ContextTests, PutConst_PanicIfCIsNotIndexOfAnObjectConstant) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1470,7 +1470,7 @@ TEST_F(ContextTests, PutTypeConst) {
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Int"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({}, 0));
     auto f_call_fn =
         [](yama::context& ctx) {
         for (size_t i = 0; i < type_constant_types; i++) {
@@ -1492,7 +1492,7 @@ TEST_F(ContextTests, PutTypeConst) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = type_constant_types * 2,
         },
@@ -1550,7 +1550,7 @@ TEST_F(ContextTests, PutTypeConst_PanicIfXIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1586,7 +1586,7 @@ TEST_F(ContextTests, PutTypeConst_PanicIfPushingOverflows) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -1620,7 +1620,7 @@ TEST_F(ContextTests, PutTypeConst_PanicIfCIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1657,7 +1657,7 @@ TEST_F(ContextTests, PutTypeConst_PanicIfCIsNotIndexOfATypeConstant) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1696,7 +1696,7 @@ TEST_F(ContextTests, PutArg) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 1),
+            .callsig = yama::make_callsig({ 0 }, 1),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -1750,7 +1750,7 @@ TEST_F(ContextTests, PutArg_PanicIfXIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 1),
+            .callsig = yama::make_callsig({ 0 }, 1),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1785,7 +1785,7 @@ TEST_F(ContextTests, PutArg_PanicIfPushingOverflows) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 1),
+            .callsig = yama::make_callsig({ 0 }, 1),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -1820,7 +1820,7 @@ TEST_F(ContextTests, PutArg_PanicIfArgIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 1),
+            .callsig = yama::make_callsig({ 0 }, 1),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -1873,7 +1873,7 @@ TEST_F(ContextTests, Copy_NonUserCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 4,
         },
@@ -1966,7 +1966,7 @@ namespace default_init_helpers {
             .add_primitive_type("yama:Bool"_str)
             .add_primitive_type("yama:Char"_str)
             .add_primitive_type("yama:Type"_str)
-            .add_function_type("self:f"_str, yama::make_callsig_info({ 1 }, 1))
+            .add_function_type("self:f"_str, yama::make_callsig({ 1 }, 1))
             .add_struct_type("self:SomeStruct"_str);
     }
     
@@ -1975,7 +1975,7 @@ namespace default_init_helpers {
             .unqualified_name = "testfn"_str,
             .consts = std::move(consts),
             .info = yama::function_info{
-                .callsig = yama::make_callsig_info({}, 0),
+                .callsig = yama::make_callsig({}, 0),
                 .call_fn = call_fn,
                 .max_locals = default_init_helpers::total_cases,
             },
@@ -2539,7 +2539,7 @@ TEST_F(ContextTests, Call_PanicIfArgsProvidesNoCallObj) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -2661,7 +2661,7 @@ TEST_F(ContextTests, Call_PanicIfCallStackOverflow) {
     const yama::const_table_info f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({}, 0));
     auto f_call_fn =
         [](yama::context& ctx) {
         globals.call_depth++; // count number of calls until call stack overflow
@@ -2674,7 +2674,7 @@ TEST_F(ContextTests, Call_PanicIfCallStackOverflow) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -2709,7 +2709,7 @@ TEST_F(ContextTests, Call_PanicIfNoReturnValueObjectProvided) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -2877,7 +2877,7 @@ TEST_F(ContextTests, CallNR_PanicIfArgsProvidesNoCallObj) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 2,
         },
@@ -2975,7 +2975,7 @@ TEST_F(ContextTests, CallNR_PanicIfCallStackOverflow) {
     const yama::const_table_info f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
-        .add_function_type("self:f"_str, yama::make_callsig_info({}, 0));
+        .add_function_type("self:f"_str, yama::make_callsig({}, 0));
     auto f_call_fn =
         [](yama::context& ctx) {
         globals.call_depth++; // count number of calls until call stack overflow
@@ -2988,7 +2988,7 @@ TEST_F(ContextTests, CallNR_PanicIfCallStackOverflow) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -3022,7 +3022,7 @@ TEST_F(ContextTests, CallNR_PanicIfNoReturnValueObjectProvided) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -3068,7 +3068,7 @@ TEST_F(ContextTests, Ret_AllowsReturningWrongTypedObject) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 3,
         },
@@ -3115,7 +3115,7 @@ TEST_F(ContextTests, Ret_PanicIfXIsOutOfBounds) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },
@@ -3152,7 +3152,7 @@ TEST_F(ContextTests, Ret_PanicIfCalledMultipleTimesInOneCall) {
         .unqualified_name = "f"_str,
         .consts = f_consts,
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
+            .callsig = yama::make_callsig({}, 0),
             .call_fn = f_call_fn,
             .max_locals = 1,
         },

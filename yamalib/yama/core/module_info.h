@@ -62,36 +62,35 @@ namespace yama {
 
         // behaviour is undefined if unqualified_name is already used
 
-        // TODO: add_type hasn't itself been unit tested yet
+        // TODO: add hasn't itself been unit tested yet
 
-        module_factory& add_type(type_info&& x);
+        module_factory& add(type_info&& x);
 
         static_assert(kinds == 3);
 
-        module_factory& add_primitive_type(
-            str unqualified_name,
-            const_table_info&& consts,
+        module_factory& add_primitive(
+            const str& unqualified_name,
+            const_table_info consts,
             ptype ptype);
 
-        // native fn overload
-        module_factory& add_function_type(
-            str unqualified_name,
-            const_table_info&& consts,
-            callsig_info&& callsig,
+        module_factory& add_function(
+            const str& unqualified_name,
+            const_table_info consts,
+            callsig_info callsig,
             size_t max_locals,
             call_fn call_fn);
-        // bcode overload
-        module_factory& add_function_type(
-            str unqualified_name,
-            const_table_info&& consts,
-            callsig_info&& callsig,
-            size_t max_locals,
-            bc::code&& code,
-            bc::syms&& syms = bc::syms{});
 
-        module_factory& add_struct_type(
-            str unqualified_name,
-            const_table_info&& consts);
+        module_factory& add_function(
+            const str& unqualified_name,
+            const_table_info consts,
+            callsig_info callsig,
+            size_t max_locals,
+            bc::code code,
+            bc::syms syms = bc::syms{});
+
+        module_factory& add_struct(
+            const str& unqualified_name,
+            const_table_info consts);
 
 
     private:

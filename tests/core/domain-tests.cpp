@@ -433,7 +433,7 @@ namespace {
     .add_primitive_type("self:a"_str)
     .add_primitive_type("self:b"_str)
     .add_primitive_type("self:c"_str);
-    static const auto bad_callsig = yama::make_callsig_info({ 0, 7, 2 }, 1); // <- link index 7 is out-of-bounds!
+    static const auto bad_callsig = yama::make_callsig({ 0, 7, 2 }, 1); // <- link index 7 is out-of-bounds!
     yama::type_info bad_info{
         .unqualified_name = "bad"_str,
         .consts = bad_consts,
@@ -450,28 +450,28 @@ namespace {
 
     static const yama::module_info modinf_abc =
         yama::module_factory()
-        .add_primitive_type("modinf_abc_1"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_abc_2"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_abc_1"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_abc_2"_str, yama::const_table_info{}, yama::ptype::int0)
         .done();
 
     static const yama::module_info modinf_def =
         yama::module_factory()
-        .add_primitive_type("modinf_def_1"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_def_1"_str, yama::const_table_info{}, yama::ptype::int0)
         .done();
 
     static const yama::module_info modinf_root =
         yama::module_factory()
-        .add_primitive_type("modinf_root_1"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_root_2"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_root_3"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_root_1"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_root_2"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_root_3"_str, yama::const_table_info{}, yama::ptype::int0)
         .done();
     
     static const yama::module_info modinf_selfstuff =
         yama::module_factory()
-        .add_primitive_type("modinf_selfstuff_1"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_selfstuff_2"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_selfstuff_3"_str, yama::const_table_info{}, yama::ptype::int0)
-        .add_primitive_type("modinf_selfstuff_4"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_selfstuff_1"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_selfstuff_2"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_selfstuff_3"_str, yama::const_table_info{}, yama::ptype::int0)
+        .add_primitive("modinf_selfstuff_4"_str, yama::const_table_info{}, yama::ptype::int0)
         .done();
 
 
@@ -505,7 +505,7 @@ namespace {
                 //            attempting to import a *nonexistent* module
                 // this returns an invalid module to test import failure due to static verif fail
                 yama::module_factory mf{};
-                mf.add_type(yama::type_info(bad_info)); // <- will cause static verif fail
+                mf.add(yama::type_info(bad_info)); // <- will cause static verif fail
                 return yama::make_res<yama::module_info>(mf.done());
             }
             else return std::nullopt;
@@ -547,7 +547,7 @@ namespace {
         .add_primitive_type("self.abc:a"_str)
         .add_primitive_type("self.abc:b"_str)
         .add_primitive_type("self.abc:c"_str);
-    static const auto f_callsig = yama::make_callsig_info({ 0, 1, 2 }, 1);
+    static const auto f_callsig = yama::make_callsig({ 0, 1, 2 }, 1);
     yama::type_info f_info{
         .unqualified_name = "f"_str,
         .consts = f_consts,
@@ -762,10 +762,10 @@ TEST_F(DomainTests, Import_Fail_InvalidModule_StaticVerificationFailure) {
 TEST_F(DomainTests, Load) {
     auto our_parcel = yama::make_res<test_parcel2>();
     our_parcel->mf
-        .add_type(yama::type_info(f_info))
-        .add_type(yama::type_info(a_info))
-        .add_type(yama::type_info(b_info))
-        .add_type(yama::type_info(c_info));
+        .add(yama::type_info(f_info))
+        .add(yama::type_info(a_info))
+        .add(yama::type_info(b_info))
+        .add(yama::type_info(c_info));
 
     yama::install_batch ib{};
     ib.install("p"_str, our_parcel);
@@ -823,8 +823,8 @@ TEST_F(DomainTests, Load) {
 TEST_F(DomainTests, Load_DisambiguationViaImportPaths) {
     auto our_parcel_A = yama::make_res<test_parcel2>();
     auto our_parcel_B = yama::make_res<test_parcel2>();
-    our_parcel_A->mf.add_type(yama::type_info(a_info));
-    our_parcel_B->mf.add_type(yama::type_info(a_info));
+    our_parcel_A->mf.add(yama::type_info(a_info));
+    our_parcel_B->mf.add(yama::type_info(a_info));
 
     yama::install_batch ib{};
     ib.install("A"_str, our_parcel_A);
@@ -862,10 +862,10 @@ TEST_F(DomainTests, Load_FailDueToLoadingError) {
 
     auto our_parcel = yama::make_res<test_parcel2>();
     our_parcel->mf
-        .add_type(yama::type_info(f_info))
-        .add_type(yama::type_info(a_info))
+        .add(yama::type_info(f_info))
+        .add(yama::type_info(a_info))
         //.add_type(yama::type_info(b_info))
-        .add_type(yama::type_info(c_info));
+        .add(yama::type_info(c_info));
 
     yama::install_batch ib{};
     ib.install("p"_str, our_parcel);

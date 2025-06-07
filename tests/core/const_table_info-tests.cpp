@@ -19,7 +19,7 @@ TEST(ConstTableInfoTests, Construction) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     EXPECT_EQ(a.size(), yama::const_types);
@@ -43,7 +43,7 @@ TEST(ConstTableInfoTests, Construction) {
     EXPECT_EQ(*a.get<yama::char_const>(4), yama::char_const_info{ U'y' });
     EXPECT_EQ(*a.get<yama::primitive_type_const>(5), yama::primitive_type_const_info{ "abc"_str });
     // NOTE: need 'ff' to stop the macro from messing up
-    const auto ff = yama::function_type_const_info{ "def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5) };
+    const auto ff = yama::function_type_const_info{ "def"_str, yama::make_callsig({ 5, 6, 5 }, 5) };
     EXPECT_EQ(*a.get<yama::function_type_const>(6), ff);
     EXPECT_EQ(*a.get<yama::struct_type_const>(7), yama::struct_type_const_info{ "ghi"_str });
 
@@ -134,7 +134,7 @@ TEST(ConstTableInfoTests, Kind) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     EXPECT_EQ(a.kind(0), std::nullopt);
@@ -167,7 +167,7 @@ TEST(ConstTableInfoTests, QualifiedName) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     EXPECT_EQ(a.qualified_name(0), std::nullopt);
@@ -200,7 +200,7 @@ TEST(ConstTableInfoTests, CallSig) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     EXPECT_FALSE(a.callsig(0));
@@ -212,7 +212,7 @@ TEST(ConstTableInfoTests, CallSig) {
     EXPECT_TRUE(a.callsig(6));
     EXPECT_FALSE(a.callsig(7));
 
-    if (a.callsig(6)) EXPECT_EQ(*a.callsig(6), yama::make_callsig_info({ 5, 6, 5 }, 5));
+    if (a.callsig(6)) EXPECT_EQ(*a.callsig(6), yama::make_callsig({ 5, 6, 5 }, 5));
 }
 
 TEST(ConstTableInfoTests, CallSig_OutOfBounds) {
@@ -238,7 +238,7 @@ TEST(ConstTableInfoTests, Equality) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     const auto a2 =
@@ -249,7 +249,7 @@ TEST(ConstTableInfoTests, Equality) {
         .add_bool(true)
         .add_char(U'y')
         .add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 5, 6, 5 }, 5))
+        .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     const auto b =
@@ -260,7 +260,7 @@ TEST(ConstTableInfoTests, Equality) {
         .add_bool(true)
         .add_char(U'y')
         //.add_primitive_type("abc"_str)
-        .add_function_type("def"_str, yama::make_callsig_info({ 4, 4, 4 }, 4))
+        .add_function_type("def"_str, yama::make_callsig({ 4, 4, 4 }, 4))
         .add_struct_type("ghi"_str);
 
     EXPECT_EQ(a1, a1);

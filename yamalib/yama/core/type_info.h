@@ -32,6 +32,8 @@ namespace yama {
         std::string fmt(const char* tab = "    ") const;
 
 
+        // TODO: create has not been unit tested
+
         static primitive_info create(yama::ptype ptype);
     };
 
@@ -53,6 +55,8 @@ namespace yama {
         std::string fmt(const const_table_info& consts, const char* tab = "    ") const;
 
 
+        // TODO: create has not been unit tested
+
         static function_info create(callsig_info callsig, size_t max_locals, yama::call_fn call_fn);
         static function_info create(callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms);
     };
@@ -65,6 +69,8 @@ namespace yama {
 
         std::string fmt(const char* tab = "    ") const;
 
+
+        // TODO: create has not been unit tested
 
         static struct_info create();
     };
@@ -102,6 +108,8 @@ namespace yama {
         std::string fmt_sym(size_t index) const;
 
 
+        // TODO: create has not been unit tested
+
         static type_info create(const str& unqualified_name, const_table_info consts, info_t info);
     };
 }
@@ -109,4 +117,36 @@ namespace yama {
 YAMA_SETUP_FORMAT(yama::primitive_info, x.fmt());
 YAMA_SETUP_FORMAT(yama::struct_info, x.fmt());
 YAMA_SETUP_FORMAT(yama::type_info, x.fmt());
+
+namespace yama {
+
+
+    // IMPORTANT: when updating below, be sure to update module_factory::add_# methods
+
+    // TODO: these have not been unit tested
+
+    type_info make_primitive(
+        const str& unqualified_name,
+        const_table_info consts,
+        ptype ptype);
+
+    type_info make_function(
+        const str& unqualified_name,
+        const_table_info consts,
+        callsig_info callsig,
+        size_t max_locals,
+        yama::call_fn call_fn);
+
+    type_info make_function(
+        const str& unqualified_name,
+        const_table_info consts,
+        callsig_info callsig,
+        size_t max_locals,
+        bc::code bcode,
+        bc::syms bsyms = bc::syms{});
+
+    type_info make_struct(
+        const str& unqualified_name,
+        const_table_info consts);
+}
 

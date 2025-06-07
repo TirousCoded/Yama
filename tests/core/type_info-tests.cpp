@@ -38,7 +38,7 @@ TEST(TypeInfoTests, Function) {
         .unqualified_name = "abc"_str,
         .consts = {},
         .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0, 1, 2 }, 1),
+            .callsig = yama::make_callsig({ 0, 1, 2 }, 1),
             .call_fn = cf,
             .max_locals = 17,
         },

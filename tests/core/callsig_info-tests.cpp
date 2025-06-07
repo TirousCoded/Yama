@@ -11,10 +11,10 @@ using namespace yama::string_literals;
 
 
 TEST(CallSigInfoTests, Equality) {
-    const auto a1 = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    const auto a2 = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    const auto b = yama::make_callsig_info({ 0, 1, 2 }, 3);
-    const auto c = yama::make_callsig_info({ 0, 3, 2 }, 1);
+    const auto a1 = yama::make_callsig({ 0, 1, 2 }, 1);
+    const auto a2 = yama::make_callsig({ 0, 1, 2 }, 1);
+    const auto b = yama::make_callsig({ 0, 1, 2 }, 3);
+    const auto c = yama::make_callsig({ 0, 3, 2 }, 1);
 
     EXPECT_EQ(a1, a1);
     EXPECT_EQ(a1, a2);
@@ -32,9 +32,9 @@ TEST(CallSigInfoTests, Equality) {
 }
 
 TEST(CallSigInfoTests, Equality_DiffParamCounts) {
-    const auto a = yama::make_callsig_info({ 0, 1, 2 }, 1);
-    const auto b = yama::make_callsig_info({ 0, 1 }, 1);
-    const auto c = yama::make_callsig_info({ 0, 1, 2, 3 }, 1);
+    const auto a = yama::make_callsig({ 0, 1, 2 }, 1);
+    const auto b = yama::make_callsig({ 0, 1 }, 1);
+    const auto c = yama::make_callsig({ 0, 1, 2, 3 }, 1);
 
     EXPECT_EQ(a, a);
     EXPECT_NE(a, b);
@@ -58,7 +58,7 @@ TEST(CallSigInfoTests, Fmt) {
         .add_primitive_type("c"_str);
 
     std::string expected = "fn(a, b, c) -> b";
-    std::string actual = yama::make_callsig_info({ 0, 1, 2 }, 1).fmt(consts);
+    std::string actual = yama::make_callsig({ 0, 1, 2 }, 1).fmt(consts);
 
     std::cerr << expected << "\n" << actual << "\n";
 
@@ -78,7 +78,7 @@ TEST(CallSigInfoTests, Fmt_OutOfBoundsIndices) {
         .add_primitive_type("c"_str);
 
     std::string expected = "fn(a, b, <illegal(3)>) -> <illegal(7)>";
-    std::string actual = yama::make_callsig_info({ 0, 1, 3 }, 7).fmt(consts);
+    std::string actual = yama::make_callsig({ 0, 1, 3 }, 7).fmt(consts);
 
     std::cerr << expected << "\n" << actual << "\n";
 

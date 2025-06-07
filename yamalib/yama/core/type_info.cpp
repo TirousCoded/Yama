@@ -149,3 +149,26 @@ yama::type_info yama::type_info::create(const str& unqualified_name, const_table
     };
 }
 
+yama::type_info yama::make_primitive(const str& unqualified_name, const_table_info consts, ptype ptype) {
+    return type_info::create(
+        unqualified_name, std::move(consts),
+        primitive_info::create(ptype));
+}
+
+yama::type_info yama::make_function(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, yama::call_fn call_fn) {
+    return type_info::create(
+        unqualified_name, std::move(consts),
+        function_info::create(std::move(callsig), max_locals, call_fn));
+}
+
+yama::type_info yama::make_function(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms) {
+    return type_info::create(
+        unqualified_name, std::move(consts),
+        function_info::create(std::move(callsig), max_locals, std::move(bcode), std::move(bsyms)));
+}
+
+yama::type_info yama::make_struct(const str& unqualified_name, const_table_info consts) {
+    return type_info::create(
+        unqualified_name, std::move(consts),
+        struct_info::create());
+}

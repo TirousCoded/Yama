@@ -57,9 +57,9 @@ namespace yama {
     };
 
 
-    // TODO: make_callsig_info has not been unit tested
+    // TODO: make_callsig has not been unit tested
 
-    inline callsig_info make_callsig_info(std::vector<const_t>&& params, const_t ret) {
+    inline callsig_info make_callsig(std::vector<const_t>&& params, const_t ret) {
         return callsig_info{ std::forward<decltype(params)&&>(params), ret };
     }
 }

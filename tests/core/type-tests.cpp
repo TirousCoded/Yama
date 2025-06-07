@@ -76,7 +76,7 @@ TEST_F(TypeTests, CopyCtor) {
         yama::const_table_info()
         .add_int(10'000);
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -91,7 +91,7 @@ TEST_F(TypeTests, MoveCtor) {
         yama::const_table_info()
         .add_int(10'000);
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -109,8 +109,8 @@ TEST_F(TypeTests, CopyAssign) {
         yama::const_table_info()
         .add_bool(true); // <- make b consts differ from a consts
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
-    mf.add_primitive_type("def"_str, std::move(def_constsinf), yama::ptype::bool0);
+    mf.add_primitive("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("def"_str, std::move(def_constsinf), yama::ptype::bool0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -130,8 +130,8 @@ TEST_F(TypeTests, MoveAssign) {
         yama::const_table_info()
         .add_bool(true); // <- make b consts differ from a consts
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
-    mf.add_primitive_type("def"_str, std::move(def_constsinf), yama::ptype::bool0);
+    mf.add_primitive("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("def"_str, std::move(def_constsinf), yama::ptype::bool0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -148,8 +148,8 @@ TEST_F(TypeTests, Equality) {
         yama::const_table_info()
         .add_int(10'000);
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
-    mf.add_primitive_type("def"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("abc"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("def"_str, yama::const_table_info(abc_constsinf), yama::ptype::float0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -189,7 +189,7 @@ TEST_F(TypeTests, PerKind_Primitive) {
         yama::const_table_info()
         .add_int(10'000);
     yama::module_factory mf{};
-    mf.add_primitive_type("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
+    mf.add_primitive("abc"_str, std::move(abc_constsinf), yama::ptype::float0);
 
     parcel->push(""_str, std::move(mf.done()));
 
@@ -206,17 +206,17 @@ TEST_F(TypeTests, PerKind_Primitive) {
 
 TEST_F(TypeTests, PerKind_Function) {
     auto abc_call_fn = [](yama::context&) {};
-    auto abc_callsiginf = yama::make_callsig_info({ 0, 1, 2 }, 1);
+    auto abc_callsiginf = yama::make_callsig({ 0, 1, 2 }, 1);
     auto abc_constsinf =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str);
     yama::module_factory mf{};
-    mf.add_function_type(
+    mf.add_function(
         "abc"_str,
-        decltype(abc_constsinf)(abc_constsinf),
-        decltype(abc_callsiginf)(abc_callsiginf),
+        abc_constsinf,
+        abc_callsiginf,
         17,
         abc_call_fn);
 
@@ -243,9 +243,9 @@ TEST_F(TypeTests, PerKind_Struct) {
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str);
     yama::module_factory mf{};
-    mf.add_struct_type(
+    mf.add_struct(
         "abc"_str,
-        decltype(abc_constsinf)(abc_constsinf));
+        abc_constsinf);
 
     parcel->push(""_str, std::move(mf.done()));
 

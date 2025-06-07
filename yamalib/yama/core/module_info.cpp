@@ -32,61 +32,26 @@ yama::module_info yama::module_factory::done() noexcept {
     return result;
 }
 
-yama::module_factory& yama::module_factory::add_type(type_info&& x) {
+yama::module_factory& yama::module_factory::add(type_info&& x) {
     type_info temp(std::forward<type_info>(x));
     YAMA_ASSERT(!_result.contains(temp.unqualified_name));
     _result.types[temp.unqualified_name] = std::move(temp);
     return *this;
 }
 
-yama::module_factory& yama::module_factory::add_primitive_type(str unqualified_name, const_table_info&& consts, ptype ptype) {
-    type_info new_info{
-        .unqualified_name = unqualified_name,
-        .consts = std::forward<decltype(consts)>(consts),
-        .info = yama::primitive_info{
-            .ptype = ptype,
-        },
-    };
-    return add_type(std::move(new_info));
+yama::module_factory& yama::module_factory::add_primitive(const str& unqualified_name, const_table_info consts, ptype ptype) {
+    return add(make_primitive(unqualified_name, std::move(consts), ptype));
 }
 
-yama::module_factory& yama::module_factory::add_function_type(str unqualified_name, const_table_info&& consts, callsig_info&& callsig, size_t max_locals, call_fn call_fn) {
-    type_info new_info{
-        .unqualified_name = unqualified_name,
-        .consts = std::forward<decltype(consts)>(consts),
-        .info = yama::function_info{
-            .callsig = std::forward<decltype(callsig)>(callsig),
-            .call_fn = call_fn,
-            .max_locals = max_locals,
-            .bcode = bc::code{},
-            .bsyms = bc::syms{},
-        },
-    };
-    return add_type(std::move(new_info));
+yama::module_factory& yama::module_factory::add_function(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, call_fn call_fn) {
+    return add(make_function(unqualified_name, std::move(consts), std::move(callsig), max_locals, call_fn));
 }
 
-yama::module_factory& yama::module_factory::add_function_type(str unqualified_name, const_table_info&& consts, callsig_info&& callsig, size_t max_locals, bc::code&& code, bc::syms&& syms) {
-    type_info new_info{
-        .unqualified_name = unqualified_name,
-        .consts = std::forward<decltype(consts)>(consts),
-        .info = yama::function_info{
-            .callsig = std::forward<decltype(callsig)>(callsig),
-            .call_fn = bcode_call_fn,
-            .max_locals = max_locals,
-            .bcode = std::forward<decltype(code)>(code),
-            .bsyms = std::forward<decltype(syms)>(syms),
-        },
-    };
-    return add_type(std::move(new_info));
+yama::module_factory& yama::module_factory::add_function(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, bc::code code, bc::syms syms) {
+    return add(make_function(unqualified_name, std::move(consts), std::move(callsig), max_locals, std::move(code), std::move(syms)));
 }
 
-yama::module_factory& yama::module_factory::add_struct_type(str unqualified_name, const_table_info&& consts) {
-    type_info new_info{
-        .unqualified_name = unqualified_name,
-        .consts = std::forward<decltype(consts)>(consts),
-        .info = yama::struct_info{
-        },
-    };
-    return add_type(std::move(new_info));
+yama::module_factory& yama::module_factory::add_struct(const str& unqualified_name, const_table_info consts) {
+    return add(make_struct(unqualified_name, std::move(consts)));
 }
 

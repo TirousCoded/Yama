@@ -18,13 +18,13 @@ yama::res<yama::module_info> yama::internal::yama_parcel::_get_root_modinf() {
     if (!_root_modinf) {
         auto our_root_modinf =
             module_factory()
-            .add_primitive_type("None"_str, {}, yama::ptype::none)
-            .add_primitive_type("Int"_str, {}, yama::ptype::int0)
-            .add_primitive_type("UInt"_str, {}, yama::ptype::uint)
-            .add_primitive_type("Float"_str, {}, yama::ptype::float0)
-            .add_primitive_type("Bool"_str, {}, yama::ptype::bool0)
-            .add_primitive_type("Char"_str, {}, yama::ptype::char0)
-            .add_primitive_type("Type"_str, {}, yama::ptype::type)
+            .add_primitive("None"_str, {}, yama::ptype::none)
+            .add_primitive("Int"_str, {}, yama::ptype::int0)
+            .add_primitive("UInt"_str, {}, yama::ptype::uint)
+            .add_primitive("Float"_str, {}, yama::ptype::float0)
+            .add_primitive("Bool"_str, {}, yama::ptype::bool0)
+            .add_primitive("Char"_str, {}, yama::ptype::char0)
+            .add_primitive("Type"_str, {}, yama::ptype::type)
             .done();
         _root_modinf = std::make_shared<module_info>(std::move(our_root_modinf));
     }

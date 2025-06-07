@@ -191,10 +191,7 @@ parser section:
     ContinueStmt                    : CONTINUE SEMI ;
     ReturnStmt                      : RETURN Expr? SEMI ;
 
-    # TODO: if we ever add features which make the 'x' in 'x()' unable to form either a call or
-    #       a default init expr, we'll need to add compilation-tests.cpp unit tests covering this
-
-    precedence Expr                 : Expr Args                         # call/default init expr
+    precedence Expr                 : Expr Args                         # call-like expr
                                     | CONST Args                        # constexpr guarantee expr
                                     | PrimaryExpr                       # primary expr
                                     ;

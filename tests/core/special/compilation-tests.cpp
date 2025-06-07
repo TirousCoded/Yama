@@ -143,6 +143,19 @@ protected:
 
 
 // IMPORTANT:
+//      Yama lang 'homomorphic exprs' are exprs which, given a set of other exprs
+//      which all share the same syntactic structure, exist to disambiguate these
+//      exprs, defining the 'selection rules' governing which ones should be selected
+//      in a given circumstance
+//
+//      once selected, the expr *ceases to be* the homomorphic expr, and it instead
+//      will identify thereafter as the selected expr
+//
+//      the exprs covered by a homomorphic expr, in their unit tests, delegate semantics
+//      relating to selection to their associated homomorphic expr
+
+
+// IMPORTANT:
 //      all exprs must have unit tests for the following:
 //          - the compute behaviour of the expr
 //          - if it is/isn't assignable
@@ -186,7 +199,68 @@ namespace {
 
     // our Yama functions for side-effects + misc
 
-    auto consts =
+    void observeNone_fn(yama::context& ctx) {
+        sidefx.observe_none();
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeInt_fn(yama::context& ctx) {
+        sidefx.observe_int(ctx.arg(1).value().as_int());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeUInt_fn(yama::context& ctx) {
+        sidefx.observe_uint(ctx.arg(1).value().as_uint());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeFloat_fn(yama::context& ctx) {
+        sidefx.observe_float(ctx.arg(1).value().as_float());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeBool_fn(yama::context& ctx) {
+        sidefx.observe_bool(ctx.arg(1).value().as_bool());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeChar_fn(yama::context& ctx) {
+        sidefx.observe_char(ctx.arg(1).value().as_char());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void observeType_fn(yama::context& ctx) {
+        sidefx.observe_type(ctx.arg(1).value().as_type());
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void doPanic_fn(yama::context& ctx) {
+        ctx.panic();
+    }
+    void doIncr_fn(yama::context& ctx) {
+        if (ctx.push_int(ctx.arg(1).value().as_int() + 1).bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void isEqInt_fn(yama::context& ctx) {
+        const auto a = ctx.arg(1).value().as_int();
+        const auto b = ctx.arg(2).value().as_int();
+        if (ctx.push_bool(a == b).bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void isEqChar_fn(yama::context& ctx) {
+        const auto a = ctx.arg(1).value().as_char();
+        const auto b = ctx.arg(2).value().as_char();
+        if (ctx.push_bool(a == b).bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+    void isNotEqInt_fn(yama::context& ctx) {
+        const auto a = ctx.arg(1).value().as_int();
+        const auto b = ctx.arg(2).value().as_int();
+        if (ctx.push_bool(a != b).bad()) return;
+        if (ctx.ret(0).bad()) return;
+    }
+
+    const auto consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Int"_str)
@@ -196,202 +270,24 @@ namespace {
         .add_primitive_type("yama:Char"_str)
         .add_primitive_type("yama:Type"_str);
 
-    yama::type_info observeNone_info{
-        .unqualified_name = "observeNone"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 0 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_none();
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeInt_info{
-        .unqualified_name = "observeInt"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 1 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_int(ctx.arg(1).value().as_int());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeUInt_info{
-        .unqualified_name = "observeUInt"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 2 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_uint(ctx.arg(1).value().as_uint());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeFloat_info{
-        .unqualified_name = "observeFloat"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 3 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_float(ctx.arg(1).value().as_float());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeBool_info{
-        .unqualified_name = "observeBool"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 4 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_bool(ctx.arg(1).value().as_bool());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeChar_info{
-        .unqualified_name = "observeChar"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 5 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_char(ctx.arg(1).value().as_char());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info observeType_info{
-        .unqualified_name = "observeType"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 6 }, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_type(ctx.arg(1).value().as_type());
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info doPanic_info{
-        .unqualified_name = "doPanic"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    ctx.panic();
-                },
-            .max_locals = 0,
-        },
-    };
-    yama::type_info doIncr_info{
-        .unqualified_name = "doIncr"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 1 }, 1),
-            .call_fn =
-                [](yama::context& ctx) {
-                    if (ctx.push_int(ctx.arg(1).value().as_int() + 1).bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info isEqInt_info{
-        .unqualified_name = "isEqInt"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 1, 1 }, 4),
-            .call_fn =
-                [](yama::context& ctx) {
-                    const auto a = ctx.arg(1).value().as_int();
-                    const auto b = ctx.arg(2).value().as_int();
-                    if (ctx.push_bool(a == b).bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info isEqChar_info{
-        .unqualified_name = "isEqChar"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 5, 5 }, 4),
-            .call_fn =
-                [](yama::context& ctx) {
-                    const auto a = ctx.arg(1).value().as_char();
-                    const auto b = ctx.arg(2).value().as_char();
-                    if (ctx.push_bool(a == b).bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-    yama::type_info isNotEqInt_info{
-        .unqualified_name = "isNotEqInt"_str,
-        .consts = consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({ 1, 1 }, 4),
-            .call_fn =
-                [](yama::context& ctx) {
-                    const auto a = ctx.arg(1).value().as_int();
-                    const auto b = ctx.arg(2).value().as_int();
-                    if (ctx.push_bool(a != b).bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
-
-    // need this to better test w/ structs, so we'll just quick-n'-dirty bundle this
-    // w/ our helper test fns
-
-    yama::type_info SomeStruct_info{
-        .unqualified_name = "SomeStruct"_str,
-        .consts = yama::const_table_info{},
-        .info = yama::struct_info{},
-    };
-
-    yama::module_info make_fns_module() {
-        return
-            yama::module_factory()
-            .add_type(yama::type_info(observeNone_info))
-            .add_type(yama::type_info(observeInt_info))
-            .add_type(yama::type_info(observeUInt_info))
-            .add_type(yama::type_info(observeFloat_info))
-            .add_type(yama::type_info(observeBool_info))
-            .add_type(yama::type_info(observeChar_info))
-            .add_type(yama::type_info(observeType_info))
-            .add_type(yama::type_info(doPanic_info))
-            .add_type(yama::type_info(doIncr_info))
-            .add_type(yama::type_info(isEqInt_info))
-            .add_type(yama::type_info(isEqChar_info))
-            .add_type(yama::type_info(isNotEqInt_info))
-            .add_type(yama::type_info(SomeStruct_info))
-            .done();
-    }
+    const auto fns_module =
+        yama::module_factory()
+        .add_function("observeNone"_str, consts, yama::make_callsig({ 0 }, 0), 1, observeNone_fn)
+        .add_function("observeInt"_str, consts, yama::make_callsig({ 1 }, 0), 1, observeInt_fn)
+        .add_function("observeUInt"_str, consts, yama::make_callsig({ 2 }, 0), 1, observeUInt_fn)
+        .add_function("observeFloat"_str, consts, yama::make_callsig({ 3 }, 0), 1, observeFloat_fn)
+        .add_function("observeBool"_str, consts, yama::make_callsig({ 4 }, 0), 1, observeBool_fn)
+        .add_function("observeChar"_str, consts, yama::make_callsig({ 5 }, 0), 1, observeChar_fn)
+        .add_function("observeType"_str, consts, yama::make_callsig({ 6 }, 0), 1, observeType_fn)
+        .add_function("doPanic"_str, consts, yama::make_callsig({}, 0), 0, doPanic_fn)
+        .add_function("doIncr"_str, consts, yama::make_callsig({ 1 }, 1), 1, doIncr_fn)
+        .add_function("isEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isEqInt_fn)
+        .add_function("isEqChar"_str, consts, yama::make_callsig({ 5, 5 }, 4), 1, isEqChar_fn)
+        .add_function("isNotEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isNotEqInt_fn)
+        // need this to better test w/ structs, so we'll just quick-n'-dirty bundle this
+        // w/ our helper test fns
+        .add_struct("SomeStruct"_str, yama::const_table_info{})
+        .done();
 
     class fns_parcel final : public yama::parcel {
     public:
@@ -408,15 +304,15 @@ namespace {
         }
         std::optional<yama::import_result> import(const yama::str& relative_path) override final {
             if (relative_path == ".abc"_str) {
-                return yama::make_res<yama::module_info>(make_fns_module());
+                return yama::make_res<yama::module_info>(fns_module);
             }
-            // .bad is used to test 
+            // .bad is used to test failure
             else if (relative_path == ".bad"_str) {
                 yama::module_factory mf{};
-                mf.add_function_type(
+                mf.add_function(
                     "f"_str,
                     yama::const_table_info{},
-                    yama::make_callsig_info({}, 10'000), // <- return type invalid! so .bad is also invalid!
+                    yama::make_callsig({}, 10'000), // <- return type invalid! so .bad is also invalid!
                     1,
                     yama::noop_call_fn);
                 return mf.done();
@@ -426,24 +322,20 @@ namespace {
     };
 
 
-    auto acknowledge_consts =
+    const auto acknowledge_consts =
         yama::const_table_info()
         .add_primitive_type("yama:None"_str);
 
-    yama::type_info acknowledge_info{
-        .unqualified_name = "acknowledge"_str,
-        .consts = acknowledge_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig_info({}, 0),
-            .call_fn =
-                [](yama::context& ctx) {
-                    sidefx.observe_misc("ack");
-                    if (ctx.push_none().bad()) return;
-                    if (ctx.ret(0).bad()) return;
-                },
-            .max_locals = 1,
-        },
-    };
+    const auto acknowledge_info = yama::make_function(
+        "acknowledge"_str,
+        acknowledge_consts,
+        yama::make_callsig({}, 0),
+        1,
+        [](yama::context& ctx) {
+            sidefx.observe_misc("ack");
+            if (ctx.push_none().bad()) return;
+            if (ctx.ret(0).bad()) return;
+        });
 
     // test_parcel exists to establish the environment inside of which compilation is going
     // to be occurring (ie. defined via self-name and dep-names of the parcel)
@@ -494,7 +386,7 @@ namespace {
             // .abc exists to test importing a module which exists in same parcel as compiling module
             else if (relative_path == ".abc"_str) {
                 yama::module_factory mf{};
-                mf.add_type(yama::type_info(acknowledge_info));
+                mf.add(yama::type_info(acknowledge_info));
                 return mf.done();
             }
             else return std::nullopt;
@@ -5012,6 +4904,8 @@ fn f() -> Int {
 }
 
 
+// TODO: maybe rewrite 'identifier expr' to be a homomorphic expr
+
 static_assert(yama::kinds == 3); // reminder
 
 // identifier expr
@@ -6833,24 +6727,90 @@ fn f() {
 }
 
 
-// call expr
+// call-like expr
 //
-//      - given some form 'f(a0, a1, ..., an)', where f is a callable object expr, and a0, a1, 
-//        and other args (ie. the '..., an' part), the call expr describes a call site, first
-//        evaluating the f expr to acquire the call object, then evaluating the arg exprs,
-//        going from left-to-right, then performing the call, returning its return value
+//      - call-like exprs are homomorphic exprs for exprs of the form '<f>(<args>)'
+//      
+//      - selection rules:
 // 
-//      - if a call expr returns an object of a callable type, it may be nested within another
-//        call expr
+//          1) if <f> is of a callable type, the expr is a 'call expr'
+//          2) if <f> is type yama:Type, the expr is a 'default init expr'
+//          3) invalid otherwise
+
+// valid selection
+
+TEST_F(CompilationTests, CallLikeExpr_Valid) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    observeInt(100); // call expr
+
+    observeChar(Char()); // default init expr (tested w/ call expr)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    expected.observe_char(U'\0');
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// invalid selection
+
+TEST_F(CompilationTests, CallLikeExpr_Invalid) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    300(); // error!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// call expr
+// 
+//      - given form '<callobj>(<args>)', call exprs designate callsites, w/ <callobj>
+//        being the call object, and <args> being the args to it, it returns the result
+//        of the call
+// 
+//      - eval order:
+// 
+//          1) <callobj> eval
+//          2) <args> eval, going left-to-right
+//          3) call is performed
 // 
 //      - non-assignable
 //      - non-constexpr
 // 
-//      - illegal if the call object expr specifies a call object of a non-callable type
-//          * and isn't able to form something like a default init expr
-// 
-//      - illegal if the args passed to the call are the wrong number/types for a call to
-//        the specified call object
+//      - illegal if <args> has wrong number/types for a call to <callobj>
 
 // basic usage
 
@@ -6976,6 +6936,9 @@ fn f() {
 
 // call expr nesting
 
+// this isn't needed to formally define call expr behaviour, but is here for
+// comprehensiveness
+
 TEST_F(CompilationTests, CallExpr_Nesting) {
     ASSERT_TRUE(ready);
 
@@ -7019,24 +6982,6 @@ fn f() {
     expected.observe_int(50);
     expected.observe_int(60);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// illegal call due to call object is non-callable type
-
-TEST_F(CompilationTests, CallExpr_Fail_CallObjIsNonCallableType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    300(); // <- Int is non-callable!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 // illegal call due to too many args
@@ -7145,9 +7090,9 @@ static_assert(yama::kinds == 3); // reminder
 
 // default init expr
 // 
-//      - given some form 'x()', where x is a crvalue of type yama:Type,
-//        the default init expr evaluates to an object of this type, w/
-//        whatever value that type default initializes w/
+//      - given form '<type>()', where <type> is a crvalue of type yama:Type,
+//        default init expr evals to a default initialized object of the
+//        type specified by <type>
 //          * the default values of types are specified in 'general'
 //
 //      - non-assignable
@@ -7158,9 +7103,7 @@ static_assert(yama::kinds == 3); // reminder
 //          fn type             n/a
 //          struct type         non-constexpr
 //
-//      - illegal if x is not constexpr
-//      - illegal if x is not yama:Type
-//          * and isn't able to form something like a call expr
+//      - illegal if <type> is not constexpr
 //      - illegal if arg count is >=1
 
 // basic usage
@@ -7225,6 +7168,43 @@ fn f() {
     expected.observe_char(U'\0');
     expected.observe_type(ctx->none_type());
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal if x is not constexpr
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotAConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a = Int;
+    var b = a(); // error! 'a' is Type, but it's not constexpr!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if arg count >=1
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ArgCountIsNonZero) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    Int(10); // error! cannot have '10'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
 }
 
 // default init expr is non-assignable
@@ -7305,66 +7285,11 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
-// illegal if x is not constexpr
-
-TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotAConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a = Int;
-    var b = a(); // error! 'a' is Type, but it's not constexpr!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-// illegal if x is not yama:Type
-
-TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotTypeType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    300(); // <- Int is not Type (and can't form something like a call expr)
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-// illegal if arg count >=1
-
-TEST_F(CompilationTests, DefaultInitExpr_Fail_ArgCountIsNonZero) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    Int(10); // error! cannot have '10'
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
 
 // constexpr guarantee expr
 //
-//      - given some form 'const(x)', where x is a crvalue, the constexpr
-//        guarantee expr evaluates x, returning its result
+//      - given form 'const(<x>)', where <x> is a crvalue, the constexpr
+//        guarantee expr evals <x>, returning its result
 //          * this expr exists to enforce that an expr must be constexpr
 // 
 //      - non-assignable
@@ -7444,60 +7369,6 @@ fn f2() -> Type {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// constexpr guarantee expr is non-assignable
-
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    // can't really test 'const(x)' w/ an assignable x as it's a crvalue,
-    // not an lvalue
-    const(3) = 4;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// constexpr guarantee expr is constexpr
-
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_ConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    // enforce 'const(10)' MUST be constexpr
-    var a: Int = const(const(10));
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
 // illegal due to non-constexpr subexpr
 
 TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_SubExprNotAConstExpr) {
@@ -7551,5 +7422,59 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// constexpr guarantee expr is non-assignable
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // can't really test 'const(x)' w/ an assignable x as it's a crvalue,
+    // not an lvalue
+    const(3) = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// constexpr guarantee expr is constexpr
+
+TEST_F(CompilationTests, ConstExprGuaranteeExpr_ConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    // enforce 'const(10)' MUST be constexpr
+    var a: Int = const(const(10));
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
