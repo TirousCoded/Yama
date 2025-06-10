@@ -159,7 +159,7 @@ bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instan
 
 bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
     static_assert(const_types == 8);
-    switch (info->consts.const_type(index).value()) {
+    switch (info->consts().const_type(index).value()) {
     case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);                 break;
     case uint_const:            return _resolve_scalar_const<uint_const>(instance, info, index);                break;
     case float_const:           return _resolve_scalar_const<float_const>(instance, info, index);               break;
@@ -194,7 +194,7 @@ bool yama::internal::loader::_check_consts(const env& e, type_instance& instance
 
 bool yama::internal::loader::_check_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
     static_assert(const_types == 8);
-    switch (info->consts.const_type(index).value()) {
+    switch (info->consts().const_type(index).value()) {
     case int_const:             return _check_scalar_const<int_const>(instance, info, index);               break;
     case uint_const:            return _check_scalar_const<uint_const>(instance, info, index);              break;
     case float_const:           return _check_scalar_const<float_const>(instance, info, index);             break;
@@ -211,8 +211,8 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
 
 bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
     const auto  t               = create_type(instance);
-    const str   symbol_fullname = info->consts.qualified_name(index).value();
-    const auto  symbol_kind     = info->consts.kind(index).value();
+    const str   symbol_fullname = info->consts().qualified_name(index).value();
+    const auto  symbol_kind     = info->consts().kind(index).value();
     const auto  resolved_kind   = resolved.kind();
     const bool  success         = symbol_kind == resolved_kind;
     if (!success) {
@@ -228,7 +228,7 @@ bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, re
 
 bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
     const auto t                = create_type(instance);
-    const auto symbol_callsig   = info->consts.callsig(index);
+    const auto symbol_callsig   = info->consts().callsig(index);
     const auto resolved_callsig = resolved.callsig();
     // if symbol_callsig is found to not be of a type w/ a callsig, return
     // successful up-front, as that means we're not dealing w/ one anyway
@@ -246,7 +246,7 @@ bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance,
         YAMA_LOG(
             dbg(), load_error_c,
             "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol's callsig {} doesn't match the resolved type's callsig {}!",
-            t.fullname(), info->consts.qualified_name(index).value(), index, resolved.fullname(),
+            t.fullname(), info->consts().qualified_name(index).value(), index, resolved.fullname(),
             symbol_callsig_s, resolved_callsig_s);
     }
     return result;

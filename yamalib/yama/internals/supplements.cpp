@@ -20,16 +20,12 @@ yama::module_info yama::internal::make_supplements() {
         auto consts =
             const_table_info()
             .add_primitive_type(return_type);
-        yama::type_info t{
-            .unqualified_name = name,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({}, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            name,
+            consts,
+            yama::make_callsig({}, 0),
+            1,
+            cf);
         };
     
     auto add_1in0out =
@@ -38,16 +34,12 @@ yama::module_info yama::internal::make_supplements() {
             const_table_info()
             .add_primitive_type("yama:None"_str)
             .add_primitive_type(param_type);
-        yama::type_info t{
-            .unqualified_name = name,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 1 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            name,
+            consts,
+            yama::make_callsig({ 1 }, 0),
+            1,
+            cf);
         };
     
     auto add_1in1out =
@@ -55,16 +47,12 @@ yama::module_info yama::internal::make_supplements() {
         auto consts =
             const_table_info()
             .add_primitive_type(type);
-        yama::type_info t{
-            .unqualified_name = name,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            name,
+            consts,
+            yama::make_callsig({ 0 }, 0),
+            1,
+            cf);
         };
     
     auto add_2in1out =
@@ -73,16 +61,12 @@ yama::module_info yama::internal::make_supplements() {
             const_table_info()
             .add_primitive_type(param_type)
             .add_primitive_type(return_type);
-        yama::type_info t{
-            .unqualified_name = name,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0, 0 }, 1),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            name,
+            consts,
+            yama::make_callsig({ 0, 0 }, 1),
+            1,
+            cf);
         };
 
 #define _ADD_0IN1OUT_PROMPT_FN(name, return_type_short, return_type, parse_expr, put_fn, result_access_expr) \
@@ -244,16 +228,12 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a << b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        yama::type_info t{
-            .unqualified_name = "ibit_lshift"_str,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0, 1 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            "ibit_lshift"_str,
+            consts,
+            yama::make_callsig({ 0, 1 }, 0),
+            1,
+            cf);
     }
     {
         auto consts =
@@ -267,16 +247,12 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a >> b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        yama::type_info t{
-            .unqualified_name = "ibit_rshift"_str,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0, 1 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            "ibit_rshift"_str,
+            consts,
+            yama::make_callsig({ 0, 1 }, 0),
+            1,
+            cf);
     }
     {
         auto consts =
@@ -289,16 +265,12 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a << b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        yama::type_info t{
-            .unqualified_name = "ubit_lshift"_str,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0, 0 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            "ubit_lshift"_str,
+            consts,
+            yama::make_callsig({ 0, 0 }, 0),
+            1,
+            cf);
     }
     {
         auto consts =
@@ -311,16 +283,12 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a >> b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        yama::type_info t{
-            .unqualified_name = "ubit_rshift"_str,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({ 0, 0 }, 0),
-                .call_fn = cf,
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            "ubit_rshift"_str,
+            consts,
+            yama::make_callsig({ 0, 0 }, 0),
+            1,
+            cf);
     }
 
     // power fns
@@ -358,16 +326,14 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
         auto consts =
             const_table_info()
             .add_primitive_type("yama:None"_str);
-        yama::type_info t{
-            .unqualified_name = "panic"_str,
-            .consts = consts,
-            .info = function_info{
-                .callsig = yama::make_callsig({}, 0),
-                .call_fn = [](context& ctx) { ctx.panic(); },
-                .max_locals = 1,
-            },
-        };
-        mf.add(std::move(t));
+        mf.add_function(
+            "panic"_str,
+            consts,
+            yama::make_callsig({}, 0),
+            1,
+            [](context& ctx) {
+                ctx.panic();
+            });
     }
 
 #define _ADD_CONV_FN(in_letter, out_letter, in_type, out_type, out_cpp_type, in_as_method, out_put_fn) \
@@ -382,16 +348,12 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx. out_put_fn (yama::newtop, ( out_cpp_type )a).bad()) return; \
             if (ctx.ret(0).bad()) return; \
         }; \
-    yama::type_info t{ \
-        .unqualified_name = in_letter "2" out_letter ""_str, \
-        .consts = consts, \
-        .info = function_info{ \
-            .callsig = yama::make_callsig({ 0 }, 1), \
-            .call_fn = cf, \
-            .max_locals = 1, \
-        }, \
-    }; \
-    mf.add(std::move(t)); \
+    mf.add_function( \
+        in_letter "2" out_letter ""_str, \
+        consts, \
+        make_callsig({ 0 }, 1), \
+        1, \
+        cf); \
 } (void)0
 
 #define _ADD_CONV_FNS_IUFBC(in_letter, in_type, in_as_method) \

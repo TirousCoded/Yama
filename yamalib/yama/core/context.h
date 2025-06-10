@@ -155,7 +155,7 @@ namespace yama {
         // skip tells fmt_stacktrace how many of the top call frames of the
         // call stack should be ignored
 
-        std::string fmt_stacktrace(size_t skip = 0, const char* tab = "    ") const;
+        std::string fmt_stacktrace(size_t skip = 0, const char* tab = default_tab) const;
 
 
         // LOW-LEVEL COMMAND INTERFACE

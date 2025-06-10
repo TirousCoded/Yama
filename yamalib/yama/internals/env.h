@@ -40,7 +40,7 @@ namespace yama::internal {
 
         bool operator==(const env&) const noexcept = default; // compare by ref
 
-        std::string fmt(const char* tab = "    ") const;
+        std::string fmt(const char* tab = default_tab) const;
 
 
     private:

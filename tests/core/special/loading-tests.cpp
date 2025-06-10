@@ -127,14 +127,14 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
         .add_struct_type("self:b2"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
         .add_primitive("b0"_str, {}, yama::ptype::bool0)
         .add_function(
-            "b1"_str, decltype(a_consts)(a_consts),
+            "b1"_str, a_consts,
             yama::make_callsig({}, 5), // ie. fn() -> b0
             10,
             yama::noop_call_fn)
-        .add_struct("b2"_str, decltype(a_consts)(a_consts));
+        .add_struct("b2"_str, a_consts);
 
     yama::install_batch ib{};
     ib.install("p"_str, yama::make_res<test_parcel>(mf));
@@ -206,7 +206,7 @@ TEST_F(LoadingTests, WithDeps) {
         .add_primitive_type("self:c"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
         .add_primitive("b"_str, {}, yama::ptype::bool0)
         .add_primitive("c"_str, {}, yama::ptype::bool0);
 
@@ -260,9 +260,9 @@ TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
         .add_primitive_type("self:f"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
-        .add_primitive("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
-        .add_primitive("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
+        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
+        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
         .add_primitive("d"_str, {}, yama::ptype::bool0)
         .add_primitive("e"_str, {}, yama::ptype::bool0)
         .add_primitive("f"_str, {}, yama::ptype::bool0);
@@ -343,9 +343,9 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
         .add_primitive_type("self:d"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
-        .add_primitive("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
-        .add_primitive("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
+        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
+        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
         .add_primitive("d"_str, {}, yama::ptype::bool0);
 
     yama::install_batch ib{};
@@ -404,8 +404,8 @@ TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
         .add_primitive_type("self:a"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
-        .add_primitive("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0);
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
+        .add_primitive("b"_str, b_consts, yama::ptype::bool0);
 
     yama::install_batch ib{};
     ib.install("p"_str, yama::make_res<test_parcel>(mf));
@@ -458,7 +458,7 @@ TEST_F(LoadingTests, Fail_ReferencedTypeNotFound) {
         .add_primitive_type("self:c"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
         //.add_primitive("b"_str, {}, yama::ptype::bool0)
         .add_primitive("c"_str, {}, yama::ptype::bool0);
 
@@ -490,9 +490,9 @@ TEST_F(LoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
         .add_primitive_type("self:f"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
-        .add_primitive("b"_str, decltype(b_consts)(b_consts), yama::ptype::bool0)
-        .add_primitive("c"_str, decltype(c_consts)(c_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
+        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
+        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
         //.add_primitive("d"_str, {}, yama::ptype::bool0) <- missing
         .add_primitive("e"_str, {}, yama::ptype::bool0)
         .add_primitive("f"_str, {}, yama::ptype::bool0);
@@ -522,9 +522,9 @@ TEST_F(LoadingTests, Fail_KindMismatch) {
         .add_primitive_type("self:c"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, decltype(a_consts)(a_consts), yama::ptype::bool0)
+        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
         .add_function(
-            "b"_str, decltype(b_consts)(b_consts),
+            "b"_str, b_consts,
             yama::make_callsig({ 0 }, 0),
             10,
             yama::noop_call_fn)
@@ -583,13 +583,15 @@ TEST_F(LoadingTests, Fail_CallSigMismatch) {
     yama::module_factory mf{};
     mf
         .add_function(
-            "a"_str, decltype(a_consts)(a_consts),
-            decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
+            "a"_str,
+            a_consts,
+            clever_callsig_info_for_test,
             10,
             yama::noop_call_fn)
         .add_function(
-            "b"_str, decltype(b_consts)(b_consts),
-            decltype(clever_callsig_info_for_test)(clever_callsig_info_for_test),
+            "b"_str,
+            b_consts,
+            clever_callsig_info_for_test,
             10,
             yama::noop_call_fn)
         .add_primitive("c"_str, {}, yama::ptype::bool0);

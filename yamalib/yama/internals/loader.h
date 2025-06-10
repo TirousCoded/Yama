@@ -103,7 +103,7 @@ namespace yama::internal {
 
     template<const_type C>
     inline bool loader::_resolve_scalar_const(type_instance& instance, res<type_info> info, const_t index) {
-        if (const auto x = info->consts.get<C>(index)) {
+        if (const auto x = info->consts().get<C>(index)) {
             instance.put<C>(index, x->v);
         }
         else YAMA_DEADEND;
@@ -115,7 +115,7 @@ namespace yama::internal {
         // TODO: when we add *incomplete type cloning*-using stuff, this
         //       method may need to be revised
         YAMA_ASSERT(create_type(instance).consts().is_stub(index));
-        const fullname fullname = fullname::parse(e, info->consts.qualified_name(index).value()).value();
+        const fullname fullname = fullname::parse(e, info->consts().qualified_name(index).value()).value();
         if (!_add_type(fullname)) {
             return false;
         }
@@ -135,7 +135,7 @@ namespace yama::internal {
     template<const_type C>
     inline bool loader::_check_type_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
         YAMA_ASSERT(!create_type(instance).consts().is_stub(index));
-        const fullname fullname = fullname::parse(e, info->consts.qualified_name(index).value()).value();
+        const fullname fullname = fullname::parse(e, info->consts().qualified_name(index).value()).value();
         const type resolved = _pull_type(fullname).value();
         return
             _check_no_kind_mismatch(instance, info, index, resolved) &&

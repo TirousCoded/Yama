@@ -11,6 +11,7 @@ std::string yama::fmt_kind(kind x) {
     switch (x) {
     case kind::primitive:   result = "primitive";   break;
     case kind::function:    result = "function";    break;
+    //case kind::method:      result = "method";      break;
     case kind::struct0:     result = "struct";      break;
     default:                YAMA_DEADEND;           break;
     }

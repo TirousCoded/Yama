@@ -19,6 +19,12 @@ namespace yama {
     using ssize_t = std::make_signed_t<size_t>;
 
 
+    // using '    ' instead of '\t' as the former will be consistent
+    // across environments
+
+    constexpr const char* default_tab = "    ";
+
+
     // yama will make use of TAUL's immutable string type str as its
     // own main string type
 

@@ -214,7 +214,7 @@ namespace yama {
 
         std::string fmt_const(const_t x) const;
         std::string fmt_type_const(const_t x) const;
-        std::string fmt(const char* tab = "    ") const;
+        std::string fmt(const char* tab = default_tab) const;
 
 
         // these methods add new entries into consts

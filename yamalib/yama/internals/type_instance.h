@@ -90,7 +90,7 @@ namespace yama::internal {
 
 template<yama::const_type C>
 inline void yama::internal::type_instance::put(const_t x, const const_data_of_t<C>& v) {
-    YAMA_ASSERT(_mem->info->consts.const_type(x) == C); // out-of-bounds, or wrong C
+    YAMA_ASSERT(_mem->info->consts().const_type(x) == C); // out-of-bounds, or wrong C
     // decr stubs if we're assigning to a stub
     if (_mem.elems()[x].holds_stub()) {
         _mem->stubs--;

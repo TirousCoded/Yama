@@ -434,15 +434,12 @@ namespace {
     .add_primitive_type("self:b"_str)
     .add_primitive_type("self:c"_str);
     static const auto bad_callsig = yama::make_callsig({ 0, 7, 2 }, 1); // <- link index 7 is out-of-bounds!
-    yama::type_info bad_info{
-        .unqualified_name = "bad"_str,
-        .consts = bad_consts,
-        .info = yama::function_info{
-            .callsig = bad_callsig,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
-        },
-    };
+    const auto bad_info = yama::make_function(
+        "bad"_str,
+        bad_consts,
+        bad_callsig,
+        4,
+        yama::noop_call_fn);
 
 
     // give each of these module_info different internal structure so we can value-compare
@@ -513,50 +510,23 @@ namespace {
     };
 
 
-    yama::type_info a_info{
-        .unqualified_name = "a"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info b_info{
-        .unqualified_name = "b"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info c_info{
-        .unqualified_name = "c"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
-    yama::type_info d_info{
-        .unqualified_name = "d"_str,
-        .consts = {},
-        .info = yama::primitive_info{
-            .ptype = yama::ptype::bool0,
-        },
-    };
+    const auto a_info = yama::make_primitive("a"_str, {}, yama::ptype::bool0);
+    const auto b_info = yama::make_primitive("b"_str, {}, yama::ptype::bool0);
+    const auto c_info = yama::make_primitive("c"_str, {}, yama::ptype::bool0);
+    const auto d_info = yama::make_primitive("d"_str, {}, yama::ptype::bool0);
 
     static const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("self.abc:a"_str)
         .add_primitive_type("self.abc:b"_str)
         .add_primitive_type("self.abc:c"_str);
-    static const auto f_callsig = yama::make_callsig({ 0, 1, 2 }, 1);
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = f_callsig,
-            .call_fn = yama::noop_call_fn,
-            .max_locals = 4,
-        },
-    };
+    const auto f_callsig = yama::make_callsig({ 0, 1, 2 }, 1);
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        f_callsig,
+        4,
+        yama::noop_call_fn);
 
 
     class test_parcel2 final : public yama::parcel {

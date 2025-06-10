@@ -34,8 +34,10 @@ yama::module_info yama::module_factory::done() noexcept {
 
 yama::module_factory& yama::module_factory::add(type_info&& x) {
     type_info temp(std::forward<type_info>(x));
-    YAMA_ASSERT(!_result.contains(temp.unqualified_name));
-    _result.types[temp.unqualified_name] = std::move(temp);
+    // extracting this into a local var to avoid potential issues w/ C++ arg eval order
+    const str& unqualified_name = temp.unqualified_name();
+    YAMA_ASSERT(!_result.contains(unqualified_name));
+    _result.types.insert({ unqualified_name, std::move(temp) });
     return *this;
 }
 

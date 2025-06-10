@@ -28,7 +28,7 @@ yama::internal::fullname yama::internal::ctype::fullname() const {
     const str our_uqn =
         _csymtab_entry_not_typeinf()
         ? _csymtab_entry()->name
-        : _typeinf().unqualified_name;
+        : _typeinf().unqualified_name();
     return internal::fullname(qualified_name(_where, our_uqn));
 }
 
@@ -70,7 +70,7 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
         const auto& our_params = deref_assert(_typeinf().callsig()).params;
         if (param_index >= our_params.size()) return std::nullopt; // out-of-bounds
         const auto& our_const = our_params[param_index];
-        const str our_qn = _typeinf().consts.qualified_name(our_const).value();
+        const str our_qn = _typeinf().consts().qualified_name(our_const).value();
         return _s->load(_s->cs->sp.pull_f(e(), our_qn).value()); // <- can parse qn as fullname
     }
 }
@@ -86,7 +86,7 @@ std::optional<yama::internal::ctype> yama::internal::ctype::return_type(compiler
     }
     else {
         const auto& our_const = deref_assert(_typeinf().callsig()).ret;
-        const str our_qn = _typeinf().consts.qualified_name(our_const).value();
+        const str our_qn = _typeinf().consts().qualified_name(our_const).value();
         return _s->load(_s->cs->sp.pull_f(e(), our_qn).value()); // <- can parse qn as fullname
     }
 }

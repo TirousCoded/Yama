@@ -92,8 +92,8 @@ public:
     // IMPORTANT: remember that the first load actually builds the modules, so no more
     //            uploading once first loaded
 
-    void upload(yama::type_info&& info) {
-        our_parcel->mf.add(std::forward<yama::type_info>(info));
+    void upload(yama::type_info info) {
+        our_parcel->mf.add(std::move(info));
     }
 
     void upload_f();
@@ -129,24 +129,18 @@ void ContextTests::upload_f() {
     const yama::const_table_info f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str);
-    auto f_call_fn =
+    upload(yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 0),
+        6,
         [](yama::context& ctx) {
-        globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
-        globals.snapshot_0 = CallStateSnapshot::make(ctx);
+            globals.even_reached_0 = true; // acknowledge that call behaviour actually occurred
+            globals.snapshot_0 = CallStateSnapshot::make(ctx);
 
-        if (ctx.push_arg(1).bad()) return;
-        if (ctx.ret(0).bad()) return;
-        };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 6,
-        },
-    };
-    upload(std::move(f_info));
+            if (ctx.push_arg(1).bad()) return;
+            if (ctx.ret(0).bad()) return;
+        }));
 }
 
 void ContextTests::upload_g() {
@@ -154,23 +148,17 @@ void ContextTests::upload_g() {
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
         .add_function_type("self:f"_str, yama::make_callsig({ 0 }, 0));
-    auto g_call_fn =
+    upload(yama::make_function(
+        "g"_str,
+        g_consts,
+        yama::make_callsig({ 0 }, 0),
+        4,
         [](yama::context& ctx) {
-        if (ctx.push_fn(ctx.consts().type(1).value()).bad()) return; // f
-        if (ctx.push_arg(1).bad()) return; // argument
-        if (ctx.call(2, yama::newtop).bad()) return; // call f
-        if (ctx.ret(0).bad()) return; // return result of call f
-        };
-    yama::type_info g_info{
-        .unqualified_name = "g"_str,
-        .consts = g_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 0),
-            .call_fn = g_call_fn,
-            .max_locals = 4,
-        },
-    };
-    upload(std::move(g_info));
+            if (ctx.push_fn(ctx.consts().type(1).value()).bad()) return; // f
+            if (ctx.push_arg(1).bad()) return; // argument
+            if (ctx.call(2, yama::newtop).bad()) return; // call f
+            if (ctx.ret(0).bad()) return; // return result of call f
+        }));
 }
 
 void ContextTests::upload_h() {
@@ -186,26 +174,18 @@ void ContextTests::upload_h() {
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
         .add_function_type("self:f"_str, yama::make_callsig({ 0 }, 0));
-    yama::type_info h_info{
-        .unqualified_name = "h"_str,
-        .consts = h_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 0),
-            .call_fn = yama::bcode_call_fn,
-            .max_locals = 2,
-            .bcode = h_bcode,
-        },
-    };
-    upload(std::move(h_info));
+    upload(yama::make_function(
+        "h"_str,
+        h_consts,
+        yama::make_callsig({ 0 }, 0),
+        2,
+        h_bcode));
 }
 
 void ContextTests::upload_SomeStruct() {
-    yama::type_info SomeStruct_info{
-        .unqualified_name = "SomeStruct"_str,
-        .consts = yama::const_table_info{},
-        .info = yama::struct_info{},
-    };
-    upload(std::move(SomeStruct_info));
+    upload(yama::make_struct(
+        "SomeStruct"_str,
+        yama::const_table_info{}));
 }
 
 
@@ -488,16 +468,13 @@ TEST_F(ContextTests, InitialState_NonUserCall) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 13,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        13,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -655,16 +632,13 @@ TEST_F(ContextTests, Arg_NonUserCall) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0, 1 }, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0, 1 }, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -716,16 +690,13 @@ TEST_F(ContextTests, Local_NonUserCall) {
         if (ctx.put_none(0).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -760,16 +731,13 @@ TEST_F(ContextTests, Panic) {
         ctx.panic(); // should fail quietly
         globals.snapshot_2 = CallStateSnapshot::make(ctx);
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -847,15 +815,12 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
         if (ctx.ret(1).bad()) return;
         globals.even_reached_0 = true;
         };
-    yama::type_info fa_info{
-        .unqualified_name = "fa"_str,
-        .consts = fa_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = fa_call_fn,
-            .max_locals = 4,
-        },
-    };
+    const auto fa_info = yama::make_function(
+        "fa"_str,
+        fa_consts,
+        yama::make_callsig({}, 0),
+        4,
+        fa_call_fn);
     // inner call
     const yama::const_table_info fb_consts =
         yama::const_table_info()
@@ -868,17 +833,14 @@ TEST_F(ContextTests, Panic_MultiLevelCallStack) {
         ctx.panic(); // should fail quietly
         globals.snapshot_2 = CallStateSnapshot::make(ctx);
         };
-    yama::type_info fb_info{
-        .unqualified_name = "fb"_str,
-        .consts = fb_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = fb_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(fa_info));
-    upload(yama::type_info(fb_info));
+    const auto fb_info = yama::make_function(
+        "fb"_str,
+        fb_consts,
+        yama::make_callsig({}, 0),
+        1,
+        fb_call_fn);
+    upload(fa_info);
+    upload(fb_info);
     ASSERT_TRUE(dm->load("abc:fa"_str));
     ASSERT_TRUE(dm->load("abc:fb"_str));
     const yama::type fa = dm->load("abc:fa"_str).value();
@@ -960,16 +922,13 @@ TEST_F(ContextTests, Pop_NonUserCall) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1024,16 +983,13 @@ TEST_F(ContextTests, Put_NonUserCall) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1254,16 +1210,13 @@ TEST_F(ContextTests, PutConst) {
         if (ctx.put_none(0).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = yama::const_types * 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        yama::const_types * 2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1320,16 +1273,13 @@ TEST_F(ContextTests, PutConst_PanicIfXIsOutOfBounds) {
         if (ctx.put_none(yama::newtop).bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1356,16 +1306,13 @@ TEST_F(ContextTests, PutConst_PanicIfPushingOverflows) {
         globals.even_reached_0 = true; // shouldn't reach due to panic
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1390,16 +1337,13 @@ TEST_F(ContextTests, PutConst_PanicIfCIsOutOfBounds) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1426,16 +1370,13 @@ TEST_F(ContextTests, PutConst_PanicIfCIsNotIndexOfAnObjectConstant) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1488,16 +1429,13 @@ TEST_F(ContextTests, PutTypeConst) {
         if (ctx.put_none(0).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = type_constant_types * 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        type_constant_types * 2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1546,16 +1484,13 @@ TEST_F(ContextTests, PutTypeConst_PanicIfXIsOutOfBounds) {
         if (ctx.put_none(yama::newtop).bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1582,16 +1517,13 @@ TEST_F(ContextTests, PutTypeConst_PanicIfPushingOverflows) {
         globals.even_reached_0 = true; // shouldn't reach due to panic
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1616,16 +1548,13 @@ TEST_F(ContextTests, PutTypeConst_PanicIfCIsOutOfBounds) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1653,16 +1582,13 @@ TEST_F(ContextTests, PutTypeConst_PanicIfCIsNotIndexOfATypeConstant) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1692,16 +1618,13 @@ TEST_F(ContextTests, PutArg) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(2).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 1),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 1),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1746,16 +1669,13 @@ TEST_F(ContextTests, PutArg_PanicIfXIsOutOfBounds) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 1),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 1),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1781,16 +1701,13 @@ TEST_F(ContextTests, PutArg_PanicIfPushingOverflows) {
         if (ctx.put_arg(yama::newtop, 0).bad()) return; // overflow!
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 1),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 1),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1816,16 +1733,13 @@ TEST_F(ContextTests, PutArg_PanicIfArgIsOutOfBounds) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(1).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({ 0 }, 1),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({ 0 }, 1),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1869,16 +1783,13 @@ TEST_F(ContextTests, Copy_NonUserCall) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(3).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 4,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        4,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -1971,15 +1882,12 @@ namespace default_init_helpers {
     }
     
     yama::type_info mk_testfn(yama::call_fn call_fn, yama::const_table_info consts = mk_testfn_consts()) {
-        return yama::type_info{
-            .unqualified_name = "testfn"_str,
-            .consts = std::move(consts),
-            .info = yama::function_info{
-                .callsig = yama::make_callsig({}, 0),
-                .call_fn = call_fn,
-                .max_locals = default_init_helpers::total_cases,
-            },
-        };
+        return yama::make_function(
+            "testfn"_str,
+            consts,
+            yama::make_callsig({}, 0),
+            default_init_helpers::total_cases,
+            call_fn);
     }
 
     // the const_t overload has its testfn code directly in the unit test, w/
@@ -2535,16 +2443,13 @@ TEST_F(ContextTests, Call_PanicIfArgsProvidesNoCallObj) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -2670,16 +2575,13 @@ TEST_F(ContextTests, Call_PanicIfCallStackOverflow) {
         if (ctx.call(1, yama::newtop).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -2705,16 +2607,13 @@ TEST_F(ContextTests, Call_PanicIfNoReturnValueObjectProvided) {
         globals.even_reached_0 = true;
         // return w/out ever calling ret
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -2873,16 +2772,13 @@ TEST_F(ContextTests, CallNR_PanicIfArgsProvidesNoCallObj) {
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 2,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -2984,16 +2880,13 @@ TEST_F(ContextTests, CallNR_PanicIfCallStackOverflow) {
         if (ctx.call(1, yama::newtop).bad()) return;
         if (ctx.ret(2).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -3018,16 +2911,13 @@ TEST_F(ContextTests, CallNR_PanicIfNoReturnValueObjectProvided) {
         globals.even_reached_0 = true;
         // return w/out ever calling ret
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -3064,16 +2954,13 @@ TEST_F(ContextTests, Ret_AllowsReturningWrongTypedObject) {
         if (ctx.push_uint(301).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 3,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        3,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -3111,16 +2998,13 @@ TEST_F(ContextTests, Ret_PanicIfXIsOutOfBounds) {
         globals.even_reached_0 = true;
         if (ctx.ret(70).bad()) return; // 70 is out-of-bounds
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 
@@ -3148,16 +3032,13 @@ TEST_F(ContextTests, Ret_PanicIfCalledMultipleTimesInOneCall) {
         if (ctx.ret(0).bad()) return; // okay
         if (ctx.ret(0).bad()) return; // illegal
         };
-    yama::type_info f_info{
-        .unqualified_name = "f"_str,
-        .consts = f_consts,
-        .info = yama::function_info{
-            .callsig = yama::make_callsig({}, 0),
-            .call_fn = f_call_fn,
-            .max_locals = 1,
-        },
-    };
-    upload(yama::type_info(f_info));
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        1,
+        f_call_fn);
+    upload(f_info);
     ASSERT_TRUE(dm->load("abc:f"_str));
     const yama::type f = dm->load("abc:f"_str).value();
 

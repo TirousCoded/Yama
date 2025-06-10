@@ -34,8 +34,8 @@ const yama::str& yama::internal::type_instance::fullname() const noexcept {
 yama::internal::type_mem yama::internal::type_instance::_create_mem(str fullname, res<type_info> info) {
     internal::type_mem_header header{
         .fullname = fullname,
-        .len = info->consts.size(),
-        .stubs = info->consts.size(),
+        .len = info->consts().size(),
+        .stubs = info->consts().size(),
         .info = info,
         .kind = info->kind(),
     };

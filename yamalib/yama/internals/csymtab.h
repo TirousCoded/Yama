@@ -188,7 +188,7 @@ namespace yama::internal {
         }
 
 
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
     };
 
     // csymtab defines Yama's internal repr for a symbol table
@@ -227,7 +227,7 @@ namespace yama::internal {
                 : nullptr;
         }
 
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
 
 
     private:
@@ -320,7 +320,7 @@ namespace yama::internal {
             return false;
         }
 
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = "    ");
+        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
 
 
     private:

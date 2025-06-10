@@ -41,7 +41,7 @@ void yama::internal::register_stk::push_temp(const ast_node& x, ctype type) {
             x,
             dsignal::compile_impl_limits,
             "fn {} contains parts requiring >{} registers to store all temporaries and local vars, exceeding limit!",
-            tu->cgt.target().unqualified_name,
+            tu->cgt.target().unqualified_name(),
             reg_limit);
         return;
     }
@@ -145,8 +145,7 @@ bool yama::internal::register_stk::type_check_reg(ssize_t index, ctype expected)
 }
 
 void yama::internal::register_stk::_update_max_locals_of_codegen_target() {
-    if (!std::holds_alternative<function_info>(tu->cgt.target().info)) return;
-    auto& fn_info = std::get<function_info>(tu->cgt.target().info);
-    fn_info.max_locals = std::max(fn_info.max_locals, regs());
+    auto& info = tu->cgt.target();
+    info.change_max_locals(std::max(info.max_locals(), regs()));
 }
 

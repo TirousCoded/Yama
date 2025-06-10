@@ -79,7 +79,7 @@ void yama::verifier::_dump_cfg(const yama::type_info& subject, const bc::code& b
         }
         const auto& b = _cfg_blocks.at(i);
         YAMA_LOG(dbg(), verif_error_c, "{}", b.fmt());
-        constexpr const char* tab = "    ";
+        constexpr const char* tab = default_tab;
         YAMA_LOG(dbg(), verif_error_c, "{}processed            : {}", tab, b.processed);
         YAMA_LOG(dbg(), verif_error_c, "{}processed-by         : {}", tab,
             [&]() -> std::string {
@@ -152,7 +152,7 @@ bool yama::verifier::_verify(const type_info& subject, const str& module_path, c
 }
 
 void yama::verifier::_begin_verify(const type_info& subject) {
-    YAMA_LOG(dbg(), verif_c, "verifying {}...", subject.unqualified_name);
+    YAMA_LOG(dbg(), verif_c, "verifying {}...", subject.unqualified_name());
 }
 
 void yama::verifier::_end_verify(bool success) {
@@ -191,35 +191,35 @@ bool yama::verifier::_verify_type_callsig(const type_info& subject) {
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} callsig (expressed using constant symbols) {} contains out-of-bounds param type constant indices!",
-            subject.unqualified_name, deref_assert(subject.callsig()).fmt(subject.consts));
+            subject.unqualified_name(), deref_assert(subject.callsig()).fmt(subject.consts()));
     }
     if (!report.param_type_indices_specify_type_consts) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_param_type_not_type_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} callsig (expressed using constant symbols) {} contains param type constant indices specifying non-type constant symbols!",
-            subject.unqualified_name, deref_assert(subject.callsig()).fmt(subject.consts));
+            subject.unqualified_name(), deref_assert(subject.callsig()).fmt(subject.consts()));
     }
     if (!report.return_type_indices_are_in_bounds) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_return_type_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} callsig (expressed using constant symbols) {} contains out-of-bounds return type constant indices!",
-            subject.unqualified_name, deref_assert(subject.callsig()).fmt(subject.consts));
+            subject.unqualified_name(), deref_assert(subject.callsig()).fmt(subject.consts()));
     }
     if (!report.return_type_indices_specify_type_consts) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_return_type_not_type_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} callsig (expressed using constant symbols) {} contains return type constant indices specifying non-type constant symbols!",
-            subject.unqualified_name, deref_assert(subject.callsig()).fmt(subject.consts));
+            subject.unqualified_name(), deref_assert(subject.callsig()).fmt(subject.consts()));
     }
     return success;
 }
 
 bool yama::verifier::_verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata) {
     bool success = true;
-    for (const_t i = 0; i < subject.consts.size(); i++) {
+    for (const_t i = 0; i < subject.consts().size(); i++) {
         // keep iterating if we find a failure so as to get a chance
         // to log all issues found
         if (!_verify_constant_symbol(subject, i, metadata)) {
@@ -241,18 +241,18 @@ bool yama::verifier::_verify_constant_symbol(const type_info& subject, const_t i
 }
 
 bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& subject, const_t index, const parcel_metadata& metadata) {
-    const bool has_qualified_name = (bool)subject.consts.qualified_name(index);
+    const bool has_qualified_name = (bool)subject.consts().qualified_name(index);
     if (!has_qualified_name) {
         return true; // default to successful
     }
-    const str qualified_name = subject.consts.qualified_name(index).value();
+    const str qualified_name = subject.consts().qualified_name(index).value();
     const auto parsed = internal::parse_qualified_name(qualified_name);
     if (!parsed) {
         YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) is invalid; syntax error!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index);
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index);
         return false;
     }
     if (!metadata.is_self_or_dep_name(parsed->import_path.head)) {
@@ -260,18 +260,18 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) is invalid; head is not self-name or dep-name!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index);
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index);
         return false;
     }
     return true;
 }
 
 bool yama::verifier::_verify_constant_symbol_callsig(const type_info& subject, const_t index) {
-    const bool has_callsig = (bool)subject.consts.callsig(index);
+    const bool has_callsig = (bool)subject.consts().callsig(index);
     if (!has_callsig) {
         return true; // default to successful
     }
-    const auto report = gen_callsig_report(subject, subject.consts.callsig(index));
+    const auto report = gen_callsig_report(subject, subject.consts().callsig(index));
     const bool success =
         report.param_type_indices_are_in_bounds &&
         report.param_type_indices_specify_type_consts &&
@@ -285,28 +285,28 @@ bool yama::verifier::_verify_constant_symbol_callsig(const type_info& subject, c
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains out-of-bounds param type constant indices!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index, deref_assert(subject.consts.callsig(index)).fmt(subject.consts));
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index, deref_assert(subject.consts().callsig(index)).fmt(subject.consts()));
     }
     if (!report.param_type_indices_specify_type_consts) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_param_type_not_type_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains param type constant indices specifying non-type constant symbols!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index, deref_assert(subject.consts.callsig(index)).fmt(subject.consts));
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index, deref_assert(subject.consts().callsig(index)).fmt(subject.consts()));
     }
     if (!report.return_type_indices_are_in_bounds) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_return_type_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains out-of-bounds return type constant indices!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index, deref_assert(subject.consts.callsig(index)).fmt(subject.consts));
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index, deref_assert(subject.consts().callsig(index)).fmt(subject.consts()));
     }
     if (!report.return_type_indices_specify_type_consts) {
         YAMA_RAISE(dbg(), dsignal::verif_callsig_return_type_not_type_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} type constant symbol {} (at constant index {}) callsig (expressed using constant symbols) {} contains return type constant indices specifying non-type constant symbols!",
-            subject.unqualified_name, subject.consts.fmt_type_const(index), index, deref_assert(subject.consts.callsig(index)).fmt(subject.consts));
+            subject.unqualified_name(), subject.consts().fmt_type_const(index), index, deref_assert(subject.consts().callsig(index)).fmt(subject.consts()));
     }
     return success;
 }
@@ -315,19 +315,19 @@ yama::verifier::_callsig_report yama::verifier::gen_callsig_report(const type_in
     _callsig_report result{};
     YAMA_DEREF_SAFE(callsig) {
         for (const auto& I : callsig->params) {
-            if (I >= subject.consts.size()) {
+            if (I >= subject.consts().size()) {
                 result.param_type_indices_are_in_bounds = false;
                 break;
             }
-            else if (!is_type_const(subject.consts.const_type(I).value())) {
+            else if (!is_type_const(subject.consts().const_type(I).value())) {
                 result.param_type_indices_specify_type_consts = false;
                 break;
             }
         }
-        if (callsig->ret >= subject.consts.size()) {
+        if (callsig->ret >= subject.consts().size()) {
             result.return_type_indices_are_in_bounds = false;
         }
-        else if (!is_type_const(subject.consts.const_type(callsig->ret).value())) {
+        else if (!is_type_const(subject.consts().const_type(callsig->ret).value())) {
             result.return_type_indices_specify_type_consts = false;
         }
     }
@@ -362,7 +362,7 @@ bool yama::verifier::_verify_bcode_not_empty(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} uses bcode, but it's bcode contains no instructions!",
-            subject.unqualified_name);
+            subject.unqualified_name());
         return false;
     }
     return true;
@@ -451,7 +451,7 @@ void yama::verifier::_report_dead_code_blocks(const type_info& subject, const bc
             dbg(), verif_warning_c,
             "warning: {} {} bcode dead code {}!",
             subject.fmt_sym(I.first),
-            subject.unqualified_name,
+            subject.unqualified_name(),
             I.second.fmt());
     }
 }
@@ -462,11 +462,11 @@ bool yama::verifier::_visit_entrypoint_block(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_warning_c,
             "warning: {} {} bcode symbolic execution aborted; there may be additional issues which hadn't yet been detected!",
-            subject.fmt_sym(0), subject.unqualified_name);
+            subject.fmt_sym(0), subject.unqualified_name());
         YAMA_LOG(
             dbg(), verif_error_c,
             "{}",
-            subject.consts);
+            subject.consts());
         if (const auto bc = subject.bcode()) {
             YAMA_LOG(
                 dbg(), verif_error_c,
@@ -543,7 +543,7 @@ bool yama::verifier::_verify_no_register_coherence_violation(const type_info& su
             YAMA_LOG(
                 dbg(), verif_error_c,
                 "error: {} bcode register coherence violation: for {}, incoming register {} is type {}, but dest {} expected type {}!",
-                subject.unqualified_name, _fmt_branch(incoming_branched_from, block.first), i, incoming, block.fmt(), expected);
+                subject.unqualified_name(), _fmt_branch(incoming_branched_from, block.first), i, incoming, block.fmt(), expected);
             // don't abort after detecting one violation, instead report for any and all registers in error
             success = false;
         }
@@ -553,7 +553,7 @@ bool yama::verifier::_verify_no_register_coherence_violation(const type_info& su
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} bcode register coherence violation: for {}, incoming register count is {}, but expected {}!",
-            subject.unqualified_name, _fmt_branch(incoming_branched_from, block.first), incoming_reg_set.size(), block.initial_reg_set.size());
+            subject.unqualified_name(), _fmt_branch(incoming_branched_from, block.first), incoming_reg_set.size(), block.initial_reg_set.size());
         success = false;
     }
     return success;
@@ -564,7 +564,7 @@ bool yama::verifier::_symbolic_exec(const type_info& subject, const bc::code& bc
     YAMA_LOG(
         dbg(), general_c,
         "symbolic exec (subject {}) (block {})\n(no success msg means exec failed)\ninitial_reg_set ~> {}",
-        subject.unqualified_name,
+        subject.unqualified_name(),
         block.fmt(),
         fmt_reg_set_state_diagnostic(block.initial_reg_set));
 #endif
@@ -860,7 +860,7 @@ bool yama::verifier::_verify_RTop_exists(const type_info& subject, const bc::cod
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(top) does not exist!",
-            subject.fmt_sym(i), subject.unqualified_name, i);
+            subject.fmt_sym(i), subject.unqualified_name(), i);
         return false;
     }
     return true;
@@ -874,7 +874,7 @@ bool yama::verifier::_verify_RTop_is_type_bool(const type_info& subject, const b
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(top) (top == {}) is type {}, but it must be {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, block.final_reg_set.size(), _RTop, _other);
+            subject.fmt_sym(i), subject.unqualified_name(), i, block.final_reg_set.size(), _RTop, _other);
         return false;
     }
     return true;
@@ -886,7 +886,7 @@ bool yama::verifier::_verify_RA_in_bounds(const type_info& subject, const bc::co
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A);
         return false;
     }
     return true;
@@ -900,7 +900,7 @@ bool yama::verifier::_verify_RA_is_type_none(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, _RA, _other);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, _RA, _other);
         return false;
     }
     return true;
@@ -921,7 +921,7 @@ bool yama::verifier::_verify_RA_is_type_bool(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, _RA, _other);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, _RA, _other);
         return false;
     }
     return true;
@@ -935,7 +935,7 @@ bool yama::verifier::_verify_RA_is_type_type(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but it must be {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, _RA, _other);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, _RA, _other);
         return false;
     }
     return true;
@@ -951,13 +951,13 @@ bool yama::verifier::_verify_RA_is_type_type_skip_if_reinit(const type_info& sub
 bool yama::verifier::_verify_RA_is_return_type_of_this_call(const type_info& subject, const bc::code& bcode, _cfg_block& block, size_t i) {
     const auto RA = _R_type(block, bcode[i].A);
     const auto this_return_type_index = deref_assert(subject.callsig()).ret;
-    const str this_return_type = subject.consts.qualified_name(this_return_type_index).value();
+    const str this_return_type = subject.consts().qualified_name(this_return_type_index).value();
     if (RA != this_return_type) {
         YAMA_RAISE(dbg(), dsignal::verif_RA_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) is type {}, but ret expects return type {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, RA, this_return_type);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, RA, this_return_type);
         return false;
     }
     return true;
@@ -969,7 +969,7 @@ bool yama::verifier::_verify_RB_in_bounds_for_copy_instr(const type_info& subjec
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
@@ -983,7 +983,7 @@ bool yama::verifier::_verify_RB_in_bounds_for_call_instr(const type_info& subjec
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(B) (B == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
@@ -993,15 +993,15 @@ bool yama::verifier::_verify_RB_is_return_type_of_call_object(const type_info& s
     const auto args_index = block.final_reg_set.size() - size_t(bcode[i].A);
     const auto callobj = _R_type(block, args_index);
     const auto callobj_index = _find_type_const(subject, callobj).value();
-    const auto callobj_return_type_index = deref_assert(subject.consts.callsig(callobj_index)).ret;
-    const str callobj_return_type = subject.consts.qualified_name(callobj_return_type_index).value();
+    const auto callobj_return_type_index = deref_assert(subject.consts().callsig(callobj_index)).ret;
+    const str callobj_return_type = subject.consts().qualified_name(callobj_return_type_index).value();
     const auto RB = _R_type(block, bcode[i].B);
     if (RB != callobj_return_type) {
         YAMA_RAISE(dbg(), dsignal::verif_RB_wrong_type);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(top-A) (top-A == {}) call object return type is {}, but return target R(B) (B == {}) is type {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, args_index, callobj_return_type, bcode[i].B, RB);
+            subject.fmt_sym(i), subject.unqualified_name(), i, args_index, callobj_return_type, bcode[i].B, RB);
         return false;
     }
     return true;
@@ -1015,50 +1015,50 @@ bool yama::verifier::_verify_RB_is_return_type_of_call_object_skip_if_reinit(con
 }
 
 bool yama::verifier::_verify_KoB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].B >= subject.consts.size()) {
+    if (bcode[i].B >= subject.consts().size()) {
         YAMA_RAISE(dbg(), dsignal::verif_KoB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: Ko(B) (B == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
 }
 
 bool yama::verifier::_verify_KoB_is_object_const(const type_info& subject, const bc::code& bcode, size_t i) {
-    const auto KoB_const_type = subject.consts.const_type(bcode[i].B).value();
+    const auto KoB_const_type = subject.consts().const_type(bcode[i].B).value();
     if (!is_object_const(KoB_const_type)) {
         YAMA_RAISE(dbg(), dsignal::verif_KoB_not_object_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: Ko(B) (B == {}) must be object constant, but isn't!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
 }
 
 bool yama::verifier::_verify_KtB_in_bounds(const type_info& subject, const bc::code& bcode, size_t i) {
-    if (bcode[i].B >= subject.consts.size()) {
+    if (bcode[i].B >= subject.consts().size()) {
         YAMA_RAISE(dbg(), dsignal::verif_KtB_out_of_bounds);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: Kt(B) (B == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
 }
 
 bool yama::verifier::_verify_KtB_is_type_const(const type_info& subject, const bc::code& bcode, size_t i) {
-    const auto KtB_const_type = subject.consts.const_type(bcode[i].B).value();
+    const auto KtB_const_type = subject.consts().const_type(bcode[i].B).value();
     if (!is_type_const(KtB_const_type)) {
         YAMA_RAISE(dbg(), dsignal::verif_KtB_not_type_const);
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: Kt(B) (B == {}) must be type constant, but isn't!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
@@ -1072,7 +1072,7 @@ bool yama::verifier::_verify_ArgB_in_bounds(const type_info& subject, const bc::
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: Arg(B) (B == {}) out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].B);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].B);
         return false;
     }
     return true;
@@ -1086,7 +1086,7 @@ bool yama::verifier::_verify_RA_and_RB_agree_on_type(const type_info& subject, c
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) and R(B) (B == {}) do not agree on type ({} != {})!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _RB);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, bcode[i].B, _RA, _RB);
         return false;
     }
     return true;
@@ -1107,7 +1107,7 @@ bool yama::verifier::_verify_RA_and_KoB_agree_on_type(const type_info& subject, 
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) and Ko(B) (B == {}) do not agree on type ({} != {})!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _KoB);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, bcode[i].B, _RA, _KoB);
         return false;
     }
     return true;
@@ -1128,7 +1128,7 @@ bool yama::verifier::_verify_RA_and_KtB_agree_on_type(const type_info& subject, 
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) and Kt(B) (B == {}) do not agree on type ({} != {})!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _KtB);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, bcode[i].B, _RA, _KtB);
         return false;
     }
     return true;
@@ -1149,7 +1149,7 @@ bool yama::verifier::_verify_RA_and_ArgB_agree_on_type(const type_info& subject,
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(A) (A == {}) and Arg(B) (B == {}) do not agree on type ({} != {})!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].A, bcode[i].B, _RA, _ArgB);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].A, bcode[i].B, _RA, _ArgB);
         return false;
     }
     return true;
@@ -1174,7 +1174,7 @@ bool yama::verifier::_verify_ArgRs_legal_call_object(const type_info& subject, c
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: R(top-A) (top-A == {}) is type {}, which cannot be used as call object!",
-            subject.fmt_sym(i), subject.unqualified_name, i, args_index, callobj_type);
+            subject.fmt_sym(i), subject.unqualified_name(), i, args_index, callobj_type);
         return false;
     }
     return true;
@@ -1186,7 +1186,7 @@ bool yama::verifier::_verify_ArgRs_in_bounds(const type_info& subject, const bc:
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: more args registers than there are local object stack registers!",
-            subject.fmt_sym(i), subject.unqualified_name, i);
+            subject.fmt_sym(i), subject.unqualified_name(), i);
         return false;
     }
     return true;
@@ -1198,7 +1198,7 @@ bool yama::verifier::_verify_ArgRs_have_at_least_one_object(const type_info& sub
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: no args registers (ie. A == 0)!",
-            subject.fmt_sym(i), subject.unqualified_name, i);
+            subject.fmt_sym(i), subject.unqualified_name(), i);
         return false;
     }
     return true;
@@ -1209,7 +1209,7 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
     const auto args_count = size_t(bcode[i].A);
     const auto callobj_type = _R_type(block, args_index);
     const auto callobj_index = _find_type_const(subject, callobj_type).value();
-    const auto& callobj_params = deref_assert(subject.consts.callsig(callobj_index)).params;
+    const auto& callobj_params = deref_assert(subject.consts().callsig(callobj_index)).params;
     YAMA_ASSERT(args_count >= 1);
     YAMA_ASSERT(internal::range_contains<size_t>(0, block.final_reg_set.size(), args_index, args_index + args_count));
     const auto param_args_index = args_index + 1;
@@ -1220,7 +1220,7 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: param args register count is {}, but expected {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, param_args_count, expected_param_args_count);
+            subject.fmt_sym(i), subject.unqualified_name(), i, param_args_count, expected_param_args_count);
         return false;
     }
     // keep iterating to report all errors involving improper param arg types
@@ -1229,7 +1229,7 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
         const auto param_arg_index = param_args_index + j;
         const auto param_arg = _R_type(block, param_arg_index);
         const auto expected_param_arg_index = callobj_params[j];
-        const str expected_param_arg = subject.consts.qualified_name(expected_param_arg_index).value();
+        const str expected_param_arg = subject.consts().qualified_name(expected_param_arg_index).value();
         if (param_arg == expected_param_arg) {
             continue;
         }
@@ -1239,7 +1239,7 @@ bool yama::verifier::_verify_param_arg_registers_are_correct_number_and_types(co
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: param arg {} (register {}) is type {}, but expected {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, j, param_arg_index, param_arg, expected_param_arg);
+            subject.fmt_sym(i), subject.unqualified_name(), i, j, param_arg_index, param_arg, expected_param_arg);
         success = false;
     }
     return success;
@@ -1251,7 +1251,7 @@ bool yama::verifier::_verify_pushing_does_not_overflow(const type_info& subject,
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: pushing new register would overflow max locals count of {}!",
-            subject.fmt_sym(i), subject.unqualified_name, i, subject.max_locals());
+            subject.fmt_sym(i), subject.unqualified_name(), i, subject.max_locals());
         return false;
     }
     return true;
@@ -1263,7 +1263,7 @@ bool yama::verifier::_verify_program_counter_valid_after_jump_by_sBx_offset(cons
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: jump by sBx (sBx == {}) would put program counter out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, bcode[i].sBx);
+            subject.fmt_sym(i), subject.unqualified_name(), i, bcode[i].sBx);
         return false;
     }
     return true;
@@ -1275,7 +1275,7 @@ bool yama::verifier::_verify_program_counter_valid_after_fallthrough(const type_
         YAMA_LOG(
             dbg(), verif_error_c,
             "error: {} {} bcode instr {}: {} fallthrough would put program counter out-of-bounds!",
-            subject.fmt_sym(i), subject.unqualified_name, i, block.fmt());
+            subject.fmt_sym(i), subject.unqualified_name(), i, block.fmt());
         return false;
     }
     return true;
@@ -1320,34 +1320,34 @@ yama::str yama::verifier::_R_type(const _cfg_block& block, size_t index) {
 yama::str yama::verifier::_R_call_object_type_return_type(const type_info& subject, const _cfg_block& block, size_t index) {
     const auto RA_type = _R_type(block, index);
     const auto RA_index = _find_type_const(subject, RA_type).value();
-    const auto RA_return_type_index = deref_assert(subject.consts.callsig(RA_index)).ret;
-    return subject.consts.qualified_name(RA_return_type_index).value();
+    const auto RA_return_type_index = deref_assert(subject.consts().callsig(RA_index)).ret;
+    return subject.consts().qualified_name(RA_return_type_index).value();
 }
 
 yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
     static_assert(const_types == 8);
-    switch (subject.consts.const_type(index).value()) {
+    switch (subject.consts().const_type(index).value()) {
     case const_type::int0:          return _int_type();                                     break;
     case const_type::uint:          return _uint_type();                                    break;
     case const_type::float0:        return _float_type();                                   break;
     case const_type::bool0:         return _bool_type();                                    break;
     case const_type::char0:         return _char_type();                                    break;
-    case const_type::function_type: return subject.consts.qualified_name(index).value();    break;
+    case const_type::function_type: return subject.consts().qualified_name(index).value();    break;
     default:                        YAMA_DEADEND;                                           break;
     }
     return str();
 }
 
 yama::str yama::verifier::_Kt_type(const type_info& subject, size_t index) {
-    return subject.consts.qualified_name(index).value();
+    return subject.consts().qualified_name(index).value();
 }
 
 yama::str yama::verifier::_Arg_type(const type_info& subject, size_t index) {
     if (index == 0) { // callobj arg
-        return str(std::format("{}:{}", _module_path(), subject.unqualified_name));
+        return str(std::format("{}:{}", _module_path(), subject.unqualified_name()));
     }
     else { // param arg
-        return subject.consts.qualified_name(deref_assert(subject.callsig()).params[index - 1]).value();
+        return subject.consts().qualified_name(deref_assert(subject.callsig()).params[index - 1]).value();
     }
 }
 
@@ -1377,8 +1377,8 @@ bool yama::verifier::_is_builtin_prim_type(const str& x) {
 
 std::optional<size_t> yama::verifier::_find_type_const(const type_info& subject, const str& x) {
     // NOTE: need to do a O(n)-time search of the constant table
-    for (size_t i = 0; i < subject.consts.size(); i++) {
-        if (subject.consts.qualified_name(i) == x) {
+    for (size_t i = 0; i < subject.consts().size(); i++) {
+        if (subject.consts().qualified_name(i) == x) {
             return std::make_optional(i);
         }
     }
@@ -1386,7 +1386,7 @@ std::optional<size_t> yama::verifier::_find_type_const(const type_info& subject,
 }
 
 std::optional<yama::kind> yama::verifier::_find_type_kind(const type_info& subject, const str& x) {
-    if (const auto index = _find_type_const(subject, x))    return subject.consts.kind(index.value());
+    if (const auto index = _find_type_const(subject, x))    return subject.consts().kind(index.value());
     else if (_is_builtin_prim_type(x))                      return kind::primitive;
     else                                                    return std::nullopt;
 }

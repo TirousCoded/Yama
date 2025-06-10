@@ -67,7 +67,6 @@ namespace yama::internal {
         label_id_t _next_label = 0;
 
 
-        void _bind_bare_bones_type_info(const str& unqualified_name, type_info::info_t&& info);
         void _apply_bcode_to_target(const ast_node& where);
     };
 }

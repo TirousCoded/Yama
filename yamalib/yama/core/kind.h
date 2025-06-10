@@ -26,6 +26,7 @@ namespace yama {
     enum class kind : uint8_t {
         primitive,
         function,
+        //method,
         struct0,
 
         num,        // this is not a valid kind of type

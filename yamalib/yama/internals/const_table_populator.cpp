@@ -14,7 +14,7 @@ yama::internal::const_table_populator::const_table_populator(translation_unit& t
     : tu(tu) {}
 
 yama::const_t yama::internal::const_table_populator::pull_int(int_t x) {
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // first try and find existing constant
     if (const auto found = _find_existing_c<int_const>(_consts, x)) {
         return found.value();
@@ -25,7 +25,7 @@ yama::const_t yama::internal::const_table_populator::pull_int(int_t x) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_uint(uint_t x) {
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // first try and find existing constant
     if (const auto found = _find_existing_c<uint_const>(_consts, x)) {
         return found.value();
@@ -36,7 +36,7 @@ yama::const_t yama::internal::const_table_populator::pull_uint(uint_t x) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_float(float_t x) {
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // NOTE: as stated, we're not gonna bother trying to compare floats to
     //       avoid duplicates, as comparing floats is never consistent enough
     //       to not potentially cause problems
@@ -45,7 +45,7 @@ yama::const_t yama::internal::const_table_populator::pull_float(float_t x) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_bool(bool_t x) {
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // first try and find existing constant
     if (const auto found = _find_existing_c<bool_const>(_consts, x)) {
         return found.value();
@@ -56,7 +56,7 @@ yama::const_t yama::internal::const_table_populator::pull_bool(bool_t x) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_char(char_t x) {
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // first try and find existing constant
     if (const auto found = _find_existing_c<char_const>(_consts, x)) {
         return found.value();
@@ -76,7 +76,7 @@ yama::const_t yama::internal::const_table_populator::pull_type(const ctype& t) {
 
 yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype& t) {
     const auto qn = t.fullname().qualified_name().str(tu->e());
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<primitive_type_const>(_consts, qn)) {
         return found.value();
@@ -88,7 +88,7 @@ yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype&
 
 yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t) {
     const auto qn = t.fullname().qualified_name().str(tu->e());
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<function_type_const>(_consts, qn)) {
         return found.value();
@@ -110,7 +110,7 @@ yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t
 
 yama::const_t yama::internal::const_table_populator::pull_struct_type(const ctype& t) {
     const auto qn = t.fullname().qualified_name().str(tu->e());
-    auto& _consts = tu->cgt.target().consts;
+    auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<struct_type_const>(_consts, qn)) {
         return found.value();

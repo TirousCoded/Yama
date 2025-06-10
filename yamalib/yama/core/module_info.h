@@ -32,7 +32,7 @@ namespace yama {
 
         bool operator==(const module_info&) const noexcept = default;
 
-        std::string fmt(const char* tab = "    ") const;
+        std::string fmt(const char* tab = default_tab) const;
     };
 }
 

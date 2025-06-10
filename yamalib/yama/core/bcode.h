@@ -430,10 +430,10 @@ namespace yama::bc {
         bool operator==(const code&) const noexcept = default;
 
 
-        std::string fmt_instr(size_t x, const char* tab = "    ") const;
-        std::string fmt_instr(size_t x, const syms& syms, const char* tab = "    ") const;
-        std::string fmt_disassembly(const char* tab = "    ") const;
-        std::string fmt_disassembly(const syms& syms, const char* tab = "    ") const;
+        std::string fmt_instr(size_t x, const char* tab = default_tab) const;
+        std::string fmt_instr(size_t x, const syms& syms, const char* tab = default_tab) const;
+        std::string fmt_disassembly(const char* tab = default_tab) const;
+        std::string fmt_disassembly(const syms& syms, const char* tab = default_tab) const;
 
 
         static_assert(opcodes == 14);
@@ -462,7 +462,7 @@ namespace yama::bc {
         std::vector<bool> _reinit_flags;
 
 
-        std::string _fmt_instr(size_t x, const syms* syms, const char* tab = "    ") const;
+        std::string _fmt_instr(size_t x, const syms* syms, const char* tab = default_tab) const;
     };
 
 

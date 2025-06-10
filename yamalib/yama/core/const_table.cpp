@@ -20,7 +20,7 @@ bool yama::const_table::is_stub(const_t x) const noexcept {
 }
 
 std::optional<yama::const_type> yama::const_table::const_type(const_t x) const noexcept {
-    return _mem->info->consts.const_type(x);
+    return _mem->info->consts().const_type(x);
 }
 
 std::optional<yama::type> yama::const_table::type(const_t x) const noexcept {

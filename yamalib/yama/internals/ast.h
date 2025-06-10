@@ -361,7 +361,7 @@ namespace yama::internal {
 
         virtual void fmt(ast_formatter& x) = 0;
 
-        inline std::string fmt_tree(str src, const char* tab = "    ") {
+        inline std::string fmt_tree(str src, const char* tab = default_tab) {
             YAMA_ASSERT(tab);
             ast_formatter a(src, tab);
             fmt(a);
