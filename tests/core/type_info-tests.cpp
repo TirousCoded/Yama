@@ -15,6 +15,9 @@ using namespace yama::string_literals;
 const yama::str old_name = "abc"_str;
 const yama::str new_name = "def"_str;
 
+const yama::str old_name_member = "a.b"_str;
+const yama::str new_name_member = "aaa.bbb"_str;
+
 const yama::const_table_info old_consts =
 yama::const_table_info()
 .add_bool(true)
@@ -65,8 +68,8 @@ yama::bc::syms()
 
 // IMPORTANT: update this as we add new properties
 
-void change(yama::type_info& x) {
-    x.change_unqualified_name(new_name);
+void change(yama::type_info& x, const yama::str& new_name_v = new_name) {
+    x.change_unqualified_name(new_name_v);
     x.change_consts(new_consts);
     x.change_ptype(new_ptype);
     x.change_callsig(new_callsig);
@@ -77,7 +80,7 @@ void change(yama::type_info& x) {
 }
 
 
-static_assert(yama::kinds == 3); // reminder
+static_assert(yama::kinds == 4); // reminder
 
 TEST(TypeInfoTests, Primitive) {
     auto abc = yama::make_primitive(old_name, old_consts, old_ptype);
@@ -92,6 +95,8 @@ TEST(TypeInfoTests, Primitive) {
     EXPECT_EQ(abc.bcode(), nullptr);
     EXPECT_EQ(abc.bsyms(), nullptr);
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), old_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 
     change(abc);
 
@@ -105,6 +110,8 @@ TEST(TypeInfoTests, Primitive) {
     EXPECT_EQ(abc.bcode(), nullptr);
     EXPECT_EQ(abc.bsyms(), nullptr);
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), new_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 }
 
 TEST(TypeInfoTests, Function_NonBCode) {
@@ -120,6 +127,8 @@ TEST(TypeInfoTests, Function_NonBCode) {
     if (abc.bcode()) EXPECT_EQ(*abc.bcode(), yama::bc::code{}); else ADD_FAILURE();
     if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), yama::bc::syms{}); else ADD_FAILURE();
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), old_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 
     change(abc);
 
@@ -133,6 +142,8 @@ TEST(TypeInfoTests, Function_NonBCode) {
     if (abc.bcode()) EXPECT_EQ(*abc.bcode(), new_bcode); else ADD_FAILURE();
     if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), new_bsyms); else ADD_FAILURE();
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), new_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 }
 
 TEST(TypeInfoTests, Function_BCode) {
@@ -148,6 +159,8 @@ TEST(TypeInfoTests, Function_BCode) {
     if (abc.bcode()) EXPECT_EQ(*abc.bcode(), old_bcode); else ADD_FAILURE();
     if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), old_bsyms); else ADD_FAILURE();
     EXPECT_EQ(abc.uses_bcode(), true);
+    EXPECT_EQ(abc.owner_name(), old_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 
     change(abc);
 
@@ -161,6 +174,72 @@ TEST(TypeInfoTests, Function_BCode) {
     if (abc.bcode()) EXPECT_EQ(*abc.bcode(), new_bcode); else ADD_FAILURE();
     if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), new_bsyms); else ADD_FAILURE();
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), new_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
+}
+
+TEST(TypeInfoTests, Method_NonBCode) {
+    auto abc = yama::make_method(old_name_member, old_consts, old_callsig, old_max_locals, old_cf);
+
+    EXPECT_EQ(abc.unqualified_name(), old_name_member);
+    EXPECT_EQ(abc.consts(), old_consts);
+    EXPECT_EQ(abc.kind(), yama::kind::method);
+    EXPECT_EQ(abc.ptype(), std::nullopt);
+    if (abc.callsig()) EXPECT_EQ(*abc.callsig(), old_callsig); else ADD_FAILURE();
+    EXPECT_EQ(abc.max_locals(), old_max_locals);
+    EXPECT_EQ(abc.call_fn(), std::make_optional(old_cf));
+    if (abc.bcode()) EXPECT_EQ(*abc.bcode(), yama::bc::code{}); else ADD_FAILURE();
+    if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), yama::bc::syms{}); else ADD_FAILURE();
+    EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), "a"_str);
+    EXPECT_EQ(abc.member_name(), "b"_str);
+
+    change(abc, new_name_member);
+
+    EXPECT_EQ(abc.unqualified_name(), new_name_member);
+    EXPECT_EQ(abc.consts(), new_consts);
+    EXPECT_EQ(abc.kind(), yama::kind::method);
+    EXPECT_EQ(abc.ptype(), std::nullopt);
+    if (abc.callsig()) EXPECT_EQ(*abc.callsig(), new_callsig); else ADD_FAILURE();
+    EXPECT_EQ(abc.max_locals(), new_max_locals);
+    EXPECT_EQ(abc.call_fn(), std::make_optional(new_cf));
+    if (abc.bcode()) EXPECT_EQ(*abc.bcode(), new_bcode); else ADD_FAILURE();
+    if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), new_bsyms); else ADD_FAILURE();
+    EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), "aaa"_str);
+    EXPECT_EQ(abc.member_name(), "bbb"_str);
+}
+
+TEST(TypeInfoTests, Method_BCode) {
+    auto abc = yama::make_method(old_name_member, old_consts, old_callsig, old_max_locals, old_bcode, old_bsyms);
+
+    EXPECT_EQ(abc.unqualified_name(), old_name_member);
+    EXPECT_EQ(abc.consts(), old_consts);
+    EXPECT_EQ(abc.kind(), yama::kind::method);
+    EXPECT_EQ(abc.ptype(), std::nullopt);
+    if (abc.callsig()) EXPECT_EQ(*abc.callsig(), old_callsig); else ADD_FAILURE();
+    EXPECT_EQ(abc.max_locals(), old_max_locals);
+    EXPECT_EQ(abc.call_fn(), std::make_optional(yama::bcode_call_fn));
+    if (abc.bcode()) EXPECT_EQ(*abc.bcode(), old_bcode); else ADD_FAILURE();
+    if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), old_bsyms); else ADD_FAILURE();
+    EXPECT_EQ(abc.uses_bcode(), true);
+    EXPECT_EQ(abc.owner_name(), "a"_str);
+    EXPECT_EQ(abc.member_name(), "b"_str);
+
+    change(abc, new_name_member);
+
+    EXPECT_EQ(abc.unqualified_name(), new_name_member);
+    EXPECT_EQ(abc.consts(), new_consts);
+    EXPECT_EQ(abc.kind(), yama::kind::method);
+    EXPECT_EQ(abc.ptype(), std::nullopt);
+    if (abc.callsig()) EXPECT_EQ(*abc.callsig(), new_callsig); else ADD_FAILURE();
+    EXPECT_EQ(abc.max_locals(), new_max_locals);
+    EXPECT_EQ(abc.call_fn(), std::make_optional(new_cf));
+    if (abc.bcode()) EXPECT_EQ(*abc.bcode(), new_bcode); else ADD_FAILURE();
+    if (abc.bsyms()) EXPECT_EQ(*abc.bsyms(), new_bsyms); else ADD_FAILURE();
+    EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), "aaa"_str);
+    EXPECT_EQ(abc.member_name(), "bbb"_str);
 }
 
 TEST(TypeInfoTests, Struct) {
@@ -176,6 +255,8 @@ TEST(TypeInfoTests, Struct) {
     EXPECT_EQ(abc.bcode(), nullptr);
     EXPECT_EQ(abc.bsyms(), nullptr);
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), old_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 
     change(abc);
 
@@ -189,6 +270,8 @@ TEST(TypeInfoTests, Struct) {
     EXPECT_EQ(abc.bcode(), nullptr);
     EXPECT_EQ(abc.bsyms(), nullptr);
     EXPECT_EQ(abc.uses_bcode(), false);
+    EXPECT_EQ(abc.owner_name(), new_name);
+    EXPECT_EQ(abc.member_name(), ""_str);
 }
 
 
@@ -213,6 +296,8 @@ TEST(TypeInfoTests, CopyCtor) {
     if (copy.bcode()) EXPECT_EQ(*copy.bcode(), old_bcode); else ADD_FAILURE();
     if (copy.bsyms()) EXPECT_EQ(*copy.bsyms(), old_bsyms); else ADD_FAILURE();
     EXPECT_EQ(copy.uses_bcode(), true);
+    EXPECT_EQ(copy.owner_name(), old_name);
+    EXPECT_EQ(copy.member_name(), ""_str);
 }
 
 TEST(TypeInfoTests, CopyAssign) {
@@ -235,5 +320,7 @@ TEST(TypeInfoTests, CopyAssign) {
     if (copy.bcode()) EXPECT_EQ(*copy.bcode(), old_bcode); else ADD_FAILURE();
     if (copy.bsyms()) EXPECT_EQ(*copy.bsyms(), old_bsyms); else ADD_FAILURE();
     EXPECT_EQ(copy.uses_bcode(), true);
+    EXPECT_EQ(copy.owner_name(), old_name);
+    EXPECT_EQ(copy.member_name(), ""_str);
 }
 

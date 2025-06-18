@@ -95,6 +95,10 @@ void yama::internal::first_pass::visit_begin(res<ast_Args> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
+void yama::internal::first_pass::visit_begin(res<ast_MemberAccess> x) {
+    tu->cs->ea.acknowledge(*tu, *x);
+}
+
 void yama::internal::first_pass::visit_begin(res<ast_TypeAnnot> x) {
     tu->cs->ea.add_root(*deref_assert(x->type).expr);
 }
@@ -261,9 +265,9 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
 
 void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x, bool& no_name_conflict) {
     // NOTE: no_name_conflict must ALWAYS be set
-    const auto unqualified_name = x->name.str(tu->src);
+    const auto unqualified_name = str(x->fmt_unqualified_name(tu->src).value());
     // prepare symbol
-    fn_csym sym = _mk_fn_csym(*x);
+    fn_like_csym sym = _mk_fn_like_csym(*x);
     // insert symbol
     bool no_table_found = false;
     const bool success = tu->syms.insert(
@@ -349,13 +353,13 @@ yama::internal::var_csym yama::internal::first_pass::_mk_var_csym(const ast_VarD
     return result;
 }
 
-yama::internal::fn_csym yama::internal::first_pass::_mk_fn_csym(const ast_FnDecl& x) {
-    fn_csym result{};
+yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const ast_FnDecl& x) {
+    fn_like_csym result{ .is_method = x.is_method() };
     if (x.callsig->result) {
         result.return_type = x.callsig->result->type.get();
     }
     for (const auto& I : x.callsig->params) {
-        result.params.push_back(fn_csym::param{
+        result.params.push_back(fn_like_csym::param{
             .name = I->name.str(tu->src),
             .type = nullptr, // <- will be filled in below
             });
@@ -385,7 +389,7 @@ yama::internal::fn_csym yama::internal::first_pass::_mk_fn_csym(const ast_FnDecl
 yama::internal::param_csym yama::internal::first_pass::_mk_param_csym(const ast_ParamDecl& x) {
     const auto param_type =
         _is_in_fn() && _current_fn().symbol
-        ? _current_fn().symbol->as<fn_csym>().params[x.index].type
+        ? _current_fn().symbol->as<fn_like_csym>().params[x.index].type
         : nullptr; // <- nullptr if fn is in error
     return param_csym{
         .type = param_type,
@@ -415,7 +419,7 @@ taul::source_pos yama::internal::first_pass::_paramdecl_intro_point(const ast_Pa
     // TODO: *technically*, the more correct AST node to be using is the ast_TypeAnnot of the
     //       ast_TypeSpec at t, but I'm fairly certain the high_pos() of the two *should be*
     //       equal, so I think using this t should be fine
-    const auto t = _current_fn().symbol->as<fn_csym>().params[x.index].type;
+    const auto t = _current_fn().symbol->as<fn_like_csym>().params[x.index].type;
     return
         t
         ? t->high_pos() // only valid AFTER fully introduced
@@ -434,11 +438,11 @@ void yama::internal::first_pass::_process_decl(const res<ast_VarDecl>& x) {
 
 void yama::internal::first_pass::_process_decl(const res<ast_FnDecl>& x, bool& no_name_conflict) {
     // NOTE: no_name_conflict must ALWAYS be set
-    const auto name = x->name.str(tu->src);
+    const auto name = x->name.value().str(tu->src);
     if (_is_in_fn()) {
         tu->err.error(
             *x,
-            dsignal::compile_local_fn,
+            dsignal::compile_illegal_local_decl,
             "illegal local fn {}!",
             name);
         
@@ -459,7 +463,7 @@ void yama::internal::first_pass::_process_decl(const res<ast_StructDecl>& x) {
     if (_is_in_fn()) {
         tu->err.error(
             *x,
-            dsignal::compile_local_struct,
+            dsignal::compile_illegal_local_decl,
             "illegal local struct {}!",
             name);
     }
@@ -482,7 +486,7 @@ yama::internal::first_pass::_fn_decl& yama::internal::first_pass::_current_fn() 
 }
 
 void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x, bool no_name_conflict) {
-    const auto name = x->name.str(tu->src);
+    const auto name = str(x->fmt_unqualified_name(tu->src).value());
     _cfg.begin_fn();
     // for fn decls, since we need to have params and local vars be in the same
     // block, we add the csymtab to the fn decl, and suppress adding one for the
@@ -499,7 +503,7 @@ void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x, bool no_name_confl
 void yama::internal::first_pass::_end_fn() {
     // propagate above to symbol (+ fail quietly if no symbol due to compiling code being in error)
     if (const auto& symbol = _current_fn().symbol) {
-        symbol->as<fn_csym>().all_paths_return_or_loop = _cfg.check_fn();
+        symbol->as<fn_like_csym>().all_paths_return_or_loop = _cfg.check_fn();
     }
     _cfg.end_fn();
 }
@@ -516,7 +520,7 @@ void yama::internal::first_pass::_check_var_is_local(res<ast_VarDecl> x) {
     if (_is_in_fn()) return;
     tu->err.error(
         *x,
-        dsignal::compile_nonlocal_var,
+        dsignal::compile_illegal_nonlocal_decl,
         "illegal non-local var {}!",
         x->name.str(tu->src));
 }

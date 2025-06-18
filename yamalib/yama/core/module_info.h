@@ -66,7 +66,7 @@ namespace yama {
 
         module_factory& add(type_info&& x);
 
-        static_assert(kinds == 3);
+        static_assert(kinds == 4);
 
         module_factory& add_primitive(
             const str& unqualified_name,
@@ -81,6 +81,21 @@ namespace yama {
             call_fn call_fn);
 
         module_factory& add_function(
+            const str& unqualified_name,
+            const_table_info consts,
+            callsig_info callsig,
+            size_t max_locals,
+            bc::code code,
+            bc::syms syms = bc::syms{});
+        
+        module_factory& add_method(
+            const str& unqualified_name,
+            const_table_info consts,
+            callsig_info callsig,
+            size_t max_locals,
+            call_fn call_fn);
+
+        module_factory& add_method(
             const str& unqualified_name,
             const_table_info consts,
             callsig_info callsig,

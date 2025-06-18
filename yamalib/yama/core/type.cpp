@@ -34,7 +34,7 @@ yama::const_table yama::type::consts() const noexcept {
 }
 
 std::optional<yama::ptype> yama::type::ptype() const noexcept {
-    return info().ptype();
+    return _mem->ptype;
 }
 
 std::optional<yama::callsig> yama::type::callsig() const noexcept {

@@ -183,7 +183,7 @@ yama::canonical_ref yama::context::new_type(type v) {
 }
 
 std::optional<yama::canonical_ref> yama::context::new_fn(type f) {
-    if (!is_function(f.kind())) return std::nullopt;
+    if (!is_callable(f.kind())) return std::nullopt;
     return canonical_ref{
         .t = f,
         .v{ .i = 0 },
@@ -621,8 +621,7 @@ bool yama::context::_put_fn_err_f_not_callable_type(type f) {
 yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     static_assert(
         []() constexpr -> bool {
-            // NOTE: extend this each time we add a new loadable object constant
-            static_assert(yama::const_types == 8);
+            static_assert(yama::const_types == 9);
             return
                 yama::is_object_const(yama::int_const) &&
                 yama::is_object_const(yama::uint_const) &&
@@ -631,6 +630,7 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
                 yama::is_object_const(yama::char_const) &&
                 !yama::is_object_const(yama::primitive_type_const) &&
                 yama::is_object_const(yama::function_type_const) &&
+                yama::is_object_const(yama::method_type_const) &&
                 !yama::is_object_const(yama::struct_type_const);
         }());
     if (_put_const_err_in_user_call_frame()) {
@@ -644,7 +644,7 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
     }
     return _put(x,
         [&]() -> canonical_ref {
-            static_assert(const_types == 8);
+            static_assert(const_types == 9);
             const auto& cc = consts();
             if (const auto r = cc.get<int_const>(c))                return new_int(*r);
             else if (const auto r = cc.get<uint_const>(c))          return new_uint(*r);
@@ -652,6 +652,7 @@ yama::cmd_status yama::context::_put_const(local_t x, const_t c) {
             else if (const auto r = cc.get<bool_const>(c))          return new_bool(*r);
             else if (const auto r = cc.get<char_const>(c))          return new_char(*r);
             else if (const auto r = cc.get<function_type_const>(c)) return new_fn(*r).value();
+            else if (const auto r = cc.get<method_type_const>(c))   return new_fn(*r).value();
             else                                                    YAMA_DEADEND;
             return new_none(); // dummy
         }());
@@ -687,7 +688,7 @@ bool yama::context::_put_const_err_c_is_not_object_constant(const_t c) {
 yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
     static_assert(
         []() constexpr -> bool {
-            static_assert(yama::const_types == 8); // reminder
+            static_assert(yama::const_types == 9); // reminder
             return
                 !yama::is_type_const(yama::int_const) &&
                 !yama::is_type_const(yama::uint_const) &&
@@ -696,6 +697,7 @@ yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
                 !yama::is_type_const(yama::char_const) &&
                 yama::is_type_const(yama::primitive_type_const) &&
                 yama::is_type_const(yama::function_type_const) &&
+                yama::is_type_const(yama::method_type_const) &&
                 yama::is_type_const(yama::struct_type_const);
         }());
     if (_put_type_const_err_in_user_call_frame()) {
@@ -709,10 +711,11 @@ yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
     }
     return _put(x, new_type(
         [&]() -> type {
-            static_assert(const_types == 8);
+            static_assert(const_types == 9);
             const auto& cc = consts();
             if (const auto r = cc.get<primitive_type_const>(c))     return r.value();
             else if (const auto r = cc.get<function_type_const>(c)) return r.value();
+            else if (const auto r = cc.get<method_type_const>(c))   return r.value();
             else if (const auto r = cc.get<struct_type_const>(c))   return r.value();
             else                                                    YAMA_DEADEND;
             return none_type(); // dummy
@@ -805,6 +808,7 @@ yama::cmd_status yama::context::_default_init(local_t x, const_t c) {
 }
 
 yama::object_ref yama::context::_gen_default_initialized(type t) {
+    static_assert(kinds == 4);
     if (is_primitive(t.kind())) {
         if (t.ptype() == ptype::none)           return new_none();
         else if (t.ptype() == ptype::int0)      return new_int(0);
@@ -813,11 +817,12 @@ yama::object_ref yama::context::_gen_default_initialized(type t) {
         else if (t.ptype() == ptype::bool0)     return new_bool(false);
         else if (t.ptype() == ptype::char0)     return new_char(U'\0');
         else if (t.ptype() == ptype::type)      return new_type(none_type());
-        else YAMA_DEADEND;
+        else                                    YAMA_DEADEND;
     }
     else if (is_function(t.kind()))             return new_fn(t).value();
+    else if (is_method(t.kind()))               return new_fn(t).value();
     else if (is_struct(t.kind()))               return object_ref{ .t = t, .v{ .i = 0 } }; // TODO: not 100% sure about this
-    else YAMA_DEADEND;
+    else                                        YAMA_DEADEND;
     return object_ref{ .t = t }; // dummy
 }
 

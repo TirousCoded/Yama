@@ -38,6 +38,7 @@ yama::internal::type_mem yama::internal::type_instance::_create_mem(str fullname
         .stubs = info->consts().size(),
         .info = info,
         .kind = info->kind(),
+        .ptype = info->ptype(),
     };
     return internal::type_mem::create(std::allocator<void>{}, std::move(header));
 }

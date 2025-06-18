@@ -92,7 +92,9 @@ namespace yama::internal {
         static constexpr lookup_proc lp = lookup_proc::normal;
     };
 
-    struct fn_csym final {
+    // we'll call it 'fn-like' to make clear that it conflates fns and methods
+
+    struct fn_like_csym final {
         struct param final {
             str name;
             const ast_TypeSpec* type;
@@ -102,6 +104,7 @@ namespace yama::internal {
         };
 
 
+        bool is_method = false;
         std::vector<param> params;
         const ast_TypeSpec* return_type;
 
@@ -147,7 +150,7 @@ namespace yama::internal {
             import_csym,
             prim_csym,
             var_csym,
-            fn_csym,
+            fn_like_csym,
             param_csym,
             struct_csym
         >;
@@ -173,13 +176,13 @@ namespace yama::internal {
 
         inline bool is_type() const noexcept {
             static_assert(std::variant_size_v<info_t> == 6); // reminder
-            if (is<import_csym>())      return false;
-            else if (is<prim_csym>())   return true;
-            else if (is<var_csym>())    return false;
-            else if (is<fn_csym>())     return true;
-            else if (is<param_csym>())  return false;
-            else if (is<struct_csym>()) return true;
-            else                        YAMA_DEADEND;
+            if (is<import_csym>())          return false;
+            else if (is<prim_csym>())       return true;
+            else if (is<var_csym>())        return false;
+            else if (is<fn_like_csym>())    return true;
+            else if (is<param_csym>())      return false;
+            else if (is<struct_csym>())     return true;
+            else                            YAMA_DEADEND;
             return bool{};
         }
 

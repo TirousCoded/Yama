@@ -5,6 +5,8 @@
 #include "asserts.h"
 #include "kind-features.h"
 
+#include "../internals/util.h"
+
 
 yama::type_info::type_info(const type_info& other)
     : _info(other._info->clone()) {}
@@ -60,6 +62,14 @@ const yama::bc::syms* yama::type_info::bsyms() const noexcept {
 
 bool yama::type_info::uses_bcode() const noexcept {
     return _info->uses_bcode();
+}
+
+yama::str yama::type_info::owner_name() const noexcept {
+    return internal::split(unqualified_name(), '.').first;
+}
+
+yama::str yama::type_info::member_name() const noexcept {
+    return internal::split(unqualified_name(), '.').second;
 }
 
 bool yama::type_info::operator==(const yama::type_info& other) const noexcept {
@@ -138,6 +148,25 @@ yama::type_info yama::make_function(const str& unqualified_name, const_table_inf
 
 yama::type_info yama::make_function(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms) {
     return internal::make_type_info<internal::function_info>(
+        unqualified_name,
+        std::move(consts),
+        std::move(callsig),
+        max_locals,
+        std::move(bcode),
+        std::move(bsyms));
+}
+
+yama::type_info yama::make_method(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, yama::call_fn call_fn) {
+    return internal::make_type_info<internal::method_info>(
+        unqualified_name,
+        std::move(consts),
+        std::move(callsig),
+        max_locals,
+        call_fn);
+}
+
+yama::type_info yama::make_method(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, bc::code bcode, bc::syms bsyms) {
+    return internal::make_type_info<internal::method_info>(
         unqualified_name,
         std::move(consts),
         std::move(callsig),
@@ -225,7 +254,10 @@ yama::internal::method_info::method_info(const str& unqualified_name, const_tabl
     : callable_type_info(unqualified_name, std::move(consts), std::move(callsig), max_locals, std::move(bcode), std::move(bsyms)) {}
 
 yama::res<yama::internal::base_info> yama::internal::method_info::clone() const {
-    throw std::runtime_error(""); // TODO
+    auto result = make_res<method_info>(unqualified_name, consts, callsig, max_locals, bcode, bsyms);
+    // gotta assign this one manually
+    result->call_fn = call_fn;
+    return result;
 }
 
 yama::internal::struct_info::struct_info(const str& unqualified_name, const_table_info consts)

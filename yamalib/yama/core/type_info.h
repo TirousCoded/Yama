@@ -24,9 +24,7 @@ namespace yama {
     namespace internal {
         class base_info;
         template<std::derived_from<internal::base_info> T, typename... Args>
-        inline type_info make_type_info(Args&&... args) {
-            return type_info(make_res<T>(std::forward<Args>(args)...));
-        }
+        inline type_info make_type_info(Args&&... args);
     }
 
 
@@ -39,6 +37,10 @@ namespace yama {
         type_info& operator=(const type_info& other);
         type_info& operator=(type_info&&) noexcept = default;
 
+
+        // TODO: we don't really unit test owner_name/member_name for scenarios where
+        //       owner/member name division is opposite of what is expected (ie. method
+        //       expects name in form '<owner>.<member>', but name is instead just '<name>')
 
         // IMPORTANT: do keep in mind that most of the below methods involve a virtual
         //            method call
@@ -55,6 +57,8 @@ namespace yama {
         const bc::code* bcode() const noexcept;
         const bc::syms* bsyms() const noexcept;
         bool uses_bcode() const noexcept;
+        str owner_name() const noexcept;
+        str member_name() const noexcept;
 
         // TODO: operator== has not been unit tested
 
@@ -115,6 +119,21 @@ namespace yama {
         size_t max_locals,
         bc::code bcode,
         bc::syms bsyms = bc::syms{});
+    
+    type_info make_method(
+        const str& unqualified_name,
+        const_table_info consts,
+        callsig_info callsig,
+        size_t max_locals,
+        yama::call_fn call_fn);
+
+    type_info make_method(
+        const str& unqualified_name,
+        const_table_info consts,
+        callsig_info callsig,
+        size_t max_locals,
+        bc::code bcode,
+        bc::syms bsyms = bc::syms{});
 
     type_info make_struct(
         const str& unqualified_name,
@@ -122,6 +141,12 @@ namespace yama {
 }
 
 namespace yama::internal {
+
+
+    template<std::derived_from<internal::base_info> T, typename... Args>
+    inline type_info make_type_info(Args&&... args) {
+        return type_info(make_res<T>(std::forward<Args>(args)...));
+    }
 
 
     class base_info {
@@ -257,8 +282,7 @@ namespace yama::internal {
 
 
         res<base_info> clone() const override final;
-        static_assert(kinds == 3); // TODO: change kind::function to kind::method, don't forget!
-        inline yama::kind get_kind() const noexcept override final { return kind::function; }
+        inline yama::kind get_kind() const noexcept override final { return kind::method; }
     };
 
     class struct_info final : public base_info {

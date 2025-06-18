@@ -161,9 +161,10 @@ parser section:
     RelativePath                    : ( DOT IDENTIFIER )+ ;
 
     # NOTE: VarDecl is for specifying local and non-local variables
+    # NOTE: FnDecl is used generally for fn-like things (fns, methods, etc.)
 
     VarDecl                         : VAR IDENTIFIER TypeAnnot? Assign? SEMI ;
-    FnDecl                          : FN IDENTIFIER CallSig Block ;
+    FnDecl                          : FN IDENTIFIER ( DOT IDENTIFIER )? CallSig Block ;
     StructDecl                      : STRUCT IDENTIFIER L_CURLY R_CURLY ;
 
     CallSig                         : L_ROUND ( ParamDecl ( COMMA ParamDecl )* )? R_ROUND Result? ;
@@ -192,6 +193,7 @@ parser section:
     ReturnStmt                      : RETURN Expr? SEMI ;
 
     precedence Expr                 : Expr Args                         # call-like expr
+                                    | Expr MemberAccess                 # member access expr
                                     | CONST Args                        # constexpr guarantee expr
                                     | PrimaryExpr                       # primary expr
                                     ;
@@ -214,7 +216,9 @@ parser section:
     CharLit                         : CHAR ;
 
     Assign                          : ASSIGN Expr ;
+
     Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
+    MemberAccess                    : DOT IDENTIFIER ;
 
     TypeAnnot                       : COLON TypeSpec ;
     TypeSpec                        : Expr ;

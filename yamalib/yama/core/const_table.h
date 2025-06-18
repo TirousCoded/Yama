@@ -31,6 +31,10 @@ namespace yama {
         const_table& operator=(const_table&&) noexcept = default;
 
 
+        // TODO: the unit tests for methods like 'get', 'const_type', 'type', etc.
+        //       haven't really been expanded as we've adding things like new kinds
+        //       of types
+
         // TODO: update our is_stub unit tests when we add types w/ stubs in their
         //       otherwise resolved constant table (also update Get_Stub!)
 

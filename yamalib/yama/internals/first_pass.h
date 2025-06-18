@@ -60,7 +60,7 @@ namespace yama::internal {
         first_pass(translation_unit& tu);
 
 
-        static_assert(ast_types == 30); // reminder
+        static_assert(ast_types == 31); // reminder
 
         void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_Decl> x) override final;
@@ -90,10 +90,11 @@ namespace yama::internal {
         //void visit_begin(res<ast_CharLit> x) override final;
         void visit_begin(res<ast_Assign> x) override final;
         void visit_begin(res<ast_Args> x) override final;
+        void visit_begin(res<ast_MemberAccess> x) override final;
         void visit_begin(res<ast_TypeAnnot> x) override final;
         //void visit_begin(res<ast_TypeSpec> x) override final;
 
-        static_assert(ast_types == 30); // reminder
+        static_assert(ast_types == 31); // reminder
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
@@ -123,6 +124,7 @@ namespace yama::internal {
         //void visit_end(res<ast_CharLit> x) override final;
         //void visit_end(res<ast_Assign> x) override final;
         //void visit_end(res<ast_Args> x) override final;
+        //void visit_end(res<ast_MemberAccess> x) override final;
         //void visit_end(res<ast_TypeAnnot> x) override final;
         //void visit_end(res<ast_TypeSpec> x) override final;
 
@@ -145,7 +147,7 @@ namespace yama::internal {
         void _insert_structdecl(res<ast_StructDecl> x);
         
         var_csym _mk_var_csym(const ast_VarDecl& x);
-        fn_csym _mk_fn_csym(const ast_FnDecl& x);
+        fn_like_csym _mk_fn_like_csym(const ast_FnDecl& x);
         param_csym _mk_param_csym(const ast_ParamDecl& x);
         struct_csym _mk_struct_csym(const ast_StructDecl& x);
 

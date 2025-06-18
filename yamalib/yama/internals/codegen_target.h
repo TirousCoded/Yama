@@ -47,9 +47,9 @@ namespace yama::internal {
         std::optional<size_t> target_param_index(const str& name);
 
 
-        static_assert(kinds == 3); // reminder
+        static_assert(kinds == 4); // reminder
 
-        void gen_target_fn(const str& unqualified_name);
+        void gen_target_fn_like(const str& unqualified_name, bool is_method);
         void gen_target_struct(const str& unqualified_name);
 
         void upload_target(const ast_node& where); // uploads target to module, unbinding it

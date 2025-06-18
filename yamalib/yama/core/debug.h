@@ -172,12 +172,12 @@ namespace yama {
         compile_undeclared_name,
         compile_ambiguous_name,
         compile_undeclared_qualifier,
+        compile_nonexistent_owner,
         compile_type_mismatch,
         compile_not_a_type,
         compile_not_an_expr,
-        compile_nonlocal_var,
-        compile_local_fn,
-        compile_local_struct,
+        compile_illegal_nonlocal_decl,
+        compile_illegal_local_decl,
         compile_invalid_local_var,
         compile_invalid_param_list,
         compile_nonassignable_expr,
@@ -194,7 +194,9 @@ namespace yama {
         compile_misplaced_import,
         compile_invalid_env,
 
+        verif_type_unqualified_name_invalid,
         verif_type_callsig_invalid,
+        verif_type_owner_not_in_module,
         verif_constsym_qualified_name_invalid,
         verif_constsym_callsig_invalid,
         verif_callsig_param_type_out_of_bounds,
@@ -247,7 +249,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 71);
+        static_assert(dsignals == 73);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -260,12 +262,12 @@ namespace yama {
             _YAMA_ENTRY_(compile_undeclared_name);
             _YAMA_ENTRY_(compile_ambiguous_name);
             _YAMA_ENTRY_(compile_undeclared_qualifier);
+            _YAMA_ENTRY_(compile_nonexistent_owner);
             _YAMA_ENTRY_(compile_type_mismatch);
             _YAMA_ENTRY_(compile_not_a_type);
             _YAMA_ENTRY_(compile_not_an_expr);
-            _YAMA_ENTRY_(compile_nonlocal_var);
-            _YAMA_ENTRY_(compile_local_fn);
-            _YAMA_ENTRY_(compile_local_struct);
+            _YAMA_ENTRY_(compile_illegal_nonlocal_decl);
+            _YAMA_ENTRY_(compile_illegal_local_decl);
             _YAMA_ENTRY_(compile_invalid_local_var);
             _YAMA_ENTRY_(compile_invalid_param_list);
             _YAMA_ENTRY_(compile_nonassignable_expr);
@@ -282,7 +284,9 @@ namespace yama {
             _YAMA_ENTRY_(compile_misplaced_import);
             _YAMA_ENTRY_(compile_invalid_env);
 
+            _YAMA_ENTRY_(verif_type_unqualified_name_invalid);
             _YAMA_ENTRY_(verif_type_callsig_invalid);
+            _YAMA_ENTRY_(verif_type_owner_not_in_module);
             _YAMA_ENTRY_(verif_constsym_qualified_name_invalid);
             _YAMA_ENTRY_(verif_constsym_callsig_invalid);
             _YAMA_ENTRY_(verif_callsig_param_type_out_of_bounds);

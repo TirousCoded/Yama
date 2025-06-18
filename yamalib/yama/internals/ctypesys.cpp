@@ -35,9 +35,9 @@ yama::internal::fullname yama::internal::ctype::fullname() const {
 yama::kind yama::internal::ctype::kind() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
         yama::kind result{};
-        static_assert(kinds == 3);
+        static_assert(kinds == 4);
         if (_csymtab_entry()->is<prim_csym>())          result = yama::kind::primitive;
-        else if (_csymtab_entry()->is<fn_csym>())       result = yama::kind::function;
+        else if (_csymtab_entry()->is<fn_like_csym>())  result = _csymtab_entry()->as<fn_like_csym>().is_method ? yama::kind::method : yama::kind::function;
         else if (_csymtab_entry()->is<struct_csym>())   result = yama::kind::struct0;
         return result;
     }
@@ -49,8 +49,8 @@ yama::kind yama::internal::ctype::kind() const noexcept {
 size_t yama::internal::ctype::param_count() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
         return
-            _csymtab_entry()->is<fn_csym>()
-            ? _csymtab_entry()->as<fn_csym>().params.size()
+            _csymtab_entry()->is<fn_like_csym>()
+            ? _csymtab_entry()->as<fn_like_csym>().params.size()
             : 0;
     }
     else {
@@ -60,8 +60,8 @@ size_t yama::internal::ctype::param_count() const noexcept {
 
 std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
-        if (!_csymtab_entry()->is<fn_csym>()) return std::nullopt;
-        const auto& our_csym = _csymtab_entry()->as<fn_csym>();
+        if (!_csymtab_entry()->is<fn_like_csym>()) return std::nullopt;
+        const auto& our_csym = _csymtab_entry()->as<fn_like_csym>();
         if (param_index >= our_csym.params.size()) return std::nullopt; // out-of-bounds
         const auto& our_param_type = deref_assert(our_csym.params[param_index].type);
         return cs.ea.crvalue_to_type(deref_assert(our_param_type.expr));
@@ -77,8 +77,8 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
 
 std::optional<yama::internal::ctype> yama::internal::ctype::return_type(compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
-        if (_csymtab_entry()->is<fn_csym>()) {
-            if (const auto return_type = _csymtab_entry()->as<fn_csym>().return_type) {
+        if (_csymtab_entry()->is<fn_like_csym>()) {
+            if (const auto return_type = _csymtab_entry()->as<fn_like_csym>().return_type) {
                 return cs.ea.crvalue_to_type(deref_assert(return_type->expr));
             }
         }

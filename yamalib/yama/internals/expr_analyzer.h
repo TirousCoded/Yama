@@ -47,6 +47,7 @@ namespace yama::internal {
             bool_lit,
             char_lit,
             call,
+            unbound_method_access,
             default_init,
             constexpr_guarantee,
 
@@ -171,17 +172,21 @@ namespace yama::internal {
         bool _resolve(const ast_expr& x);
         bool _resolve(const ast_PrimaryExpr& x);
         bool _resolve(const ast_Args& x);
+        bool _resolve(const ast_MemberAccess& x);
         bool _resolve(const ast_Expr& x);
 
         bool _resolve_children(const ast_Args& x);
+        bool _resolve_children(const ast_MemberAccess& x);
         bool _resolve_children(const ast_Expr& x);
 
         category _discern_category(const ast_PrimaryExpr& x);
         category _discern_category(const ast_Args& x);
+        category _discern_category(const ast_MemberAccess& x);
         category _discern_category(const ast_Expr& x);
 
         bool _resolve_expr(const ast_PrimaryExpr& x);
         bool _resolve_expr(const ast_Args& x);
+        bool _resolve_expr(const ast_MemberAccess& x);
         bool _resolve_expr(const ast_Expr& x);
 
         // below, ret == std::nullopt means no result
@@ -190,10 +195,11 @@ namespace yama::internal {
         void _codegen_step(const ast_expr& x, std::optional<size_t> ret);
         void _codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret);
         void _codegen_step(const ast_Args& x, std::optional<size_t> ret);
+        void _codegen_step(const ast_MemberAccess& x, std::optional<size_t> ret);
         void _codegen_step(const ast_Expr& x, std::optional<size_t> ret);
 
-        mode _discern_mode(const ast_PrimaryExpr& x) const noexcept;
-        mode _discern_mode(const ast_Args& x) const noexcept;
+        mode _discern_mode(const ast_base_expr& x) const noexcept;
+        mode _discern_mode(const ast_suffix_expr& x) const noexcept;
         mode _discern_mode(const ast_Expr& x) const noexcept;
 
         std::optional<cvalue> _default_init_crvalue(const ctype& type, metadata& md);
@@ -220,6 +226,9 @@ namespace yama::internal {
 
 
         static constexpr std::nullopt_t _runtime_only = std::nullopt;
+
+
+        void _dump_log_helper(bool success, const ast_expr& x);
     };
 }
 

@@ -99,6 +99,8 @@ namespace yama {
     //          3) return immediately after #2
 
 
+    class token_exception final {};
+
     // cmd_status encapsulates whether a low-level context command 
     // succeeded or failed
 
@@ -108,6 +110,18 @@ namespace yama {
 
         inline bool good() const noexcept { return status; }
         inline bool bad() const noexcept { return !good(); }
+
+        // TODO: or_throw has not been unit tested
+
+        // or_throw is alternative to good for situations where cleanup needs to occur
+        // before exiting a call_fn which detected a panic, w/ or_throw throwing an
+        // exception upon fail so end-user can have all the cleanup code required on
+        // panic in one place, rather than duplicating it for every context command
+        // in the try-block
+
+        inline void or_throw() const {
+            if (bad()) throw token_exception{};
+        }
 
 
         static inline cmd_status init(bool is_good) noexcept {
@@ -231,7 +245,7 @@ namespace yama {
         canonical_ref new_char(char_t v);
         canonical_ref new_type(type v);
 
-        std::optional<canonical_ref> new_fn(type f);        // new_fn returns std::nullopt if f is not a function type
+        std::optional<canonical_ref> new_fn(type f);        // new_fn returns std::nullopt if f is not a callable type
 
         // it's okay to use panicking and panics while panicking,
         // as the whole point of it is to detect it

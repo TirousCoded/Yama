@@ -34,7 +34,7 @@ TEST(ModuleFactoryTests, DoneResetsFactory) {
 TEST(ModuleFactoryTests, PopulatedModule) {
     yama::module_factory f{};
 
-    static_assert(yama::kinds == 3);
+    static_assert(yama::kinds == 4);
 
     // primitive type
 
@@ -44,7 +44,7 @@ TEST(ModuleFactoryTests, PopulatedModule) {
 
     f.add_primitive("A"_str, A_consts, yama::ptype::int0);
 
-    // function type (native fn)
+    // function/method type (native fn)
 
     yama::const_table_info B_consts{};
     B_consts
@@ -58,8 +58,9 @@ TEST(ModuleFactoryTests, PopulatedModule) {
     auto B_call_fn = [](yama::context&) {};
 
     f.add_function("B"_str, B_consts, B_callsig, B_max_locals, B_call_fn);
+    f.add_method("Bm"_str, B_consts, B_callsig, B_max_locals, B_call_fn);
 
-    // function type (bcode)
+    // function/method type (bcode)
 
     yama::const_table_info C_consts{};
     C_consts
@@ -85,6 +86,7 @@ TEST(ModuleFactoryTests, PopulatedModule) {
         .add(2, "origin"_str, 15, 15);
 
     f.add_function("C"_str, C_consts, C_callsig, C_max_locals, C_code, C_syms);
+    f.add_method("Cm"_str, C_consts, C_callsig, C_max_locals, C_code, C_syms);
 
     // struct type
 
@@ -96,16 +98,20 @@ TEST(ModuleFactoryTests, PopulatedModule) {
 
     auto m = f.done();
 
-    ASSERT_EQ(m.size(), 4);
+    ASSERT_EQ(m.size(), 6);
 
     ASSERT_TRUE(m.contains("A"_str));
     ASSERT_TRUE(m.contains("B"_str));
+    ASSERT_TRUE(m.contains("Bm"_str));
     ASSERT_TRUE(m.contains("C"_str));
+    ASSERT_TRUE(m.contains("Cm"_str));
     ASSERT_TRUE(m.contains("D"_str));
 
     EXPECT_EQ(m["A"_str], yama::make_primitive("A"_str, A_consts, yama::ptype::int0));
     EXPECT_EQ(m["B"_str], yama::make_function("B"_str, B_consts, B_callsig, B_max_locals, B_call_fn));
+    EXPECT_EQ(m["Bm"_str], yama::make_method("Bm"_str, B_consts, B_callsig, B_max_locals, B_call_fn));
     EXPECT_EQ(m["C"_str], yama::make_function("C"_str, C_consts, C_callsig, C_max_locals, C_code, C_syms));
+    EXPECT_EQ(m["Cm"_str], yama::make_method("Cm"_str, C_consts, C_callsig, C_max_locals, C_code, C_syms));
     EXPECT_EQ(m["D"_str], yama::make_struct("D"_str, D_consts));
 }
 

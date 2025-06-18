@@ -3,9 +3,11 @@
 #pragma once
 
 
+#include <optional>
 #include <variant>
 
 #include "../core/res.h"
+#include "../core/ptype.h"
 #include "../core/const_type.h"
 #include "../core/type_info.h"
 
@@ -16,14 +18,15 @@ namespace yama::internal {
 
 
     struct type_mem_header final {
-        str             fullname;
-        size_t          len;        // size of constant table
-        size_t          stubs;      // constant table stubs
-        res<type_info>  info;
+        str                     fullname;
+        size_t                  len;        // size of constant table
+        size_t                  stubs;      // constant table stubs
+        res<type_info>          info;
 
         // storing these for fast RTTI access if we need it
 
-        kind            kind;       // the kind of type this is
+        kind                    kind;       // the kind of type this is
+        std::optional<ptype>    ptype;      // the ptype, if any, of this type
 
 
         inline size_t length() const noexcept { return len; }

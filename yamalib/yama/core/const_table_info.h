@@ -33,7 +33,7 @@ namespace yama {
     // these define the 'symbol' structs used to populate a const_table_info
     // w/ data about the consts described by the table
 
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
 
     struct int_const_info final {
         int_t           v;
@@ -95,6 +95,17 @@ namespace yama {
         bool operator==(const function_type_const_info&) const noexcept = default;
         std::string fmt(const const_table_info& consts) const;
     };
+    
+    struct method_type_const_info final {
+        str             qualified_name;
+        callsig_info    callsig;
+
+
+        kind kind() const noexcept;
+
+        bool operator==(const method_type_const_info&) const noexcept = default;
+        std::string fmt(const const_table_info& consts) const;
+    };
 
     struct struct_type_const_info final {
         str             qualified_name;
@@ -107,7 +118,7 @@ namespace yama {
     };
 
 
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
 
     template<>
     struct const_info_of<int_const> final {
@@ -138,6 +149,10 @@ namespace yama {
         using type = function_type_const_info;
     };
     template<>
+    struct const_info_of<method_type_const> final {
+        using type = method_type_const_info;
+    };
+    template<>
     struct const_info_of<struct_type_const> final {
         using type = struct_type_const_info;
     };
@@ -152,6 +167,7 @@ namespace yama {
             char_const_info,
             primitive_type_const_info,
             function_type_const_info,
+            method_type_const_info,
             struct_type_const_info>;
 
         static std::string fmt_info(const info& x, const const_table_info& consts);
@@ -161,7 +177,7 @@ namespace yama {
 
         static_assert(const_types == std::variant_size_v<info>);
 
-        static_assert(const_types == 8);
+        static_assert(const_types == 9);
         static_assert(std::is_same_v<info_t<int_const>, int_const_info>);
         static_assert(std::is_same_v<info_t<uint_const>, uint_const_info>);
         static_assert(std::is_same_v<info_t<float_const>, float_const_info>);
@@ -169,6 +185,7 @@ namespace yama {
         static_assert(std::is_same_v<info_t<char_const>, char_const_info>);
         static_assert(std::is_same_v<info_t<primitive_type_const>, primitive_type_const_info>);
         static_assert(std::is_same_v<info_t<function_type_const>, function_type_const_info>);
+        static_assert(std::is_same_v<info_t<method_type_const>, method_type_const_info>);
         static_assert(std::is_same_v<info_t<struct_type_const>, struct_type_const_info>);
 
 
@@ -219,7 +236,7 @@ namespace yama {
 
         // these methods add new entries into consts
 
-        static_assert(const_types == 8);
+        static_assert(const_types == 9);
 
         const_table_info& add_int(int_t v);
         const_table_info& add_uint(uint_t v);
@@ -228,6 +245,7 @@ namespace yama {
         const_table_info& add_char(char_t v);
         const_table_info& add_primitive_type(const str& qualified_name);
         const_table_info& add_function_type(const str& qualified_name, callsig_info callsig);
+        const_table_info& add_method_type(const str& qualified_name, callsig_info callsig);
         const_table_info& add_struct_type(const str& qualified_name);
 
 
@@ -238,6 +256,7 @@ namespace yama {
         // hacky little thing needed for const_table_populator
 
         const_table_info& _patch_function_type(const_t x, callsig_info new_callsig);
+        const_table_info& _patch_method_type(const_t x, callsig_info new_callsig);
     };
 
 

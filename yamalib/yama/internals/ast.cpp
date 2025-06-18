@@ -15,44 +15,6 @@
 using namespace yama::string_literals;
 
 
-std::string yama::internal::fmt_ast_type(ast_type x) {
-    static_assert(ast_types == 30); // reminder
-    switch (x) {
-    case ast_type::Chunk:           return "Chunk";
-    case ast_type::Decl:            return "Decl";
-    case ast_type::ImportDecl:      return "ImportDecl";
-    case ast_type::RelativePath:    return "RelativePath";
-    case ast_type::VarDecl:         return "VarDecl";
-    case ast_type::FnDecl:          return "FnDecl";
-    case ast_type::StructDecl:      return "StructDecl";
-    case ast_type::CallSig:         return "CallSig";
-    case ast_type::ParamDecl:       return "ParamDecl";
-    case ast_type::Result:          return "Result";
-    case ast_type::Block:           return "Block";
-    case ast_type::Stmt:            return "Stmt";
-    case ast_type::ExprStmt:        return "ExprStmt";
-    case ast_type::IfStmt:          return "IfStmt";
-    case ast_type::LoopStmt:        return "LoopStmt";
-    case ast_type::BreakStmt:       return "BreakStmt";
-    case ast_type::ContinueStmt:    return "ContinueStmt";
-    case ast_type::ReturnStmt:      return "ReturnStmt";
-    case ast_type::Expr:            return "Expr";
-    case ast_type::PrimaryExpr:     return "PrimaryExpr";
-    case ast_type::Lit:             return "Lit";
-    case ast_type::IntLit:          return "IntLit";
-    case ast_type::UIntLit:         return "UIntLit";
-    case ast_type::FloatLit:        return "FloatLit";
-    case ast_type::BoolLit:         return "BoolLit";
-    case ast_type::CharLit:         return "CharLit";
-    case ast_type::Assign:          return "Assign";
-    case ast_type::Args:            return "Args";
-    case ast_type::TypeAnnot:       return "TypeAnnot";
-    case ast_type::TypeSpec:        return "TypeSpec";
-    default: YAMA_DEADEND; break;
-    }
-    return std::string{};
-}
-
 yama::res<yama::internal::ast_Expr> yama::internal::ast_expr::root_expr() const {
     return _root_expr_helper(*this);
 }
@@ -256,9 +218,32 @@ void yama::internal::ast_VarDecl::do_give(res<ast_Assign> x) {
     assign = x;
 }
 
+std::optional<std::string> yama::internal::ast_FnDecl::fmt_unqualified_name(const taul::source_code& src) const {
+    if (!name) return std::nullopt;
+    std::string result = std::string(name.value().str(src));
+    if (is_method()) {
+        if (!method_name) return std::nullopt;
+        result += std::format(".{}", method_name.value().str(src));
+    }
+    return result;
+}
+
+bool yama::internal::ast_FnDecl::is_fn() const noexcept {
+    return !is_method();
+}
+
+bool yama::internal::ast_FnDecl::is_method() const noexcept {
+    return method_name.has_value();
+}
+
 void yama::internal::ast_FnDecl::fmt(ast_formatter& x) {
     x.open("FnDecl", low_pos(), high_pos(), id);
-    x.next("name", name);
+    if (name) {
+        x.next("name", *name);
+    }
+    if (method_name) {
+        x.next("method_name", *method_name);
+    }
     if (callsig) {
         x.next("callsig");
         callsig->fmt(x);
@@ -283,7 +268,9 @@ void yama::internal::ast_FnDecl::accept(ast_visitor& x) {
 
 void yama::internal::ast_FnDecl::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
-        name = x;
+        if (!name)              name = x;
+        else if (!method_name)  method_name = x;
+        else                    YAMA_DEADEND;
     }
 }
 
@@ -680,6 +667,14 @@ void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
 }
 
 void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
+    _push_suffix(x);
+}
+
+void yama::internal::ast_Expr::do_give(res<ast_MemberAccess> x) {
+    _push_suffix(x);
+}
+
+void yama::internal::ast_Expr::_push_suffix(const res<ast_suffix_expr>& x) {
     x->index = suffixes.size();
     suffixes.push_back(x);
 }
@@ -900,6 +895,23 @@ void yama::internal::ast_Args::do_give(res<ast_Expr> x) {
     args.push_back(x);
 }
 
+void yama::internal::ast_MemberAccess::fmt(ast_formatter& x) {
+    x.open("MemberAccess", low_pos(), high_pos(), id);
+    x.next("member_name", member_name);
+    x.close();
+}
+
+void yama::internal::ast_MemberAccess::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_MemberAccess>());
+    x.visit_end(expect<ast_MemberAccess>());
+}
+
+void yama::internal::ast_MemberAccess::do_give(taul::token x) {
+    if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
+        member_name = x;
+    }
+}
+
 void yama::internal::ast_TypeAnnot::fmt(ast_formatter& x) {
     x.open("TypeAnnot", low_pos(), high_pos(), id);
     if (type) {
@@ -967,7 +979,7 @@ void yama::internal::ast_parser::listener::on_syntactic(taul::ppr_ref ppr, taul:
 #define _YAMA_UNIT_(nm) \
 if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()._next_id))
 
-    static_assert(ast_types == 30); // reminder
+    static_assert(ast_types == 31); // reminder
 
     _YAMA_UNIT_(Chunk);
     else _YAMA_UNIT_(Decl);
@@ -997,6 +1009,7 @@ if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()
     else _YAMA_UNIT_(CharLit);
     else _YAMA_UNIT_(Assign);
     else _YAMA_UNIT_(Args);
+    else _YAMA_UNIT_(MemberAccess);
     else _YAMA_UNIT_(TypeAnnot);
     else _YAMA_UNIT_(TypeSpec);
 

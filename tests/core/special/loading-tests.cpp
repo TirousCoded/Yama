@@ -91,7 +91,7 @@ namespace {
 
 
 TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
-    static_assert(yama::const_types == 8);
+    static_assert(yama::const_types == 9);
     // dep graph:
     //      a <- Int -4         (not a dep)
     //        <- UInt 301       (not a dep)
@@ -100,6 +100,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     //        <- Char 'y'       (not a dep)
     //        <- b0             (primitive)
     //        <- b1             (function)
+    //        <- b0.m           (method)
     //        <- b2             (struct)
 
     // this test is a catch-all for us testing that loading works w/ all
@@ -114,8 +115,8 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     // that linking behaviour can be expected to *generalize* across all the
     // different type constant types
 
-    static_assert(yama::const_types == 8);
-    auto a_consts =
+    static_assert(yama::const_types == 9);
+    auto consts =
         yama::const_table_info()
         .add_int(-4)
         .add_uint(301)
@@ -124,17 +125,23 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
         .add_char(U'y')
         .add_primitive_type("self:b0"_str)
         .add_function_type("self:b1"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
+        .add_method_type("self:b0.m"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
         .add_struct_type("self:b2"_str);
     yama::module_factory mf{};
     mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
+        .add_primitive("a"_str, consts, yama::ptype::bool0)
         .add_primitive("b0"_str, {}, yama::ptype::bool0)
         .add_function(
-            "b1"_str, a_consts,
+            "b1"_str, consts,
             yama::make_callsig({}, 5), // ie. fn() -> b0
             10,
             yama::noop_call_fn)
-        .add_struct("b2"_str, a_consts);
+        .add_method(
+            "b0.m"_str, consts,
+            yama::make_callsig({}, 5), // ie. fn() -> b0
+            10,
+            yama::noop_call_fn)
+        .add_struct("b2"_str, consts);
 
     yama::install_batch ib{};
     ib.install("p"_str, yama::make_res<test_parcel>(mf));
@@ -143,16 +150,19 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b0 = dm->load("p:b0"_str);
     const auto b1 = dm->load("p:b1"_str);
+    const auto b0_dot_m = dm->load("p:b0.m"_str);
     const auto b2 = dm->load("p:b2"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b0);
     ASSERT_TRUE(b1);
+    ASSERT_TRUE(b0_dot_m);
     ASSERT_TRUE(b2);
 
     const yama::type aa = a.value();
     const yama::type bb0 = b0.value();
     const yama::type bb1 = b1.value();
+    const yama::type bb0_dot_m = b0_dot_m.value();
     const yama::type bb2 = b2.value();
 
     // for this test we only really care that type 'a' loads correctly
@@ -161,7 +171,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), yama::const_types);
 
-    static_assert(yama::const_types == 8);
+    static_assert(yama::const_types == 9);
     EXPECT_EQ(aa.consts().get<yama::int_const>(0), std::make_optional(-4));
     EXPECT_EQ(aa.consts().get<yama::uint_const>(1), std::make_optional(301));
     EXPECT_EQ(aa.consts().get<yama::float_const>(2), std::make_optional(3.14159));
@@ -169,7 +179,8 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     EXPECT_EQ(aa.consts().get<yama::char_const>(4), std::make_optional(U'y'));
     EXPECT_EQ(aa.consts().get<yama::primitive_type_const>(5), std::make_optional(bb0));
     EXPECT_EQ(aa.consts().get<yama::function_type_const>(6), std::make_optional(bb1));
-    EXPECT_EQ(aa.consts().get<yama::struct_type_const>(7), std::make_optional(bb2));
+    EXPECT_EQ(aa.consts().get<yama::method_type_const>(7), std::make_optional(bb0_dot_m));
+    EXPECT_EQ(aa.consts().get<yama::struct_type_const>(8), std::make_optional(bb2));
 }
 
 TEST_F(LoadingTests, WithNoDeps) {

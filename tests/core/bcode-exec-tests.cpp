@@ -632,7 +632,9 @@ TEST_F(BCodeExecTests, DefaultInit_Newtop) {
 static bool was_called_0 = false;
 static bool was_called_1 = false;
 
-TEST_F(BCodeExecTests, Call) {
+static_assert(yama::kinds == 4); // one Call_# test for each callable kind
+
+TEST_F(BCodeExecTests, Call_Function) {
     ASSERT_TRUE(ready);
 
     auto plus_fn = 
@@ -681,6 +683,73 @@ TEST_F(BCodeExecTests, Call) {
         f_bcode);
 
     upload(plus_info);
+    upload(f_info);
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    was_called_0 = false;
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_TRUE(was_called_0);
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(149));
+}
+
+TEST_F(BCodeExecTests, Call_Method) {
+    ASSERT_TRUE(ready);
+
+    upload(yama::make_struct(
+        "Math"_str,
+        {}));
+
+    auto Math_dot_plus_fn = 
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        yama::int_t result =
+            ctx.arg(1).value().as_int() +
+            ctx.arg(2).value().as_int() +
+            ctx.arg(3).value().as_int();
+        if (ctx.push_int(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+    const auto Math_dot_plus_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str);
+    const auto Math_dot_plus_info = yama::make_method(
+        "Math.plus"_str,
+        Math_dot_plus_consts,
+        yama::make_callsig({ 0, 0, 0 }, 0),
+        1,
+        Math_dot_plus_fn);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_none(yama::newtop)
+        .add_put_const(yama::newtop, 1)
+        .add_put_const(yama::newtop, 4)
+        .add_put_const(yama::newtop, 3)
+        .add_put_const(yama::newtop, 2)
+        .add_call(4, 0, true)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_method_type("self:Math.plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
+        .add_int(1)
+        .add_int(48)
+        .add_int(100);
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        5,
+        f_bcode);
+
+    upload(Math_dot_plus_info);
     upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
@@ -1026,7 +1095,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
     EXPECT_FALSE(was_called_1); // should abort before never_reached call
 }
 
-TEST_F(BCodeExecTests, CallNR) {
+static_assert(yama::kinds == 4); // one CallNR_# test for each callable kind
+
+TEST_F(BCodeExecTests, CallNR_Function) {
     ASSERT_TRUE(ready);
 
     auto plus_fn =
@@ -1076,6 +1147,74 @@ TEST_F(BCodeExecTests, CallNR) {
         f_bcode);
 
     upload(plus_info);
+    upload(f_info);
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    was_called_0 = false;
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_TRUE(was_called_0);
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+}
+
+TEST_F(BCodeExecTests, CallNR_Method) {
+    ASSERT_TRUE(ready);
+    
+    upload(yama::make_struct(
+        "Math"_str,
+        {}));
+
+    auto Math_dot_plus_fn = 
+        [](yama::context& ctx) {
+        was_called_0 = true;
+        yama::int_t result =
+            ctx.arg(1).value().as_int() +
+            ctx.arg(2).value().as_int() +
+            ctx.arg(3).value().as_int();
+        if (ctx.push_int(result).bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+    const auto Math_dot_plus_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str);
+    const auto Math_dot_plus_info = yama::make_method(
+        "Math.plus"_str,
+        Math_dot_plus_consts,
+        yama::make_callsig({ 0, 0, 0 }, 0),
+        1,
+        Math_dot_plus_fn);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 2)
+        .add_put_const(yama::newtop, 3)
+        .add_put_const(yama::newtop, 4)
+        .add_put_const(yama::newtop, 5)
+        .add_call_nr(4)
+        .add_put_none(yama::newtop)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table_info()
+        .add_primitive_type("yama:None"_str)
+        .add_primitive_type("yama:Int"_str)
+        .add_method_type("self:Math.plus"_str, yama::make_callsig({ 1, 1, 1 }, 1))
+        .add_int(1)
+        .add_int(48)
+        .add_int(100);
+    const auto f_info = yama::make_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        4,
+        f_bcode);
+
+    upload(Math_dot_plus_info);
     upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();

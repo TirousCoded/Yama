@@ -53,6 +53,14 @@ yama::module_factory& yama::module_factory::add_function(const str& unqualified_
     return add(make_function(unqualified_name, std::move(consts), std::move(callsig), max_locals, std::move(code), std::move(syms)));
 }
 
+yama::module_factory& yama::module_factory::add_method(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, call_fn call_fn) {
+    return add(make_method(unqualified_name, std::move(consts), std::move(callsig), max_locals, call_fn));
+}
+
+yama::module_factory& yama::module_factory::add_method(const str& unqualified_name, const_table_info consts, callsig_info callsig, size_t max_locals, bc::code code, bc::syms syms) {
+    return add(make_method(unqualified_name, std::move(consts), std::move(callsig), max_locals, std::move(code), std::move(syms)));
+}
+
 yama::module_factory& yama::module_factory::add_struct(const str& unqualified_name, const_table_info consts) {
     return add(make_struct(unqualified_name, std::move(consts)));
 }

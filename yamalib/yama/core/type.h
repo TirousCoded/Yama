@@ -45,6 +45,12 @@ namespace yama {
         type& operator=(type&&) noexcept = default;
 
 
+        // TODO: at some point add a 'owner_type' method which returns type which owns
+        //       this type (if this type is a member type)
+        //
+        //       to do this, we'll need to do something like adding property to type_info
+        //       which specifies a constant table entry which refs this owner type
+
         const type_info& info() const noexcept;
         str fullname() const noexcept; // returns the fullname of the type
         kind kind() const noexcept; // returns the kind of type this is

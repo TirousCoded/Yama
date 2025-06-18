@@ -51,6 +51,7 @@ namespace yama::internal {
         bool operator==(const cvalue&) const noexcept = default;
 
         std::string fmt() const;
+        std::string fmt(const env& e) const;
 
 
         static cvalue none_v(ctypesys_local& types);
@@ -61,6 +62,7 @@ namespace yama::internal {
         static cvalue char_v(char_t x, ctypesys_local& types);
         static cvalue type_v(ctype x, ctypesys_local& types);
         static cvalue fn_v(ctype x);
+        static cvalue method_v(ctype x);
     };
 }
 

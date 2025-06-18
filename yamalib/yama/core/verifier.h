@@ -90,7 +90,13 @@ namespace yama {
         void _end_verify(bool success);
         void _post_verify_cleanup();
 
+        bool _verify_method_owner_refs(const module_info& subject);
+        bool _verify_method_owner_ref(const module_info& subject, const type_info& type);
+
         bool _verify_type(const type_info& subject);
+        bool _verify_type_unqualified_name(const type_info& subject);
+        bool _verify_type_unqualified_name_has_owner_prefix(const type_info& subject);
+        bool _verify_type_unqualified_name_has_no_owner_prefix(const type_info& subject);
         bool _verify_type_callsig(const type_info& subject);
 
         bool _verify_constant_symbols(const type_info& subject, const parcel_metadata& metadata);

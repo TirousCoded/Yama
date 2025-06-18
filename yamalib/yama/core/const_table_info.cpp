@@ -39,6 +39,14 @@ std::string yama::function_type_const_info::fmt(const const_table_info& consts) 
     return std::format("({}) {} [{}]", function_type_const, qualified_name, callsig.fmt(consts));
 }
 
+yama::kind yama::method_type_const_info::kind() const noexcept {
+    return yama::kind::method;
+}
+
+std::string yama::method_type_const_info::fmt(const const_table_info& consts) const {
+    return std::format("({}) {} [{}]", function_type_const, qualified_name, callsig.fmt(consts));
+}
+
 yama::kind yama::struct_type_const_info::kind() const noexcept {
     return yama::kind::struct0;
 }
@@ -48,7 +56,7 @@ std::string yama::struct_type_const_info::fmt(const const_table_info&) const {
 }
 
 std::string yama::const_table_info::fmt_info(const info& x, const const_table_info& consts) {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     std::string result{};
     switch (yama::const_type(x.index())) {
     case int_const:             result = std::get<int_const_info>(x).fmt(consts);               break;
@@ -58,6 +66,7 @@ std::string yama::const_table_info::fmt_info(const info& x, const const_table_in
     case char_const:            result = std::get<char_const_info>(x).fmt(consts);              break;
     case primitive_type_const:  result = std::get<primitive_type_const_info>(x).fmt(consts);    break;
     case function_type_const:   result = std::get<function_type_const_info>(x).fmt(consts);     break;
+    case method_type_const:     result = std::get<method_type_const_info>(x).fmt(consts);       break;
     case struct_type_const:     result = std::get<struct_type_const_info>(x).fmt(consts);       break;
     default:                    YAMA_DEADEND;                                                   break;
     }
@@ -72,28 +81,31 @@ std::optional<yama::const_type> yama::const_table_info::const_type(const_t x) co
 }
 
 std::optional<yama::kind> yama::const_table_info::kind(const_t x) const noexcept {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     const auto t = const_type(x);
     if (t == primitive_type_const)      return std::make_optional(get<primitive_type_const>(x)->kind());
     else if (t == function_type_const)  return std::make_optional(get<function_type_const>(x)->kind());
+    else if (t == method_type_const)    return std::make_optional(get<method_type_const>(x)->kind());
     else if (t == struct_type_const)    return std::make_optional(get<struct_type_const>(x)->kind());
     else                                return std::nullopt;
 }
 
 std::optional<yama::str> yama::const_table_info::qualified_name(const_t x) const noexcept {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     const auto t = const_type(x);
     if (t == primitive_type_const)      return std::make_optional(get<primitive_type_const>(x)->qualified_name);
     else if (t == function_type_const)  return std::make_optional(get<function_type_const>(x)->qualified_name);
     else if (t == struct_type_const)    return std::make_optional(get<struct_type_const>(x)->qualified_name);
+    else if (t == method_type_const)    return std::make_optional(get<method_type_const>(x)->qualified_name);
     else                                return std::nullopt;
 }
 
 const yama::callsig_info* yama::const_table_info::callsig(const_t x) const noexcept {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     const auto t = const_type(x);
-    if (t == function_type_const)   return &get<function_type_const>(x)->callsig;
-    else                            return nullptr;
+    if (t == function_type_const)       return &get<function_type_const>(x)->callsig;
+    else if (t == method_type_const)    return &get<method_type_const>(x)->callsig;
+    else                                return nullptr;
 }
 
 std::string yama::const_table_info::fmt_const(const_t x) const {
@@ -121,67 +133,67 @@ std::string yama::const_table_info::fmt(const char* tab) const {
 }
 
 yama::const_table_info& yama::const_table_info::add_int(int_t v) {
-    int_const_info a{
+    consts.push_back(int_const_info{
         .v = v,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_uint(uint_t v) {
-    uint_const_info a{
+    consts.push_back(uint_const_info{
         .v = v,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_float(float_t v) {
-    float_const_info a{
+    consts.push_back(float_const_info{
         .v = v,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_bool(bool_t v) {
-    bool_const_info a{
+    consts.push_back(bool_const_info{
         .v = v,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_char(char_t v) {
-    char_const_info a{
+    consts.push_back(char_const_info{
         .v = v,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_primitive_type(const str& qualified_name) {
-    primitive_type_const_info a{
+    consts.push_back(primitive_type_const_info{
         .qualified_name = qualified_name,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_function_type(const str& qualified_name, callsig_info callsig) {
-    function_type_const_info a{
+    consts.push_back(function_type_const_info{
         .qualified_name = qualified_name,
         .callsig = std::move(callsig),
-    };
-    consts.push_back(a);
+        });
+    return *this;
+}
+
+yama::const_table_info& yama::const_table_info::add_method_type(const str& qualified_name, callsig_info callsig) {
+    consts.push_back(method_type_const_info{
+        .qualified_name = qualified_name,
+        .callsig = std::move(callsig),
+        });
     return *this;
 }
 
 yama::const_table_info& yama::const_table_info::add_struct_type(const str& qualified_name) {
-    struct_type_const_info a{
+    consts.push_back(struct_type_const_info{
         .qualified_name = qualified_name,
-    };
-    consts.push_back(a);
+        });
     return *this;
 }
 
@@ -189,6 +201,13 @@ yama::const_table_info& yama::const_table_info::_patch_function_type(const_t x, 
     YAMA_ASSERT(x < consts.size());
     YAMA_ASSERT(std::holds_alternative<function_type_const_info>(consts[x]));
     std::get<function_type_const_info>(consts[x]).callsig = std::move(new_callsig);
+    return *this;
+}
+
+yama::const_table_info& yama::const_table_info::_patch_method_type(const_t x, callsig_info new_callsig) {
+    YAMA_ASSERT(x < consts.size());
+    YAMA_ASSERT(std::holds_alternative<method_type_const_info>(consts[x]));
+    std::get<method_type_const_info>(consts[x]).callsig = std::move(new_callsig);
     return *this;
 }
 

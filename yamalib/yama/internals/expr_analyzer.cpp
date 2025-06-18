@@ -8,20 +8,28 @@
 #include "compiler.h"
 
 
+#define _DUMP_LOG 0
+
+#if _DUMP_LOG == 1
+#include "domain_data.h"
+#endif
+
+
 std::string yama::internal::expr_analyzer::fmt_category(category x) {
-    static_assert(categories == 11);
+    static_assert(categories == 12);
     switch (x) {
-    case category::param_id:            return "param id expr";
-    case category::var_id:              return "local var id expr";
-    case category::type_id:             return "type id expr";
-    case category::int_lit:             return "int literal expr";
-    case category::uint_lit:            return "uint literal expr";
-    case category::float_lit:           return "float literal expr";
-    case category::bool_lit:            return "bool literal expr";
-    case category::char_lit:            return "char literal expr";
-    case category::call:                return "call expr";
-    case category::default_init:        return "default initialize expr";
-    case category::constexpr_guarantee: return "constexpr guarantee expr";
+    case category::param_id:                return "param id expr";
+    case category::var_id:                  return "local var id expr";
+    case category::type_id:                 return "type id expr";
+    case category::int_lit:                 return "int literal expr";
+    case category::uint_lit:                return "uint literal expr";
+    case category::float_lit:               return "float literal expr";
+    case category::bool_lit:                return "bool literal expr";
+    case category::char_lit:                return "char literal expr";
+    case category::call:                    return "call expr";
+    case category::unbound_method_access:   return "unbound method access expr";
+    case category::default_init:            return "default initialize expr";
+    case category::constexpr_guarantee:     return "constexpr guarantee expr";
     default: YAMA_DEADEND; break;
     }
     return std::string();
@@ -136,16 +144,19 @@ bool yama::internal::expr_analyzer::_resolve(const ast_expr& x) {
     if (_is_resolved(x)) {
         return _fetch(x).good();
     }
-    if (const auto r = x.as<ast_PrimaryExpr>()) return _resolve(*r);
-    else if (const auto r = x.as<ast_Args>())   return _resolve(*r);
-    else if (const auto r = x.as<ast_Expr>())   return _resolve(*r);
-    else                                        YAMA_DEADEND;
+    if (const auto r = x.as<ast_PrimaryExpr>())         return _resolve(*r);
+    else if (const auto r = x.as<ast_Args>())           return _resolve(*r);
+    else if (const auto r = x.as<ast_MemberAccess>())   return _resolve(*r);
+    else if (const auto r = x.as<ast_Expr>())           return _resolve(*r);
+    else                                                YAMA_DEADEND;
     return bool();
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_PrimaryExpr& x) {
     _gen_metadata(x, x.low_pos(), _discern_category(x), _discern_mode(x));
-    return _resolve_expr(x);
+    const bool result = _resolve_expr(x);
+    _dump_log_helper(result, x);
+    return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
@@ -153,10 +164,25 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
     _gen_metadata(x, x.root_expr()->low_pos(), _discern_category(x), _discern_mode(x));
-    return
+    const bool result =
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
+    _dump_log_helper(result, x);
+    return result;
+}
+
+bool yama::internal::expr_analyzer::_resolve(const ast_MemberAccess& x) {
+    // skip _resolve_expr unless we can rely 100% on subexprs being valid
+    const bool can_resolve_expr = _resolve_children(x);
+    // call after _resolve_children for _discern_category
+    _gen_metadata(x, x.root_expr()->low_pos(), _discern_category(x), _discern_mode(x));
+    const bool result =
+        can_resolve_expr
+        ? _resolve_expr(x)
+        : false;
+    _dump_log_helper(result, x);
+    return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
@@ -164,10 +190,12 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
     _gen_metadata(x, x.low_pos(), _discern_category(x), _discern_mode(x));
-    return
+    const bool result =
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
+    _dump_log_helper(result, x);
+    return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve_children(const ast_Args& x) {
@@ -180,6 +208,10 @@ bool yama::internal::expr_analyzer::_resolve_children(const ast_Args& x) {
         success = _resolve(*arg) && success;
     }
     return success;
+}
+
+bool yama::internal::expr_analyzer::_resolve_children(const ast_MemberAccess& x) {
+    return _resolve(*res(x.get_primary_subexpr()));
 }
 
 bool yama::internal::expr_analyzer::_resolve_children(const ast_Expr& x) {
@@ -221,6 +253,10 @@ yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_
     else {
         return category::call;
     }
+}
+
+yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_MemberAccess& x) {
+    return category::unbound_method_access;
 }
 
 yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_Expr& x) {
@@ -285,7 +321,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
             return false;
         }
         const ctype& our_t = deref_assert(t);
-        static_assert(kinds == 3); // reminder
+        static_assert(kinds == 4); // reminder
         if (our_t.kind() == kind::function) { // output if fn typed
             md.type = our_t;
             md.crvalue = cvalue::fn_v(our_t);
@@ -383,7 +419,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
             return false;
         }
         const ctype callobj_type = _pull(*res(x.get_primary_subexpr())).type.value();
-        const bool callobj_is_callable_type = callobj_type.kind() == kind::function;
+        const bool callobj_is_callable_type = is_callable(callobj_type.kind());
         if (_raise_invalid_operation_due_to_noncallable_type_if(!callobj_is_callable_type, md, callobj_type)) {
             return false;
         }
@@ -446,6 +482,52 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
     return md.good();
 }
 
+bool yama::internal::expr_analyzer::_resolve_expr(const ast_MemberAccess& x) {
+    metadata& md = _fetch(x);
+    switch (md.category) {
+    case category::unbound_method_access:
+    {
+        if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
+            return false;
+        }
+        const metadata& owner_md = _pull(*res(x.get_primary_subexpr()));
+        const bool owner_type_is_type_type = owner_md.type.value() == _tu(x).types.type_type();
+        if (!owner_type_is_type_type) {
+            md.tu->err.error(
+                md.where,
+                dsignal::compile_invalid_operation,
+                "cannot member access of {} type expr, type must be {}!",
+                owner_md.type.value().fmt(md.tu->e()),
+                _tu(x).types.type_type().fmt(md.tu->e()));
+            return false;
+        }
+        if (_raise_nonconstexpr_expr_if(!owner_md.crvalue, md)) {
+            return false;
+        }
+        const ctype accessed_type = owner_md.crvalue.value().as<ctype>().value();
+        const str owner_name_part = accessed_type.fullname().unqualified_name();
+        const str member_name_part = x.member_name.str(md.tu->src);
+        const str method_uqn = str(std::format("{}.{}", owner_name_part, member_name_part));
+        const import_path method_ip = accessed_type.fullname().import_path();
+        const fullname method_fln = qualified_name(method_ip, method_uqn);
+        const auto method_type = md.tu->types.load(method_fln);
+        if (!method_type) {
+            md.tu->err.error(
+                md.where,
+                dsignal::compile_invalid_operation,
+                "cannot member access non-existent member type {}!",
+                method_fln.fmt(md.tu->e()));
+            return false;
+        }
+        md.type = method_type.value();
+        md.crvalue = cvalue::method_v(method_type.value());
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+    return md.good();
+}
+
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_Expr& x) {
     metadata& md = _fetch(x);
     const auto& child_md = _pull(*res(x.get_primary_subexpr()));
@@ -468,8 +550,9 @@ void yama::internal::expr_analyzer::_codegen(const ast_Expr& root, std::optional
 }
 
 void yama::internal::expr_analyzer::_codegen_step(const ast_expr& x, std::optional<size_t> ret) {
-    if (const auto r = x.as<ast_PrimaryExpr>())    _codegen_step(*r, ret);
+    if (const auto r = x.as<ast_PrimaryExpr>())         _codegen_step(*r, ret);
     else if (const auto r = x.as<ast_Args>())           _codegen_step(*r, ret);
+    else if (const auto r = x.as<ast_MemberAccess>())   _codegen_step(*r, ret);
     else                                                YAMA_DEADEND;
 }
 
@@ -639,6 +722,34 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
     }
 }
 
+void yama::internal::expr_analyzer::_codegen_step(const ast_MemberAccess& x, std::optional<size_t> ret) {
+    const auto& md = _fetch(x);
+    YAMA_ASSERT(!md.tu->err.is_fatal());
+    auto& tu = _tu(x);
+    // expr type and crvalue (if any)
+    const ctype& type = md.type.value();
+    const auto& crvalue = md.crvalue;
+    switch (md.category) {
+    case category::unbound_method_access:
+    {
+        // if expr is not even gonna be used for its return value, then this expr is
+        // 100% transparent, and codegen can just be forwent altogether
+        if (!ret) {
+            return;
+        }
+        const uint8_t output_reg = uint8_t(deref_assert(ret));
+        // if newtop, push a temporary
+        if (ret == size_t(newtop)) {
+            tu.rs.push_temp(x, type);
+        }
+        tu.cgt.autosym(x.low_pos());
+        tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value());
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+}
+
 void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::optional<size_t> ret) {
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
@@ -666,11 +777,11 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::option
     }
 }
 
-yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_PrimaryExpr& x) const noexcept {
+yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_base_expr& x) const noexcept {
     return _discern_mode(*x.root_expr());
 }
 
-yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_Args& x) const noexcept {
+yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_suffix_expr& x) const noexcept {
     return _discern_mode(*x.root_expr());
 }
 
@@ -876,5 +987,22 @@ yama::str yama::internal::expr_analyzer::_remove_quotes(const str& x) noexcept {
         (x.back() == 39 || x.back() == 34) && // 39 == '\'', 34 == '\"'
         x.back() == x.front());
     return x.substr(1, x.length() - 2);
+}
+
+void yama::internal::expr_analyzer::_dump_log_helper(bool success, const ast_expr& x) {
+#if _DUMP_LOG == 1
+    if (success) {
+        const auto& e = cs->dd->installs.domain_env();
+        const auto& fetched = _fetch(x);
+        std::string txt{};
+        if (!success)                           txt = "fail";
+        else if (auto crv = fetched.crvalue)    txt = crv.value().fmt(e);
+        else                                    txt = std::format("{} (*runtime-only*)", fetched.type.value().fmt(e));
+        println(
+            "-- _resolve {} {} (ID={}) => {}",
+            _tu(x).src.location_at(x.low_pos()), x.node_type, x.id,
+            txt);
+    }
+#endif
 }
 

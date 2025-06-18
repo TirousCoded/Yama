@@ -28,7 +28,7 @@ yama::res<yama::internal::csymtab_entry> yama::internal::codegen_target::target_
 }
 
 std::optional<size_t> yama::internal::codegen_target::target_param_index(const str& name) {
-    const auto& params = target_csym<fn_csym>().params;
+    const auto& params = target_csym<fn_like_csym>().params;
     for (size_t i = 0; i < params.size(); i++) {
         if (params[i].name == name) {
             return i;
@@ -37,16 +37,27 @@ std::optional<size_t> yama::internal::codegen_target::target_param_index(const s
     return std::nullopt;
 }
 
-void yama::internal::codegen_target::gen_target_fn(const str& unqualified_name) {
+void yama::internal::codegen_target::gen_target_fn_like(const str& unqualified_name, bool is_method) {
     YAMA_ASSERT(!has_target());
     // bind bare-bones new type_info to _current_target
-    _current_target = yama::make_function(
-        unqualified_name,
-        // below are all stubs
-        {},
-        callsig_info{},
-        0,
-        bc::code{});
+    if (!is_method) {
+        _current_target = yama::make_function(
+            unqualified_name,
+            // below are all stubs
+            {},
+            callsig_info{},
+            0,
+            bc::code{});
+    }
+    else {
+        _current_target = yama::make_method(
+            unqualified_name,
+            // below are all stubs
+            {},
+            callsig_info{},
+            0,
+            bc::code{});
+    }
     // build callsig of new target (which has to be done after binding it as
     // we need to populate its constant table)
     target().change_callsig(tu->ctp.build_callsig_for_fn_type(tu->types.load(unqualified_name).value()));
@@ -85,9 +96,10 @@ void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cva
     else if (const auto v = x.as<bool_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_bool(*v)));
     else if (const auto v = x.as<char_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_char(*v)));
     else if (const auto v = x.to_type()) {
-        static_assert(kinds == 3); // reminder
+        static_assert(kinds == 4); // reminder
         if (is_primitive(v->kind()))            tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)));
         else if (is_function(v->kind()))        tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)));
+        else if (is_method(v->kind()))          tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_method_type(*v)));
         else if (is_struct(v->kind()))          tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)));
         else                                    YAMA_DEADEND;
     }

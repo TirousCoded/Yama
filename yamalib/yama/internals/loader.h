@@ -87,6 +87,7 @@ namespace yama::internal {
         // (ie. it will never encounter partially linked type instances)
 
         bool _check();
+        bool _check_instance(const env& e, type_instance& instance);
         bool _check_consts(const env& e, type_instance& instance, res<type_info> info);
         bool _check_const(const env& e, type_instance& instance, res<type_info> info, const_t index);
         template<const_type C>

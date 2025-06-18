@@ -60,13 +60,13 @@ std::optional<yama::internal::fullname> yama::internal::loader::_resolve_fullnam
         if (!head_was_bad) {
             YAMA_LOG(
                 dbg(), load_error_c,
-                "error: load {} failed; syntax error!",
+                "error: cannot load {}; syntax error!",
                 fullname);
         }
         else {
             YAMA_LOG(
                 dbg(), load_error_c,
-                "error: load {} failed; head specifies parcel not in env!",
+                "error: cannot load {}; head specifies parcel not in env!",
                 fullname);
         }
     }
@@ -110,7 +110,7 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         YAMA_LOG(
             dbg(), load_error_c,
-            "error: no type info exists for type {}; {} not found!",
+            "error: cannot load {}; {} not found!",
             _fmt_fullname(fullname),
             our_path);
         return nullptr;
@@ -119,7 +119,7 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         YAMA_LOG(
             dbg(), load_error_c,
-            "error: no type info exists for type {}; {} does not have {}!",
+            "error: cannot load {}; {} does not have {}!",
             _fmt_fullname(fullname),
             our_path,
             fullname.unqualified_name());
@@ -158,7 +158,7 @@ bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instan
 }
 
 bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     switch (info->consts().const_type(index).value()) {
     case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);                 break;
     case uint_const:            return _resolve_scalar_const<uint_const>(instance, info, index);                break;
@@ -167,6 +167,7 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
     case char_const:            return _resolve_scalar_const<char_const>(instance, info, index);                break;
     case primitive_type_const:  return _resolve_type_const<primitive_type_const>(e, instance, info, index);     break;
     case function_type_const:   return _resolve_type_const<function_type_const>(e, instance, info, index);      break;
+    case method_type_const:     return _resolve_type_const<method_type_const>(e, instance, info, index);        break;
     case struct_type_const:     return _resolve_type_const<struct_type_const>(e, instance, info, index);        break;
     default:                    YAMA_DEADEND;                                                                   break;
     }
@@ -177,11 +178,13 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
 bool yama::internal::loader::_check() {
     for (const auto& [key, value] : state.types) {
         const env e = _dd->installs.parcel_env(key.head()).value();
-        auto& instance = *value;
-        const auto& info = get_type_mem(instance)->info;
-        if (!_check_consts(e, instance, info)) return false;
+        if (!_check_instance(e, *value)) return false;
     }
     return true;
+}
+
+bool yama::internal::loader::_check_instance(const env& e, type_instance& instance) {
+    return _check_consts(e, instance, get_type_mem(instance)->info);
 }
 
 bool yama::internal::loader::_check_consts(const env& e, type_instance& instance, res<type_info> info) {
@@ -193,7 +196,7 @@ bool yama::internal::loader::_check_consts(const env& e, type_instance& instance
 }
 
 bool yama::internal::loader::_check_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     switch (info->consts().const_type(index).value()) {
     case int_const:             return _check_scalar_const<int_const>(instance, info, index);               break;
     case uint_const:            return _check_scalar_const<uint_const>(instance, info, index);              break;
@@ -202,6 +205,7 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
     case char_const:            return _check_scalar_const<char_const>(instance, info, index);              break;
     case primitive_type_const:  return _check_type_const<primitive_type_const>(e, instance, info, index);   break;
     case function_type_const:   return _check_type_const<function_type_const>(e, instance, info, index);    break;
+    case method_type_const:     return _check_type_const<method_type_const>(e, instance, info, index);      break;
     case struct_type_const:     return _check_type_const<struct_type_const>(e, instance, info, index);      break;
     default:                    YAMA_DEADEND;                                                               break;
     }

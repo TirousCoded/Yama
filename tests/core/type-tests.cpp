@@ -182,9 +182,9 @@ TEST_F(TypeTests, Equality) {
     EXPECT_FALSE(b != b);
 }
 
-static_assert(yama::kinds == 3);
+static_assert(yama::kinds == 4);
 
-TEST_F(TypeTests, PerKind_Primitive) {
+TEST_F(TypeTests, Primitive) {
     auto abc_constsinf =
         yama::const_table_info()
         .add_int(10'000);
@@ -197,14 +197,14 @@ TEST_F(TypeTests, PerKind_Primitive) {
 
     EXPECT_EQ(a.fullname(), "a:abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::primitive);
+    EXPECT_EQ(a.consts(), yama::const_table(a));
     EXPECT_EQ(a.ptype(), yama::ptype::float0);
     EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_EQ(a.call_fn(), std::nullopt);
     EXPECT_EQ(a.max_locals(), 0);
-    EXPECT_EQ(a.consts(), yama::const_table(a));
 }
 
-TEST_F(TypeTests, PerKind_Function) {
+TEST_F(TypeTests, Function) {
     auto abc_call_fn = [](yama::context&) {};
     auto abc_callsiginf = yama::make_callsig({ 0, 1, 2 }, 1);
     auto abc_constsinf =
@@ -229,14 +229,50 @@ TEST_F(TypeTests, PerKind_Function) {
 
     EXPECT_EQ(a.fullname(), "a:abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::function);
+    EXPECT_EQ(a.consts(), yama::const_table(a));
     EXPECT_EQ(a.ptype(), std::nullopt);
     EXPECT_EQ(a.callsig(), expected_callsig);
     EXPECT_EQ(a.call_fn(), expected_call_fn);
     EXPECT_EQ(a.max_locals(), 17);
-    EXPECT_EQ(a.consts(), yama::const_table(a));
 }
 
-TEST_F(TypeTests, PerKind_Struct) {
+TEST_F(TypeTests, Method) {
+    auto abc_m_call_fn = [](yama::context&) {};
+    auto abc_m_callsiginf = yama::make_callsig({ 0, 1, 2 }, 1);
+    auto abc_m_constsinf =
+        yama::const_table_info()
+        .add_primitive_type("yama:Int"_str)
+        .add_primitive_type("yama:Float"_str)
+        .add_primitive_type("yama:Char"_str);
+    yama::module_factory mf{};
+    mf.add_struct(
+        "abc"_str,
+        {});
+    mf.add_method(
+        "abc.m"_str,
+        abc_m_constsinf,
+        abc_m_callsiginf,
+        17,
+        abc_m_call_fn);
+
+    parcel->push(""_str, std::move(mf.done()));
+
+    yama::type abc = dm->load("a:abc"_str).value();
+    yama::type abc_m = dm->load("a:abc.m"_str).value();
+
+    std::optional<yama::callsig> expected_callsig = yama::callsig(abc_m_callsiginf, yama::const_table(abc_m));
+    std::optional<yama::call_fn> expected_call_fn = abc_m_call_fn;
+
+    EXPECT_EQ(abc_m.fullname(), "a:abc.m"_str);
+    EXPECT_EQ(abc_m.kind(), yama::kind::method);
+    EXPECT_EQ(abc_m.consts(), yama::const_table(abc_m));
+    EXPECT_EQ(abc_m.ptype(), std::nullopt);
+    EXPECT_EQ(abc_m.callsig(), expected_callsig);
+    EXPECT_EQ(abc_m.call_fn(), expected_call_fn);
+    EXPECT_EQ(abc_m.max_locals(), 17);
+}
+
+TEST_F(TypeTests, Struct) {
     auto abc_constsinf =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
@@ -253,10 +289,10 @@ TEST_F(TypeTests, PerKind_Struct) {
 
     EXPECT_EQ(a.fullname(), "a:abc"_str);
     EXPECT_EQ(a.kind(), yama::kind::struct0);
+    EXPECT_EQ(a.consts(), yama::const_table(a));
     EXPECT_EQ(a.ptype(), std::nullopt);
     EXPECT_EQ(a.callsig(), std::nullopt);
     EXPECT_EQ(a.call_fn(), std::nullopt);
     EXPECT_EQ(a.max_locals(), 0);
-    EXPECT_EQ(a.consts(), yama::const_table(a));
 }
 

@@ -33,7 +33,12 @@ bool yama::verifier::verify(const module_info& subject, const parcel_metadata& m
         subject.size(),
         module_path);
     for (const auto& I : subject) {
-        if (!verify(I.second, metadata, module_path)) return false;
+        if (!verify(I.second, metadata, module_path)) {
+            return false;
+        }
+    }
+    if (!_verify_method_owner_refs(subject)) {
+        return false;
     }
     return true;
 }
@@ -164,8 +169,72 @@ void yama::verifier::_post_verify_cleanup() {
     _cfg_blocks.clear();
 }
 
+bool yama::verifier::_verify_method_owner_refs(const module_info& subject) {
+    bool success = true;
+    for (const auto& [name, type] : subject) {
+        if (!_verify_method_owner_ref(subject, type)) {
+            success = false;
+        }
+    }
+    return success;
+}
+
+bool yama::verifier::_verify_method_owner_ref(const module_info& subject, const type_info& type) {
+    // skip if non-member type
+    if (!is_member(type.kind())) {
+        return true;
+    }
+    // skip if invalid unqualified name (as that's a different type of error)
+    if (type.member_name().empty()) {
+        return true;
+    }
+    if (!subject.contains(type.owner_name())) {
+        YAMA_RAISE(dbg(), dsignal::verif_type_owner_not_in_module);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} owner type {} not found in module!",
+            type.unqualified_name(), type.owner_name());
+        return false;
+    }
+    return true;
+}
+
 bool yama::verifier::_verify_type(const type_info& subject) {
+    if (!_verify_type_unqualified_name(subject)) {
+        return false;
+    }
     if (!_verify_type_callsig(subject)) {
+        return false;
+    }
+    return true;
+}
+
+bool yama::verifier::_verify_type_unqualified_name(const type_info& subject) {
+    return
+        is_member(subject.kind())
+        ? _verify_type_unqualified_name_has_owner_prefix(subject)
+        : _verify_type_unqualified_name_has_no_owner_prefix(subject);
+}
+
+bool yama::verifier::_verify_type_unqualified_name_has_owner_prefix(const type_info& subject) {
+    if (subject.member_name().empty()) {
+        YAMA_RAISE(dbg(), dsignal::verif_type_unqualified_name_invalid);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} unqualified name doesn't have owner name prefix, but {} types require this!",
+            subject.unqualified_name(), subject.kind());
+        return false;
+    }
+    return true;
+}
+
+bool yama::verifier::_verify_type_unqualified_name_has_no_owner_prefix(const type_info& subject) {
+    if (!subject.member_name().empty()) {
+        YAMA_RAISE(dbg(), dsignal::verif_type_unqualified_name_invalid);
+        YAMA_LOG(
+            dbg(), verif_error_c,
+            "error: {} unqualified name has owner name prefix, but {} types forbid this!",
+            subject.unqualified_name(), subject.kind());
         return false;
     }
     return true;
@@ -262,6 +331,32 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
             "error: {} type constant symbol {} (at constant index {}) is invalid; head is not self-name or dep-name!",
             subject.unqualified_name(), subject.consts().fmt_type_const(index), index);
         return false;
+    }
+    // discern owner name prefix, if any, and then check if has it, raising an
+    // error if what's found is invalid
+    const auto [owner_nm, member_nm] = internal::split(parsed->unqualified_name, '.');
+    const bool has_owner_name_prefix = !member_nm.empty();
+    if (is_member(subject.consts().kind(index).value())) { // member type
+        if (!has_owner_name_prefix) {
+            YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
+            YAMA_LOG(
+                dbg(), verif_error_c,
+                "error: {} type constant symbol {} (at constant index {}) is invalid; unqualified name {} doesn't have owner name prefix, but {} types require this!",
+                subject.unqualified_name(), subject.consts().fmt_type_const(index), index,
+                parsed->unqualified_name, subject.consts().kind(index).value());
+            return false;
+        }
+    }
+    else { // non-member type
+        if (has_owner_name_prefix) {
+            YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
+            YAMA_LOG(
+                dbg(), verif_error_c,
+                "error: {} type constant symbol {} (at constant index {}) is invalid; unqualified name {} has owner name prefix, but {} types forbid this!",
+                subject.unqualified_name(), subject.consts().fmt_type_const(index), index,
+                parsed->unqualified_name, subject.consts().kind(index).value());
+            return false;
+        }
     }
     return true;
 }
@@ -1325,14 +1420,15 @@ yama::str yama::verifier::_R_call_object_type_return_type(const type_info& subje
 }
 
 yama::str yama::verifier::_Ko_type(const type_info& subject, size_t index) {
-    static_assert(const_types == 8);
+    static_assert(const_types == 9);
     switch (subject.consts().const_type(index).value()) {
     case const_type::int0:          return _int_type();                                     break;
     case const_type::uint:          return _uint_type();                                    break;
     case const_type::float0:        return _float_type();                                   break;
     case const_type::bool0:         return _bool_type();                                    break;
     case const_type::char0:         return _char_type();                                    break;
-    case const_type::function_type: return subject.consts().qualified_name(index).value();    break;
+    case const_type::function_type: return subject.consts().qualified_name(index).value();  break;
+    case const_type::method_type:   return subject.consts().qualified_name(index).value();  break;
     default:                        YAMA_DEADEND;                                           break;
     }
     return str();

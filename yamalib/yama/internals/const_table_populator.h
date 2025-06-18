@@ -47,6 +47,7 @@ namespace yama::internal {
 
         const_t pull_prim_type(const ctype& t);
         const_t pull_fn_type(const ctype& t);
+        const_t pull_method_type(const ctype& t);
         const_t pull_struct_type(const ctype& t);
 
 

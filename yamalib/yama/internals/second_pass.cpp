@@ -18,7 +18,7 @@ void yama::internal::second_pass::visit_begin(res<ast_FnDecl> x) {
     if (tu->err.is_fatal()) {
         return;
     }
-    _begin_fn(*x);
+    _begin_fn_like(*x);
 }
 
 void yama::internal::second_pass::visit_begin(res<ast_StructDecl> x) {
@@ -67,7 +67,7 @@ void yama::internal::second_pass::visit_end(res<ast_FnDecl> x) {
     if (tu->err.is_fatal()) {
         return;
     }
-    _end_fn(*x);
+    _end_fn_like(*x);
 }
 
 void yama::internal::second_pass::visit_end(res<ast_StructDecl> x) {
@@ -172,11 +172,11 @@ void yama::internal::second_pass::_localvar_with_no_init(ast_VarDecl& x) {
     }
 }
 
-void yama::internal::second_pass::_begin_fn(ast_FnDecl& x) {
-    const str name = x.name.str(tu->src);
+void yama::internal::second_pass::_begin_fn_like(ast_FnDecl& x) {
+    const str unqualified_name = str(x.fmt_unqualified_name(tu->src).value());
     // gen new codegen target
-    tu->cgt.gen_target_fn(name);
-    auto& targsym = tu->cgt.target_csym<fn_csym>();
+    tu->cgt.gen_target_fn_like(unqualified_name, x.is_method());
+    auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // resolve if fn type is None returning
     const ctype return_type = targsym.get_return_type_or_none(*tu);
     targsym.is_none_returning = return_type == tu->types.none_type();
@@ -187,11 +187,24 @@ void yama::internal::second_pass::_begin_fn(ast_FnDecl& x) {
             x,
             dsignal::compile_no_return_stmt,
             "for {}, not all control paths end with a return stmt!",
-            name);
+            unqualified_name);
+    }
+    // if we're a method, then assert that the owner type exists IN THE SAME MODULE
+    if (x.is_method()) {
+        const str owner_uqn = x.name.value().str(tu->src);
+        const fullname owner_fln = qualified_name(tu->src_path, owner_uqn);
+        const bool owner_type_exists = tu->types.load(owner_fln).has_value();
+        if (!owner_type_exists) {
+            tu->err.error(
+                x,
+                dsignal::compile_nonexistent_owner,
+                "non-existent owner type {}!",
+                owner_fln.fmt(tu->e()));
+        }
     }
 }
 
-void yama::internal::second_pass::_end_fn(ast_FnDecl& x) {
+void yama::internal::second_pass::_end_fn_like(ast_FnDecl& x) {
     tu->cgt.upload_target(x);
 }
 
@@ -235,7 +248,7 @@ void yama::internal::second_pass::_end_block(ast_Block& x) {
     if (x.is_fn_body_block) {
         // if we're None returning, and not all control paths have an explicit return
         // stmt or enter infinite loops, write a ret instr
-        const auto& targsym = tu->cgt.target_csym<fn_csym>();
+        const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
         if (targsym.is_none_returning.value() && !targsym.all_paths_return_or_loop.value()) {
             tu->rs.push_temp(x, tu->types.none_type());
             tu->cgt.cw.add_put_none(yama::newtop);
@@ -351,7 +364,7 @@ void yama::internal::second_pass::_return_stmt(ast_ReturnStmt& x) {
 }
 
 void yama::internal::second_pass::_return_stmt_with_val(ast_ReturnStmt& x) {
-    const auto& targsym = tu->cgt.target_csym<fn_csym>();
+    const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // codegen returned value expr, pushing temporary
     tu->cs->ea.codegen(*x.expr, newtop);
     // type check return value expr, w/ return type None if no explicit return type
@@ -373,7 +386,7 @@ void yama::internal::second_pass::_return_stmt_with_val(ast_ReturnStmt& x) {
 }
 
 void yama::internal::second_pass::_return_stmt_with_no_val(ast_ReturnStmt& x) {
-    const auto& targsym = tu->cgt.target_csym<fn_csym>();
+    const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // this form may not be used if return type isn't None
     const ctype actual_return_type = targsym.get_return_type_or_none(*tu);
     const ctype expected_return_type = tu->types.none_type();

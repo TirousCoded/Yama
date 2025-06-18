@@ -50,7 +50,7 @@ bool yama::object_ref::operator==(const object_ref& other) const noexcept {
 }
 
 std::string yama::object_ref::fmt() const {
-    static_assert(kinds == 3);
+    static_assert(kinds == 4);
     std::string result{};
     if (t.kind() == kind::primitive) {
         const ptype x = t.ptype().value();
@@ -64,6 +64,7 @@ std::string yama::object_ref::fmt() const {
         else                                YAMA_DEADEND;
     }
     else if (t.kind() == kind::function)    result = std::format("{} (n/a)", t.fullname());
+    else if (t.kind() == kind::method)      result = std::format("{} (n/a)", t.fullname());
     else if (t.kind() == kind::struct0)     result = std::format("{} (n/a)", t.fullname());
     else                                    YAMA_DEADEND;
     return result;
