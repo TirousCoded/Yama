@@ -19,6 +19,8 @@
 #include "debug.h"
 #include "api_component.h"
 
+#include "attrs.h"
+
 #include "kind.h"
 #include "kind-features.h"
 

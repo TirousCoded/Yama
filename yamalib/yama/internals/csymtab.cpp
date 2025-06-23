@@ -25,7 +25,10 @@ std::optional<yama::internal::ctype> yama::internal::var_csym::get_type(compiler
 }
 
 std::optional<yama::internal::ctype> yama::internal::fn_like_csym::param::get_type(compiler& cs) const {
-    return type ? type->get_type(cs) : std::nullopt;
+    return
+        type
+        ? type->get_type(cs)
+        : (is_self_param ? cs.types.load(fn_qn) : std::nullopt);
 }
 
 std::optional<yama::internal::ctype> yama::internal::fn_like_csym::get_return_type(compiler& cs) const {
@@ -39,21 +42,32 @@ yama::internal::ctype yama::internal::fn_like_csym::get_return_type_or_none(tran
 std::string yama::internal::fn_like_csym::fmt_params(compiler& cs) const {
     std::string result{};
     result += "(";
-    for (size_t i = 0; i < params.size(); i++) {
-        if (i > 0) {
+    for (const auto& param : params) {
+        const bool not_first = &param != &params.front();
+        if (not_first) {
             result += ", ";
         }
-        result += std::format(
-            "{0}: {1}",
-            params[i].name,
-            params[i].type ? params[i].type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
+        std::string t = param.get_type(cs).value().fmt(cs.dd->installs.domain_env());
+        //std::string t =
+        //    param.is_self_param
+        //    ? "*self*"
+        //    : (param.type ? param.type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
+        result += std::format("{0}: {1}", param.name, t);
     }
     result += ")";
     return result;
 }
 
+bool yama::internal::param_csym::good() const noexcept {
+    return ptr;
+}
+
+yama::internal::fn_like_csym::param& yama::internal::param_csym::get() const noexcept {
+    return deref_assert(ptr);
+}
+
 std::optional<yama::internal::ctype> yama::internal::param_csym::get_type(compiler& cs) const {
-    return type ? type->get_type(cs) : std::nullopt;
+    return good() ? get().get_type(cs) : std::nullopt;
 }
 
 std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const char* tab) {
@@ -103,7 +117,6 @@ std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const 
         result += std::format("{0}{1}lp          : {2}\n", _tabs, tab, fmt_lookup_proc(lp));
         result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
         result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
-        result += std::format("{0}{1}type        : {2}\n", _tabs, tab, as<param_csym>().type ? as<param_csym>().type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
         result += std::format("{0}}}\n", _tabs);
     }
     else if (is<struct_csym>()) {

@@ -46,8 +46,10 @@ namespace yama::internal {
             float_lit,
             bool_lit,
             char_lit,
+            bound_method_call,
             call,
-            unbound_method_access,
+            unbound_method,
+            bound_method,
             default_init,
             constexpr_guarantee,
 
@@ -56,7 +58,27 @@ namespace yama::internal {
 
         static constexpr size_t categories = size_t(category::num);
 
-        static std::string fmt_category(category x);
+        static inline std::string fmt_category(category x) {
+            static_assert(categories == 14);
+            switch (x) {
+            case category::param_id:                return "param id expr";
+            case category::var_id:                  return "local var id expr";
+            case category::type_id:                 return "type id expr";
+            case category::int_lit:                 return "int literal expr";
+            case category::uint_lit:                return "uint literal expr";
+            case category::float_lit:               return "float literal expr";
+            case category::bool_lit:                return "bool literal expr";
+            case category::char_lit:                return "char literal expr";
+            case category::bound_method_call:       return "bound method call expr";
+            case category::call:                    return "call expr";
+            case category::unbound_method:          return "unbound method expr";
+            case category::bound_method:            return "bound method expr";
+            case category::default_init:            return "default initialize expr";
+            case category::constexpr_guarantee:     return "constexpr guarantee expr";
+            default: YAMA_DEADEND; break;
+            }
+            return std::string();
+        }
 
         // TODO: if process crashes, look into if the problem is us failing to account for
         //       if a composite expr is provided w/ invalid operand exprs
@@ -172,21 +194,25 @@ namespace yama::internal {
         bool _resolve(const ast_expr& x);
         bool _resolve(const ast_PrimaryExpr& x);
         bool _resolve(const ast_Args& x);
-        bool _resolve(const ast_MemberAccess& x);
+        bool _resolve(const ast_TypeMemberAccess& x);
+        bool _resolve(const ast_ObjectMemberAccess& x);
         bool _resolve(const ast_Expr& x);
 
         bool _resolve_children(const ast_Args& x);
-        bool _resolve_children(const ast_MemberAccess& x);
+        bool _resolve_children(const ast_TypeMemberAccess& x);
+        bool _resolve_children(const ast_ObjectMemberAccess& x);
         bool _resolve_children(const ast_Expr& x);
 
         category _discern_category(const ast_PrimaryExpr& x);
         category _discern_category(const ast_Args& x);
-        category _discern_category(const ast_MemberAccess& x);
+        category _discern_category(const ast_TypeMemberAccess& x);
+        category _discern_category(const ast_ObjectMemberAccess& x);
         category _discern_category(const ast_Expr& x);
 
         bool _resolve_expr(const ast_PrimaryExpr& x);
         bool _resolve_expr(const ast_Args& x);
-        bool _resolve_expr(const ast_MemberAccess& x);
+        bool _resolve_expr(const ast_TypeMemberAccess& x);
+        bool _resolve_expr(const ast_ObjectMemberAccess& x);
         bool _resolve_expr(const ast_Expr& x);
 
         // below, ret == std::nullopt means no result
@@ -195,7 +221,8 @@ namespace yama::internal {
         void _codegen_step(const ast_expr& x, std::optional<size_t> ret);
         void _codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret);
         void _codegen_step(const ast_Args& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_MemberAccess& x, std::optional<size_t> ret);
+        void _codegen_step(const ast_TypeMemberAccess& x, std::optional<size_t> ret);
+        void _codegen_step(const ast_ObjectMemberAccess& x, std::optional<size_t> ret);
         void _codegen_step(const ast_Expr& x, std::optional<size_t> ret);
 
         mode _discern_mode(const ast_base_expr& x) const noexcept;
@@ -215,8 +242,9 @@ namespace yama::internal {
         bool _raise_undeclared_qualifier_if(bool x, metadata& md, std::optional<taul::token> qualifier);
         bool _raise_nonassignable_expr_if(bool x, metadata& md);
         bool _raise_nonconstexpr_expr_if(bool x, metadata& md);
-        bool _raise_wrong_arg_count_if(bool x, metadata& md, size_t expected_args);
+        bool _raise_wrong_arg_count_if(bool x, metadata& md, size_t actual_args, size_t expected_args);
         bool _raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t expected_args);
+        bool _raise_wrong_arg_count_for_bound_method_call_if(bool x, metadata& md, ctype method, size_t expected_args);
         bool _raise_invalid_operation_due_to_noncallable_type_if(bool x, metadata& md, ctype t);
         bool _raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number);
         bool _raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md);

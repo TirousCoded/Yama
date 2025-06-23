@@ -1013,10 +1013,10 @@ TEST_F(CompilationTests, General_DefaultInit_Method) {
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
-fn f() -> A.g {
-    var a: A.g; // default inits a
+fn f() -> A::g {
+    var a: A::g; // default inits a
     return a;
 }
 
@@ -1025,21 +1025,21 @@ fn f() -> A.g {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto A_dot_g = dm->load("a:A.g"_str);
+    const auto A_g = dm->load("a:A::g"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(A_dot_g);
+    ASSERT_TRUE(A_g);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(A_dot_g->kind(), yama::kind::method);
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_dot_g->callsig().value().fmt(), "fn() -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A.g");
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_dot_g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
     sidefx_t expected{};
@@ -1272,12 +1272,12 @@ import fns.abc;
 
 struct Util {}
 
-fn Util.identity_int(x: Int) -> Int {
+fn Util::identity_int(x: Int) -> Int {
     return x;
 }
 
 fn f() {
-    observeInt(Util.identity_int(10));
+    observeInt(Util::identity_int(10));
 }
 
 )";
@@ -1285,14 +1285,14 @@ fn f() {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto Util_dot_identity_int = dm->load("a:Util.identity_int"_str);
+    const auto Util_identity_int = dm->load("a:Util::identity_int"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(Util_dot_identity_int);
+    ASSERT_TRUE(Util_identity_int);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(Util_dot_identity_int->kind(), yama::kind::method);
+    ASSERT_EQ(Util_identity_int->kind(), yama::kind::method);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(Util_dot_identity_int->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
+    ASSERT_EQ(Util_identity_int->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
@@ -2553,13 +2553,13 @@ TEST_F(CompilationTests, TypeSpecifier_ExprIsMethodType_AdHocImplicitConvert) {
 
     std::string txt = R"(
 
-fn f() -> A.g { // <- method type crvalue
-    return A.g;
+fn f() -> A::g { // <- method type crvalue
+    return A::g;
 }
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
 )";
 
@@ -2567,20 +2567,20 @@ fn A.g() {}
     ASSERT_TRUE(result);
 
     const auto f = dm->load("a:f"_str);
-    const auto A_dot_g = dm->load("a:A.g"_str);
+    const auto A_g = dm->load("a:A::g"_str);
     ASSERT_TRUE(f);
-    ASSERT_TRUE(A_dot_g);
+    ASSERT_TRUE(A_g);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_dot_g->kind(), yama::kind::method);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A.g");
-    ASSERT_EQ(A_dot_g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_dot_g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
     sidefx_t expected{};
@@ -4053,6 +4053,21 @@ TEST_F(CompilationTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 //                  able to have methods, so maybe the answer is to do something like
 //                  rename 'types' in modules to 'items', and then replace this current
 //                  rule w/ one requiring owner type item to be a *type item*
+//
+//      - if the first param of the method is named 'self', and it lacks an explicit
+//        type annotation directly attached to it, then this self parameter's type will
+//        specially be deduced to be the owner type of the method, overriding the usual
+//        semantics governing param type deduction
+//          * such params are called method 'self parameters'
+//          * notice how the above semantics also mean that self parameters w/ no params
+//            after them w/ type annotations are still able to have a type deduced
+//          * 'fn A::f(self) {}' is equiv to 'fn A::f(self: A) {}'
+//          * 'fn A::f(self, x: Int) {}' is equiv to 'fn A::f(self: A, x: Int) {}'
+//          * 'fn A::f(self: Int) {}' wouldn't be affected, as self is directly type
+//            annotated
+//          * 'fn A::f(x, self, y: Int) {}' wouldn't be affected, as self is not the
+//            first param
+//          * 'fn A::f() {}' wouldn't be affected, as it has no params
 
 // basic usage
 
@@ -4065,7 +4080,7 @@ import fns.abc;
 
 struct A {}
 
-fn A.g(x: Int) -> Int {
+fn A::g(x: Int) -> Int {
     // observe side-effects of call, and its return value
     observeInt(x);
     return x;
@@ -4076,13 +4091,13 @@ fn A.g(x: Int) -> Int {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto A_dot_g = dm->load("a:A.g"_str);
-    ASSERT_TRUE(A_dot_g);
+    const auto A_g = dm->load("a:A::g"_str);
+    ASSERT_TRUE(A_g);
 
-    ASSERT_EQ(A_dot_g->kind(), yama::kind::method);
-    ASSERT_EQ(A_dot_g->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn(yama:Int) -> yama:Int");
 
-    ASSERT_TRUE(ctx->push_fn(*A_dot_g).good());
+    ASSERT_TRUE(ctx->push_fn(*A_g).good());
     ASSERT_TRUE(ctx->push_int(51).good());
     ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
@@ -4092,6 +4107,103 @@ fn A.g(x: Int) -> Int {
     // expected side effects
     sidefx_t expected{};
     expected.observe_int(51);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// self parameters
+
+TEST_F(CompilationTests, MethodDecl_SelfParameters) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+// these have self params
+fn A::yes1(self) {}
+fn A::yes2(self, x: Int) {}
+
+// these do not have self params
+fn A::no1(self: Int) {}
+fn A::no2(x, self, y: Int) {}
+fn A::no3() {}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto A_yes1 = dm->load("a:A::yes1"_str);
+    const auto A_yes2 = dm->load("a:A::yes2"_str);
+    const auto A_no1 = dm->load("a:A::no1"_str);
+    const auto A_no2 = dm->load("a:A::no2"_str);
+    const auto A_no3 = dm->load("a:A::no3"_str);
+    ASSERT_TRUE(A_yes1);
+    ASSERT_TRUE(A_yes2);
+    ASSERT_TRUE(A_no1);
+    ASSERT_TRUE(A_no2);
+    ASSERT_TRUE(A_no3);
+
+    // we don't care about actually calling these methods for this test, we're only
+    // concerned about their callsigs
+
+    ASSERT_EQ(A_yes1->kind(), yama::kind::method);
+    ASSERT_EQ(A_yes2->kind(), yama::kind::method);
+    ASSERT_EQ(A_no1->kind(), yama::kind::method);
+    ASSERT_EQ(A_no2->kind(), yama::kind::method);
+    ASSERT_EQ(A_no3->kind(), yama::kind::method);
+    ASSERT_EQ(A_yes1->callsig().value().fmt(), "fn(a:A) -> yama:None");
+    ASSERT_EQ(A_yes2->callsig().value().fmt(), "fn(a:A, yama:Int) -> yama:None");
+    ASSERT_EQ(A_no1->callsig().value().fmt(), "fn(yama:Int) -> yama:None");
+    ASSERT_EQ(A_no2->callsig().value().fmt(), "fn(yama:Int, yama:Int, yama:Int) -> yama:None");
+    ASSERT_EQ(A_no3->callsig().value().fmt(), "fn() -> yama:None");
+}
+
+// self parameters work when referenced by identifier exprs
+
+TEST_F(CompilationTests, MethodDecl_SelfParameters_WorkWhenReferencedByIdentifierExprs) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::yes1(self) {
+    observeInt(200);
+}
+fn A::yes2(self, x: Int) {
+    observeInt(x);
+    self.yes1();
+}
+
+fn f() {
+    var a = A();
+    a.yes2(100);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    expected.observe_int(200);
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
@@ -4105,7 +4217,7 @@ TEST_F(CompilationTests, MethodDecl_Fail_IfLocalMethod) {
 struct A {}
 
 fn f() {
-    fn A.g() {}
+    fn A::g() {}
 }
 
 )";
@@ -4122,7 +4234,7 @@ TEST_F(CompilationTests, MethodDecl_Fail_NonExistentOwnerType) {
 
     std::string txt = R"(
 
-fn Missing.g() {} // error! no type 'Missing'
+fn Missing::g() {} // error! no type 'Missing'
 
 )";
 
@@ -7001,9 +7113,10 @@ fn f() {
 //      
 //      - selection rules:
 // 
-//          1) if <f> is of a callable type, the expr is a 'call expr'
-//          2) if <f> is type yama:Type, the expr is a 'default init expr'
-//          3) invalid otherwise
+//          1) if <f> is a bound method expr, the expr is a 'bound method call expr'
+//          2) if <f> is of a callable type, the expr is a 'call expr'
+//          3) if <f> is type yama:Type, the expr is a 'default init expr'
+//          4) invalid otherwise
 
 // valid selection
 
@@ -7014,7 +7127,16 @@ TEST_F(CompilationTests, CallLikeExpr_Valid) {
 
 import fns.abc;
 
+struct A {}
+
+fn A::g(self, x: Int) {
+    observeInt(x);
+}
+
 fn f() {
+    var a = A();
+    a.g(4); // method call expr
+
     observeInt(100); // call expr
 
     observeChar(Char()); // default init expr (tested w/ call expr)
@@ -7039,6 +7161,7 @@ fn f() {
 
     // expected side effects
     sidefx_t expected{};
+    expected.observe_int(4);
     expected.observe_int(100);
     expected.observe_char(U'\0');
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
@@ -7060,6 +7183,238 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// bound method call expr
+//
+//      - given form '<owner>.<method>(<args>)', bound method call exprs designates callsites
+//        equivalent to writing 'T::<method>(<owner>, <args>)', where T is the the same
+//        type as <owner>
+//          * here '<owner>.<method>' is a bound method expr, which has a special semantic
+//            relationship w/ bound method call expr
+// 
+//      - eval order:
+// 
+//          1) <owner> eval
+//          2) <args> eval, going left-to-right
+//          3) call is performed
+// 
+//      - non-assignable
+//      - non-constexpr
+// 
+//      - illegal if '<owner>, <args>' has wrong number/types for a call to T::<method>
+
+// basic usage
+
+TEST_F(CompilationTests, BoundMethodCallExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::choose(self, which: Bool, a, b: Int) -> Int {
+    if (which) {
+        return a;
+    }
+    else {
+        return b;
+    }
+}
+
+fn f() {
+    observeInt(A().choose(true, -3, 12));
+    observeInt(A().choose(false, -3, 12));
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(-3);
+    expected.observe_int(12);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// evaluation order
+
+TEST_F(CompilationTests, BoundMethodCallExpr_EvalOrder) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+// NOTE: this version differs quite a bit from the regular call expr one
+
+import fns.abc;
+
+fn foo() -> Int { observeInt(0); return 0; }
+fn bar() -> Int { observeInt(1); return 0; }
+fn baz() -> Int { observeInt(2); return 0; }
+
+struct A {}
+
+fn A::g(self, x, y, z: Int) {}
+
+fn get_owner() -> A { observeChar('o'); return A(); }
+
+fn f() {
+    // Yama has well defined eval order
+
+    get_owner().g(foo(), bar(), baz());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_char(U'o');
+    expected.observe_int(0);
+    expected.observe_int(1);
+    expected.observe_int(2);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// illegal call due to too many args
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooMany) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g('a', 'b');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// illegal call due to too few args
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooFew) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g();
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// illegal call due to incorrect arg type(s) (ie. type mismatch)
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g('a');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// bound method call expr is non-assignable
+
+TEST_F(CompilationTests, BoundMethodCallExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self, a, b: Int) -> Int { return 0; }
+
+fn f() {
+    A().g(3, 2) = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// bound method call expr is non-constexpr
+
+TEST_F(CompilationTests, BoundMethodCallExpr_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self, a, b: Int) -> Int { return 0; }
+
+fn f() {
+    const(A().g(3, 2));
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
 
@@ -7108,14 +7463,10 @@ fn f() {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto choose = dm->load("a:choose"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(choose);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(choose->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(choose->callsig().value().fmt(), "fn(yama:Bool, yama:Int, yama:Int) -> yama:Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
@@ -7131,7 +7482,7 @@ fn f() {
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// callobj/params evaluation order
+// evaluation order
 
 TEST_F(CompilationTests, CallExpr_EvalOrder) {
     ASSERT_TRUE(ready);
@@ -7159,30 +7510,10 @@ fn f() {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto get_callobj = dm->load("a:get_callobj"_str);
-    const auto foo = dm->load("a:foo"_str);
-    const auto bar = dm->load("a:bar"_str);
-    const auto baz = dm->load("a:baz"_str);
-    const auto g = dm->load("a:g"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(get_callobj);
-    ASSERT_TRUE(foo);
-    ASSERT_TRUE(bar);
-    ASSERT_TRUE(baz);
-    ASSERT_TRUE(g);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(get_callobj->kind(), yama::kind::function);
-    ASSERT_EQ(foo->kind(), yama::kind::function);
-    ASSERT_EQ(bar->kind(), yama::kind::function);
-    ASSERT_EQ(baz->kind(), yama::kind::function);
-    ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(get_callobj->callsig().value().fmt(), "fn() -> a:g");
-    ASSERT_EQ(foo->callsig().value().fmt(), "fn() -> yama:Int");
-    ASSERT_EQ(bar->callsig().value().fmt(), "fn() -> yama:Int");
-    ASSERT_EQ(baz->callsig().value().fmt(), "fn() -> yama:Int");
-    ASSERT_EQ(g->callsig().value().fmt(), "fn(yama:Int, yama:Int, yama:Int) -> yama:Int");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
@@ -7225,14 +7556,10 @@ fn f() {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto foo = dm->load("a:foo"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(foo);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(foo->kind(), yama::kind::function);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(foo->callsig().value().fmt(), "fn(yama:Int) -> a:foo");
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
@@ -7353,19 +7680,19 @@ fn f() {
 }
 
 
-// member access expr
+// type member access expr
 //
-//      - member access exprs are homomorphic exprs for exprs of the form '<owner>.<member>'
+//      - type member access exprs are homomorphic exprs for exprs of the form '<owner>::<member>'
 //      
 //      - selection rules:
 // 
 //          1) if <owner> is yama:Type crvalue, and <member> is a method of type <owner>,
-//             then expr is an 'unbound method access expr'
+//             then expr is an 'unbound method expr'
 //          2) invalid otherwise
 
 // valid selection
 
-TEST_F(CompilationTests, MemberAccessExpr_Valid) {
+TEST_F(CompilationTests, TypeMemberAccessExpr_Valid) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -7374,12 +7701,12 @@ import fns.abc;
 
 struct A {}
 
-fn A.g() {
+fn A::g() {
     observeInt(100);
 }
 
 fn f() {
-    A.g(); // unbound method access expr (tested w/ call expr)
+    A::g(); // unbound method expr (tested w/ call expr)
 }
 
 )";
@@ -7407,13 +7734,13 @@ fn f() {
 
 // invalid selection
 
-TEST_F(CompilationTests, MemberAccessExpr_Invalid) {
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 fn f() {
-    const(10).abc; // error!
+    const(10)::abc; // error!
 }
 
 )";
@@ -7423,7 +7750,7 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
-TEST_F(CompilationTests, MemberAccessExpr_Invalid_OwnerIsTypeType_ButUnknownMember) {
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButUnknownMember) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -7431,7 +7758,7 @@ TEST_F(CompilationTests, MemberAccessExpr_Invalid_OwnerIsTypeType_ButUnknownMemb
 struct A {}
 
 fn f() {
-    A.missing; // error! A is valid Type crvalue, but no member 'missing'!
+    A::missing; // error! A is valid Type crvalue, but no member 'missing'!
 }
 
 )";
@@ -7441,18 +7768,18 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
-TEST_F(CompilationTests, MemberAccessExpr_Invalid_OwnerIsTypeType_ButNotCRValue) {
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButNotCRValue) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
 fn f() {
     var x = A();
-    x.g; // error! x is valid Type rvalue, but is not crvalue!
+    x::g; // error! x is valid Type rvalue, but is not crvalue!
 }
 
 )";
@@ -7463,9 +7790,9 @@ fn f() {
 }
 
 
-// unbound method access expr
+// unbound method expr
 // 
-//      - given form '<type>.<method>', unbound method access exprs eval to crvalues
+//      - given form '<type>::<method>', unbound method exprs eval to crvalues
 //        of the <method> of <type> specified (where <type> is a yama:Type crvalue)
 // 
 //      - non-assignable
@@ -7473,17 +7800,17 @@ fn f() {
 
 // basic usage
 
-TEST_F(CompilationTests, UnboundMethodAccessExpr_BasicUsage) {
+TEST_F(CompilationTests, UnboundMethodExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
-fn f() -> A.g {
-    return A.g;
+fn f() -> A::g {
+    return A::g;
 }
 
 )";
@@ -7491,40 +7818,40 @@ fn f() -> A.g {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto A_dot_g = dm->load("a:A.g"_str);
+    const auto A_g = dm->load("a:A::g"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(A_dot_g);
+    ASSERT_TRUE(A_g);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(A_dot_g->kind(), yama::kind::method);
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_dot_g->callsig().value().fmt(), "fn() -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A.g");
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_dot_g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
     sidefx_t expected{};
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
 }
 
-// unbound method access expr is non-assignable
+// unbound method expr is non-assignable
 
-TEST_F(CompilationTests, UnboundMethodAccessExpr_NonAssignable) {
+TEST_F(CompilationTests, UnboundMethodExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
 fn f() {
-    A.g = 4;
+    A::g = 4;
 }
 
 )";
@@ -7534,20 +7861,20 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// unbound method access expr is constexpr
+// unbound method expr is constexpr
 
-TEST_F(CompilationTests, UnboundMethodAccessExpr_ConstExpr) {
+TEST_F(CompilationTests, UnboundMethodExpr_ConstExpr) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
 
 struct A {}
 
-fn A.g() {}
+fn A::g() {}
 
 fn f() {
-    // enforce 'A.g' MUST be constexpr
-    const(A.g);
+    // enforce 'A::g' MUST be constexpr
+    const(A::g);
 }
 
 )";
@@ -7570,6 +7897,232 @@ fn f() {
     // expected side effects
     sidefx_t expected{};
     EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+
+// object member access expr
+//
+//      - object member access exprs are homomorphic exprs for exprs of the form '<owner>.<member>'
+//      
+//      - selection rules:
+// 
+//          1) if <owner> is a rvalue, and <member> is a method of the type of object <owner>,
+//             then expr is a 'bound method expr'
+//          2) invalid otherwise
+
+// valid selection
+
+TEST_F(CompilationTests, ObjectMemberAccessExpr_Valid) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::g(self) {
+    observeInt(100);
+}
+
+fn f() {
+    var a = A();
+    a.g(); // bound method expr (tested w/ bound method call expr)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    sidefx_t expected{};
+    expected.observe_int(100);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// invalid selection
+
+TEST_F(CompilationTests, ObjectMemberAccessExpr_Invalid_UnknownMember) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn f() {
+    var a = A();
+    a.missing; // error! unknown member 'missing'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// bound method expr
+//
+//      - given form '<object>.<method>', bound method exprs eval to rvalues
+//        of the <method> of the type of <object> specified (where <object> is
+//        a rvalue)
+//          * TODO: later on, when we are able to have fn objects which can store
+//                  references to owner objects, we want to revise bound method
+//                  exprs to return these instead
+// 
+//      - non-assignable
+//      - non-constexpr
+//
+//      - illegal if <method> does not have any parameters
+//      - illegal if first parameter of <method> is not same type as <owner>
+
+
+// basic usage
+
+TEST_F(CompilationTests, BoundMethodExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() -> A::g {
+    var a = A();
+    return a.g;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto A_g = dm->load("a:A::g"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(A_g);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn(a:A) -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
+
+    // expected side effects
+    sidefx_t expected{};
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// bound method expr is non-assignable
+
+TEST_F(CompilationTests, BoundMethodExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() {
+    var a = A();
+    a.g = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// bound method expr is non-constexpr
+
+TEST_F(CompilationTests, BoundMethodExpr_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() {
+    var a = A();
+    const(a.g); // error! a.g is not constexpr
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if <method> does not have any parameters
+
+TEST_F(CompilationTests, BoundMethodExpr_Fail_NoParams) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() {
+    var a = A();
+    a.g; // error! g has no first param
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+// illegal if first parameter of <method> is not same type as <owner>
+
+TEST_F(CompilationTests, BoundMethodExpr_Fail_FirstParamNotOwnerType) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+struct A {}
+
+fn A::g(invalid_self: Int) {}
+
+fn f() {
+    var a = A();
+    a.g; // error! g first param is not type A, and so cannot be used as *self* param
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 

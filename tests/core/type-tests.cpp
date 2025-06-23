@@ -249,7 +249,7 @@ TEST_F(TypeTests, Method) {
         "abc"_str,
         {});
     mf.add_method(
-        "abc.m"_str,
+        "abc::m"_str,
         abc_m_constsinf,
         abc_m_callsiginf,
         17,
@@ -258,12 +258,12 @@ TEST_F(TypeTests, Method) {
     parcel->push(""_str, std::move(mf.done()));
 
     yama::type abc = dm->load("a:abc"_str).value();
-    yama::type abc_m = dm->load("a:abc.m"_str).value();
+    yama::type abc_m = dm->load("a:abc::m"_str).value();
 
     std::optional<yama::callsig> expected_callsig = yama::callsig(abc_m_callsiginf, yama::const_table(abc_m));
     std::optional<yama::call_fn> expected_call_fn = abc_m_call_fn;
 
-    EXPECT_EQ(abc_m.fullname(), "a:abc.m"_str);
+    EXPECT_EQ(abc_m.fullname(), "a:abc::m"_str);
     EXPECT_EQ(abc_m.kind(), yama::kind::method);
     EXPECT_EQ(abc_m.consts(), yama::const_table(abc_m));
     EXPECT_EQ(abc_m.ptype(), std::nullopt);

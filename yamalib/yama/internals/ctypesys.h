@@ -52,6 +52,10 @@ namespace yama::internal {
 
         kind kind() const noexcept;
 
+        str owner_name() const;
+        str member_name() const;
+
+        std::optional<ctype> owner_type() const;
         size_t param_count() const noexcept;
         std::optional<ctype> param_type(size_t param_index, compiler& cs) const;
         std::optional<ctype> return_type(compiler& cs) const;

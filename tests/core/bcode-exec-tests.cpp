@@ -704,7 +704,7 @@ TEST_F(BCodeExecTests, Call_Method) {
         "Math"_str,
         {}));
 
-    auto Math_dot_plus_fn = 
+    auto Math_plus_fn = 
         [](yama::context& ctx) {
         was_called_0 = true;
         yama::int_t result =
@@ -714,15 +714,15 @@ TEST_F(BCodeExecTests, Call_Method) {
         if (ctx.push_int(result).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    const auto Math_dot_plus_consts =
+    const auto Math_plus_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str);
-    const auto Math_dot_plus_info = yama::make_method(
-        "Math.plus"_str,
-        Math_dot_plus_consts,
+    const auto Math_plus_info = yama::make_method(
+        "Math::plus"_str,
+        Math_plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
         1,
-        Math_dot_plus_fn);
+        Math_plus_fn);
 
     const auto f_bcode =
         yama::bc::code()
@@ -738,7 +738,7 @@ TEST_F(BCodeExecTests, Call_Method) {
     const auto f_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str)
-        .add_method_type("self:Math.plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
+        .add_method_type("self:Math::plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
         .add_int(1)
         .add_int(48)
         .add_int(100);
@@ -749,7 +749,7 @@ TEST_F(BCodeExecTests, Call_Method) {
         5,
         f_bcode);
 
-    upload(Math_dot_plus_info);
+    upload(Math_plus_info);
     upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
@@ -1168,7 +1168,7 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         "Math"_str,
         {}));
 
-    auto Math_dot_plus_fn = 
+    auto Math_plus_fn = 
         [](yama::context& ctx) {
         was_called_0 = true;
         yama::int_t result =
@@ -1178,15 +1178,15 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         if (ctx.push_int(result).bad()) return;
         if (ctx.ret(0).bad()) return;
         };
-    const auto Math_dot_plus_consts =
+    const auto Math_plus_consts =
         yama::const_table_info()
         .add_primitive_type("yama:Int"_str);
-    const auto Math_dot_plus_info = yama::make_method(
-        "Math.plus"_str,
-        Math_dot_plus_consts,
+    const auto Math_plus_info = yama::make_method(
+        "Math::plus"_str,
+        Math_plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
         1,
-        Math_dot_plus_fn);
+        Math_plus_fn);
 
     const auto f_bcode =
         yama::bc::code()
@@ -1203,7 +1203,7 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         yama::const_table_info()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Int"_str)
-        .add_method_type("self:Math.plus"_str, yama::make_callsig({ 1, 1, 1 }, 1))
+        .add_method_type("self:Math::plus"_str, yama::make_callsig({ 1, 1, 1 }, 1))
         .add_int(1)
         .add_int(48)
         .add_int(100);
@@ -1214,7 +1214,7 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         4,
         f_bcode);
 
-    upload(Math_dot_plus_info);
+    upload(Math_plus_info);
     upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();

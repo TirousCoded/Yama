@@ -100,7 +100,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     //        <- Char 'y'       (not a dep)
     //        <- b0             (primitive)
     //        <- b1             (function)
-    //        <- b0.m           (method)
+    //        <- b0::m          (method)
     //        <- b2             (struct)
 
     // this test is a catch-all for us testing that loading works w/ all
@@ -125,7 +125,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
         .add_char(U'y')
         .add_primitive_type("self:b0"_str)
         .add_function_type("self:b1"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
-        .add_method_type("self:b0.m"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
+        .add_method_type("self:b0::m"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
         .add_struct_type("self:b2"_str);
     yama::module_factory mf{};
     mf
@@ -137,7 +137,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
             10,
             yama::noop_call_fn)
         .add_method(
-            "b0.m"_str, consts,
+            "b0::m"_str, consts,
             yama::make_callsig({}, 5), // ie. fn() -> b0
             10,
             yama::noop_call_fn)
@@ -150,19 +150,19 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b0 = dm->load("p:b0"_str);
     const auto b1 = dm->load("p:b1"_str);
-    const auto b0_dot_m = dm->load("p:b0.m"_str);
+    const auto b0_m = dm->load("p:b0::m"_str);
     const auto b2 = dm->load("p:b2"_str);
 
     ASSERT_TRUE(a);
     ASSERT_TRUE(b0);
     ASSERT_TRUE(b1);
-    ASSERT_TRUE(b0_dot_m);
+    ASSERT_TRUE(b0_m);
     ASSERT_TRUE(b2);
 
     const yama::type aa = a.value();
     const yama::type bb0 = b0.value();
     const yama::type bb1 = b1.value();
-    const yama::type bb0_dot_m = b0_dot_m.value();
+    const yama::type bb0_dot_m = b0_m.value();
     const yama::type bb2 = b2.value();
 
     // for this test we only really care that type 'a' loads correctly

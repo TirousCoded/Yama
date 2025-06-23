@@ -65,11 +65,11 @@ bool yama::type_info::uses_bcode() const noexcept {
 }
 
 yama::str yama::type_info::owner_name() const noexcept {
-    return internal::split(unqualified_name(), '.').first;
+    return internal::split_s(unqualified_name(), "::").first;
 }
 
 yama::str yama::type_info::member_name() const noexcept {
-    return internal::split(unqualified_name(), '.').second;
+    return internal::split_s(unqualified_name(), "::").second;
 }
 
 bool yama::type_info::operator==(const yama::type_info& other) const noexcept {

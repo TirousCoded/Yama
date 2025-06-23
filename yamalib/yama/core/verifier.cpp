@@ -334,7 +334,7 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
     }
     // discern owner name prefix, if any, and then check if has it, raising an
     // error if what's found is invalid
-    const auto [owner_nm, member_nm] = internal::split(parsed->unqualified_name, '.');
+    const auto [owner_nm, member_nm] = internal::split(parsed->unqualified_name, "::");
     const bool has_owner_name_prefix = !member_nm.empty();
     if (is_member(subject.consts().kind(index).value())) { // member type
         if (!has_owner_name_prefix) {

@@ -4,9 +4,11 @@
 
 #include "../core/asserts.h"
 #include "../core/general.h"
+#include "../core/kind-features.h"
 
 #include "domain_data.h"
 #include "compiler.h"
+#include "util.h"
 
 
 using namespace yama::string_literals;
@@ -46,6 +48,25 @@ yama::kind yama::internal::ctype::kind() const noexcept {
     }
 }
 
+yama::str yama::internal::ctype::owner_name() const {
+    // TODO: this is suboptimal due to fullname() call heap alloc
+    return internal::split_s(fullname().str(e()), "::"_str).first;
+}
+
+yama::str yama::internal::ctype::member_name() const {
+    // TODO: this is suboptimal due to fullname() call heap alloc
+    return internal::split_s(fullname().str(e()), "::"_str).second;
+}
+
+std::optional<yama::internal::ctype> yama::internal::ctype::owner_type() const {
+    // assert that if is_member(kind()) == true, then we MUST have valid owner/member division
+    YAMA_ASSERT(!is_member(kind()) || !member_name().empty());
+    return
+        is_member(kind())
+        ? _s->load(_s->cs->sp.pull_f(e(), owner_name()).value())
+        : std::nullopt;
+}
+
 size_t yama::internal::ctype::param_count() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
         return
@@ -60,15 +81,24 @@ size_t yama::internal::ctype::param_count() const noexcept {
 
 std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
-        if (!_csymtab_entry()->is<fn_like_csym>()) return std::nullopt;
+        if (!_csymtab_entry()->is<fn_like_csym>()) {
+            return std::nullopt;
+        }
         const auto& our_csym = _csymtab_entry()->as<fn_like_csym>();
-        if (param_index >= our_csym.params.size()) return std::nullopt; // out-of-bounds
-        const auto& our_param_type = deref_assert(our_csym.params[param_index].type);
-        return cs.ea.crvalue_to_type(deref_assert(our_param_type.expr));
+        if (param_index >= our_csym.params.size()) {
+            return std::nullopt; // out-of-bounds
+        }
+        const auto& our_param = our_csym.params[param_index];
+        return
+            our_param.is_self_param
+            ? owner_type()
+            : cs.ea.crvalue_to_type(deref_assert(deref_assert(our_param.type).expr));
     }
     else {
         const auto& our_params = deref_assert(_typeinf().callsig()).params;
-        if (param_index >= our_params.size()) return std::nullopt; // out-of-bounds
+        if (param_index >= our_params.size()) {
+            return std::nullopt; // out-of-bounds
+        }
         const auto& our_const = our_params[param_index];
         const str our_qn = _typeinf().consts().qualified_name(our_const).value();
         return _s->load(_s->cs->sp.pull_f(e(), our_qn).value()); // <- can parse qn as fullname

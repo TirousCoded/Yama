@@ -95,11 +95,14 @@ namespace yama::internal {
     // we'll call it 'fn-like' to make clear that it conflates fns and methods
 
     struct fn_like_csym final {
-        struct param final {
+        struct param {
+            qualified_name fn_qn; // used to help get_type w/ self params
+            size_t index;
             str name;
             const ast_TypeSpec* type;
-            
-            
+            bool is_self_param = false;
+
+
             std::optional<ctype> get_type(compiler& cs) const;
         };
 
@@ -128,9 +131,11 @@ namespace yama::internal {
     };
 
     struct param_csym final {
-        const ast_TypeSpec* type;
+        fn_like_csym::param* ptr = nullptr;
 
 
+        bool good() const noexcept;
+        fn_like_csym::param& get() const noexcept;
         std::optional<ctype> get_type(compiler& cs) const;
 
 

@@ -60,7 +60,7 @@ TEST_F(VerifierTests, TypeLevel_General) {
         // test w/ each constant type (w/ static verif stuff)
         .add_primitive_type("abc:a"_str)
         .add_function_type("abc:b"_str, yama::make_callsig({ 0 }, 3)) // ie. 'fn(a) -> d'
-        .add_method_type("abc:a.c"_str, yama::make_callsig({ 0 }, 3)) // ie. 'fn(a) -> d'
+        .add_method_type("abc:a::c"_str, yama::make_callsig({ 0 }, 3)) // ie. 'fn(a) -> d'
         .add_struct_type("abc:d"_str);
     // test w/ each kind of type
     static_assert(yama::kinds == 4); // reminder
@@ -75,7 +75,7 @@ TEST_F(VerifierTests, TypeLevel_General) {
         4,
         yama::noop_call_fn);
     const auto c = yama::make_method(
-        "a.c"_str,
+        "a::c"_str,
         consts,
         yama::make_callsig({ 0, 1, 3 }, 0),
         4,
@@ -94,7 +94,7 @@ TEST_F(VerifierTests, TypeLevel_General) {
 
 TEST_F(VerifierTests, TypeLevel_TypeItself_Fail_InvalidUnqualifiedName_NonMemberTypeButHasOwnerPrefix) {
     const auto a = yama::make_primitive(
-        "a.m"_str, // <- invalid! has owner prefix!
+        "a::m"_str, // <- invalid! has owner prefix!
         {},
         yama::ptype::bool0);
 
@@ -154,7 +154,7 @@ TEST_F(VerifierTests, TypeLevel_ConstSym_Fail_InvalidQualifiedName_HeadNamesParc
 TEST_F(VerifierTests, TypeLevel_ConstSym_Fail_InvalidQualifiedName_NonMemberTypeButHasOwnerPrefix) {
     const auto a_consts =
         yama::const_table_info()
-        .add_primitive_type("abc:owner.b"_str); // <- invalid! primitive types cannot have 'owner.' prefix!
+        .add_primitive_type("abc:owner::b"_str); // <- invalid! primitive types cannot have 'owner::' prefix!
     const auto a = yama::make_function(
         "a"_str,
         a_consts,
@@ -171,7 +171,7 @@ TEST_F(VerifierTests, TypeLevel_ConstSym_Fail_InvalidQualifiedName_MemberTypeBut
     const auto a_consts =
         yama::const_table_info()
         .add_primitive_type("abc:a"_str)
-        .add_method_type("abc:b"_str, yama::make_callsig({}, 0)); // <- invalid! method types require '<owner>.' prefix!
+        .add_method_type("abc:b"_str, yama::make_callsig({}, 0)); // <- invalid! method types require '<owner>::' prefix!
     const auto a = yama::make_function(
         "a"_str,
         a_consts,
@@ -2147,7 +2147,7 @@ TEST_F(VerifierTests, BCode_Call_Method) {
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str)
-        .add_method_type("abc:Something.g"_str, yama::make_callsig({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
+        .add_method_type("abc:Something::g"_str, yama::make_callsig({ 0, 1, 0 }, 2)) // fn(Int, Float, Int) -> Char
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
@@ -2644,7 +2644,7 @@ TEST_F(VerifierTests, BCode_CallNR_Method) {
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Float"_str)
         .add_primitive_type("yama:Char"_str)
-        .add_method_type("abc:Something.g"_str, yama::make_callsig({ 0, 1, 0 }, 7)) // fn(Int, Float, Int) -> None
+        .add_method_type("abc:Something::g"_str, yama::make_callsig({ 0, 1, 0 }, 7)) // fn(Int, Float, Int) -> None
         .add_int(10)
         .add_float(0.05)
         .add_int(-4)
@@ -3643,7 +3643,7 @@ TEST_F(VerifierTests, ModuleLevel_Populated) {
         .add_function_type("abc:c"_str, yama::make_callsig({ 0 }, 1)) // ie. 'fn(b) -> c'
         .add_primitive_type("abc:d"_str);
     mf.add_method(
-        "A.D"_str,
+        "A::D"_str,
         std::move(D_consts),
         yama::make_callsig({ 0, 1, 2 }, 0),
         4,
@@ -3663,7 +3663,7 @@ TEST_F(VerifierTests, ModuleLevel_Populated) {
         .add_float(0.05)
         .add_float(3.14159);
     mf.add_method(
-        "A.E"_str,
+        "A::E"_str,
         std::move(E_consts),
         yama::make_callsig({}, 0),
         2,
@@ -3758,7 +3758,7 @@ TEST_F(VerifierTests, ModuleLevel_Populated_Fail_OwnerNotInModule) {
         yama::const_table_info()
         .add_primitive_type("abc:b"_str);
     mf.add_method(
-        "Missing.A"_str, // <- error! 'Missing' is not a type in module!
+        "Missing::A"_str, // <- error! 'Missing' is not a type in module!
         A_consts,
         yama::make_callsig({}, 0),
         4,

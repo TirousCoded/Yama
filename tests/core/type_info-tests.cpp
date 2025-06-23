@@ -15,8 +15,8 @@ using namespace yama::string_literals;
 const yama::str old_name = "abc"_str;
 const yama::str new_name = "def"_str;
 
-const yama::str old_name_member = "a.b"_str;
-const yama::str new_name_member = "aaa.bbb"_str;
+const yama::str old_name_member = "a::b"_str;
+const yama::str new_name_member = "aaa::bbb"_str;
 
 const yama::const_table_info old_consts =
 yama::const_table_info()

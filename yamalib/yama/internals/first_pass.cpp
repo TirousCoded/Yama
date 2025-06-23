@@ -2,6 +2,9 @@
 
 #include "first_pass.h"
 
+#include <ranges>
+
+#include "util.h"
 #include "compiler.h"
 
 
@@ -95,7 +98,11 @@ void yama::internal::first_pass::visit_begin(res<ast_Args> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
-void yama::internal::first_pass::visit_begin(res<ast_MemberAccess> x) {
+void yama::internal::first_pass::visit_begin(res<ast_TypeMemberAccess> x) {
+    tu->cs->ea.acknowledge(*tu, *x);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_ObjectMemberAccess> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
@@ -266,8 +273,10 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
 void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x, bool& no_name_conflict) {
     // NOTE: no_name_conflict must ALWAYS be set
     const auto unqualified_name = str(x->fmt_unqualified_name(tu->src).value());
+    // TODO: refactor owner_unqualified_name away
+    const auto owner_unqualified_name = internal::split_s(unqualified_name, "::"_str).first;
     // prepare symbol
-    fn_like_csym sym = _mk_fn_like_csym(*x);
+    fn_like_csym sym = _mk_fn_like_csym(*x, owner_unqualified_name);
     // insert symbol
     bool no_table_found = false;
     const bool success = tu->syms.insert(
@@ -292,13 +301,15 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     const auto name = x->name.str(tu->src);
     // prepare symbol
     param_csym sym = _mk_param_csym(*x);
-    // report if no type annotation
-    if (!sym.type) {
-        tu->err.error(
-            *x,
-            dsignal::compile_invalid_param_list,
-            "param {} has no type annotation!",
-            name);
+    if (sym.good()) {
+        // report if no type annotation (if we're not self param)
+        if (!sym.get().type && !sym.get().is_self_param) {
+            tu->err.error(
+                *x,
+                dsignal::compile_invalid_param_list,
+                "param {} has no type annotation!",
+                name);
+        }
     }
     // insert symbol
     bool no_table_found = false;
@@ -353,13 +364,15 @@ yama::internal::var_csym yama::internal::first_pass::_mk_var_csym(const ast_VarD
     return result;
 }
 
-yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const ast_FnDecl& x) {
+yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const ast_FnDecl& x, const str& owner_unqualified_name) {
     fn_like_csym result{ .is_method = x.is_method() };
     if (x.callsig->result) {
         result.return_type = x.callsig->result->type.get();
     }
     for (const auto& I : x.callsig->params) {
         result.params.push_back(fn_like_csym::param{
+            .fn_qn = qualified_name(tu->src_path, owner_unqualified_name),
+            .index = result.params.size(), // <- will incr up from zero
             .name = I->name.str(tu->src),
             .type = nullptr, // <- will be filled in below
             });
@@ -370,12 +383,18 @@ yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const 
     // info output to the corresponding parts of the fn decl symbol's param list (below
     // called 'out'), w/ us also detecting unannotated trailing param decls
     std::shared_ptr<ast_TypeAnnot> annot{}; // latest encountered type annot
-    const auto& params_in = x.callsig->params;
-    auto& params_out = result.params;
-    for (size_t i = 0; i < params_in.size(); i++) {
-        const size_t index = params_in.size() - 1 - i; // <- iterate backwards
-        const auto& in = params_in[index];
-        auto& out = params_out[index];
+    for (auto [in, out] : std::views::zip(x.callsig->params, result.params) | std::views::reverse) {
+        const bool is_first_param_of_method         = result.is_method && out.index == 0;
+        const bool is_named_self                    = out.name == "self"_str;
+        const bool no_directly_attached_type_annot  = in->type == nullptr;
+        const bool is_valid_self_param =
+            is_first_param_of_method &&
+            is_named_self &&
+            no_directly_attached_type_annot;
+        if (is_valid_self_param) {
+            out.is_self_param = true;
+            break;
+        }
         if (in->type) {
             annot = in->type; // encountered new type annot
         }
@@ -387,12 +406,13 @@ yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const 
 }
 
 yama::internal::param_csym yama::internal::first_pass::_mk_param_csym(const ast_ParamDecl& x) {
-    const auto param_type =
-        _is_in_fn() && _current_fn().symbol
-        ? _current_fn().symbol->as<fn_like_csym>().params[x.index].type
-        : nullptr; // <- nullptr if fn is in error
+    const bool fn_is_valid = _is_in_fn() && _current_fn().symbol;
+    fn_like_csym::param* ptr =
+        fn_is_valid
+        ? &_current_fn().symbol->as<fn_like_csym>().params[_current_fn().next_param_index()]
+        : nullptr;
     return param_csym{
-        .type = param_type,
+        .ptr = ptr,
     };
 }
 

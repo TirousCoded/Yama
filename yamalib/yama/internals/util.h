@@ -74,6 +74,39 @@ namespace yama::internal {
             i < x.length() ? x.substr(include_divider_in_second ? i : i + 1) : taul::basic_str<Char>{});
     }
 
+    // split_s splits along a string, rather than treating the string like a char set
+
+    template<typename Char>
+    inline std::pair<taul::basic_str<Char>, taul::basic_str<Char>> split_s(
+        taul::basic_str<Char> x,
+        const std::convertible_to<std::basic_string_view<Char>> auto& divider,
+        bool include_divider_in_second = false) noexcept {
+        std::basic_string_view<Char> d(divider);
+        size_t i = 0;
+        for (; i < x.length(); i++) {
+            if (x.substr(i, d.length()) == d) break;
+        }
+        return std::make_pair(
+            x.substr(0, i),
+            i < x.length() ? x.substr(include_divider_in_second ? i : i + d.length()) : taul::basic_str<Char>{});
+    }
+    
+    template<typename Char>
+    constexpr std::pair<std::basic_string_view<Char>, std::basic_string_view<Char>> split_s(
+        const std::convertible_to<std::basic_string_view<Char>> auto& x,
+        const std::convertible_to<std::basic_string_view<Char>> auto& divider,
+        bool include_divider_in_second = false) noexcept {
+        std::basic_string_view<Char> xx(x);
+        std::basic_string_view<Char> d(divider);
+        size_t i = 0;
+        for (; i < xx.length(); i++) {
+            if (xx.substr(i, d.length()) == d) break;
+        }
+        return std::make_pair(
+            xx.substr(0, i),
+            i < xx.length() ? xx.substr(include_divider_in_second ? i : i + d.length()) : std::basic_string_view<Char>{});
+    }
+
 
     // NOTE: copied range_overlap from TAUL
 
