@@ -95,21 +95,10 @@ namespace yama::internal {
     // we'll call it 'fn-like' to make clear that it conflates fns and methods
 
     struct fn_like_csym final {
-        struct param {
-            qualified_name fn_qn; // used to help get_type w/ self params
-            size_t index;
-            str name;
-            const ast_TypeSpec* type;
-            bool is_self_param = false;
-
-
-            std::optional<ctype> get_type(compiler& cs) const;
-        };
-
-
         bool is_method = false;
-        std::vector<param> params;
+        std::vector<safeptr<csymtab_entry>> params;
         const ast_TypeSpec* return_type;
+        fullname fln;
 
         // if all control paths (reachable from entrypoint) either reach explicit return
         // stmts, or enter infinite loops
@@ -121,6 +110,8 @@ namespace yama::internal {
         std::optional<bool> is_none_returning;
 
 
+        std::optional<ctype> get_owner_type(compiler& cs) const;
+
         std::optional<ctype> get_return_type(compiler& cs) const;
         ctype get_return_type_or_none(translation_unit& tu) const;
 
@@ -131,11 +122,12 @@ namespace yama::internal {
     };
 
     struct param_csym final {
-        fn_like_csym::param* ptr = nullptr;
+        csymtab_entry* fn; // for get_type w/ self params
+        size_t index;
+        const ast_TypeSpec* type;
+        bool self_param = false;
 
 
-        bool good() const noexcept;
-        fn_like_csym::param& get() const noexcept;
         std::optional<ctype> get_type(compiler& cs) const;
 
 
@@ -211,9 +203,9 @@ namespace yama::internal {
 
         // fails if entry under name already exists
         template<typename Info>
-        inline bool insert(const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info) {
+        inline std::shared_ptr<csymtab_entry> insert(const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info) {
             if (_entries.contains(csym_key::make(name, lookup_proc_of<Info>))) {
-                return false;
+                return nullptr;
             }
             auto new_entry = csymtab_entry{
                 .name = name,
@@ -222,9 +214,10 @@ namespace yama::internal {
                 .starts = starts,
                 .info = std::forward<Info>(info),
             };
-            const auto key = new_entry.get_key(); // <- C++ arg eval order is undefined!
-            _entries.try_emplace(key, make_res<csymtab_entry>(std::move(new_entry)));
-            return true;
+            const auto key = new_entry.get_key(); // <- get key before move new_entry
+            const auto result = make_res<csymtab_entry>(std::move(new_entry));
+            _entries.try_emplace(key, result);
+            return result;
         }
 
         inline std::shared_ptr<csymtab_entry> fetch(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
@@ -310,13 +303,13 @@ namespace yama::internal {
                 : nullptr;
         }
 
-        // searching from x, then through each ancestor AST node, insert inserts a new symbol
-        // table entry into the first AST node found w/ an associated symbol table, if any,
-        // returning if successful, failing if no symbol table could be found, or if inserting
-        // would conflict w/ an existing symbol under name in that table (if no_table_found is
-        // not nullptr, *no_table_found will be set to true if no table was found)
+        // searching from x, then through each ancestor AST node, insert inserts a new symbol table
+        // entry into the first AST node found w/ an associated symbol table, if any, returning
+        // new entry if successful, failing if no symbol table could be found, or if inserting
+        // would conflict w/ an existing symbol under name in that table (if no_table_found
+        // is not nullptr, *no_table_found will be set to true if no table was found)
         template<typename Info>
-        inline bool insert(ast_node& x, const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info, bool* no_table_found = nullptr) {
+        inline std::shared_ptr<csymtab_entry> insert(ast_node& x, const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info, bool* no_table_found = nullptr) {
             if (const auto table_nd = node_of_inner_most(x)) {
                 const auto table = get(table_nd->id);
                 YAMA_ASSERT(table);
@@ -325,7 +318,7 @@ namespace yama::internal {
             if (no_table_found) {
                 *no_table_found = true;
             }
-            return false;
+            return nullptr;
         }
 
         std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);

@@ -76,7 +76,7 @@ yama::const_t yama::internal::const_table_populator::pull_type(const ctype& t) {
 }
 
 yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(tu->e());
+    const auto qn = t.fln().qn().str(tu->e());
     auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<primitive_type_const>(_consts, qn)) {
@@ -88,7 +88,7 @@ yama::const_t yama::internal::const_table_populator::pull_prim_type(const ctype&
 }
 
 yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(tu->e());
+    const auto qn = t.fln().qn().str(tu->e());
     auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<function_type_const>(_consts, qn)) {
@@ -110,7 +110,7 @@ yama::const_t yama::internal::const_table_populator::pull_fn_type(const ctype& t
 }
 
 yama::const_t yama::internal::const_table_populator::pull_method_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(tu->e());
+    const auto qn = t.fln().qn().str(tu->e());
     auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<method_type_const>(_consts, qn)) {
@@ -132,7 +132,7 @@ yama::const_t yama::internal::const_table_populator::pull_method_type(const ctyp
 }
 
 yama::const_t yama::internal::const_table_populator::pull_struct_type(const ctype& t) {
-    const auto qn = t.fullname().qualified_name().str(tu->e());
+    const auto qn = t.fln().qn().str(tu->e());
     auto& _consts = tu->cgt.target().consts();
     // search for existing constant to use
     if (const auto found = _find_existing_type_c<struct_type_const>(_consts, qn)) {

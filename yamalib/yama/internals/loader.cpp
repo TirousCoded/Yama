@@ -103,7 +103,7 @@ bool yama::internal::loader::_add_type(const fullname& fullname) {
 
 std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(const fullname& fullname) {
     const env& e = _dd->installs.domain_env();
-    const auto our_path = fullname.import_path().str(e);
+    const auto our_path = fullname.ip().str(e);
     const auto our_module = _dd->importer.import(e, our_path, state);
     _dd->importer.commit_or_discard(); // can't forget (also, we don't need to lock for this one)
     if (!our_module) {
@@ -115,23 +115,23 @@ std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(cons
             our_path);
         return nullptr;
     }
-    if (!our_module->info().contains(fullname.unqualified_name())) {
+    if (!our_module->info().contains(fullname.uqn().str())) {
         YAMA_RAISE(dbg(), dsignal::load_type_not_found);
         YAMA_LOG(
             dbg(), load_error_c,
             "error: cannot load {}; {} does not have {}!",
             _fmt_fullname(fullname),
             our_path,
-            fullname.unqualified_name());
+            fullname.uqn());
         return nullptr;
     }
     // TODO: having to clone this is gross, so maybe change type_instance to instead use raw ptr
     //       to type_info instead of a res
-    return std::make_shared<type_info>(our_module->info()[fullname.unqualified_name()]);
+    return std::make_shared<type_info>(our_module->info()[fullname.uqn().str()]);
 }
 
 bool yama::internal::loader::_create_and_link_instance(const fullname& fullname, res<type_info> info) {
-    const env e = _dd->installs.parcel_env(fullname.head()).value();
+    const env e = _dd->installs.parcel_env(fullname.ip().head()).value();
     const auto new_instance = _create_instance(fullname, info);
     // during linking, it's possible for other types to be loaded recursively, and these
     // new types may need to link against new_instance, and so to this end, we add our
@@ -177,7 +177,7 @@ bool yama::internal::loader::_resolve_const(const env& e, type_instance& instanc
 
 bool yama::internal::loader::_check() {
     for (const auto& [key, value] : state.types) {
-        const env e = _dd->installs.parcel_env(key.head()).value();
+        const env e = _dd->installs.parcel_env(key.ip().head()).value();
         if (!_check_instance(e, *value)) return false;
     }
     return true;

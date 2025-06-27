@@ -27,11 +27,11 @@ std::string yama::internal::cvalue::fmt() const {
         else if (const auto v = as<float_t>())  result = fmt_float(*v);
         else if (const auto v = as<bool_t>())   result = fmt_bool(*v);
         else if (const auto v = as<char_t>())   result = fmt_char(*v);
-        else if (const auto v = as<ctype>())    result = v->fullname().fmt();
+        else if (const auto v = as<ctype>())    result = v->fln().fmt();
         else                                    YAMA_DEADEND;
         return result;
         };
-    return std::format("{} ({})", t.fullname(), _fmt_val());
+    return std::format("{} ({})", t.fln(), _fmt_val());
 }
 
 std::string yama::internal::cvalue::fmt(const env& e) const {
@@ -43,11 +43,11 @@ std::string yama::internal::cvalue::fmt(const env& e) const {
         else if (const auto v = as<float_t>())  result = fmt_float(*v);
         else if (const auto v = as<bool_t>())   result = fmt_bool(*v);
         else if (const auto v = as<char_t>())   result = fmt_char(*v);
-        else if (const auto v = as<ctype>())    result = v->fullname().fmt(e);
+        else if (const auto v = as<ctype>())    result = v->fln().fmt(e);
         else                                    YAMA_DEADEND;
         return result;
         };
-    return std::format("{} ({})", t.fullname().fmt(e), _fmt_val());
+    return std::format("{} ({})", t.fln().fmt(e), _fmt_val());
 }
 
 yama::internal::cvalue yama::internal::cvalue::none_v(ctypesys_local& types) {

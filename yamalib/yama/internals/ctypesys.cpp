@@ -26,12 +26,15 @@ yama::internal::ctype::ctype(ctypesys& s, const type_info& x, const import_path&
     _info(x),
     _where(where) {}
 
-yama::internal::fullname yama::internal::ctype::fullname() const {
-    const str our_uqn =
+yama::internal::unqualified_name yama::internal::ctype::uqn() const {
+    return
         _csymtab_entry_not_typeinf()
         ? _csymtab_entry()->name
         : _typeinf().unqualified_name();
-    return internal::fullname(qualified_name(_where, our_uqn));
+}
+
+yama::internal::fullname yama::internal::ctype::fln() const {
+    return qualified_name(_where, uqn());
 }
 
 yama::kind yama::internal::ctype::kind() const noexcept {
@@ -48,22 +51,12 @@ yama::kind yama::internal::ctype::kind() const noexcept {
     }
 }
 
-yama::str yama::internal::ctype::owner_name() const {
-    // TODO: this is suboptimal due to fullname() call heap alloc
-    return internal::split_s(fullname().str(e()), "::"_str).first;
-}
-
-yama::str yama::internal::ctype::member_name() const {
-    // TODO: this is suboptimal due to fullname() call heap alloc
-    return internal::split_s(fullname().str(e()), "::"_str).second;
-}
-
 std::optional<yama::internal::ctype> yama::internal::ctype::owner_type() const {
     // assert that if is_member(kind()) == true, then we MUST have valid owner/member division
-    YAMA_ASSERT(!is_member(kind()) || !member_name().empty());
+    YAMA_ASSERT(!is_member(kind()) || fln().uqn().is_member());
     return
         is_member(kind())
-        ? _s->load(_s->cs->sp.pull_f(e(), owner_name()).value())
+        ? _s->load(qualified_name(_where, uqn().owner_name()))
         : std::nullopt;
 }
 
@@ -88,9 +81,9 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
         if (param_index >= our_csym.params.size()) {
             return std::nullopt; // out-of-bounds
         }
-        const auto& our_param = our_csym.params[param_index];
+        const auto& our_param = our_csym.params[param_index]->as<param_csym>();
         return
-            our_param.is_self_param
+            our_param.self_param
             ? owner_type()
             : cs.ea.crvalue_to_type(deref_assert(deref_assert(our_param.type).expr));
     }
@@ -100,8 +93,8 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
             return std::nullopt; // out-of-bounds
         }
         const auto& our_const = our_params[param_index];
-        const str our_qn = _typeinf().consts().qualified_name(our_const).value();
-        return _s->load(_s->cs->sp.pull_f(e(), our_qn).value()); // <- can parse qn as fullname
+        const str our_qn(_typeinf().consts().qualified_name(our_const).value());
+        return _s->load(_s->cs->sp.qn(e(), our_qn).value());
     }
 }
 
@@ -116,17 +109,17 @@ std::optional<yama::internal::ctype> yama::internal::ctype::return_type(compiler
     }
     else {
         const auto& our_const = deref_assert(_typeinf().callsig()).ret;
-        const str our_qn = _typeinf().consts().qualified_name(our_const).value();
-        return _s->load(_s->cs->sp.pull_f(e(), our_qn).value()); // <- can parse qn as fullname
+        const str our_qn(_typeinf().consts().qualified_name(our_const).value());
+        return _s->load(_s->cs->sp.qn(e(), our_qn).value());
     }
 }
 
 std::string yama::internal::ctype::fmt(const env& e) const {
-    return fullname().fmt(e);
+    return fln().fmt(e);
 }
 
 yama::internal::env yama::internal::ctype::_e() const {
-    return _s->cs->dd->installs.parcel_env(fullname().head()).value();
+    return _s->cs->dd->installs.parcel_env(fln().ip().head()).value();
 }
 
 bool yama::internal::ctype::_csymtab_entry_not_typeinf() const noexcept {
@@ -158,19 +151,19 @@ std::optional<yama::internal::ctype> yama::internal::cmodule::type(const str& un
     if (_tu_not_modinf()) {
         const auto& our_csymtab = deref_assert(_tu().syms.get(_tu().root().id));
         if (const auto entry = our_csymtab.fetch(unqualified_name); entry && entry->is_type()) {
-            return ctype(*_s, res(entry), import_path());
+            return ctype(*_s, res(entry), ip());
         }
     }
     else {
         if (_modinf()->contains(unqualified_name)) {
-            return ctype(*_s, _modinf()->type(unqualified_name), import_path());
+            return ctype(*_s, _modinf()->type(unqualified_name), ip());
         }
     }
     return std::nullopt;
 }
 
 yama::internal::env yama::internal::cmodule::_e() const {
-    return _s->cs->dd->installs.parcel_env(import_path().head()).value();
+    return _s->cs->dd->installs.parcel_env(ip().head()).value();
 }
 
 bool yama::internal::cmodule::_tu_not_modinf() const noexcept {
@@ -219,10 +212,10 @@ std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys::import(const 
 }
 
 std::optional<yama::internal::ctype> yama::internal::ctypesys::load(const fullname& x) {
-    const auto m = fetch_module(x.import_path());
+    const auto m = fetch_module(x.ip());
     return
         m
-        ? m->type(x.unqualified_name())
+        ? m->type(x.uqn().str())
         : std::nullopt;
 }
 
@@ -382,7 +375,7 @@ yama::internal::ctype yama::internal::ctypesys_local::type_type() {
 const yama::internal::ctypesys_local::_builtin_cache& yama::internal::ctypesys_local::_get_builtin_cache() {
     if (!_builtin_cache_v) {
         auto load_builtin = [&](const str& x) -> ctype {
-            return load(tu->cs->sp.pull_f(tu->e(), x).value()).value();
+            return load(tu->cs->sp.fln(tu->e(), x).value()).value();
             };
         _builtin_cache_v = _builtin_cache{
             .none   = load_builtin("yama:None"_str),

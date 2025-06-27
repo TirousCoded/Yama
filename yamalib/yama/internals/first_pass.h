@@ -149,9 +149,12 @@ namespace yama::internal {
         void _insert_structdecl(res<ast_StructDecl> x);
         
         var_csym _mk_var_csym(const ast_VarDecl& x);
-        fn_like_csym _mk_fn_like_csym(const ast_FnDecl& x, const str& owner_unqualified_name);
-        param_csym _mk_param_csym(const ast_ParamDecl& x);
+        fn_like_csym _mk_fn_like_csym(const ast_FnDecl& x, const str& unqualified_name);
+        param_csym _mk_param_csym(const ast_ParamDecl& x, const str& name);
         struct_csym _mk_struct_csym(const ast_StructDecl& x);
+
+        void _check_name_conflict(bool no_name_conflict, const ast_node& where, const str& name);
+        void _check_name_conflict_for_import(bool no_name_conflict, const ast_node& where, const str& name);
 
         taul::source_pos _vardecl_intro_point(const ast_VarDecl& x);
         taul::source_pos _fndecl_intro_point(const ast_FnDecl& x);
@@ -170,12 +173,6 @@ namespace yama::internal {
         struct _fn_decl final {
             res<ast_FnDecl> node;
             std::shared_ptr<csymtab_entry> symbol; // nullptr if error
-            size_t next_param_index_v = 0; // helps param csyms learn their index
-
-
-            inline size_t next_param_index() noexcept {
-                return next_param_index_v++;
-            }
         };
 
         // TODO: maybe replace std::vector w/ scope_stack

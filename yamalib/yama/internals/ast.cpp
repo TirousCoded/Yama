@@ -309,6 +309,17 @@ void yama::internal::ast_StructDecl::do_give(taul::token x) {
     }
 }
 
+yama::internal::ast_CallSig::find_param_type_annot_result yama::internal::ast_CallSig::find_param_type_annot(size_t index) const noexcept {
+    for (size_t i = index; i < params.size(); i++) {
+        if (!params[i]->type) continue;
+        return find_param_type_annot_result{
+            .type_annot = params[i]->type.get(),
+            .directly_attached = i == index,
+        };
+    }
+    return find_param_type_annot_result{ .type_annot = nullptr };
+}
+
 void yama::internal::ast_CallSig::fmt(ast_formatter& x) {
     x.open("CallSig", low_pos(), high_pos(), id);
     x.next("params");

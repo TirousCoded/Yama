@@ -720,6 +720,17 @@ namespace yama::internal {
             : ast_node(pos, id, ast_type_value) {}
 
 
+        struct find_param_type_annot_result final {
+            const ast_TypeAnnot* type_annot; // type annot found, if any
+            bool directly_attached = false; // if the type annot was *directly attached* to the param at specified index
+
+
+            explicit inline operator bool() const noexcept { return type_annot; }
+        };
+
+        find_param_type_annot_result find_param_type_annot(size_t index) const noexcept;
+
+
         inline void give_to(ast_node& target) override final { target.dispatch_give(res<ast_CallSig>(shared_from_this())); }
         void fmt(ast_formatter& x) override final;
         void accept(ast_visitor& x) override final;

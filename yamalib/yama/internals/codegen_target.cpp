@@ -30,7 +30,7 @@ yama::res<yama::internal::csymtab_entry> yama::internal::codegen_target::target_
 std::optional<size_t> yama::internal::codegen_target::target_param_index(const str& name) {
     const auto& params = target_csym<fn_like_csym>().params;
     for (size_t i = 0; i < params.size(); i++) {
-        if (params[i].name == name) {
+        if (params[i]->name == name) {
             return i;
         }
     }

@@ -24,11 +24,8 @@ std::optional<yama::internal::ctype> yama::internal::var_csym::get_type(compiler
     else                    return std::nullopt;
 }
 
-std::optional<yama::internal::ctype> yama::internal::fn_like_csym::param::get_type(compiler& cs) const {
-    return
-        type
-        ? type->get_type(cs)
-        : (is_self_param ? cs.types.load(fn_qn) : std::nullopt);
+std::optional<yama::internal::ctype> yama::internal::fn_like_csym::get_owner_type(compiler& cs) const {
+    return cs.types.load(fln);
 }
 
 std::optional<yama::internal::ctype> yama::internal::fn_like_csym::get_return_type(compiler& cs) const {
@@ -42,35 +39,30 @@ yama::internal::ctype yama::internal::fn_like_csym::get_return_type_or_none(tran
 std::string yama::internal::fn_like_csym::fmt_params(compiler& cs) const {
     std::string result{};
     result += "(";
+    bool first = true;
     for (const auto& param : params) {
-        const bool not_first = &param != &params.front();
-        if (not_first) {
+        if (!first) {
             result += ", ";
         }
-        std::string t = param.get_type(cs).value().fmt(cs.dd->installs.domain_env());
-        //std::string t =
-        //    param.is_self_param
-        //    ? "*self*"
-        //    : (param.type ? param.type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
-        result += std::format("{0}: {1}", param.name, t);
+        first = false;
+        result += std::format(
+            "{0}: {1}",
+            param->name,
+            param->as<param_csym>().get_type(cs).value().fmt(cs.dd->installs.domain_env()));
     }
     result += ")";
     return result;
 }
 
-bool yama::internal::param_csym::good() const noexcept {
-    return ptr;
-}
-
-yama::internal::fn_like_csym::param& yama::internal::param_csym::get() const noexcept {
-    return deref_assert(ptr);
-}
-
 std::optional<yama::internal::ctype> yama::internal::param_csym::get_type(compiler& cs) const {
-    return good() ? get().get_type(cs) : std::nullopt;
+    return
+        type
+        ? type->get_type(cs)
+        : (self_param ? deref_assert(fn).as<fn_like_csym>().get_owner_type(cs) : std::nullopt);
 }
 
 std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const char* tab) {
+    const auto& e = cs.dd->installs.domain_env();
     const auto _tabs = fmt_tabs(tabs, tab);
     std::string result{};
     static_assert(std::variant_size_v<info_t> == 6); // reminder
@@ -97,8 +89,8 @@ std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const 
         result += std::format("{0}{1}lp          : {2}\n", _tabs, tab, fmt_lookup_proc(lp));
         result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
         result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
-        result += std::format("{0}{1}annot_type  : {2}\n", _tabs, tab, as<var_csym>().annot_type ? as<var_csym>().annot_type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
-        result += std::format("{0}{1}initializer : {2}\n", _tabs, tab, as<var_csym>().initializer ? as<var_csym>().initializer->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
+        result += std::format("{0}{1}annot-type  : {2}\n", _tabs, tab, as<var_csym>().annot_type ? as<var_csym>().annot_type->get_type(cs).value().fmt(e) : "n/a");
+        result += std::format("{0}{1}initializer : {2}\n", _tabs, tab, as<var_csym>().initializer ? as<var_csym>().initializer->get_type(cs).value().fmt(e) : "n/a");
         result += std::format("{0}}}\n", _tabs);
     }
     else if (is<fn_like_csym>()) {
@@ -108,15 +100,19 @@ std::string yama::internal::csymtab_entry::fmt(compiler& cs, size_t tabs, const 
         result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
         result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
         result += std::format("{0}{1}params      : {2}\n", _tabs, tab, as<fn_like_csym>().fmt_params(cs));
-        result += std::format("{0}{1}return_type : {2}\n", _tabs, tab, as<fn_like_csym>().return_type ? as<fn_like_csym>().return_type->get_type(cs).value().fmt(cs.dd->installs.domain_env()) : "n/a");
+        result += std::format("{0}{1}return-type : {2}\n", _tabs, tab, as<fn_like_csym>().return_type ? as<fn_like_csym>().return_type->get_type(cs).value().fmt(e) : "n/a");
         result += std::format("{0}}}\n", _tabs);
     }
     else if (is<param_csym>()) {
+        const auto our_type = as<param_csym>().get_type(cs);
         result += std::format("{0}param-decl {{\n", _tabs);
         result += std::format("{0}{1}name        : {2}\n", _tabs, tab, name);
         result += std::format("{0}{1}lp          : {2}\n", _tabs, tab, fmt_lookup_proc(lp));
         result += std::format("{0}{1}id          : {2}\n", _tabs, tab, node ? std::format("{0}", node->id) : "n/a");
         result += std::format("{0}{1}starts      : {2}\n", _tabs, tab, starts);
+        result += std::format("{0}{1}index       : {2}\n", _tabs, tab, as<param_csym>().index);
+        result += std::format("{0}{1}type        : {2}\n", _tabs, tab, our_type ? our_type->fmt(e) : "n/a");
+        result += std::format("{0}{1}self-param  : {2}\n", _tabs, tab, as<param_csym>().self_param);
         result += std::format("{0}}}\n", _tabs);
     }
     else if (is<struct_csym>()) {

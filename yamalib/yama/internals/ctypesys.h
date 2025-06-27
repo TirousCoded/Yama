@@ -18,14 +18,14 @@
 namespace yama::internal {
 
 
+    // IMPORTANT: importing modules into a ctypesys should only happen in first_pass
+    
+    // IMPORTANT: loading types into a ctypesys should only happen in second_pass
+    //              * it should also be fine in expr_analyzer too
+
+
     class compiler;
     class translation_unit;
-
-
-    // IMPORTANT: importing modules into a ctypesys should only happen in first_pass
-
-    // IMPORTANT: loading types into a ctypesys should only happen in second_pass
-
 
     class csymtab;
     struct csymtab_entry;
@@ -48,19 +48,18 @@ namespace yama::internal {
 
 
         inline env e() const { return _e(); }
-        fullname fullname() const;
+
+        unqualified_name uqn() const;
+        fullname fln() const;
 
         kind kind() const noexcept;
-
-        str owner_name() const;
-        str member_name() const;
 
         std::optional<ctype> owner_type() const;
         size_t param_count() const noexcept;
         std::optional<ctype> param_type(size_t param_index, compiler& cs) const;
         std::optional<ctype> return_type(compiler& cs) const;
 
-        inline bool operator==(const ctype& other) const noexcept { return fullname() == other.fullname(); }
+        inline bool operator==(const ctype& other) const noexcept { return fln() == other.fln(); }
         inline bool operator!=(const ctype& other) const noexcept { return !(*this == other); }
 
         // for safety fmt will require caller to specify e, as I worry using e() will cause
@@ -93,7 +92,7 @@ namespace yama::internal {
 
 
         inline env e() const { return _e(); }
-        constexpr const import_path& import_path() const noexcept { return _where; }
+        constexpr const import_path& ip() const noexcept { return _where; }
 
         std::optional<ctype> type(const str& unqualified_name);
 

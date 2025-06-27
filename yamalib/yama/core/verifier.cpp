@@ -18,7 +18,7 @@ yama::verifier::verifier(std::shared_ptr<debug> dbg)
     : api_component(dbg) {}
 
 bool yama::verifier::verify(const type_info& subject, const parcel_metadata& metadata, const str& module_path) {
-    YAMA_ASSERT(internal::valid_import_path(module_path));
+    YAMA_ASSERT(internal::valid_ip(module_path));
     _begin_verify(subject);
     const bool success = _verify(subject, module_path, metadata);
     _end_verify(success);
@@ -27,7 +27,7 @@ bool yama::verifier::verify(const type_info& subject, const parcel_metadata& met
 }
 
 bool yama::verifier::verify(const module_info& subject, const parcel_metadata& metadata, const str& module_path) {
-    YAMA_ASSERT(internal::valid_import_path(module_path));
+    YAMA_ASSERT(internal::valid_ip(module_path));
     YAMA_LOG(dbg(), verif_c,
         "verifying module ({} types) (at {})...",
         subject.size(),
@@ -315,7 +315,7 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
         return true; // default to successful
     }
     const str qualified_name = subject.consts().qualified_name(index).value();
-    const auto parsed = internal::parse_qualified_name(qualified_name);
+    const auto parsed = internal::parse_qn(qualified_name);
     if (!parsed) {
         YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
         YAMA_LOG(
@@ -324,7 +324,7 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
             subject.unqualified_name(), subject.consts().fmt_type_const(index), index);
         return false;
     }
-    if (!metadata.is_self_or_dep_name(parsed->import_path.head)) {
+    if (!metadata.is_self_or_dep_name(parsed->ip.head)) {
         YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
         YAMA_LOG(
             dbg(), verif_error_c,
@@ -334,27 +334,25 @@ bool yama::verifier::_verify_constant_symbol_qualified_name(const type_info& sub
     }
     // discern owner name prefix, if any, and then check if has it, raising an
     // error if what's found is invalid
-    const auto [owner_nm, member_nm] = internal::split(parsed->unqualified_name, "::");
-    const bool has_owner_name_prefix = !member_nm.empty();
     if (is_member(subject.consts().kind(index).value())) { // member type
-        if (!has_owner_name_prefix) {
+        if (!parsed->uqn.is_member()) {
             YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
             YAMA_LOG(
                 dbg(), verif_error_c,
                 "error: {} type constant symbol {} (at constant index {}) is invalid; unqualified name {} doesn't have owner name prefix, but {} types require this!",
                 subject.unqualified_name(), subject.consts().fmt_type_const(index), index,
-                parsed->unqualified_name, subject.consts().kind(index).value());
+                parsed->uqn.name, subject.consts().kind(index).value());
             return false;
         }
     }
     else { // non-member type
-        if (has_owner_name_prefix) {
+        if (parsed->uqn.is_member()) {
             YAMA_RAISE(dbg(), dsignal::verif_constsym_qualified_name_invalid);
             YAMA_LOG(
                 dbg(), verif_error_c,
                 "error: {} type constant symbol {} (at constant index {}) is invalid; unqualified name {} has owner name prefix, but {} types forbid this!",
                 subject.unqualified_name(), subject.consts().fmt_type_const(index), index,
-                parsed->unqualified_name, subject.consts().kind(index).value());
+                parsed->uqn.name, subject.consts().kind(index).value());
             return false;
         }
     }

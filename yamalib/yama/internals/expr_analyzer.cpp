@@ -282,7 +282,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
         }
         const auto name = x.name->str(md.tu->src);
         const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        const auto& param = symbol->as<param_csym>().get();
+        const auto& param = symbol->as<param_csym>();
         // by this point, first pass checks should guarantee that below
         // param.get_type(*cs) cannot be empty
         md.type = param.get_type(*cs).value();
@@ -539,11 +539,11 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_TypeMemberAccess& x)
             return false;
         }
         const ctype accessed_type = owner_md.crvalue.value().as<ctype>().value();
-        const str owner_name_part = accessed_type.fullname().unqualified_name();
-        const str member_name_part = x.member_name.str(md.tu->src);
-        const str method_uqn = str(std::format("{}::{}", owner_name_part, member_name_part));
-        const import_path method_ip = accessed_type.fullname().import_path();
-        const fullname method_fln = qualified_name(method_ip, method_uqn);
+        const fullname method_fln = qualified_name(
+            accessed_type.fln().ip(),
+            unqualified_name(
+                accessed_type.fln().uqn().owner_name(),
+                x.member_name.str(md.tu->src)));
         const auto method_type = md.tu->types.load(method_fln);
         if (!method_type) {
             md.tu->err.error(
@@ -572,11 +572,11 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_ObjectMemberAccess& 
         }// here!
         const metadata& owner_md = _pull(*res(x.get_primary_subexpr()));
         const ctype& owner_type = owner_md.type.value();
-        const str owner_name_part = owner_type.fullname().unqualified_name();
-        const str member_name_part = x.member_name.str(md.tu->src);
-        const str method_uqn = str(std::format("{}::{}", owner_name_part, member_name_part));
-        const import_path method_ip = owner_type.fullname().import_path();
-        const fullname method_fln = qualified_name(method_ip, method_uqn);
+        const fullname method_fln = qualified_name(
+            owner_type.fln().ip(),
+            unqualified_name(
+                owner_type.fln().uqn().owner_name(),
+                x.member_name.str(md.tu->src)));
         const auto method_type_opt = md.tu->types.load(method_fln);
         if (!method_type_opt) {
             md.tu->err.error(
