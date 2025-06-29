@@ -14,11 +14,11 @@
 using namespace yama::string_literals;
 
 
-yama::internal::ctype::ctype(ctypesys& s, res<csymtab_entry> x, const import_path& where)
+yama::internal::ctype::ctype(ctypesys& s, res<csym> x, const import_path& where)
     : _s(s),
     _info(std::move(x)),
     _where(where) {
-    YAMA_ASSERT(_csymtab_entry()->is_type());
+    YAMA_ASSERT(_csymtab_entry()->is_type);
 }
 
 yama::internal::ctype::ctype(ctypesys& s, const type_info& x, const import_path& where)
@@ -41,9 +41,10 @@ yama::kind yama::internal::ctype::kind() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
         yama::kind result{};
         static_assert(kinds == 4);
-        if (_csymtab_entry()->is<prim_csym>())          result = yama::kind::primitive;
-        else if (_csymtab_entry()->is<fn_like_csym>())  result = _csymtab_entry()->as<fn_like_csym>().is_method ? yama::kind::method : yama::kind::function;
-        else if (_csymtab_entry()->is<struct_csym>())   result = yama::kind::struct0;
+        if (auto s = _csymtab_entry()->as<prim_csym>())         result = yama::kind::primitive;
+        else if (auto s = _csymtab_entry()->as<fn_like_csym>()) result = s->is_method ? yama::kind::method : yama::kind::function;
+        else if (auto s = _csymtab_entry()->as<struct_csym>())  result = yama::kind::struct0;
+        else                                                    YAMA_DEADEND;
         return result;
     }
     else {
@@ -62,10 +63,10 @@ std::optional<yama::internal::ctype> yama::internal::ctype::owner_type() const {
 
 size_t yama::internal::ctype::param_count() const noexcept {
     if (_csymtab_entry_not_typeinf()) {
-        return
-            _csymtab_entry()->is<fn_like_csym>()
-            ? _csymtab_entry()->as<fn_like_csym>().params.size()
-            : 0;
+        if (const auto s = _csymtab_entry()->as<fn_like_csym>()) {
+            return s->params.size();
+        }
+        else return 0;
     }
     else {
         return deref_assert(_typeinf().callsig()).params.size();
@@ -74,18 +75,17 @@ size_t yama::internal::ctype::param_count() const noexcept {
 
 std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t param_index, compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
-        if (!_csymtab_entry()->is<fn_like_csym>()) {
-            return std::nullopt;
+        if (const auto s = _csymtab_entry()->as<fn_like_csym>()) {
+            if (param_index >= s->params.size()) {
+                return std::nullopt; // out-of-bounds
+            }
+            const auto& our_param = s->params[param_index];
+            return
+                our_param->self_param
+                ? owner_type()
+                : cs.ea.crvalue_to_type(deref_assert(deref_assert(our_param->type).expr));
         }
-        const auto& our_csym = _csymtab_entry()->as<fn_like_csym>();
-        if (param_index >= our_csym.params.size()) {
-            return std::nullopt; // out-of-bounds
-        }
-        const auto& our_param = our_csym.params[param_index]->as<param_csym>();
-        return
-            our_param.self_param
-            ? owner_type()
-            : cs.ea.crvalue_to_type(deref_assert(deref_assert(our_param.type).expr));
+        else return std::nullopt;
     }
     else {
         const auto& our_params = deref_assert(_typeinf().callsig()).params;
@@ -100,12 +100,10 @@ std::optional<yama::internal::ctype> yama::internal::ctype::param_type(size_t pa
 
 std::optional<yama::internal::ctype> yama::internal::ctype::return_type(compiler& cs) const {
     if (_csymtab_entry_not_typeinf()) {
-        if (_csymtab_entry()->is<fn_like_csym>()) {
-            if (const auto return_type = _csymtab_entry()->as<fn_like_csym>().return_type) {
-                return cs.ea.crvalue_to_type(deref_assert(return_type->expr));
-            }
+        if (const auto s = _csymtab_entry()->as<fn_like_csym>(); s && s->return_type) {
+            return cs.ea.crvalue_to_type(deref_assert(s->return_type->expr));
         }
-        return std::nullopt;
+        else return std::nullopt;
     }
     else {
         const auto& our_const = deref_assert(_typeinf().callsig()).ret;
@@ -123,13 +121,12 @@ yama::internal::env yama::internal::ctype::_e() const {
 }
 
 bool yama::internal::ctype::_csymtab_entry_not_typeinf() const noexcept {
-    YAMA_ASSERT(std::holds_alternative<res<csymtab_entry>>(_info) != std::holds_alternative<safeptr<const type_info>>(_info));
-    return std::holds_alternative<res<csymtab_entry>>(_info);
+    return std::holds_alternative<res<csym>>(_info);
 }
 
-const yama::res<yama::internal::csymtab_entry>& yama::internal::ctype::_csymtab_entry() const {
+const yama::res<yama::internal::csym>& yama::internal::ctype::_csymtab_entry() const {
     YAMA_ASSERT(_csymtab_entry_not_typeinf());
-    return std::get<res<csymtab_entry>>(_info);
+    return std::get<res<csym>>(_info);
 }
 
 const yama::type_info& yama::internal::ctype::_typeinf() const {
@@ -150,7 +147,7 @@ yama::internal::cmodule::cmodule(ctypesys& s, const res<module_info>& x, const i
 std::optional<yama::internal::ctype> yama::internal::cmodule::type(const str& unqualified_name) {
     if (_tu_not_modinf()) {
         const auto& our_csymtab = deref_assert(_tu().syms.get(_tu().root().id));
-        if (const auto entry = our_csymtab.fetch(unqualified_name); entry && entry->is_type()) {
+        if (const auto entry = our_csymtab.fetch(unqualified_name); entry && entry->is_type) {
             return ctype(*_s, res(entry), ip());
         }
     }
@@ -285,10 +282,9 @@ std::optional<yama::internal::ctype> yama::internal::ctypesys_local::load(const 
     bad_qualifier = false;
     // query qualifier symbol
     std::optional<ctype> result{};
-    if (const auto qualifier_sym = tu->syms.lookup(tu->root(), qualifier, 0, lookup_proc::qualifier)) {
-        const auto& symbol = qualifier_sym->as<import_csym>();
+    if (const auto symbol = tu->syms.lookup_expect<import_csym>(tu->root(), qualifier, 0, lookup_proc::qualifier)) {
         // attempt load itself
-        result = tu->cs->types.load(qualified_name(symbol.path, unqualified_name));
+        result = tu->cs->types.load(qualified_name(symbol->path, unqualified_name));
     }
     else bad_qualifier = true;
     return result;

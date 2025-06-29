@@ -281,19 +281,18 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
             return false;
         }
         const auto name = x.name->str(md.tu->src);
-        const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        const auto& param = symbol->as<param_csym>();
+        const auto symbol = md.tu->syms.lookup_expect<param_csym>(x, name, x.low_pos());
         // by this point, first pass checks should guarantee that below
-        // param.get_type(*cs) cannot be empty
-        md.type = param.get_type(*cs).value();
+        // symbol->get_type() cannot be empty
+        md.type = symbol->get_type().value();
         md.crvalue = _runtime_only;
     }
     break;
     case category::var_id:
     {
         const auto name = x.name->str(md.tu->src);
-        const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        const auto t = symbol->as<var_csym>().get_type(*cs);
+        const auto symbol = md.tu->syms.lookup_expect<var_csym>(x, name, x.low_pos());
+        const auto t = symbol->get_type();
         // TODO: we don't really have unit tests covering the below case of
         //       undeclared name error arising here specifically
         //       (ie. removing below error check doesn't result in unit tests
@@ -679,8 +678,8 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_PrimaryExpr& x, std:
     case category::var_id:
     {
         const auto name = x.name->str(md.tu->src);
-        const auto symbol = md.tu->syms.lookup(x, name, x.low_pos());
-        const uint8_t local_var_reg = uint8_t(symbol->as<var_csym>().reg.value());
+        const auto symbol = md.tu->syms.lookup_expect<var_csym>(x, name, x.low_pos());
+        const uint8_t local_var_reg = uint8_t(symbol->reg.value());
         // write copy from local var into output
         tu.cgt.cw.add_copy(local_var_reg, output_reg);
     }
@@ -1000,7 +999,7 @@ bool yama::internal::expr_analyzer::_is_type_ref_id_expr(const ast_PrimaryExpr& 
     const auto& tu = _tu(x);
     const auto sym = tu.syms.lookup(x, x.name->str(tu.src), x.low_pos());
     // succeed if nullptr, as that means it MUST ref type not in compiling module
-    return !sym || sym->is_type();
+    return !sym || sym->is_type;
 }
 
 bool yama::internal::expr_analyzer::_raise_numeric_overflow_if(bool x, metadata& md, const taul::token& lit) {

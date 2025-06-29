@@ -128,14 +128,11 @@ void yama::internal::register_stk::promote_to_localvar(ast_VarDecl& x) {
     const auto localvar_name = x.name.str(tu->src);
     top_reg().localvar = true; // tell the register it's now a local var
     // update symbol table entry
-    if (const auto symbol = tu->syms.lookup(x, localvar_name, x.high_pos())) {
-        if (symbol->is<var_csym>()) {
-            auto& info = symbol->as<var_csym>();
-            // when we promote a temporary to a local var, its symbol is expected to not
-            // yet have an associated register index, w/ this assigning one
-            YAMA_ASSERT(!info.reg);
-            info.reg = top_reg().index;
-        }
+    if (const auto symbol = tu->syms.lookup_as<var_csym>(x, localvar_name, x.high_pos())) {
+        // when we promote a temporary to a local var, its symbol is expected to not
+        // yet have an associated register index, w/ this assigning one
+        YAMA_ASSERT(!symbol->reg);
+        symbol->reg = top_reg().index;
     }
     YAMA_ASSERT(top_reg().is_localvar());
 }

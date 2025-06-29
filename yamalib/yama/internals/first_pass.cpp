@@ -198,13 +198,13 @@ void yama::internal::first_pass::_insert_importdecl(res<ast_ImportDecl> x, const
     const auto name = x->name->str(tu->src);
     // insert symbol
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<import_csym>(
         *x,
+        &no_table_found,
         name,
         x,
         0,
-        import_csym{ .path = path },
-        &no_table_found);
+        path);
     YAMA_ASSERT(!no_table_found);
     _check_name_conflict_for_import((bool)entry, *x, name);
 }
@@ -213,13 +213,13 @@ void yama::internal::first_pass::_insert_importdecl_for_implicit_yama_import(con
     const auto name = "yama"_str;
     // insert symbol
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<import_csym>(
         tu->root(),
+        &no_table_found,
         name,
         nullptr, // <- no associated AST node
         0,
-        import_csym{ .path = path },
-        &no_table_found);
+        path);
     YAMA_ASSERT(!no_table_found);
     // NOTE: below failure should NEVER occur, but is here for *completeness*
     _check_name_conflict_for_import((bool)entry, tu->root(), name);
@@ -230,13 +230,16 @@ void yama::internal::first_pass::_insert_vardecl(res<ast_VarDecl> x) {
     const auto name = x->name.str(tu->src);
     // insert symbol
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<var_csym>(
         *x,
+        &no_table_found,
         name,
         x,
         _vardecl_intro_point(*x),
-        _mk_var_csym(*x),
-        &no_table_found);
+        // get annotated type, if any
+        x->type ? x->type->type.get() : nullptr,
+        // get initializer expr, if any
+        x->assign ? x->assign->expr.get() : nullptr);
     YAMA_ASSERT(!no_table_found);
     _check_name_conflict((bool)entry, *x, name);
 }
@@ -246,13 +249,15 @@ void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x, bool& no_name
     const auto unqualified_name = str(x->fmt_unqualified_name(tu->src).value());
     // insert symbol
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<fn_like_csym>(
         *x,
+        &no_table_found,
         unqualified_name,
         x,
         _fndecl_intro_point(*x),
-        _mk_fn_like_csym(*x, unqualified_name),
-        &no_table_found);
+        // param stuff won't be resolved until later
+        x->is_method(),
+        x->callsig->result ? x->callsig->result->type.get() : nullptr);
     YAMA_ASSERT(!no_table_found);
     _check_name_conflict((bool)entry, *x, unqualified_name);
     no_name_conflict = (bool)entry;
@@ -260,21 +265,40 @@ void yama::internal::first_pass::_insert_fndecl(res<ast_FnDecl> x, bool& no_name
 
 void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
     const auto name = x->name.str(tu->src);
+    const bool in_valid_fn = _is_in_fn() && _current_fn().symbol;
     // insert symbol
+    size_t index{}; // dummy value if invalid fn
+    bool self_param = false; // dummy value if invalid fn
+    const ast_TypeSpec* type_spec = nullptr; // dummy value if invalid fn
+    if (in_valid_fn) {
+        index = _current_fn().symbol->params.size();
+        const auto type_annot_info = _current_fn().symbol->node->as<ast_FnDecl>()->callsig->find_param_type_annot(index);
+        self_param =
+            _current_fn().symbol->is_method &&
+            index == 0 &&
+            name == "self"_str &&
+            !type_annot_info.directly_attached;
+        type_spec =
+            type_annot_info && !self_param
+            ? type_annot_info.type_annot->type.get()
+            : nullptr;
+    }
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<param_csym>(
         *x,
+        &no_table_found,
         name,
         x,
         _paramdecl_intro_point(*x),
-        _mk_param_csym(*x, name),
-        &no_table_found);
+        _current_fn().symbol.get(),
+        index,
+        type_spec,
+        self_param);
     YAMA_ASSERT(!no_table_found);
     _check_name_conflict((bool)entry, *x, name);
-    if (entry && _is_in_fn() && _current_fn().symbol) {
-        const auto& csym = entry->as<param_csym>();
+    if (entry && in_valid_fn) {
         // check for no type annotation error
-        if (!csym.type && !csym.self_param) {
+        if (!entry->type && !entry->self_param) {
             tu->err.error(
                 *x,
                 dsignal::compile_invalid_param_list,
@@ -282,7 +306,7 @@ void yama::internal::first_pass::_insert_paramdecl(res<ast_ParamDecl> x) {
                 entry->name);
         }
         // add entry to param list of current fn
-        _current_fn().symbol->as<fn_like_csym>().params.push_back(*entry);
+        _current_fn().symbol->params.push_back(*entry);
     }
 }
 
@@ -290,13 +314,12 @@ void yama::internal::first_pass::_insert_structdecl(res<ast_StructDecl> x) {
     const auto unqualified_name = x->name.str(tu->src);
     // insert symbol
     bool no_table_found = false;
-    const std::shared_ptr entry = tu->syms.insert(
+    const auto entry = tu->syms.insert<struct_csym>(
         *x,
+        &no_table_found,
         unqualified_name,
         x,
-        _structdecl_intro_point(*x),
-        _mk_struct_csym(*x),
-        &no_table_found);
+        _structdecl_intro_point(*x));
     YAMA_ASSERT(!no_table_found);
     _check_name_conflict((bool)entry, *x, unqualified_name);
 }
@@ -318,63 +341,6 @@ void yama::internal::first_pass::_check_name_conflict_for_import(bool no_name_co
         // add the 'import' bit as only other import decls can conflict w/ this
         "name {} already in use by another import decl!",
         name);
-}
-
-yama::internal::var_csym yama::internal::first_pass::_mk_var_csym(const ast_VarDecl& x) {
-    var_csym result{};
-    if (x.type) { // get annotated type, if any
-        result.annot_type = x.type->type.get();
-    }
-    if (x.assign) { // get initializer expr, if any
-        result.initializer = x.assign->expr.get();
-    }
-    return result;
-}
-
-yama::internal::fn_like_csym yama::internal::first_pass::_mk_fn_like_csym(const ast_FnDecl& x, const str& unqualified_name) {
-    // param stuff won't be resolved until later
-    fn_like_csym result{
-        .is_method = x.is_method(),
-        .fln = qualified_name(tu->src_path, internal::unqualified_name(unqualified_name).owner_name()),
-    };
-    if (x.callsig->result) {
-        result.return_type = x.callsig->result->type.get();
-    }
-    return result;
-}
-
-yama::internal::param_csym yama::internal::first_pass::_mk_param_csym(const ast_ParamDecl& x, const str& name) {
-    if (!(_is_in_fn() && _current_fn().symbol)) {
-        // dummy if invalid fn
-        return param_csym{
-            .fn = nullptr,
-            .index = size_t(),
-            .type = nullptr,
-            .self_param = false,
-        };
-    }
-    const auto& csym = _current_fn().symbol->as<fn_like_csym>();
-    const size_t index = csym.params.size();
-    const auto type_annot_info = _current_fn().symbol->node->as<ast_FnDecl>()->callsig->find_param_type_annot(index);
-    const bool self_param =
-        csym.is_method &&
-        index == 0 &&
-        name == "self"_str &&
-        !type_annot_info.directly_attached;
-    const auto type_spec =
-        type_annot_info && !self_param
-        ? type_annot_info.type_annot->type.get()
-        : nullptr;
-    return param_csym{
-        .fn = _current_fn().symbol.get(),
-        .index = index,
-        .type = type_spec,
-        .self_param = self_param,
-    };
-}
-
-yama::internal::struct_csym yama::internal::first_pass::_mk_struct_csym(const ast_StructDecl& x) {
-    return struct_csym{};
 }
 
 taul::source_pos yama::internal::first_pass::_vardecl_intro_point(const ast_VarDecl& x) {
@@ -469,7 +435,7 @@ void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x, bool no_name_confl
     _fn_decl details{
         .node = x,
         // if name conflict arose, then should be nullptr
-        .symbol = no_name_conflict ? tu->syms.lookup(*x, name, 0) : nullptr,
+        .symbol = no_name_conflict ? tu->syms.lookup_as<fn_like_csym>(*x, name, 0) : nullptr,
     };
     _fn_decl_stk.push_back(std::move(details));
 }
@@ -477,8 +443,7 @@ void yama::internal::first_pass::_begin_fn(res<ast_FnDecl> x, bool no_name_confl
 void yama::internal::first_pass::_end_fn() {
     // propagate above to symbol (+ fail quietly if no symbol due to compiling code being in error)
     if (const auto& symbol = _current_fn().symbol) {
-        auto& fn_csym = symbol->as<fn_like_csym>();
-        fn_csym.all_paths_return_or_loop = _cfg.check_fn();
+        symbol->all_paths_return_or_loop = _cfg.check_fn();
     }
     _cfg.end_fn();
 }

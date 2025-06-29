@@ -67,7 +67,7 @@ yama::internal::translation_unit::translation_unit(compiler& cs, taul::source_co
     src_path(src_path),
     err(*this),
     cgt(*this),
-    syms(),
+    syms(*this),
     types(*this),
     ctp(*this),
     rs(*this),

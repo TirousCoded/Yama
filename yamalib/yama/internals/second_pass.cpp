@@ -178,7 +178,7 @@ void yama::internal::second_pass::_begin_fn_like(ast_FnDecl& x) {
     tu->cgt.gen_target_fn_like(unqualified_name, x.is_method());
     auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // resolve if fn type is None returning
-    const ctype return_type = targsym.get_return_type_or_none(*tu);
+    const ctype return_type = targsym.get_return_type_or_none();
     targsym.is_none_returning = return_type == tu->types.none_type();
     // if return type is not None, then control-flow error if not all control paths have
     // explicit return stmts (or enter infinite loops)
@@ -281,13 +281,11 @@ void yama::internal::second_pass::_assign_stmt(ast_ExprStmt& x) {
     const auto expr = x.expr->expect<ast_Expr>();
     const auto primary = res(expr->base)->expect<ast_PrimaryExpr>();
     const auto name = primary->name.value().str(tu->src);
-    const auto symbol = tu->syms.lookup(x, name, x.low_pos());
-    const bool is_var = symbol && symbol->is<var_csym>();
-    YAMA_ASSERT(is_var); // assignable
-    const auto& info = symbol->as<var_csym>();
+    const auto symbol = tu->syms.lookup_as<var_csym>(x, name, x.low_pos());
+    YAMA_ASSERT(symbol); // assignable
     // type check assignment before allowing it
     const ctype assigner_type = tu->cs->ea[*x.assign->expr].type.value();
-    const ctype assignee_type = info.get_type(*tu->cs).value();
+    const ctype assignee_type = symbol->get_type().value();
     if (assigner_type != assignee_type) {
         tu->err.error(
             x,
@@ -297,7 +295,7 @@ void yama::internal::second_pass::_assign_stmt(ast_ExprStmt& x) {
             assignee_type.fmt(tu->e()));
         return;
     }
-    const size_t assignee_reg = info.reg.value();
+    const size_t assignee_reg = symbol->reg.value();
     tu->cs->ea.codegen(*x.assign->expr, assignee_reg);
 }
 
@@ -368,7 +366,7 @@ void yama::internal::second_pass::_return_stmt_with_val(ast_ReturnStmt& x) {
     // codegen returned value expr, pushing temporary
     tu->cs->ea.codegen(*x.expr, newtop);
     // type check return value expr, w/ return type None if no explicit return type
-    const ctype return_type = targsym.get_return_type_or_none(*tu);
+    const ctype return_type = targsym.get_return_type_or_none();
     const ctype returned_value_type = tu->cs->ea[*x.expr].type.value();
     if (returned_value_type != return_type) {
         tu->err.error(
@@ -388,7 +386,7 @@ void yama::internal::second_pass::_return_stmt_with_val(ast_ReturnStmt& x) {
 void yama::internal::second_pass::_return_stmt_with_no_val(ast_ReturnStmt& x) {
     const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // this form may not be used if return type isn't None
-    const ctype actual_return_type = targsym.get_return_type_or_none(*tu);
+    const ctype actual_return_type = targsym.get_return_type_or_none();
     const ctype expected_return_type = tu->types.none_type();
     if (actual_return_type != expected_return_type) {
         tu->err.error(

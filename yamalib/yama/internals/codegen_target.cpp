@@ -19,11 +19,11 @@ yama::type_info& yama::internal::codegen_target::target() noexcept {
     return deref_assert(_current_target);
 }
 
-std::shared_ptr<yama::internal::csymtab_entry> yama::internal::codegen_target::try_target_csym_entry() {
+std::shared_ptr<yama::internal::csym> yama::internal::codegen_target::try_target_csym_entry() {
     return tu->syms.lookup(tu->root(), target().unqualified_name(), 0);
 }
 
-yama::res<yama::internal::csymtab_entry> yama::internal::codegen_target::target_csym_entry() {
+yama::res<yama::internal::csym> yama::internal::codegen_target::target_csym_entry() {
     return res(try_target_csym_entry());
 }
 

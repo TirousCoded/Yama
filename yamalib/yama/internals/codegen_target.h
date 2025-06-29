@@ -37,11 +37,11 @@ namespace yama::internal {
         bool has_target() const noexcept;
         yama::type_info& target() noexcept;
 
-        std::shared_ptr<csymtab_entry> try_target_csym_entry();
-        res<csymtab_entry> target_csym_entry();
-        template<typename T>
+        std::shared_ptr<csym> try_target_csym_entry();
+        res<csym> target_csym_entry();
+        template<csym_type T>
         inline T& target_csym() {
-            return target_csym_entry()->as<T>();
+            return *target_csym_entry()->expect<T>();
         }
 
         std::optional<size_t> target_param_index(const str& name);

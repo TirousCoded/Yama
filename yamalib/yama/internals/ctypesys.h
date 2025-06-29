@@ -28,7 +28,7 @@ namespace yama::internal {
     class translation_unit;
 
     class csymtab;
-    struct csymtab_entry;
+    class csym;
 
     class compiler_services;
 
@@ -40,7 +40,7 @@ namespace yama::internal {
 
     class ctype final {
     public:
-        ctype(ctypesys& s, res<csymtab_entry> x, const import_path& where);
+        ctype(ctypesys& s, res<csym> x, const import_path& where);
         ctype(ctypesys& s, const type_info& x, const import_path& where);
 
         ctype(const ctype&) = default;
@@ -69,7 +69,7 @@ namespace yama::internal {
 
 
     private:
-        using _info_t = std::variant<res<csymtab_entry>, safeptr<const type_info>>;
+        using _info_t = std::variant<res<csym>, safeptr<const type_info>>;
 
 
         safeptr<ctypesys> _s;
@@ -80,7 +80,7 @@ namespace yama::internal {
         env _e() const;
 
         bool _csymtab_entry_not_typeinf() const noexcept;
-        const res<csymtab_entry>& _csymtab_entry() const;
+        const res<csym>& _csymtab_entry() const;
         const type_info& _typeinf() const;
     };
 

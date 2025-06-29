@@ -48,57 +48,256 @@ YAMA_SETUP_HASH(yama::internal::csym_key, x.hash());
 namespace yama::internal {
 
 
-    template<typename T>
-    concept lookup_proc_of_type =
-        requires
-    {
-        { std::remove_cvref_t<T>::lp } noexcept -> std::convertible_to<lookup_proc>;
+    // forward decls
+
+    class csym;
+    class import_csym;
+    class prim_csym;
+    class var_csym;
+    class fn_like_csym;
+    class param_csym;
+    class struct_csym;
+
+
+    enum class csym_category : uint8_t {
+        import,
+        prim,
+        var,
+        fn_like,
+        param,
+        struct0,
+
+        num, // not a valid csym_category
     };
 
-    template<lookup_proc_of_type T>
-    constexpr lookup_proc lookup_proc_of = std::remove_cvref_t<T>::lp;
+    constexpr size_t csym_categories = size_t(csym_category::num);
+
+    inline std::string fmt_csym_category(csym_category x) {
+        static_assert(csym_categories == 6);
+        switch (x) {
+        case csym_category::import:     return "import";
+        case csym_category::prim:       return "prim";
+        case csym_category::var:        return "var";
+        case csym_category::fn_like:    return "fn-like";
+        case csym_category::param:      return "param";
+        case csym_category::struct0:    return "struct";
+        default: YAMA_DEADEND; break;
+        }
+        return {};
+    }
 
 
-    // only named imports get symbols
+    template<typename T>
+    struct csym_traits final {};
+    template<>
+    struct csym_traits<import_csym> final {
+        static constexpr auto category = csym_category::import;
+        static constexpr auto lp = lookup_proc::qualifier;
+        static constexpr bool is_type = false;
+    };
+    template<>
+    struct csym_traits<prim_csym> final {
+        static constexpr auto category = csym_category::prim;
+        static constexpr auto lp = lookup_proc::normal;
+        static constexpr bool is_type = true;
+    };
+    template<>
+    struct csym_traits<var_csym> final {
+        static constexpr auto category = csym_category::var;
+        static constexpr auto lp = lookup_proc::normal;
+        static constexpr bool is_type = false;
+    };
+    template<>
+    struct csym_traits<fn_like_csym> final {
+        static constexpr auto category = csym_category::fn_like;
+        static constexpr auto lp = lookup_proc::normal;
+        static constexpr bool is_type = true;
+    };
+    template<>
+    struct csym_traits<param_csym> final {
+        static constexpr auto category = csym_category::param;
+        static constexpr auto lp = lookup_proc::normal;
+        static constexpr bool is_type = false;
+    };
+    template<>
+    struct csym_traits<struct_csym> final {
+        static constexpr auto category = csym_category::struct0;
+        static constexpr auto lp = lookup_proc::normal;
+        static constexpr bool is_type = true;
+    };
 
-    struct import_csym final {
+
+    template<typename T>
+    concept with_csym_traits =
+        requires
+    {
+        { csym_traits<T>::category } noexcept -> std::convertible_to<csym_category>;
+        { csym_traits<T>::lp } noexcept -> std::convertible_to<lookup_proc>;
+        { csym_traits<T>::is_type } noexcept -> std::convertible_to<bool>;
+    };
+    template<typename T>
+    concept csym_type =
+        std::derived_from<T, csym> &&
+        with_csym_traits<T>;
+
+
+    class csym : public std::enable_shared_from_this<csym> {
+    public:
+        const csym_category             category;
+        const lookup_proc               lp;
+        const bool                      is_type;
+        const str                       name;
+        const std::shared_ptr<ast_node> node;       // the node corresponding to this entry's declaration, if any
+        const taul::source_pos          starts;     // where in src scope begins (continuing until end of block), should be 0 if has global scope
+        const safeptr<translation_unit> tu;
+        
+        
+        inline csym(
+            csym_category category,
+            lookup_proc lp,
+            bool is_type,
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu)
+            : category(category),
+            lp(lp),
+            is_type(is_type),
+            name(name),
+            node(node),
+            starts(starts),
+            tu(tu) {}
+
+        virtual ~csym() noexcept = default;
+
+
+        // below 'is', 'as' and 'expect' methods let us use custom RTTI to discern types
+
+        inline bool is(csym_category x) const noexcept {
+            return category == x;
+        }
+        template<csym_type T>
+        inline bool is() const noexcept {
+            return is(csym_traits<T>::category);
+        }
+        template<csym_type T>
+        inline std::shared_ptr<T> as() noexcept {
+            return
+                is<T>()
+                ? std::static_pointer_cast<T>(shared_from_this())
+                : nullptr;
+        }
+        template<csym_type T>
+        inline std::shared_ptr<const T> as() const noexcept {
+            return
+                is<const T>()
+                ? std::static_pointer_cast<const T>(shared_from_this())
+                : nullptr;
+        }
+        template<csym_type T>
+        inline res<T> expect() {
+            return res(as<T>());
+        }
+        template<csym_type T>
+        inline res<const T> expect() const {
+            return res(as<T>());
+        }
+
+
+        inline csym_key get_key() const noexcept {
+            return csym_key::make(name, lp);
+        }
+
+
+        virtual std::string fmt(size_t tabs = 0, const char* tab = default_tab) = 0;
+    };
+
+
+    // helper
+
+    template<with_csym_traits T>
+    class csym_base : public csym {
+    public:
+        using Traits = csym_traits<T>;
+
+
+        inline csym_base(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu)
+            : csym(Traits::category, Traits::lp, Traits::is_type, name, node, starts, tu) {}
+    };
+
+
+    // IMPORTANT: only named imports get symbols
+
+    class import_csym final : public csym_base<import_csym> {
+    public:
         import_path path;
 
 
-        static constexpr lookup_proc lp = lookup_proc::qualifier;
+        inline import_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu,
+            import_path path)
+            : csym_base(name, node, starts, tu),
+            path(std::move(path)) {}
+
+
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
-    struct prim_csym final {
+    class prim_csym final : public csym_base<prim_csym> {
+    public:
         //
 
 
-        static constexpr lookup_proc lp = lookup_proc::normal;
+        inline prim_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu)
+            : csym_base(name, node, starts, tu) {}
+
+
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
-    struct var_csym final {
-        const ast_TypeSpec* annot_type; // type specified by annotation, if any
-        const ast_Expr* initializer; // explicit initializer, if any
+    class var_csym final : public csym_base<var_csym> {
+    public:
+        const ast_TypeSpec* annot_type = nullptr; // type specified by annotation, if any
+        const ast_Expr* initializer = nullptr; // explicit initializer, if any
         std::optional<size_t> reg; // register index of local var (resolved in second_pass)
 
 
-        // var_csym is recognized as a 'local var symbol' only once reg has been assigned
+        inline var_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu,
+            const ast_TypeSpec* annot_type,
+            const ast_Expr* initializer)
+            : csym_base(name, node, starts, tu),
+            annot_type(annot_type),
+            initializer(initializer) {}
 
-        //inline bool is_localvar() const noexcept { return reg.has_value(); }
+
+        std::optional<ctype> get_type() const; // returns deduced type of the var, if any
 
 
-        std::optional<ctype> get_type(compiler& cs) const; // returns deduced type of the var, if any
-
-
-        static constexpr lookup_proc lp = lookup_proc::normal;
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
     // we'll call it 'fn-like' to make clear that it conflates fns and methods
 
-    struct fn_like_csym final {
+    class fn_like_csym final : public csym_base<fn_like_csym> {
+    public:
         bool is_method = false;
-        std::vector<safeptr<csymtab_entry>> params;
-        const ast_TypeSpec* return_type;
-        fullname fln;
+        std::vector<safeptr<param_csym>> params;
+        const ast_TypeSpec* return_type = nullptr;
 
         // if all control paths (reachable from entrypoint) either reach explicit return
         // stmts, or enter infinite loops
@@ -110,135 +309,145 @@ namespace yama::internal {
         std::optional<bool> is_none_returning;
 
 
-        std::optional<ctype> get_owner_type(compiler& cs) const;
+        inline fn_like_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu,
+            bool is_method,
+            const ast_TypeSpec* return_type)
+            : csym_base(name, node, starts, tu),
+            is_method(is_method),
+            return_type(return_type) {}
 
-        std::optional<ctype> get_return_type(compiler& cs) const;
-        ctype get_return_type_or_none(translation_unit& tu) const;
 
-        std::string fmt_params(compiler& cs) const;
+        fullname get_owner_fln() const;
 
+        std::optional<ctype> get_owner_type() const;
+        std::optional<ctype> get_return_type() const;
+        ctype get_return_type_or_none() const;
 
-        static constexpr lookup_proc lp = lookup_proc::normal;
+        std::string fmt_params() const;
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
-    struct param_csym final {
-        csymtab_entry* fn; // for get_type w/ self params
+    class param_csym final : public csym_base<param_csym> {
+    public:
+        const fn_like_csym* fn = nullptr; // for get_type w/ self params
         size_t index;
-        const ast_TypeSpec* type;
+        const ast_TypeSpec* type = nullptr;
         bool self_param = false;
 
 
-        std::optional<ctype> get_type(compiler& cs) const;
+        inline param_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu,
+            const fn_like_csym* fn,
+            size_t index,
+            const ast_TypeSpec* type,
+            bool self_param)
+            : csym_base(name, node, starts, tu),
+            fn(fn),
+            index(index),
+            type(type),
+            self_param(self_param) {}
 
 
-        static constexpr lookup_proc lp = lookup_proc::normal;
+        std::optional<ctype> get_type() const;
+
+
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
-    struct struct_csym final {
+    class struct_csym final : public csym_base<struct_csym> {
+    public:
         //
 
 
-        static constexpr lookup_proc lp = lookup_proc::normal;
+        inline struct_csym(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            safeptr<translation_unit> tu)
+            : csym_base(name, node, starts, tu) {}
+
+
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab) override;
     };
 
-
-    struct csymtab_entry final {
-        using info_t = std::variant<
-            import_csym,
-            prim_csym,
-            var_csym,
-            fn_like_csym,
-            param_csym,
-            struct_csym
-        >;
-
-
-        str                         name;
-        const lookup_proc           lp;
-        std::shared_ptr<ast_node>   node; // the node corresponding to this entry's declaration, if any
-        taul::source_pos            starts; // where in src scope begins (continuing until end of block), should be 0 if has global scope
-        info_t                      info;
-
-
-        template<typename Info>
-        inline bool is() const noexcept {
-            return std::holds_alternative<Info>(info);
-        }
-        template<typename Info>
-        inline Info& as() noexcept {
-            YAMA_ASSERT(is<Info>());
-            return std::get<Info>(info);
-        }
-
-
-        inline bool is_type() const noexcept {
-            static_assert(std::variant_size_v<info_t> == 6); // reminder
-            if (is<import_csym>())          return false;
-            else if (is<prim_csym>())       return true;
-            else if (is<var_csym>())        return false;
-            else if (is<fn_like_csym>())    return true;
-            else if (is<param_csym>())      return false;
-            else if (is<struct_csym>())     return true;
-            else                            YAMA_DEADEND;
-            return bool{};
-        }
-
-        inline csym_key get_key() const noexcept {
-            return csym_key::make(name, lp);
-        }
-
-
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
-    };
 
     // csymtab defines Yama's internal repr for a symbol table
     class csymtab final {
     public:
-        csymtab() = default;
+        const safeptr<translation_unit> tu;
+
+
+        inline csymtab(safeptr<translation_unit> tu)
+            : tu(tu) {}
 
 
         inline size_t count() const noexcept {
             return _entries.size();
         }
 
-        // fails if entry under name already exists
-        template<typename Info>
-        inline std::shared_ptr<csymtab_entry> insert(const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info) {
-            if (_entries.contains(csym_key::make(name, lookup_proc_of<Info>))) {
-                return nullptr;
-            }
-            auto new_entry = csymtab_entry{
-                .name = name,
-                .lp = lookup_proc_of<Info>,
-                .node = node,
-                .starts = starts,
-                .info = std::forward<Info>(info),
-            };
-            const auto key = new_entry.get_key(); // <- get key before move new_entry
-            const auto result = make_res<csymtab_entry>(std::move(new_entry));
-            _entries.try_emplace(key, result);
-            return result;
-        }
-
-        inline std::shared_ptr<csymtab_entry> fetch(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
+        inline std::shared_ptr<csym> fetch(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
             const auto it = _entries.find(csym_key::make(name, lp));
             return
                 it != _entries.end()
-                ? std::shared_ptr<csymtab_entry>(it->second)
+                ? it->second.base()
+                : nullptr;
+        }
+        template<csym_type T>
+        inline std::shared_ptr<T> fetch_as(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
+            const auto result = fetch(name, lp);
+            return
+                (bool)result
+                ? result->as<T>()
+                : nullptr;
+        }
+        template<csym_type T>
+        inline std::shared_ptr<T> fetch_expect(const str& name, lookup_proc lp = lookup_proc::normal) const noexcept {
+            const auto result = fetch(name, lp);
+            return
+                (bool)result
+                ? result->expect<T>().base()
                 : nullptr;
         }
 
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
+        // fails if entry under name already exists
+        template<csym_type T, typename... Args>
+        inline std::shared_ptr<T> insert(
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            Args&&... args) {
+            using Traits = csym_traits<T>;
+            const auto key = csym_key::make(name, Traits::lp);
+            if (_entries.contains(key)) {
+                return nullptr;
+            }
+            const auto result = make_res<T>(name, node, starts, tu, std::forward<Args>(args)...);
+            _entries.insert({ key, result });
+            return result;
+        }
+
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab);
 
 
     private:
-        std::unordered_map<csym_key, res<csymtab_entry>> _entries;
+        std::unordered_map<csym_key, res<csym>> _entries;
     };
 
     // csymtab_group maps Chunk/Block AST nodes (by ID) to corresponding csymtab(s)
     class csymtab_group final {
     public:
-        csymtab_group() = default;
+        const safeptr<translation_unit> tu;
+
+
+        inline csymtab_group(safeptr<translation_unit> tu)
+            : tu(tu) {}
 
 
         inline size_t count() const noexcept {
@@ -249,7 +458,7 @@ namespace yama::internal {
         inline res<csymtab> acquire(ast_id_t id) {
             auto it = _csymtabs.find(id);
             if (it == _csymtabs.end()) {
-                _csymtabs.try_emplace(id, make_res<csymtab>());
+                _csymtabs.insert({ id, make_res<csymtab>(tu) });
                 it = _csymtabs.find(id);
             }
             YAMA_ASSERT(it != _csymtabs.end());
@@ -261,7 +470,7 @@ namespace yama::internal {
             const auto it = _csymtabs.find(id);
             return
                 it != _csymtabs.end()
-                ? std::shared_ptr<csymtab>(it->second)
+                ? it->second.base()
                 : nullptr;
         }
 
@@ -286,7 +495,11 @@ namespace yama::internal {
         // from the symbol table of x, if any, and propagating to upstream symbol tables
         // of ancestor AST nodes of x (note how these rules let x be nodes w/out symbol tables),
         // w/ symbols which haven't entered scope by src_pos not being visible
-        inline std::shared_ptr<csymtab_entry> lookup(const ast_node& x, const str& name, taul::source_pos src_pos, lookup_proc lp = lookup_proc::normal) const noexcept {
+        inline std::shared_ptr<csym> lookup(
+            const ast_node& x,
+            const str& name,
+            taul::source_pos src_pos,
+            lookup_proc lp = lookup_proc::normal) const noexcept {
             // IMPORTANT: we CAN'T use node_of_inner_most here, as we care about visibility throughout all csymtabs relative to x
             // below code will recursively skip past interim parent nodes w/out symbol tables
             if (const auto table = get(x.id)) {
@@ -303,17 +516,48 @@ namespace yama::internal {
                 : nullptr;
         }
 
+        template<csym_type T>
+        inline std::shared_ptr<T> lookup_as(
+            const ast_node& x,
+            const str& name,
+            taul::source_pos src_pos,
+            lookup_proc lp = lookup_proc::normal) const noexcept {
+            const auto result = lookup(x, name, src_pos, lp);
+            return
+                (bool)result
+                ? result->as<T>()
+                : nullptr;
+        }
+        template<csym_type T>
+        inline std::shared_ptr<T> lookup_expect(
+            const ast_node& x,
+            const str& name,
+            taul::source_pos src_pos,
+            lookup_proc lp = lookup_proc::normal) const noexcept {
+            const auto result = lookup(x, name, src_pos, lp);
+            return
+                (bool)result
+                ? result->expect<T>().base()
+                : nullptr;
+        }
+
         // searching from x, then through each ancestor AST node, insert inserts a new symbol table
         // entry into the first AST node found w/ an associated symbol table, if any, returning
         // new entry if successful, failing if no symbol table could be found, or if inserting
         // would conflict w/ an existing symbol under name in that table (if no_table_found
         // is not nullptr, *no_table_found will be set to true if no table was found)
-        template<typename Info>
-        inline std::shared_ptr<csymtab_entry> insert(ast_node& x, const str& name, std::shared_ptr<ast_node> node, taul::source_pos starts, Info&& info, bool* no_table_found = nullptr) {
+        template<csym_type T, typename... Args>
+        inline std::shared_ptr<T> insert(
+            ast_node& x,
+            bool* no_table_found,
+            const str& name,
+            const std::shared_ptr<ast_node>& node,
+            taul::source_pos starts,
+            Args&&... args) {
             if (const auto table_nd = node_of_inner_most(x)) {
                 const auto table = get(table_nd->id);
                 YAMA_ASSERT(table);
-                return table->insert(name, node, starts, std::forward<Info>(info));
+                return table->insert<T>(name, node, starts, std::forward<Args>(args)...);
             }
             if (no_table_found) {
                 *no_table_found = true;
@@ -321,7 +565,7 @@ namespace yama::internal {
             return nullptr;
         }
 
-        std::string fmt(compiler& cs, size_t tabs = 0, const char* tab = default_tab);
+        std::string fmt(size_t tabs = 0, const char* tab = default_tab);
 
 
     private:
