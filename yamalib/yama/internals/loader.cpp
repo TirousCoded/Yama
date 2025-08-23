@@ -2,9 +2,9 @@
 
 #include "loader.h"
 
-#include "../core/type.h"
-#include "../core/const_table.h"
-#include "../core/callsig.h"
+#include "../core/item_ref.h"
+#include "../core/const_table_ref.h"
+#include "../core/callsig_ref.h"
 
 #include "type_instance.h"
 #include "specifiers.h"
@@ -21,7 +21,7 @@ yama::internal::loader::loader(
     state.set_upstream(upstream);
 }
 
-std::optional<yama::type> yama::internal::loader::load(const str& fullname) {
+std::optional<yama::item_ref> yama::internal::loader::load(const str& fullname) {
     const auto resolved_fullname = _resolve_fullname(fullname);
     if (!resolved_fullname) return std::nullopt;
     _last_was_success = _load(*resolved_fullname);
@@ -56,7 +56,7 @@ std::optional<yama::internal::fullname> yama::internal::loader::_resolve_fullnam
     //       will, when called in domain, only be protected by inclusive lock meant for READ ONLY STUFF
     const auto result = internal::fullname::parse(_dd->installs.domain_env(), fullname, head_was_bad);
     if (!result) {
-        YAMA_RAISE(dbg(), dsignal::load_type_not_found);
+        YAMA_RAISE(dbg(), dsignal::load_item_not_found);
         if (!head_was_bad) {
             YAMA_LOG(
                 dbg(), load_error_c,
@@ -73,7 +73,7 @@ std::optional<yama::internal::fullname> yama::internal::loader::_resolve_fullnam
     return result;
 }
 
-std::optional<yama::type> yama::internal::loader::_pull_type(const fullname& fullname) const noexcept {
+std::optional<yama::item_ref> yama::internal::loader::_pull_type(const fullname& fullname) const noexcept {
     const auto found = state.types.pull(fullname);
     return
         found
@@ -96,43 +96,43 @@ bool yama::internal::loader::_check_already_loaded(const fullname& fullname) con
 bool yama::internal::loader::_add_type(const fullname& fullname) {
     if (_pull_type(fullname)) return true; // exit if type has already been added
     YAMA_LOG(dbg(), load_c, "loading {}...", fullname);
-    const auto info = _acquire_type_info(fullname);
+    mid_t mid{};
+    const auto info = _acquire_info(fullname, mid);
     if (!info) return false;
-    return _create_and_link_instance(fullname, res(info));
+    return _create_and_link_instance(fullname, mid, *info);
 }
 
-std::shared_ptr<yama::type_info> yama::internal::loader::_acquire_type_info(const fullname& fullname) {
+std::optional<yama::module::item> yama::internal::loader::_acquire_info(const fullname& fullname, mid_t& mid_out) {
     const env& e = _dd->installs.domain_env();
     const auto our_path = fullname.ip().str(e);
     const auto our_module = _dd->importer.import(e, our_path, state);
     _dd->importer.commit_or_discard(); // can't forget (also, we don't need to lock for this one)
     if (!our_module) {
-        YAMA_RAISE(dbg(), dsignal::load_type_not_found);
+        YAMA_RAISE(dbg(), dsignal::load_item_not_found);
         YAMA_LOG(
             dbg(), load_error_c,
             "error: cannot load {}; {} not found!",
             _fmt_fullname(fullname),
             our_path);
-        return nullptr;
+        return std::nullopt;
     }
-    if (!our_module->info().contains(fullname.uqn().str())) {
-        YAMA_RAISE(dbg(), dsignal::load_type_not_found);
+    if (!our_module->info().exists(fullname.uqn().str())) {
+        YAMA_RAISE(dbg(), dsignal::load_item_not_found);
         YAMA_LOG(
             dbg(), load_error_c,
             "error: cannot load {}; {} does not have {}!",
             _fmt_fullname(fullname),
             our_path,
             fullname.uqn());
-        return nullptr;
+        return std::nullopt;
     }
-    // TODO: having to clone this is gross, so maybe change type_instance to instead use raw ptr
-    //       to type_info instead of a res
-    return std::make_shared<type_info>(our_module->info()[fullname.uqn().str()]);
+    mid_out = our_module->id();
+    return our_module->info().get_item(fullname.uqn().str());
 }
 
-bool yama::internal::loader::_create_and_link_instance(const fullname& fullname, res<type_info> info) {
+bool yama::internal::loader::_create_and_link_instance(const fullname& fullname, mid_t mid, module::item info) {
     const env e = _dd->installs.parcel_env(fullname.ip().head()).value();
-    const auto new_instance = _create_instance(fullname, info);
+    const auto new_instance = _create_instance(fullname, mid, info);
     // during linking, it's possible for other types to be loaded recursively, and these
     // new types may need to link against new_instance, and so to this end, we add our
     // new_instance to state before linking
@@ -140,8 +140,8 @@ bool yama::internal::loader::_create_and_link_instance(const fullname& fullname,
     return _resolve_consts(e, *new_instance, info); // link
 }
 
-yama::res<yama::internal::type_instance> yama::internal::loader::_create_instance(const fullname& fullname, res<type_info> info) {
-    return make_res<type_instance>(_str_fullname(fullname), info);
+yama::res<yama::internal::type_instance> yama::internal::loader::_create_instance(const fullname& fullname, mid_t mid, module::item info) {
+    return make_res<type_instance>(_str_fullname(fullname), mid, info);
 }
 
 void yama::internal::loader::_add_instance_to_state(const fullname& fullname, res<type_instance> instance) {
@@ -149,7 +149,7 @@ void yama::internal::loader::_add_instance_to_state(const fullname& fullname, re
     YAMA_ASSERT(result);
 }
 
-bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instance, res<type_info> info) {
+bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instance, module::item info) {
     const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_resolve_const(e, instance, info, i)) return false;
@@ -157,9 +157,9 @@ bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instan
     return true;
 }
 
-bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
+bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, module::item info, const_t index) {
     static_assert(const_types == 9);
-    switch (info->consts().const_type(index).value()) {
+    switch (info.consts().const_type(index).value()) {
     case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);                 break;
     case uint_const:            return _resolve_scalar_const<uint_const>(instance, info, index);                break;
     case float_const:           return _resolve_scalar_const<float_const>(instance, info, index);               break;
@@ -187,7 +187,7 @@ bool yama::internal::loader::_check_instance(const env& e, type_instance& instan
     return _check_consts(e, instance, get_type_mem(instance)->info);
 }
 
-bool yama::internal::loader::_check_consts(const env& e, type_instance& instance, res<type_info> info) {
+bool yama::internal::loader::_check_consts(const env& e, type_instance& instance, module::item info) {
     const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_check_const(e, instance, info, i)) return false;
@@ -195,9 +195,9 @@ bool yama::internal::loader::_check_consts(const env& e, type_instance& instance
     return true;
 }
 
-bool yama::internal::loader::_check_const(const env& e, type_instance& instance, res<type_info> info, const_t index) {
+bool yama::internal::loader::_check_const(const env& e, type_instance& instance, module::item info, const_t index) {
     static_assert(const_types == 9);
-    switch (info->consts().const_type(index).value()) {
+    switch (info.consts().const_type(index).value()) {
     case int_const:             return _check_scalar_const<int_const>(instance, info, index);               break;
     case uint_const:            return _check_scalar_const<uint_const>(instance, info, index);              break;
     case float_const:           return _check_scalar_const<float_const>(instance, info, index);             break;
@@ -213,10 +213,10 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
     return bool();
 }
 
-bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
+bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved) {
     const auto  t               = create_type(instance);
-    const str   symbol_fullname = info->consts().qualified_name(index).value();
-    const auto  symbol_kind     = info->consts().kind(index).value();
+    const str   symbol_fullname = info.consts().qualified_name(index).value();
+    const auto  symbol_kind     = info.consts().kind(index).value();
     const auto  resolved_kind   = resolved.kind();
     const bool  success         = symbol_kind == resolved_kind;
     if (!success) {
@@ -230,9 +230,9 @@ bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, re
     return success;
 }
 
-bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance, res<type_info> info, const_t index, const type& resolved) {
+bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved) {
     const auto t                = create_type(instance);
-    const auto symbol_callsig   = info->consts().callsig(index);
+    const auto symbol_callsig   = info.consts().callsig(index);
     const auto resolved_callsig = resolved.callsig();
     // if symbol_callsig is found to not be of a type w/ a callsig, return
     // successful up-front, as that means we're not dealing w/ one anyway
@@ -250,7 +250,7 @@ bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance,
         YAMA_LOG(
             dbg(), load_error_c,
             "error: {} type constant symbol {} (at constant index {}) has corresponding type {} matched against it, but the type constant symbol's callsig {} doesn't match the resolved type's callsig {}!",
-            t.fullname(), info->consts().qualified_name(index).value(), index, resolved.fullname(),
+            t.fullname(), info.consts().qualified_name(index).value(), index, resolved.fullname(),
             symbol_callsig_s, resolved_callsig_s);
     }
     return result;

@@ -14,14 +14,14 @@
 namespace yama {
 
 
-    // TODO: later on, when we add structs being able to be not default initializable,
+    // TODO: Later on, when we add structs being able to be not default initializable,
     //       we'll need to revise our code (such as w/ ctx cmd/bcode instr default_init)
-    //       which presumes that they always are
+    //       which presumes that they always are.
     //
-    //       also, be sure to update compilation-tests.cpp, in 'general', 'struct decl'
-    //       and 'default init expr' sections
+    //       Also, be sure to update compilation-tests.cpp, in 'general', 'struct decl'
+    //       and 'default init expr' sections.
 
-    // yama::kind defines the different *kinds of* types in Yama
+    // yama::kind defines the different *kinds of* items in Yama.
 
     enum class kind : uint8_t {
         primitive,
@@ -29,7 +29,7 @@ namespace yama {
         method,
         struct0,
 
-        num,        // this is not a valid kind of type
+        num,        // This is not a valid kind of item.
     };
 
     constexpr size_t kinds = size_t(kind::num);

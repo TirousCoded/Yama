@@ -8,6 +8,7 @@
 #include <taul/source_code.h>
 
 #include "../core/res.h"
+#include "../core/module.h"
 
 #include "safeptr.h"
 #include "specifiers.h"
@@ -81,7 +82,7 @@ namespace yama::internal {
         second_pass sp;
 
         std::shared_ptr<ast_Chunk> ast;
-        module_factory output;
+        yama::module output;
 
 
         translation_unit(compiler& cs, taul::source_code&& src, const import_path& src_path);

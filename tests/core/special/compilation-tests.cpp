@@ -2,13 +2,18 @@
 
 #include <gtest/gtest.h>
 
+#include <optional>
+
 #include <yama/core/general.h>
 #include <yama/core/res.h>
 #include <yama/core/scalars.h>
+#include <yama/core/module.h>
 #include <yama/core/domain.h>
 #include <yama/core/context.h>
-#include <yama/core/callsig_info.h>
-#include <yama/core/const_table_info.h>
+#include <yama/core/callsig.h>
+#include <yama/core/const_table.h>
+
+#include "../../utils/module_helper.h"
 
 
 using namespace yama::string_literals;
@@ -23,7 +28,7 @@ public:
     bool ready = false; // if fixture setup correctly
 
 
-    std::optional<yama::module> perform_compile(
+    std::optional<yama::module_ref> perform_compile(
         const std::string& txt,
         const std::string& txt_multi_a = "",
         const std::string& txt_multi_b = "",
@@ -189,7 +194,7 @@ namespace {
         void observe_float(yama::float_t) { seq += std::format("float n/a\n"); }
         void observe_bool(yama::bool_t x) { seq += std::format("bool {}\n", yama::fmt_bool(x)); }
         void observe_char(yama::char_t x) { seq += std::format("char {}\n", yama::fmt_char(x)); }
-        void observe_type(yama::type x) { seq += std::format("type {}\n", x); }
+        void observe_type(yama::item_ref x) { seq += std::format("type {}\n", x); }
 
         void observe_misc(std::string_view msg) { seq += std::format("misc {}\n", msg); }
     };
@@ -199,100 +204,100 @@ namespace {
 
     // our Yama functions for side-effects + misc
 
-    void observeNone_fn(yama::context& ctx) {
+    static void observeNone_fn(yama::context& ctx) {
         sidefx.observe_none();
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeInt_fn(yama::context& ctx) {
+    static void observeInt_fn(yama::context& ctx) {
         sidefx.observe_int(ctx.arg(1).value().as_int());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeUInt_fn(yama::context& ctx) {
+    static void observeUInt_fn(yama::context& ctx) {
         sidefx.observe_uint(ctx.arg(1).value().as_uint());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeFloat_fn(yama::context& ctx) {
+    static void observeFloat_fn(yama::context& ctx) {
         sidefx.observe_float(ctx.arg(1).value().as_float());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeBool_fn(yama::context& ctx) {
+    static void observeBool_fn(yama::context& ctx) {
         sidefx.observe_bool(ctx.arg(1).value().as_bool());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeChar_fn(yama::context& ctx) {
+    static void observeChar_fn(yama::context& ctx) {
         sidefx.observe_char(ctx.arg(1).value().as_char());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void observeType_fn(yama::context& ctx) {
+    static void observeType_fn(yama::context& ctx) {
         sidefx.observe_type(ctx.arg(1).value().as_type());
         if (ctx.push_none().bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void doPanic_fn(yama::context& ctx) {
+    static void doPanic_fn(yama::context& ctx) {
         ctx.panic();
     }
-    void doIncr_fn(yama::context& ctx) {
+    static void doIncr_fn(yama::context& ctx) {
         if (ctx.push_int(ctx.arg(1).value().as_int() + 1).bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void isEqInt_fn(yama::context& ctx) {
+    static void isEqInt_fn(yama::context& ctx) {
         const auto a = ctx.arg(1).value().as_int();
         const auto b = ctx.arg(2).value().as_int();
         if (ctx.push_bool(a == b).bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void isEqChar_fn(yama::context& ctx) {
+    static void isEqChar_fn(yama::context& ctx) {
         const auto a = ctx.arg(1).value().as_char();
         const auto b = ctx.arg(2).value().as_char();
         if (ctx.push_bool(a == b).bad()) return;
         if (ctx.ret(0).bad()) return;
     }
-    void isNotEqInt_fn(yama::context& ctx) {
+    static void isNotEqInt_fn(yama::context& ctx) {
         const auto a = ctx.arg(1).value().as_int();
         const auto b = ctx.arg(2).value().as_int();
         if (ctx.push_bool(a != b).bad()) return;
         if (ctx.ret(0).bad()) return;
     }
 
-    const auto consts =
-        yama::const_table_info()
-        .add_primitive_type("yama:None"_str)
-        .add_primitive_type("yama:Int"_str)
-        .add_primitive_type("yama:UInt"_str)
-        .add_primitive_type("yama:Float"_str)
-        .add_primitive_type("yama:Bool"_str)
-        .add_primitive_type("yama:Char"_str)
-        .add_primitive_type("yama:Type"_str);
-
-    const auto fns_module =
-        yama::module_factory()
-        .add_function("observeNone"_str, consts, yama::make_callsig({ 0 }, 0), 1, observeNone_fn)
-        .add_function("observeInt"_str, consts, yama::make_callsig({ 1 }, 0), 1, observeInt_fn)
-        .add_function("observeUInt"_str, consts, yama::make_callsig({ 2 }, 0), 1, observeUInt_fn)
-        .add_function("observeFloat"_str, consts, yama::make_callsig({ 3 }, 0), 1, observeFloat_fn)
-        .add_function("observeBool"_str, consts, yama::make_callsig({ 4 }, 0), 1, observeBool_fn)
-        .add_function("observeChar"_str, consts, yama::make_callsig({ 5 }, 0), 1, observeChar_fn)
-        .add_function("observeType"_str, consts, yama::make_callsig({ 6 }, 0), 1, observeType_fn)
-        .add_function("doPanic"_str, consts, yama::make_callsig({}, 0), 0, doPanic_fn)
-        .add_function("doIncr"_str, consts, yama::make_callsig({ 1 }, 1), 1, doIncr_fn)
-        .add_function("isEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isEqInt_fn)
-        .add_function("isEqChar"_str, consts, yama::make_callsig({ 5, 5 }, 4), 1, isEqChar_fn)
-        .add_function("isNotEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isNotEqInt_fn)
+    static yama::module get_fns_module() {
+        const auto consts =
+            yama::const_table()
+            .add_primitive_type("yama:None"_str)
+            .add_primitive_type("yama:Int"_str)
+            .add_primitive_type("yama:UInt"_str)
+            .add_primitive_type("yama:Float"_str)
+            .add_primitive_type("yama:Bool"_str)
+            .add_primitive_type("yama:Char"_str)
+            .add_primitive_type("yama:Type"_str);
+        module_helper mh{};
+        mh.add_function("observeNone"_str, consts, yama::make_callsig({ 0 }, 0), 1, observeNone_fn);
+        mh.add_function("observeInt"_str, consts, yama::make_callsig({ 1 }, 0), 1, observeInt_fn);
+        mh.add_function("observeUInt"_str, consts, yama::make_callsig({ 2 }, 0), 1, observeUInt_fn);
+        mh.add_function("observeFloat"_str, consts, yama::make_callsig({ 3 }, 0), 1, observeFloat_fn);
+        mh.add_function("observeBool"_str, consts, yama::make_callsig({ 4 }, 0), 1, observeBool_fn);
+        mh.add_function("observeChar"_str, consts, yama::make_callsig({ 5 }, 0), 1, observeChar_fn);
+        mh.add_function("observeType"_str, consts, yama::make_callsig({ 6 }, 0), 1, observeType_fn);
+        mh.add_function("doPanic"_str, consts, yama::make_callsig({}, 0), 0, doPanic_fn);
+        mh.add_function("doIncr"_str, consts, yama::make_callsig({ 1 }, 1), 1, doIncr_fn);
+        mh.add_function("isEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isEqInt_fn);
+        mh.add_function("isEqChar"_str, consts, yama::make_callsig({ 5, 5 }, 4), 1, isEqChar_fn);
+        mh.add_function("isNotEqInt"_str, consts, yama::make_callsig({ 1, 1 }, 4), 1, isNotEqInt_fn);
         // need this to better test w/ structs, so we'll just quick-n'-dirty bundle this
         // w/ our helper test fns
-        .add_struct("SomeStruct"_str, yama::const_table_info{})
-        .done();
+        mh.add_struct("SomeStruct"_str, yama::const_table{});
+        return mh.result();
+    }
 
     class fns_parcel final : public yama::parcel {
     public:
         std::optional<yama::parcel_metadata> md;
-        std::shared_ptr<const yama::module_info> mi;
+        std::shared_ptr<const yama::module> mi;
 
 
         fns_parcel() = default;
@@ -304,38 +309,26 @@ namespace {
         }
         std::optional<yama::import_result> import(const yama::str& relative_path) override final {
             if (relative_path == ".abc"_str) {
-                return yama::make_res<yama::module_info>(fns_module);
+                return yama::make_res<yama::module>(get_fns_module());
             }
             // .bad is used to test failure
             else if (relative_path == ".bad"_str) {
-                yama::module_factory mf{};
-                mf.add_function(
+                yama::module m{};
+                const bool success = m.add_function(
                     "f"_str,
-                    yama::const_table_info{},
+                    yama::const_table{},
                     yama::make_callsig({}, 10'000), // <- return type invalid! so .bad is also invalid!
                     1,
                     yama::noop_call_fn);
-                return mf.done();
+                if (!success) {
+                    return std::nullopt;
+                }
+                return m;
             }
             else return std::nullopt;
         }
     };
 
-
-    const auto acknowledge_consts =
-        yama::const_table_info()
-        .add_primitive_type("yama:None"_str);
-
-    const auto acknowledge_info = yama::make_function(
-        "acknowledge"_str,
-        acknowledge_consts,
-        yama::make_callsig({}, 0),
-        1,
-        [](yama::context& ctx) {
-            sidefx.observe_misc("ack");
-            if (ctx.push_none().bad()) return;
-            if (ctx.ret(0).bad()) return;
-        });
 
     // test_parcel exists to establish the environment inside of which compilation is going
     // to be occurring (ie. defined via self-name and dep-names of the parcel)
@@ -385,9 +378,24 @@ namespace {
             }
             // .abc exists to test importing a module which exists in same parcel as compiling module
             else if (relative_path == ".abc"_str) {
-                yama::module_factory mf{};
-                mf.add(yama::type_info(acknowledge_info));
-                return mf.done();
+                yama::module m{};
+                const auto acknowledge_consts =
+                    yama::const_table()
+                    .add_primitive_type("yama:None"_str);
+                const bool success = m.add_function(
+                    "acknowledge"_str,
+                    acknowledge_consts,
+                    yama::make_callsig({}, 0),
+                    1,
+                    [](yama::context& ctx) {
+                        sidefx.observe_misc("ack");
+                        if (ctx.push_none().bad()) return;
+                        if (ctx.ret(0).bad()) return;
+                    });
+                return
+                    success
+                    ? std::make_optional(std::move(m))
+                    : std::nullopt;
             }
             else return std::nullopt;
         }
@@ -459,7 +467,7 @@ namespace {
 }
 
 
-std::optional<yama::module> CompilationTests::perform_compile(
+std::optional<yama::module_ref> CompilationTests::perform_compile(
     const std::string& txt,
     const std::string& txt_multi_a,
     const std::string& txt_multi_b,
@@ -511,7 +519,7 @@ TEST_F(CompilationTests, Empty) {
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    ASSERT_EQ(result->size(), 0); // can't really test w/ dm if *result is empty
+    ASSERT_EQ(result->count(), 0); // can't really test w/ dm if *result is empty
 }
 
 TEST_F(CompilationTests, MultipleRoundsOfCompilation) {
@@ -6626,7 +6634,7 @@ fn f6() -> Float { return nan; }
 
     // f6 is handled seperately, due to NAN values being annoying
 
-    std::initializer_list<std::pair<yama::type, yama::float_t>> cases{
+    std::initializer_list<std::pair<yama::item_ref, yama::float_t>> cases{
         { *f0, 0.0 },
         { *f1, 1.0 },
         { *f2, 1'000'000.0 },

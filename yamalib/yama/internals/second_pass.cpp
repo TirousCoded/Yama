@@ -173,9 +173,8 @@ void yama::internal::second_pass::_localvar_with_no_init(ast_VarDecl& x) {
 }
 
 void yama::internal::second_pass::_begin_fn_like(ast_FnDecl& x) {
-    const str unqualified_name = str(x.fmt_unqualified_name(tu->src).value());
     // gen new codegen target
-    tu->cgt.gen_target_fn_like(unqualified_name, x.is_method());
+    tu->cgt.start(x);
     auto& targsym = tu->cgt.target_csym<fn_like_csym>();
     // resolve if fn type is None returning
     const ctype return_type = targsym.get_return_type_or_none();
@@ -183,6 +182,7 @@ void yama::internal::second_pass::_begin_fn_like(ast_FnDecl& x) {
     // if return type is not None, then control-flow error if not all control paths have
     // explicit return stmts (or enter infinite loops)
     if (!targsym.is_none_returning.value() && !targsym.all_paths_return_or_loop.value()) {
+    const str unqualified_name = str(x.fmt_unqualified_name(tu->src).value());
         tu->err.error(
             x,
             dsignal::compile_no_return_stmt,
@@ -205,17 +205,16 @@ void yama::internal::second_pass::_begin_fn_like(ast_FnDecl& x) {
 }
 
 void yama::internal::second_pass::_end_fn_like(ast_FnDecl& x) {
-    tu->cgt.upload_target(x);
+    tu->cgt.finish();
 }
 
 void yama::internal::second_pass::_begin_struct(ast_StructDecl& x) {
-    const str name = x.name.str(tu->src);
     // gen new codegen target
-    tu->cgt.gen_target_struct(name);
+    tu->cgt.start(x);
 }
 
 void yama::internal::second_pass::_end_struct(ast_StructDecl& x) {
-    tu->cgt.upload_target(x);
+    tu->cgt.finish();
 }
 
 void yama::internal::second_pass::_begin_block(ast_Block& x) {

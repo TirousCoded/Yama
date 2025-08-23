@@ -7,14 +7,8 @@
 #include "../core/kind-features.h"
 
 #include "util.h"
-#include "compiler.h"
-
-
-#define _DUMP_LOG 0
-
-#if _DUMP_LOG == 1
 #include "domain_data.h"
-#endif
+#include "compiler.h"
 
 
 yama::internal::expr_analyzer::expr_analyzer(compiler& cs)
@@ -62,17 +56,25 @@ std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_t
 }
 
 void yama::internal::expr_analyzer::codegen(const ast_Expr& root, size_t ret) {
+    YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result sent to {})...",
+        _tu(root).src.location_at(root.low_pos()),
+        ret == (size_t)newtop ? "*newtop*" : std::format("{}", ret));
     _codegen(root, ret);
+    YAMA_LOG(cs->dbg(), compile_c, "expr codegen complete!");
 }
 
 void yama::internal::expr_analyzer::codegen_nr(const ast_Expr& root) {
+    YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result discarded)...", _tu(root).src.location_at(root.low_pos()));
     _codegen(root, std::nullopt);
+    YAMA_LOG(cs->dbg(), compile_c, "expr codegen complete!");
 }
 
 void yama::internal::expr_analyzer::analyze() {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing exprs ({} roots)...", _roots.size());
     for (const auto& [key, value] : _roots) {
         _resolve(*key);
     }
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing exprs complete!");
 }
 
 void yama::internal::expr_analyzer::cleanup() {
@@ -113,6 +115,10 @@ bool yama::internal::expr_analyzer::_is_resolved(const ast_expr& x) const noexce
 
 void yama::internal::expr_analyzer::_gen_metadata(const ast_expr& x, taul::source_pos where, category category, mode mode) {
     if (_is_resolved(x)) return;
+    YAMA_LOG(cs->dbg(), compile_c, "generating metadata ({}, {}, {})...",
+        _tu(x).src.location_at(where),
+        fmt_category(category),
+        mode == mode::rvalue ? "rvalue" : "lvalue");
     metadata new_md{
         .tu = _tu(x),
         .where = where,
@@ -136,13 +142,16 @@ bool yama::internal::expr_analyzer::_resolve(const ast_expr& x) {
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_PrimaryExpr& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing PrimaryExpr {}...", _tu(x).src.location_at(x.low_pos()));
     _gen_metadata(x, x.low_pos(), _discern_category(x), _discern_mode(x));
     const bool result = _resolve_expr(x);
-    _dump_log_helper(result, x);
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze PrimaryExpr complete!");
     return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing Args {}...", _tu(x).src.location_at(x.low_pos()));
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
@@ -151,11 +160,13 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Args& x) {
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
-    _dump_log_helper(result, x);
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze Args complete!");
     return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_TypeMemberAccess& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing TypeMemberAccess {}...", _tu(x).src.location_at(x.low_pos()));
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
@@ -164,11 +175,13 @@ bool yama::internal::expr_analyzer::_resolve(const ast_TypeMemberAccess& x) {
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
-    _dump_log_helper(result, x);
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze TypeMemberAccess complete!");
     return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_ObjectMemberAccess& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing ObjectMemberAccess {}...", _tu(x).src.location_at(x.low_pos()));
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
@@ -177,11 +190,13 @@ bool yama::internal::expr_analyzer::_resolve(const ast_ObjectMemberAccess& x) {
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
-    _dump_log_helper(result, x);
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze ObjectMemberAccess complete!");
     return result;
 }
 
 bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing Expr {}...", _tu(x).src.location_at(x.low_pos()));
     // skip _resolve_expr unless we can rely 100% on subexprs being valid
     const bool can_resolve_expr = _resolve_children(x);
     // call after _resolve_children for _discern_category
@@ -190,7 +205,8 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
         can_resolve_expr
         ? _resolve_expr(x)
         : false;
-    _dump_log_helper(result, x);
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze Expr complete!");
     return result;
 }
 
@@ -274,6 +290,7 @@ yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
     metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving PrimaryExpr ({})...", fmt_category(md.category));
     switch (md.category) {
     case category::param_id:
     {
@@ -415,6 +432,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
     metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving Args ({})...", fmt_category(md.category));
     switch (md.category) {
     case category::bound_method_call:
     {
@@ -517,6 +535,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_TypeMemberAccess& x) {
     metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving TypeMemberAccess ({})...", fmt_category(md.category));
     switch (md.category) {
     case category::unbound_method:
     {
@@ -563,6 +582,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_TypeMemberAccess& x)
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_ObjectMemberAccess& x) {
     metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving ObjectMemberAccess ({})...", fmt_category(md.category));
     switch (md.category) {
     case category::bound_method:
     {
@@ -618,6 +638,7 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_ObjectMemberAccess& 
 
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_Expr& x) {
     metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving Expr ({})...", fmt_category(md.category));
     const auto& child_md = _pull(*res(x.get_primary_subexpr()));
     const bool must_be_constexpr_but_isnt =
         _is_root_and_must_be_constexpr(x) &&
@@ -1186,20 +1207,14 @@ yama::str yama::internal::expr_analyzer::_remove_quotes(const str& x) noexcept {
     return x.substr(1, x.length() - 2);
 }
 
-void yama::internal::expr_analyzer::_dump_log_helper(bool success, const ast_expr& x) {
-#if _DUMP_LOG == 1
-    if (success) {
+void yama::internal::expr_analyzer::_trace_result(bool success, const ast_expr& x) {
+    auto msg = [&]() -> std::string {
         const auto& e = cs->dd->installs.domain_env();
         const auto& fetched = _fetch(x);
-        std::string txt{};
-        if (!success)                           txt = "fail";
-        else if (auto crv = fetched.crvalue)    txt = crv.value().fmt(e);
-        else                                    txt = std::format("{} (*runtime-only*)", fetched.type.value().fmt(e));
-        println(
-            "-- _resolve {} {} (ID={}) => {}",
-            _tu(x).src.location_at(x.low_pos()), x.node_type, x.id,
-            txt);
-    }
-#endif
+        if (!success)                           return "fail";
+        else if (auto crv = fetched.crvalue)    return crv.value().fmt(e);
+        else                                    return std::format("{} (*runtime-only*)", fetched.type.value().fmt(e));
+        };
+    YAMA_LOG(cs->dbg(), compile_c, "result: {}", msg());
 }
 

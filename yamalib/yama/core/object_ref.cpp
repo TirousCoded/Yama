@@ -28,7 +28,7 @@ yama::char_t yama::object_ref::as_char() const noexcept {
     return v.c;
 }
 
-yama::type yama::object_ref::as_type() const noexcept {
+yama::item_ref yama::object_ref::as_type() const noexcept {
     YAMA_ASSERT(t.ptype() == ptype::type);
     return v.t;
 }

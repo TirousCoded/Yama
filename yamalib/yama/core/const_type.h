@@ -13,11 +13,11 @@
 namespace yama {
 
 
-    class type;
-    struct const_table_info;
+    class item_ref;
+    struct const_table;
 
 
-    // const_t specifies an index into a const_table or const_table_info
+    // const_t specifies an index into a const_table_ref or const_table
 
     using const_t = size_t;
 
@@ -133,7 +133,7 @@ namespace yama {
     // type traits
 
     // const_info_of queries the #_const_info struct encapsulating
-    // a symbol for a constant of type C in a const_table_info
+    // a symbol for a constant of type C in a const_table
 
     template<const_type C>
     struct const_info_of final {};
@@ -141,7 +141,7 @@ namespace yama {
     template<const_type C>
     using const_info_of_t = typename const_info_of<C>::type;
 
-    // const_data_of queries the const_table entry value which
+    // const_data_of queries the const_table_ref entry value which
     // constants of type C ultimately map to
 
     template<const_type C>
@@ -175,19 +175,19 @@ namespace yama {
     };
     template<>
     struct const_data_of<primitive_type_const> final {
-        using type = yama::type;
+        using type = yama::item_ref;
     };
     template<>
     struct const_data_of<function_type_const> final {
-        using type = yama::type;
+        using type = yama::item_ref;
     };
     template<>
     struct const_data_of<method_type_const> final {
-        using type = yama::type;
+        using type = yama::item_ref;
     };
     template<>
     struct const_data_of<struct_type_const> final {
-        using type = yama::type;
+        using type = yama::item_ref;
     };
 }
 

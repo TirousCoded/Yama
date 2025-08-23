@@ -46,7 +46,7 @@ std::shared_ptr<yama::parcel> yama::domain::get_installed(parcel_id id) const no
     return _dd.installs.get_installed(id);
 }
 
-std::optional<yama::module> yama::domain::import(const str& import_path) {
+std::optional<yama::module_ref> yama::domain::import(const str& import_path) {
     std::shared_lock lk(_dd.state_mtx);
     auto result = _dd.importer.import(_dd.installs.domain_env(), import_path, _dd.state);
     lk.unlock(); // release before commit_or_discard
@@ -54,7 +54,7 @@ std::optional<yama::module> yama::domain::import(const str& import_path) {
     return result;
 }
 
-std::optional<yama::type> yama::domain::load(const str& fullname) {
+std::optional<yama::item_ref> yama::domain::load(const str& fullname) {
     std::shared_lock lk(_dd.state_mtx);
     auto result = _dd.loader.load(fullname);
     lk.unlock(); // release before commit_or_discard
@@ -62,31 +62,31 @@ std::optional<yama::type> yama::domain::load(const str& fullname) {
     return result;
 }
 
-yama::type yama::domain::none_type() {
+yama::item_ref yama::domain::none_type() {
     return deref_assert(_dd.quick_access).none;
 }
 
-yama::type yama::domain::int_type() {
+yama::item_ref yama::domain::int_type() {
     return deref_assert(_dd.quick_access).int0;
 }
 
-yama::type yama::domain::uint_type() {
+yama::item_ref yama::domain::uint_type() {
     return deref_assert(_dd.quick_access).uint;
 }
 
-yama::type yama::domain::float_type() {
+yama::item_ref yama::domain::float_type() {
     return deref_assert(_dd.quick_access).float0;
 }
 
-yama::type yama::domain::bool_type() {
+yama::item_ref yama::domain::bool_type() {
     return deref_assert(_dd.quick_access).bool0;
 }
 
-yama::type yama::domain::char_type() {
+yama::item_ref yama::domain::char_type() {
     return deref_assert(_dd.quick_access).char0;
 }
 
-yama::type yama::domain::type_type() {
+yama::item_ref yama::domain::type_type() {
     return deref_assert(_dd.quick_access).type;
 }
 

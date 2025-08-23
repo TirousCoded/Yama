@@ -7,7 +7,7 @@
 #include <variant>
 
 #include "../core/res.h"
-#include "../core/module_info.h"
+#include "../core/module.h"
 
 #include "safeptr.h"
 #include "env.h"
@@ -41,7 +41,7 @@ namespace yama::internal {
     class ctype final {
     public:
         ctype(ctypesys& s, res<csym> x, const import_path& where);
-        ctype(ctypesys& s, const type_info& x, const import_path& where);
+        ctype(ctypesys& s, module::item x, const import_path& where);
 
         ctype(const ctype&) = default;
         ctype& operator=(const ctype&) = default;
@@ -69,7 +69,7 @@ namespace yama::internal {
 
 
     private:
-        using _info_t = std::variant<res<csym>, safeptr<const type_info>>;
+        using _info_t = std::variant<res<csym>, module::item>;
 
 
         safeptr<ctypesys> _s;
@@ -81,14 +81,14 @@ namespace yama::internal {
 
         bool _csymtab_entry_not_typeinf() const noexcept;
         const res<csym>& _csymtab_entry() const;
-        const type_info& _typeinf() const;
+        module::item _typeinf() const;
     };
 
 
     class cmodule final {
     public:
         cmodule(ctypesys& s, translation_unit& tu, const internal::import_path& where);
-        cmodule(ctypesys& s, const res<module_info>& x, const internal::import_path& where);
+        cmodule(ctypesys& s, const res<module>& x, const internal::import_path& where);
 
 
         inline env e() const { return _e(); }
@@ -100,7 +100,7 @@ namespace yama::internal {
     private:
         // TODO: _dummy_t use involves a dirty C-style pointer cast
         struct _dummy_t {}; // <- helps avoid possible template instantiation issues w/ translation_unit in _info_t
-        using _info_t = std::variant<safeptr<_dummy_t>, res<module_info>>;
+        using _info_t = std::variant<safeptr<_dummy_t>, res<module>>;
 
 
         safeptr<ctypesys> _s;
@@ -112,7 +112,7 @@ namespace yama::internal {
 
         bool _tu_not_modinf() const noexcept;
         const translation_unit& _tu() const;
-        const res<module_info>& _modinf() const;
+        const res<module>& _modinf() const;
     };
 
 
@@ -128,7 +128,7 @@ namespace yama::internal {
         std::shared_ptr<cmodule> import(const import_path& x);
         std::optional<ctype> load(const fullname& x);
 
-        std::shared_ptr<cmodule> register_module(const import_path& where, res<module_info> x);
+        std::shared_ptr<cmodule> register_module(const import_path& where, res<module> x);
         std::shared_ptr<cmodule> register_module(translation_unit& x);
 
         void cleanup();

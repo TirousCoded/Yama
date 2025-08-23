@@ -9,7 +9,8 @@
 #include "../core/res.h"
 #include "../core/ptype.h"
 #include "../core/const_type.h"
-#include "../core/type_info.h"
+#include "../core/ids.h"
+#include "../core/module.h"
 
 #include "ha_struct.h"
 
@@ -19,14 +20,17 @@ namespace yama::internal {
 
     struct type_mem_header final {
         str                     fullname;
-        size_t                  len;        // size of constant table
-        size_t                  stubs;      // constant table stubs
-        res<type_info>          info;
+        size_t                  len;                    // size of constant table
+        size_t                  stubs;                  // constant table stubs
+        module::item            info;
+        mid_t                   mid;
 
         // storing these for fast RTTI access if we need it
 
-        kind                    kind;       // the kind of type this is
-        std::optional<ptype>    ptype;      // the ptype, if any, of this type
+        kind                    kind;                   // the kind of type this is
+        std::optional<ptype>    ptype;                  // the ptype, if any, of this type
+        yama::call_fn           cf          = nullptr;
+        size_t                  max_locals  = 0;
 
 
         inline size_t length() const noexcept { return len; }

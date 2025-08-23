@@ -21,7 +21,7 @@ yama::internal::ctype::ctype(ctypesys& s, res<csym> x, const import_path& where)
     YAMA_ASSERT(_csymtab_entry()->is_type);
 }
 
-yama::internal::ctype::ctype(ctypesys& s, const type_info& x, const import_path& where)
+yama::internal::ctype::ctype(ctypesys& s, module::item x, const import_path& where)
     : _s(s),
     _info(x),
     _where(where) {}
@@ -30,7 +30,7 @@ yama::internal::unqualified_name yama::internal::ctype::uqn() const {
     return
         _csymtab_entry_not_typeinf()
         ? _csymtab_entry()->name
-        : _typeinf().unqualified_name();
+        : _typeinf().name();
 }
 
 yama::internal::fullname yama::internal::ctype::fln() const {
@@ -129,9 +129,9 @@ const yama::res<yama::internal::csym>& yama::internal::ctype::_csymtab_entry() c
     return std::get<res<csym>>(_info);
 }
 
-const yama::type_info& yama::internal::ctype::_typeinf() const {
+yama::module::item yama::internal::ctype::_typeinf() const {
     YAMA_ASSERT(!_csymtab_entry_not_typeinf());
-    return *std::get<safeptr<const yama::type_info>>(_info);
+    return std::get<module::item>(_info);
 }
 
 yama::internal::cmodule::cmodule(ctypesys& s, translation_unit& tu, const internal::import_path& where)
@@ -139,7 +139,7 @@ yama::internal::cmodule::cmodule(ctypesys& s, translation_unit& tu, const intern
     _info(safeptr(*(_dummy_t*)&tu)),
     _where(where) {}
 
-yama::internal::cmodule::cmodule(ctypesys& s, const res<module_info>& x, const internal::import_path& where)
+yama::internal::cmodule::cmodule(ctypesys& s, const res<module>& x, const internal::import_path& where)
     : _s(s),
     _info(x),
     _where(where) {}
@@ -152,8 +152,8 @@ std::optional<yama::internal::ctype> yama::internal::cmodule::type(const str& un
         }
     }
     else {
-        if (_modinf()->contains(unqualified_name)) {
-            return ctype(*_s, _modinf()->type(unqualified_name), ip());
+        if (const auto item = _modinf()->get_item(unqualified_name)) {
+            return ctype(*_s, *item, ip());
         }
     }
     return std::nullopt;
@@ -164,7 +164,7 @@ yama::internal::env yama::internal::cmodule::_e() const {
 }
 
 bool yama::internal::cmodule::_tu_not_modinf() const noexcept {
-    YAMA_ASSERT(std::holds_alternative<safeptr<_dummy_t>>(_info) != std::holds_alternative<res<module_info>>(_info));
+    YAMA_ASSERT(std::holds_alternative<safeptr<_dummy_t>>(_info) != std::holds_alternative<res<module>>(_info));
     return std::holds_alternative<safeptr<_dummy_t>>(_info);
 }
 
@@ -173,9 +173,9 @@ const yama::internal::translation_unit& yama::internal::cmodule::_tu() const {
     return *(translation_unit*)std::get<safeptr<_dummy_t>>(_info).get();
 }
 
-const yama::res<yama::module_info>& yama::internal::cmodule::_modinf() const {
+const yama::res<yama::module>& yama::internal::cmodule::_modinf() const {
     YAMA_ASSERT(!_tu_not_modinf());
-    return std::get<res<module_info>>(_info);
+    return std::get<res<module>>(_info);
 }
 
 yama::internal::ctypesys::ctypesys(compiler& cs)
@@ -216,7 +216,7 @@ std::optional<yama::internal::ctype> yama::internal::ctypesys::load(const fullna
         : std::nullopt;
 }
 
-std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys::register_module(const import_path& where, res<module_info> x) {
+std::shared_ptr<yama::internal::cmodule> yama::internal::ctypesys::register_module(const import_path& where, res<module> x) {
     if (_modules.contains(where)) return nullptr;
     const auto new_cmodule = yama::make_res<cmodule>(*this, x, where);
     _modules.insert({ where, new_cmodule });

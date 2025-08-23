@@ -19,8 +19,6 @@
 #include "debug.h"
 #include "api_component.h"
 
-#include "attrs.h"
-
 #include "kind.h"
 #include "kind-features.h"
 
@@ -29,18 +27,19 @@
 #include "newtop.h"
 #include "bcode.h"
 
-#include "callsig_info.h"
 #include "callsig.h"
+#include "callsig_ref.h"
 
 #include "const_type.h"
-#include "const_table_info.h"
 #include "const_table.h"
+#include "const_table_ref.h"
 
-#include "type_info.h"
-#include "type.h"
+#include "ids.h"
 
-#include "module_info.h"
+#include "item_ref.h"
+
 #include "module.h"
+#include "module_ref.h"
 
 #include "parcel.h"
 

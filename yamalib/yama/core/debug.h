@@ -194,16 +194,17 @@ namespace yama {
         compile_misplaced_import,
         compile_invalid_env,
 
-        verif_type_unqualified_name_invalid,
-        verif_type_callsig_invalid,
-        verif_type_owner_not_in_module,
-        verif_constsym_qualified_name_invalid,
-        verif_constsym_callsig_invalid,
+        verif_invalid_unqualified_name,
+        verif_invalid_callsig,
+        verif_owner_not_in_module,
+        verif_constsym_invalid_qualified_name,
+        verif_constsym_invalid_callsig,
         verif_callsig_param_type_out_of_bounds,
         verif_callsig_return_type_out_of_bounds,
         verif_callsig_param_type_not_type_const,
         verif_callsig_return_type_not_type_const,
         verif_binary_is_empty,
+        verif_binary_not_found,
         verif_RTop_does_not_exist,
         verif_RTop_wrong_type,
         verif_RA_out_of_bounds,
@@ -238,7 +239,7 @@ namespace yama {
         import_module_not_found,
         import_invalid_module,
 
-        load_type_not_found,
+        load_item_not_found,
         load_kind_mismatch,
         load_callsig_mismatch,
 
@@ -249,7 +250,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 73);
+        static_assert(dsignals == 74);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -284,16 +285,17 @@ namespace yama {
             _YAMA_ENTRY_(compile_misplaced_import);
             _YAMA_ENTRY_(compile_invalid_env);
 
-            _YAMA_ENTRY_(verif_type_unqualified_name_invalid);
-            _YAMA_ENTRY_(verif_type_callsig_invalid);
-            _YAMA_ENTRY_(verif_type_owner_not_in_module);
-            _YAMA_ENTRY_(verif_constsym_qualified_name_invalid);
-            _YAMA_ENTRY_(verif_constsym_callsig_invalid);
+            _YAMA_ENTRY_(verif_invalid_unqualified_name);
+            _YAMA_ENTRY_(verif_invalid_callsig);
+            _YAMA_ENTRY_(verif_owner_not_in_module);
+            _YAMA_ENTRY_(verif_constsym_invalid_qualified_name);
+            _YAMA_ENTRY_(verif_constsym_invalid_callsig);
             _YAMA_ENTRY_(verif_callsig_param_type_out_of_bounds);
             _YAMA_ENTRY_(verif_callsig_return_type_out_of_bounds);
             _YAMA_ENTRY_(verif_callsig_param_type_not_type_const);
             _YAMA_ENTRY_(verif_callsig_return_type_not_type_const);
             _YAMA_ENTRY_(verif_binary_is_empty);
+            _YAMA_ENTRY_(verif_binary_not_found);
             _YAMA_ENTRY_(verif_RTop_does_not_exist);
             _YAMA_ENTRY_(verif_RTop_wrong_type);
             _YAMA_ENTRY_(verif_RA_out_of_bounds);
@@ -328,7 +330,7 @@ namespace yama {
             _YAMA_ENTRY_(import_module_not_found);
             _YAMA_ENTRY_(import_invalid_module);
 
-            _YAMA_ENTRY_(load_type_not_found);
+            _YAMA_ENTRY_(load_item_not_found);
             _YAMA_ENTRY_(load_kind_mismatch);
             _YAMA_ENTRY_(load_callsig_mismatch);
 

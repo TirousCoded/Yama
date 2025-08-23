@@ -5,9 +5,10 @@
 #include <yama/core/res.h>
 #include <yama/core/debug.h>
 #include <yama/core/domain.h>
-#include <yama/core/const_table_info.h>
 #include <yama/core/const_table.h>
-#include <yama/core/module_info.h>
+#include <yama/core/const_table_ref.h>
+
+#include "../../utils/module_helper.h"
 
 
 using namespace yama::string_literals;
@@ -17,6 +18,11 @@ class LoadingTests : public testing::Test {
 public:
     std::shared_ptr<yama::dsignal_debug> dbg;
     std::shared_ptr<yama::domain> dm;
+
+
+    module_helper mh;
+
+    bool install_and_check();
 
 
 protected:
@@ -64,12 +70,12 @@ namespace {
     class test_parcel final : public yama::parcel {
     public:
         std::optional<yama::parcel_metadata> md;
-        yama::res<yama::module_info> m;
+        yama::res<yama::module> m;
 
 
-        test_parcel(yama::module_factory& mf)
+        test_parcel(const yama::module& m)
             : parcel(),
-            m(yama::make_res<yama::module_info>(mf.done())) {}
+            m(yama::make_res<yama::module>(m)) {}
 
 
         const yama::parcel_metadata& metadata() override final {
@@ -81,6 +87,12 @@ namespace {
             return decltype(m)(m);
         }
     };
+}
+
+bool LoadingTests::install_and_check() {
+    yama::install_batch ib{};
+    ib.install("p"_str, yama::make_res<test_parcel>(mh.result()));
+    return dm->install(std::move(ib));
 }
 
 
@@ -117,7 +129,7 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
 
     static_assert(yama::const_types == 9);
     auto consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_int(-4)
         .add_uint(301)
         .add_float(3.14159)
@@ -127,25 +139,22 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
         .add_function_type("self:b1"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
         .add_method_type("self:b0::m"_str, yama::make_callsig({}, 5)) // ie. fn() -> b0
         .add_struct_type("self:b2"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, consts, yama::ptype::bool0)
-        .add_primitive("b0"_str, {}, yama::ptype::bool0)
-        .add_function(
-            "b1"_str, consts,
-            yama::make_callsig({}, 5), // ie. fn() -> b0
-            10,
-            yama::noop_call_fn)
-        .add_method(
-            "b0::m"_str, consts,
-            yama::make_callsig({}, 5), // ie. fn() -> b0
-            10,
-            yama::noop_call_fn)
-        .add_struct("b2"_str, consts);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, consts, yama::ptype::bool0);
+    mh.add_primitive("b0"_str, {}, yama::ptype::bool0);
+    mh.add_function(
+        "b1"_str, consts,
+        yama::make_callsig({}, 5), // ie. fn() -> b0
+        10,
+        yama::noop_call_fn);
+    mh.add_method(
+        "b0"_str, "m"_str, consts,
+        yama::make_callsig({}, 5), // ie. fn() -> b0
+        10,
+        yama::noop_call_fn);
+    mh.add_struct("b2"_str, consts);
+
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b0 = dm->load("p:b0"_str);
@@ -159,11 +168,11 @@ TEST_F(LoadingTests, EnsureWorksWithAllConstTypes) {
     ASSERT_TRUE(b0_m);
     ASSERT_TRUE(b2);
 
-    const yama::type aa = a.value();
-    const yama::type bb0 = b0.value();
-    const yama::type bb1 = b1.value();
-    const yama::type bb0_dot_m = b0_m.value();
-    const yama::type bb2 = b2.value();
+    const yama::item_ref aa = a.value();
+    const yama::item_ref bb0 = b0.value();
+    const yama::item_ref bb1 = b1.value();
+    const yama::item_ref bb0_dot_m = b0_m.value();
+    const yama::item_ref bb2 = b2.value();
 
     // for this test we only really care that type 'a' loads correctly
 
@@ -187,19 +196,15 @@ TEST_F(LoadingTests, WithNoDeps) {
     // dep graph:
     //      a
 
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("a"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
 
     ASSERT_TRUE(a);
 
-    const yama::type aa = a.value();
+    const yama::item_ref aa = a.value();
 
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
@@ -212,18 +217,15 @@ TEST_F(LoadingTests, WithDeps) {
     //        -> c
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:c"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_primitive("b"_str, {}, yama::ptype::bool0)
-        .add_primitive("c"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_primitive("b"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("c"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b = dm->load("p:b"_str);
@@ -233,9 +235,9 @@ TEST_F(LoadingTests, WithDeps) {
     ASSERT_TRUE(b);
     ASSERT_TRUE(c);
 
-    const yama::type aa = a.value();
-    const yama::type bb = b.value();
-    const yama::type cc = c.value();
+    const yama::item_ref aa = a.value();
+    const yama::item_ref bb = b.value();
+    const yama::item_ref cc = c.value();
 
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
@@ -259,28 +261,25 @@ TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     //        -> c -> f
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:c"_str);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:d"_str)
         .add_primitive_type("self:e"_str);
     auto c_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:f"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
-        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
-        .add_primitive("d"_str, {}, yama::ptype::bool0)
-        .add_primitive("e"_str, {}, yama::ptype::bool0)
-        .add_primitive("f"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_primitive("b"_str, b_consts, yama::ptype::bool0);
+    mh.add_primitive("c"_str, c_consts, yama::ptype::bool0);
+    mh.add_primitive("d"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("e"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("f"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b = dm->load("p:b"_str);
@@ -296,12 +295,12 @@ TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     ASSERT_TRUE(e);
     ASSERT_TRUE(f);
 
-    const yama::type aa = a.value();
-    const yama::type bb = b.value();
-    const yama::type cc = c.value();
-    const yama::type dd = d.value();
-    const yama::type ee = e.value();
-    const yama::type ff = f.value();
+    const yama::item_ref aa = a.value();
+    const yama::item_ref bb = b.value();
+    const yama::item_ref cc = c.value();
+    const yama::item_ref dd = d.value();
+    const yama::item_ref ee = e.value();
+    const yama::item_ref ff = f.value();
 
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
@@ -341,27 +340,24 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     //             -> d
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:c"_str);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:d"_str);
     auto c_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:d"_str)
         .add_primitive_type("self:d"_str)
         .add_primitive_type("self:d"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
-        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
-        .add_primitive("d"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_primitive("b"_str, b_consts, yama::ptype::bool0);
+    mh.add_primitive("c"_str, c_consts, yama::ptype::bool0);
+    mh.add_primitive("d"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b = dm->load("p:b"_str);
@@ -373,10 +369,10 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     ASSERT_TRUE(c);
     ASSERT_TRUE(d);
 
-    const yama::type aa = a.value();
-    const yama::type bb = b.value();
-    const yama::type cc = c.value();
-    const yama::type dd = d.value();
+    const yama::item_ref aa = a.value();
+    const yama::item_ref bb = b.value();
+    const yama::item_ref cc = c.value();
+    const yama::item_ref dd = d.value();
 
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
@@ -407,20 +403,17 @@ TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
     //        -> a          (back ref)
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:a"_str);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:a"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_primitive("b"_str, b_consts, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_primitive("b"_str, b_consts, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     const auto a = dm->load("p:a"_str); // <- main one under test
     const auto b = dm->load("p:b"_str);
@@ -428,8 +421,8 @@ TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
 
-    const yama::type aa = a.value();
-    const yama::type bb = b.value();
+    const yama::item_ref aa = a.value();
+    const yama::item_ref bb = b.value();
 
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
@@ -447,15 +440,11 @@ TEST_F(LoadingTests, Fail_OriginalTypeNotFound) {
     // dep graph:
     //      a           <- error is that no type_info 'a' provided
 
-    yama::module_factory mf{};
-
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    ASSERT_TRUE(install_and_check());
 
     EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
 
-    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_item_not_found), 1);
 }
 
 TEST_F(LoadingTests, Fail_ReferencedTypeNotFound) {
@@ -464,22 +453,19 @@ TEST_F(LoadingTests, Fail_ReferencedTypeNotFound) {
     //        -> c
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:c"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        //.add_primitive("b"_str, {}, yama::ptype::bool0)
-        .add_primitive("c"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    //mh.add_primitive("b"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("c"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
 
-    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_item_not_found), 1);
 }
 
 TEST_F(LoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
@@ -489,32 +475,29 @@ TEST_F(LoadingTests, Fail_IndirectlyReferencedTypeNotFound) {
     //        -> c -> f
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:b"_str)
         .add_primitive_type("self:c"_str);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:d"_str) // <- import of 'a' indirectly refers to 'd'
         .add_primitive_type("self:e"_str);
     auto c_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:f"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_primitive("b"_str, b_consts, yama::ptype::bool0)
-        .add_primitive("c"_str, c_consts, yama::ptype::bool0)
-        //.add_primitive("d"_str, {}, yama::ptype::bool0) <- missing
-        .add_primitive("e"_str, {}, yama::ptype::bool0)
-        .add_primitive("f"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_primitive("b"_str, b_consts, yama::ptype::bool0);
+    mh.add_primitive("c"_str, c_consts, yama::ptype::bool0);
+    //mh.add_primitive("d"_str, {}, yama::ptype::bool0); <- missing
+    mh.add_primitive("e"_str, {}, yama::ptype::bool0);
+    mh.add_primitive("f"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail
     
-    EXPECT_EQ(dbg->count(yama::dsignal::load_type_not_found), 1);
+    EXPECT_EQ(dbg->count(yama::dsignal::load_item_not_found), 1);
 }
 
 TEST_F(LoadingTests, Fail_KindMismatch) {
@@ -525,25 +508,22 @@ TEST_F(LoadingTests, Fail_KindMismatch) {
     // b's kind is function
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         // kind is intended to mismatch w/ the indirectly referenced type b
         .add_primitive_type("self:b"_str);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:c"_str);
-    yama::module_factory mf{};
-    mf
-        .add_primitive("a"_str, a_consts, yama::ptype::bool0)
-        .add_function(
-            "b"_str, b_consts,
-            yama::make_callsig({ 0 }, 0),
-            10,
-            yama::noop_call_fn)
-        .add_primitive("c"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_primitive("a"_str, a_consts, yama::ptype::bool0);
+    mh.add_function(
+        "b"_str, b_consts,
+        yama::make_callsig({ 0 }, 0),
+        10,
+        yama::noop_call_fn);
+    mh.add_primitive("c"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail (due to kind mismatch between 'a' and 'b')
 
@@ -585,31 +565,28 @@ TEST_F(LoadingTests, Fail_CallSigMismatch) {
     auto clever_callsig_info_for_test = yama::make_callsig({ 0 }, 0);
 
     auto a_consts =
-        yama::const_table_info()
+        yama::const_table()
         // callsig is intended to mismatch w/ the indirectly referenced type b
         .add_function_type("self:b"_str, clever_callsig_info_for_test);
     auto b_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("self:c"_str); // <- c exists for b's constant indices to differ from a's
-    yama::module_factory mf{};
-    mf
-        .add_function(
-            "a"_str,
-            a_consts,
-            clever_callsig_info_for_test,
-            10,
-            yama::noop_call_fn)
-        .add_function(
-            "b"_str,
-            b_consts,
-            clever_callsig_info_for_test,
-            10,
-            yama::noop_call_fn)
-        .add_primitive("c"_str, {}, yama::ptype::bool0);
 
-    yama::install_batch ib{};
-    ib.install("p"_str, yama::make_res<test_parcel>(mf));
-    ASSERT_TRUE(dm->install(std::move(ib)));
+    mh.add_function(
+        "a"_str,
+        a_consts,
+        clever_callsig_info_for_test,
+        10,
+        yama::noop_call_fn);
+    mh.add_function(
+        "b"_str,
+        b_consts,
+        clever_callsig_info_for_test,
+        10,
+        yama::noop_call_fn);
+    mh.add_primitive("c"_str, {}, yama::ptype::bool0);
+
+    ASSERT_TRUE(install_and_check());
 
     EXPECT_FALSE(dm->load("p:a"_str)); // <- should fail (due to callsig mismatch between 'a' and 'b')
 

@@ -6,6 +6,8 @@
 #include <yama/core/domain.h>
 #include <yama/core/context.h>
 
+#include "../utils/module_helper.h"
+
 
 using namespace yama::string_literals;
 
@@ -28,7 +30,7 @@ public:
     class test_parcel final : public yama::parcel {
     public:
         std::optional<yama::parcel_metadata> md;
-        yama::module_factory mf;
+        module_helper mh;
 
 
         test_parcel() = default;
@@ -40,13 +42,11 @@ public:
         }
         std::optional<yama::import_result> import(const yama::str& relative_path) {
             if (relative_path != ""_str) return std::nullopt;
-            return yama::make_res<yama::module_info>(std::move(mf.done()));
+            return yama::make_res<yama::module>(mh.result());
         }
     };
 
     std::shared_ptr<test_parcel> our_parcel;
-
-    void upload(yama::type_info x) { our_parcel->mf.add(std::move(x)); }
 
     bool ready = false;
 
@@ -95,17 +95,15 @@ TEST_F(BCodeExecTests, Noop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -127,17 +125,15 @@ TEST_F(BCodeExecTests, Pop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -158,17 +154,15 @@ TEST_F(BCodeExecTests, Pop_Zero) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -193,17 +187,15 @@ TEST_F(BCodeExecTests, Pop_Many) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -225,17 +217,15 @@ TEST_F(BCodeExecTests, Pop_MoreThanAreOnStack) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -256,17 +246,15 @@ TEST_F(BCodeExecTests, PutNone) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -286,17 +274,15 @@ TEST_F(BCodeExecTests, PutNone_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -317,17 +303,15 @@ TEST_F(BCodeExecTests, PutConst) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Float"_str)
         .add_float(1.01);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -347,17 +331,15 @@ TEST_F(BCodeExecTests, PutConst_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Float"_str)
         .add_float(1.01);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -378,17 +360,15 @@ TEST_F(BCodeExecTests, PutTypeConst) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Type"_str)
         .add_primitive_type("yama:Bool"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -408,17 +388,15 @@ TEST_F(BCodeExecTests, PutTypeConst_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Type"_str)
         .add_primitive_type("yama:Bool"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -439,16 +417,14 @@ TEST_F(BCodeExecTests, PutArg) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Float"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({ 0 }, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -474,16 +450,14 @@ TEST_F(BCodeExecTests, PutArg_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Float"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({ 0 }, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -511,18 +485,16 @@ TEST_F(BCodeExecTests, Copy) {
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(10)
         .add_float(1.01);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -543,17 +515,15 @@ TEST_F(BCodeExecTests, Copy_Newtop) {
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(101);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -581,16 +551,14 @@ TEST_F(BCodeExecTests, DefaultInit) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -610,16 +578,14 @@ TEST_F(BCodeExecTests, DefaultInit_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -648,9 +614,9 @@ TEST_F(BCodeExecTests, Call_Function) {
         if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto plus_info = yama::make_function(
+    our_parcel->mh.add_function(
         "plus"_str,
         plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
@@ -669,21 +635,18 @@ TEST_F(BCodeExecTests, Call_Function) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_function_type("self:plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
         .add_int(1)
         .add_int(48)
         .add_int(100);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         5,
         f_bcode);
-
-    upload(plus_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -700,9 +663,7 @@ TEST_F(BCodeExecTests, Call_Function) {
 TEST_F(BCodeExecTests, Call_Method) {
     ASSERT_TRUE(ready);
 
-    upload(yama::make_struct(
-        "Math"_str,
-        {}));
+    our_parcel->mh.add_struct("Math"_str, {});
 
     auto Math_plus_fn = 
         [](yama::context& ctx) {
@@ -715,10 +676,10 @@ TEST_F(BCodeExecTests, Call_Method) {
         if (ctx.ret(0).bad()) return;
         };
     const auto Math_plus_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto Math_plus_info = yama::make_method(
-        "Math::plus"_str,
+    our_parcel->mh.add_method(
+        "Math"_str, "plus"_str,
         Math_plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
         1,
@@ -736,21 +697,18 @@ TEST_F(BCodeExecTests, Call_Method) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_method_type("self:Math::plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
         .add_int(1)
         .add_int(48)
         .add_int(100);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         5,
         f_bcode);
-
-    upload(Math_plus_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -778,9 +736,9 @@ TEST_F(BCodeExecTests, Call_Newtop) {
         if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto plus_info = yama::make_function(
+    our_parcel->mh.add_function(
         "plus"_str,
         plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
@@ -798,21 +756,18 @@ TEST_F(BCodeExecTests, Call_Newtop) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_function_type("self:plus"_str, yama::make_callsig({ 0, 0, 0 }, 0))
         .add_int(1)
         .add_int(48)
         .add_int(100);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         5,
         f_bcode);
-
-    upload(plus_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -835,9 +790,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourPanics) {
         ctx.panic();
         };
     const auto panic_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto panic_info = yama::make_function(
+    our_parcel->mh.add_function(
         "panic"_str,
         panic_consts,
         yama::make_callsig({}, 0),
@@ -851,9 +806,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourPanics) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -870,20 +825,16 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourPanics) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_function_type("self:panic"_str, yama::make_callsig({}, 0))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(panic_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -910,9 +861,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         // should induce panic by failing to call ll_ret
         };
     const auto panic_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto panic_info = yama::make_function(
+    our_parcel->mh.add_function(
         "panic"_str,
         panic_consts,
         yama::make_callsig({}, 0),
@@ -926,9 +877,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -945,20 +896,16 @@ TEST_F(BCodeExecTests, Call_PanicIfCallBehaviourDoesNotReturnAnything) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_function_type("self:panic"_str, yama::make_callsig({}, 0))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(panic_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -993,9 +940,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto dummy_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto dummy_info = yama::make_function(
+    our_parcel->mh.add_function(
         "dummy"_str,
         dummy_consts,
         yama::make_callsig({}, 0),
@@ -1015,9 +962,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto fail_safe_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Bool"_str);
-    const auto fail_safe_info = yama::make_function(
+    our_parcel->mh.add_function(
         "fail_safe"_str,
         fail_safe_consts,
         yama::make_callsig({}, 0),
@@ -1031,9 +978,9 @@ TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -1060,24 +1007,19 @@ TEST_F(BCodeExecTests, Call_PanicIfCallStackWouldOverflow) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_function_type("self:fail_safe"_str, yama::make_callsig({}, 1))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0))
         .add_function_type("self:f"_str, yama::make_callsig({}, 0))
         .add_function_type("self:dummy"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(dummy_info);
-    upload(fail_safe_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1111,9 +1053,9 @@ TEST_F(BCodeExecTests, CallNR_Function) {
         if (ctx.ret(0).bad()) return;
         };
     const auto plus_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto plus_info = yama::make_function(
+    our_parcel->mh.add_function(
         "plus"_str,
         plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
@@ -1132,22 +1074,19 @@ TEST_F(BCodeExecTests, CallNR_Function) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Int"_str)
         .add_function_type("self:plus"_str, yama::make_callsig({ 1, 1, 1 }, 1))
         .add_int(1)
         .add_int(48)
         .add_int(100);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(plus_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1164,9 +1103,7 @@ TEST_F(BCodeExecTests, CallNR_Function) {
 TEST_F(BCodeExecTests, CallNR_Method) {
     ASSERT_TRUE(ready);
     
-    upload(yama::make_struct(
-        "Math"_str,
-        {}));
+    our_parcel->mh.add_struct("Math"_str, {});
 
     auto Math_plus_fn = 
         [](yama::context& ctx) {
@@ -1179,10 +1116,10 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         if (ctx.ret(0).bad()) return;
         };
     const auto Math_plus_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str);
-    const auto Math_plus_info = yama::make_method(
-        "Math::plus"_str,
+    our_parcel->mh.add_method(
+        "Math"_str, "plus"_str,
         Math_plus_consts,
         yama::make_callsig({ 0, 0, 0 }, 0),
         1,
@@ -1200,22 +1137,19 @@ TEST_F(BCodeExecTests, CallNR_Method) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Int"_str)
         .add_method_type("self:Math::plus"_str, yama::make_callsig({ 1, 1, 1 }, 1))
         .add_int(1)
         .add_int(48)
         .add_int(100);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         4,
         f_bcode);
-
-    upload(Math_plus_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1238,9 +1172,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourPanics) {
         ctx.panic();
         };
     const auto panic_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto panic_info = yama::make_function(
+    our_parcel->mh.add_function(
         "panic"_str,
         panic_consts,
         yama::make_callsig({}, 0),
@@ -1254,9 +1188,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourPanics) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -1273,20 +1207,16 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourPanics) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_function_type("self:panic"_str, yama::make_callsig({}, 0))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(panic_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1313,9 +1243,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         // should induce panic by failing to call ll_ret
         };
     const auto panic_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto panic_info = yama::make_function(
+    our_parcel->mh.add_function(
         "panic"_str,
         panic_consts,
         yama::make_callsig({}, 0),
@@ -1329,9 +1259,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -1348,20 +1278,16 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallBehaviourDoesNotReturnAnything) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_function_type("self:panic"_str, yama::make_callsig({}, 0))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(panic_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1396,9 +1322,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto dummy_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto dummy_info = yama::make_function(
+    our_parcel->mh.add_function(
         "dummy"_str,
         dummy_consts,
         yama::make_callsig({}, 0),
@@ -1418,9 +1344,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto fail_safe_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Bool"_str);
-    const auto fail_safe_info = yama::make_function(
+    our_parcel->mh.add_function(
         "fail_safe"_str,
         fail_safe_consts,
         yama::make_callsig({}, 0),
@@ -1434,9 +1360,9 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallStackWouldOverflow) {
         if (ctx.ret(0).bad()) return;
         };
     const auto never_reached_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str);
-    const auto never_reached_info = yama::make_function(
+    our_parcel->mh.add_function(
         "never_reached"_str,
         never_reached_consts,
         yama::make_callsig({}, 0),
@@ -1463,24 +1389,19 @@ TEST_F(BCodeExecTests, CallNR_PanicIfCallStackWouldOverflow) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:None"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_function_type("self:fail_safe"_str, yama::make_callsig({}, 1))
         .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0))
         .add_function_type("self:f"_str, yama::make_callsig({}, 0))
         .add_function_type("self:dummy"_str, yama::make_callsig({}, 0));
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         2,
         f_bcode);
-
-    upload(dummy_info);
-    upload(fail_safe_info);
-    upload(never_reached_info);
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1510,19 +1431,17 @@ TEST_F(BCodeExecTests, Ret) {
         .add_ret(1);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str)
         .add_int(-10)
         .add_uint(4)
         .add_float(1.01);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         3,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1547,18 +1466,16 @@ TEST_F(BCodeExecTests, Jump) {
         .add_ret(0);
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_int(70)
         .add_int(-7);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({}, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1584,19 +1501,17 @@ TEST_F(BCodeExecTests, JumpTrue) {
         .add_ret(0); // assert index 0 register is Int
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_int(-10)
         .add_int(4);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({ 1 }, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1628,19 +1543,17 @@ TEST_F(BCodeExecTests, JumpFalse) {
         .add_ret(0); // assert index 0 register is Int
     std::cerr << f_bcode.fmt_disassembly() << "\n";
     const auto f_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:Int"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_int(-10)
         .add_int(4);
-    const auto f_info = yama::make_function(
+    our_parcel->mh.add_function(
         "f"_str,
         f_consts,
         yama::make_callsig({ 1 }, 0),
         1,
         f_bcode);
-
-    upload(f_info);
 
     const auto f = ctx->load("abc:f"_str).value();
 
@@ -1676,9 +1589,9 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         if (ctx.ret(0).bad()) return;
         };
     const auto subtract_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str);
-    const auto subtract_info = yama::make_function(
+    our_parcel->mh.add_function(
         "subtract"_str,
         subtract_consts,
         yama::make_callsig({ 0, 0 }, 0),
@@ -1694,9 +1607,9 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         if (ctx.ret(0).bad()) return;
         };
     const auto multiply_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str);
-    const auto multiply_info = yama::make_function(
+    our_parcel->mh.add_function(
         "multiply"_str,
         multiply_consts,
         yama::make_callsig({ 0, 0 }, 0),
@@ -1710,10 +1623,10 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         if (ctx.ret(0).bad()) return;
         };
     const auto greaterThanZero_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str)
         .add_primitive_type("yama:Bool"_str);
-    const auto greaterThanZero_info = yama::make_function(
+    our_parcel->mh.add_function(
         "greaterThanZero"_str,
         greaterThanZero_consts,
         yama::make_callsig({ 0 }, 1),
@@ -1750,7 +1663,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .add_ret(0); // return n * (n - 1)! if n > 0
     std::cerr << factorial_bcode.fmt_disassembly() << "\n";
     const auto factorial_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_function_type("self:subtract"_str, yama::make_callsig({ 0, 0 }, 0))
@@ -1758,17 +1671,12 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         .add_function_type("self:greaterThanZero"_str, yama::make_callsig({ 0 }, 1))
         .add_function_type("self:factorial"_str, yama::make_callsig({ 0 }, 0))
         .add_uint(1);
-    const auto factorial_info = yama::make_function(
+    our_parcel->mh.add_function(
         "factorial"_str,
         factorial_consts,
         yama::make_callsig({ 0 }, 0),
         6,
         factorial_bcode);
-
-    upload(subtract_info);
-    upload(multiply_info);
-    upload(greaterThanZero_info);
-    upload(factorial_info);
 
     const auto factorial = ctx->load("abc:factorial"_str).value();
 
@@ -1806,9 +1714,9 @@ TEST_F(BCodeExecTests, Example_Counter) {
         if (ctx.ret(0).bad()) return;
         };
     const auto addOne_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str);
-    const auto addOne_info = yama::make_function(
+    our_parcel->mh.add_function(
         "addOne"_str,
         addOne_consts,
         yama::make_callsig({ 0 }, 0),
@@ -1824,10 +1732,10 @@ TEST_F(BCodeExecTests, Example_Counter) {
         if (ctx.ret(0).bad()) return;
         };
     const auto lessThan_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str)
         .add_primitive_type("yama:Bool"_str);
-    const auto lessThan_info = yama::make_function(
+    our_parcel->mh.add_function(
         "lessThan"_str,
         lessThan_consts,
         yama::make_callsig({ 0, 0 }, 1),
@@ -1856,22 +1764,18 @@ TEST_F(BCodeExecTests, Example_Counter) {
         .add_ret(0); // return final value of counter
     std::cerr << counter_bcode.fmt_disassembly() << "\n";
     const auto counter_consts =
-        yama::const_table_info()
+        yama::const_table()
         .add_primitive_type("yama:UInt"_str)
         .add_primitive_type("yama:Bool"_str)
         .add_function_type("self:addOne"_str, yama::make_callsig({ 0 }, 0))
         .add_function_type("self:lessThan"_str, yama::make_callsig({ 0, 0 }, 1))
         .add_uint(0);
-    const auto counter_info = yama::make_function(
+    our_parcel->mh.add_function(
         "counter"_str,
         counter_consts,
         yama::make_callsig({ 0 }, 0),
         4,
         counter_bcode);
-
-    upload(addOne_info);
-    upload(lessThan_info);
-    upload(counter_info);
 
     const auto counter = ctx->dm().load("abc:counter"_str).value();
 

@@ -5,22 +5,22 @@
 #include <cmath>
 
 #include "../core/scalars.h"
-#include "../core/callsig_info.h"
+#include "../core/callsig.h"
 #include "../core/context.h"
 
 
 using namespace yama::string_literals;
 
 
-yama::module_info yama::internal::make_supplements() {
-    module_factory mf{};
+yama::module yama::internal::make_supplements() {
+    yama::module m{};
 
     auto add_0in1out =
         [&](yama::str name, yama::str return_type, yama::call_fn cf) {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type(return_type);
-        mf.add_function(
+        m.add_function(
             name,
             consts,
             yama::make_callsig({}, 0),
@@ -31,10 +31,10 @@ yama::module_info yama::internal::make_supplements() {
     auto add_1in0out =
         [&](yama::str name, yama::str param_type, yama::call_fn cf) {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:None"_str)
             .add_primitive_type(param_type);
-        mf.add_function(
+        m.add_function(
             name,
             consts,
             yama::make_callsig({ 1 }, 0),
@@ -45,9 +45,9 @@ yama::module_info yama::internal::make_supplements() {
     auto add_1in1out =
         [&](yama::str name, yama::str type, yama::call_fn cf) {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type(type);
-        mf.add_function(
+        m.add_function(
             name,
             consts,
             yama::make_callsig({ 0 }, 0),
@@ -58,10 +58,10 @@ yama::module_info yama::internal::make_supplements() {
     auto add_2in1out =
         [&](yama::str name, yama::str param_type, yama::str return_type, yama::call_fn cf) {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type(param_type)
             .add_primitive_type(return_type);
-        mf.add_function(
+        m.add_function(
             name,
             consts,
             yama::make_callsig({ 0, 0 }, 1),
@@ -218,7 +218,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     // we'll just manually write the bit-shift ops
     {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:Int"_str)
             .add_primitive_type("yama:UInt"_str);
         auto cf =
@@ -228,7 +228,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a << b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        mf.add_function(
+        m.add_function(
             "ibit_lshift"_str,
             consts,
             yama::make_callsig({ 0, 1 }, 0),
@@ -237,7 +237,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     }
     {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:Int"_str)
             .add_primitive_type("yama:UInt"_str);
         auto cf =
@@ -247,7 +247,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a >> b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        mf.add_function(
+        m.add_function(
             "ibit_rshift"_str,
             consts,
             yama::make_callsig({ 0, 1 }, 0),
@@ -256,7 +256,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     }
     {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:UInt"_str);
         auto cf =
             [](context& ctx) {
@@ -265,7 +265,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a << b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        mf.add_function(
+        m.add_function(
             "ubit_lshift"_str,
             consts,
             yama::make_callsig({ 0, 0 }, 0),
@@ -274,7 +274,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     }
     {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:UInt"_str);
         auto cf =
             [](context& ctx) {
@@ -283,7 +283,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx.push_int(a >> b).bad()) return;
             if (ctx.ret(0).bad()) return;
             };
-        mf.add_function(
+        m.add_function(
             "ubit_rshift"_str,
             consts,
             yama::make_callsig({ 0, 0 }, 0),
@@ -324,9 +324,9 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
     // panic fn
     {
         auto consts =
-            const_table_info()
+            const_table()
             .add_primitive_type("yama:None"_str);
-        mf.add_function(
+        m.add_function(
             "panic"_str,
             consts,
             yama::make_callsig({}, 0),
@@ -339,7 +339,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
 #define _ADD_CONV_FN(in_letter, out_letter, in_type, out_type, out_cpp_type, in_as_method, out_put_fn) \
 { \
     auto consts = \
-        const_table_info() \
+        const_table() \
         .add_primitive_type(in_type) \
         .add_primitive_type(out_type); \
     auto cf = \
@@ -348,7 +348,7 @@ _ADD_2IN1OUT_PANIC_IF_B_IS_0("u" suffix, "yama:UInt"_str, "yama:UInt"_str, expr,
             if (ctx. out_put_fn (yama::newtop, ( out_cpp_type )a).bad()) return; \
             if (ctx.ret(0).bad()) return; \
         }; \
-    mf.add_function( \
+    m.add_function( \
         in_letter "2" out_letter ""_str, \
         consts, \
         make_callsig({ 0 }, 1), \
@@ -370,6 +370,6 @@ _ADD_CONV_FN(in_letter, "c", in_type, "yama:Char"_str, yama::char_t, in_as_metho
     _ADD_CONV_FNS_IUFBC("b", "yama:Bool"_str, as_bool);
     _ADD_CONV_FNS_IUFBC("c", "yama:Char"_str, as_char);
 
-    return mf.done();
+    return m;
 }
 

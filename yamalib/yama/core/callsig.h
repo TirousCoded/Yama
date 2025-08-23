@@ -3,60 +3,62 @@
 #pragma once
 
 
-#include "callsig_info.h"
-#include "const_table.h"
+#include <format>
 
-#include "../internals/safeptr.h"
+#include "const_type.h"
 
 
 namespace yama {
 
 
-    // callsig encapsulates a non-owning view of a callsig_info associated w/ a const_table
-
-    class callsig final {
-    public:
-        // behaviour is undefined if consts is not appropriate to be used w/ info provided
-
-        callsig(const callsig_info& info, const_table consts);
-
-        callsig() = delete;
-        callsig(const callsig&) = default;
-        callsig(callsig&&) noexcept = default;
-        ~callsig() noexcept = default;
-        callsig& operator=(const callsig&) = default;
-        callsig& operator=(callsig&&) noexcept = default;
+    // IMPORTANT:
+    //      this code is provided to allow for the end-user to define their own
+    //      types, which they can then push to a yama::domain
+    //
+    //      this is part of the frontend, but being technical and niche, should
+    //      avoid being liberally exposed on the interfaces of things like 
+    //      yama::item_ref, yama::callsig_ref, etc.
 
 
-        const callsig_info& info() const noexcept;
-        size_t params() const noexcept;
-
-        // TODO: when we add types w/ stubs in their otherwise resolved constant table, try
-        //       to update our unit tests to cover the below behaviour
-        //
-        //       right now our unit tests don't really cover this behaviour
-
-        // NOTE: param_type and return_type return std::nullopt if queried type's constant
-        //       table index refers to a stub (including if it's out-of-bounds)
-        //
-        //       when equality comparing two callsigs, these std::nullopt(s) are considered,
-        //       w/ equality being established even if the two callsigs have std::nullopt
-        //       at a particular index for two different reasons
-
-        std::optional<type> param_type(size_t index) const noexcept;
-        std::optional<type> return_type() const noexcept;
-
-        bool operator==(const callsig& other) const noexcept; // compares by value
-
-        std::string fmt() const;
+    struct const_table;
+    class const_table_ref;
 
 
-    private:
-        internal::safeptr<const callsig_info> _info;
-        const_table _consts;
+    // yama::callsig encapsulates a 'call signature' of a function-like type.
+    //
+    // yama::callsig encapsulate a list of parameter types, and a return 
+    // type, w/ Yama functions being expected to use unit types to specify
+    // situations where a function should return *nothing*.
+    //
+    // yama::callsig encapsulates type info in the form of constant table
+    // indices, which specify types relative to some constant table.
+    //
+    // In Yama, methods are called as just regular functions but w/ their first
+    // parameter being the object they're being called in relation to, w/ this
+    // meaning that they use otherwise normal call signatures, w/ any kind of
+    // syntax used to differentiate methods from other functions being beyond
+    // the scope of call signature syntax/formatting.
+    struct callsig final {
+        std::vector<const_t>    params; // The parameter types.
+        const_t                 ret;    // The return type.
+
+
+        // Compares by value.
+        // Compares raw constant index values.
+        bool operator==(const callsig&) const noexcept = default;
+
+
+        // Behaviour is undefined if consts provided is inappropriate to use w/ *this.
+        std::string fmt(const const_table& consts) const;
+        // Behaviour is undefined if consts provided is inappropriate to use w/ *this.
+        std::string fmt(const const_table_ref& consts) const;
     };
+
+
+    // TODO: make_callsig has not been unit tested
+
+    inline callsig make_callsig(std::vector<const_t>&& params, const_t ret) {
+        return callsig{ std::forward<decltype(params)&&>(params), ret };
+    }
 }
-
-
-YAMA_SETUP_FORMAT(yama::callsig, x.fmt());
 

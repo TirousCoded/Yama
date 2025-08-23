@@ -11,16 +11,73 @@ yama::internal::codegen_target::codegen_target(translation_unit& tu)
     : tu(tu),
     cw(syms) {}
 
-bool yama::internal::codegen_target::has_target() const noexcept {
-    return (bool)_current_target;
+void yama::internal::codegen_target::start(const ast_FnDecl& decl) {
+    YAMA_ASSERT(!has_target());
+    where = &decl;
+    kind = decl.is_fn() ? kind::function : kind::method;
+    owner_name = decl.name.value().str(tu->src);
+    member_name =
+        decl.is_method()
+        ? std::make_optional(decl.method_name.value().str(tu->src))
+        : std::nullopt;
+    unqualified_name = str(decl.fmt_unqualified_name(tu->src).value());
+    consts = const_table{}; // Reset this.
+    callsig.reset();
+    max_locals = 0; // Reset this.
+    // Build callsig of new item (which has to be done AFTER above as
+    // we need to populate its constant table.)
+    callsig = tu->ctp.build_callsig_for_fn_type(tu->types.load(unqualified_name).value());
 }
 
-yama::type_info& yama::internal::codegen_target::target() noexcept {
-    return deref_assert(_current_target);
+void yama::internal::codegen_target::start(const ast_StructDecl& decl) {
+    YAMA_ASSERT(!has_target());
+    where = &decl;
+    kind = kind::struct0;
+    owner_name = decl.name.str(tu->src);
+    member_name.reset();
+    unqualified_name = owner_name;
+    consts = const_table{}; // Reset this.
+    callsig.reset();
+    max_locals = 0; // Reset this.
+}
+
+void yama::internal::codegen_target::finish() {
+    YAMA_ASSERT(has_target());
+    if (kind == kind::function) {
+        tu->output.add_function(
+            owner_name,
+            std::move(consts),
+            std::move(callsig.value()),
+            max_locals,
+            yama::bcode_call_fn);
+        _apply_bcode_to_output();
+    }
+    else if (kind == kind::method) {
+        tu->output.add_method(
+            owner_name,
+            member_name.value(),
+            std::move(consts),
+            std::move(callsig.value()),
+            max_locals,
+            yama::bcode_call_fn);
+        _apply_bcode_to_output();
+    }
+    else if (kind == kind::struct0) {
+        tu->output.add_struct(
+            owner_name,
+            std::move(consts));
+    }
+    else YAMA_DEADEND;
+    // Reset cw and syms.
+    cw = bc::code_writer(syms); // <- Can't forget to reassociate w/ syms.
+    syms = bc::syms{};
+    // Declare has no current target.
+    where = nullptr;
 }
 
 std::shared_ptr<yama::internal::csym> yama::internal::codegen_target::try_target_csym_entry() {
-    return tu->syms.lookup(tu->root(), target().unqualified_name(), 0);
+    YAMA_ASSERT(has_target());
+    return tu->syms.lookup(tu->root(), unqualified_name, 0);
 }
 
 yama::res<yama::internal::csym> yama::internal::codegen_target::target_csym_entry() {
@@ -37,51 +94,6 @@ std::optional<size_t> yama::internal::codegen_target::target_param_index(const s
     return std::nullopt;
 }
 
-void yama::internal::codegen_target::gen_target_fn_like(const str& unqualified_name, bool is_method) {
-    YAMA_ASSERT(!has_target());
-    // bind bare-bones new type_info to _current_target
-    if (!is_method) {
-        _current_target = yama::make_function(
-            unqualified_name,
-            // below are all stubs
-            {},
-            callsig_info{},
-            0,
-            bc::code{});
-    }
-    else {
-        _current_target = yama::make_method(
-            unqualified_name,
-            // below are all stubs
-            {},
-            callsig_info{},
-            0,
-            bc::code{});
-    }
-    // build callsig of new target (which has to be done after binding it as
-    // we need to populate its constant table)
-    target().change_callsig(tu->ctp.build_callsig_for_fn_type(tu->types.load(unqualified_name).value()));
-}
-
-void yama::internal::codegen_target::gen_target_struct(const str& unqualified_name) {
-    YAMA_ASSERT(!has_target());
-    // bind bare-bones new type_info to _current_target
-    _current_target = yama::make_struct(
-        unqualified_name,
-        // below are all stubs
-        {});
-}
-
-void yama::internal::codegen_target::upload_target(const ast_node& where) {
-    YAMA_ASSERT(has_target());
-    _apply_bcode_to_target(where);
-    tu->output.add(std::move(target()));
-    _current_target.reset();
-    // reset cw and syms
-    cw = bc::code_writer(syms); // <- can't forget to reassociate w/ syms
-    syms = bc::syms{};
-}
-
 void yama::internal::codegen_target::autosym(taul::source_pos pos) {
     YAMA_ASSERT(has_target());
     const auto loc = tu->src.location_at(pos);
@@ -89,6 +101,7 @@ void yama::internal::codegen_target::autosym(taul::source_pos pos) {
 }
 
 void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cvalue& x) {
+    YAMA_ASSERT(has_target());
     if (x.is(tu->types.none_type()))            tu->cgt.cw.add_put_none(reg);
     else if (const auto v = x.as<int_t>())      tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_int(*v)));
     else if (const auto v = x.as<uint_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_uint(*v)));
@@ -106,27 +119,25 @@ void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cva
     else                                        YAMA_DEADEND;
 }
 
-void yama::internal::codegen_target::_apply_bcode_to_target(const ast_node& where) {
+void yama::internal::codegen_target::_apply_bcode_to_output() {
     YAMA_ASSERT(has_target());
-    if (!target().uses_bcode()) return; // skip if non-callable
     bool label_not_found{};
     if (auto fn_bcode = cw.done(&label_not_found)) {
-        target().change_bcode(std::move(*fn_bcode));
-        target().change_bsyms(std::move(syms));
+        tu->output.bind_bcode(unqualified_name, std::move(*fn_bcode), std::move(syms));
     }
     else {
-        if (label_not_found) { // if this, then the compiler is broken
+        if (label_not_found) { // If this, then the compiler is broken.
             tu->err.error(
-                where,
+                deref_assert(where),
                 dsignal::compile_impl_internal,
                 "internal error; label_not_found == true!");
         }
-        else { // exceeded branch dist limit
+        else { // Exceeded branch dist limit.
             tu->err.error(
-                where,
+                deref_assert(where),
                 dsignal::compile_impl_limits,
                 "fn {} contains branch which exceeds max branch offset limits!",
-                target().unqualified_name());
+                unqualified_name);
         }
     }
 }

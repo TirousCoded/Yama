@@ -10,7 +10,7 @@
 #include "object_ref.h"
 
 #include "newtop.h"
-#include "const_table.h"
+#include "const_table_ref.h"
 
 
 namespace yama {
@@ -150,15 +150,15 @@ namespace yama {
         res<domain> get_domain() const noexcept;
         domain& dm() const noexcept;
 
-        std::optional<type> load(const str& fullname);
+        std::optional<item_ref> load(const str& fullname);
 
-        type none_type();
-        type int_type();
-        type uint_type();
-        type float_type();
-        type bool_type();
-        type char_type();
-        type type_type();
+        item_ref none_type();
+        item_ref int_type();
+        item_ref uint_type();
+        item_ref float_type();
+        item_ref bool_type();
+        item_ref char_type();
+        item_ref type_type();
 
 
         // TODO: fmt_stacktrace has not been unit tested
@@ -176,7 +176,7 @@ namespace yama {
         
         // IMPORTANT:
         //      for the methods below, it's always undefined behaviour to
-        //      use a yama::object_ref, yama::type, etc. which is associated
+        //      use a yama::object_ref, yama::item_ref, etc. which is associated
         //      w/ another context, or w/ a domain other than the one this
         //      context is associated w/
 
@@ -243,9 +243,9 @@ namespace yama {
         canonical_ref new_float(float_t v);
         canonical_ref new_bool(bool_t v);
         canonical_ref new_char(char_t v);
-        canonical_ref new_type(type v);
+        canonical_ref new_type(item_ref v);
 
-        std::optional<canonical_ref> new_fn(type f);        // new_fn returns std::nullopt if f is not a callable type
+        std::optional<canonical_ref> new_fn(item_ref f);        // new_fn returns std::nullopt if f is not a callable type
 
         // it's okay to use panicking and panics while panicking,
         // as the whole point of it is to detect it
@@ -258,7 +258,7 @@ namespace yama {
 
         // consts behaviour is undefined if in the user call frame
 
-        const_table consts() noexcept;                      // consts returns the constant table of the current call
+        const_table_ref consts() noexcept;                  // consts returns the constant table of the current call
 
         size_t args() noexcept;                             // args returns the number of args available
         size_t locals() noexcept;                           // locals returns the height of the current local object stack
@@ -293,7 +293,7 @@ namespace yama {
         cmd_status put_float(local_t x, float_t v);
         cmd_status put_bool(local_t x, bool_t v);
         cmd_status put_char(local_t x, char_t v);
-        cmd_status put_type(local_t x, type v);
+        cmd_status put_type(local_t x, item_ref v);
 
         inline cmd_status push_none() { return put_none(newtop); }
         inline cmd_status push_int(int_t v) { return put_int(newtop, v); }
@@ -301,7 +301,7 @@ namespace yama {
         inline cmd_status push_float(float_t v) { return put_float(newtop, v); }
         inline cmd_status push_bool(bool_t v) { return put_bool(newtop, v); }
         inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
-        inline cmd_status push_type(type v) { return put_type(newtop, v); }
+        inline cmd_status push_type(item_ref v) { return put_type(newtop, v); }
 
         // put_fn loads fn object of type f into the local object register at x (x may be newtop)
 
@@ -310,9 +310,9 @@ namespace yama {
         //      - if (x == newtop, but) pushing would overflow
         //      - if f is not a function type
 
-        cmd_status put_fn(local_t x, type f);
+        cmd_status put_fn(local_t x, item_ref f);
 
-        inline cmd_status push_fn(type f) { return put_fn(newtop, f); }
+        inline cmd_status push_fn(item_ref f) { return put_fn(newtop, f); }
 
         // put_const loads the object constant at c, in the constant table
         // of the current call, into the local object register at x (x may be newtop)
@@ -394,7 +394,7 @@ namespace yama {
         //      - if the constant at c is not a type constant
         //          * const_t overload
 
-        cmd_status default_init(local_t x, type t);
+        cmd_status default_init(local_t x, item_ref t);
         cmd_status default_init(local_t x, const_t c);
 
         // NOTE: due to the existence of the callobj, plus the limit to only one return value
@@ -466,7 +466,7 @@ namespace yama {
         // NOTE: _cf_t must use indices, as reallocs in _registers will invalidate pointers
 
         struct _cf_t final {
-            std::optional<type>         t;              // the type associated w/ this call (or std::nullopt if user call frame)
+            std::optional<item_ref>     t;              // the type associated w/ this call (or std::nullopt if user call frame)
             size_t                      args_offset;    // offset into _registers where call args begin
             size_t                      args_count;     // number of registers in call args
             size_t                      locals_offset;  // offset into _registers where local object stack begins
@@ -501,7 +501,7 @@ namespace yama {
         _cf_view_t _view_top_cf();
         _cf_view_t _view_below_top_cf(); // cf just below the top one
 
-        type _curr_type() noexcept;
+        item_ref _curr_type() noexcept;
         bool _has_curr_type() noexcept;
 
 
@@ -515,7 +515,7 @@ namespace yama {
         // _push_cf will handle converting [args_start, args_start+args_n) into
         // the equiv _registers index range
 
-        bool _push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t max_locals);
+        bool _push_cf(std::optional<item_ref> t, local_t args_start, size_t args_n, size_t max_locals);
         void _pop_cf();
 
         void _push_user_cf();
@@ -556,9 +556,9 @@ namespace yama {
         bool _put_err_pushing_overflows(borrowed_ref v);
         bool _put_err_x_out_of_bounds(local_t x, borrowed_ref v, const char* verb);
 
-        cmd_status _put_fn(local_t x, type f);
+        cmd_status _put_fn(local_t x, item_ref f);
 
-        bool _put_fn_err_f_not_callable_type(type f);
+        bool _put_fn_err_f_not_callable_type(item_ref f);
 
         cmd_status _put_const(local_t x, const_t c);
 
@@ -586,7 +586,7 @@ namespace yama {
         cmd_status _default_init(local_t x, stolen_ref obj);
         cmd_status _default_init(local_t x, const_t c);
 
-        object_ref _gen_default_initialized(type t);
+        object_ref _gen_default_initialized(item_ref t);
 
         bool _default_init_err_in_user_call_frame();
         bool _default_init_err_c_out_of_bounds(const_t c);

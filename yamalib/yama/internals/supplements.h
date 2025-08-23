@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "../core/module_info.h"
+#include "../core/module.h"
 
 
 namespace yama::internal {
@@ -15,6 +15,6 @@ namespace yama::internal {
     // these fn impls are temporary, w/ plans to replace them w/ a more proper
     // standard library later
 
-    module_info make_supplements();
+    yama::module make_supplements();
 }
 

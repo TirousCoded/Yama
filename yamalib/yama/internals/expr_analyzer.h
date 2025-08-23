@@ -256,7 +256,7 @@ namespace yama::internal {
         static constexpr std::nullopt_t _runtime_only = std::nullopt;
 
 
-        void _dump_log_helper(bool success, const ast_expr& x);
+        void _trace_result(bool success, const ast_expr& x);
     };
 }
 

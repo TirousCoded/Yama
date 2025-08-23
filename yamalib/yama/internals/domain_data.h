@@ -20,7 +20,7 @@ namespace yama::internal {
 
 
     struct quick_access final {
-        type none, int0, uint, float0, bool0, char0, type;
+        item_ref none, int0, uint, float0, bool0, char0, type;
     };
 
 

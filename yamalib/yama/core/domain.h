@@ -7,9 +7,8 @@
 
 #include "res.h"
 #include "api_component.h"
-#include "type_info.h" // <- for quality-of-life (eg. exposes yama::primitive_info)
-#include "type.h"
-#include "module.h"
+#include "item_ref.h"
+#include "module_ref.h"
 #include "parcel.h"
 #include "install_batch.h"
 
@@ -27,7 +26,7 @@ namespace yama {
     //       types or imported modules, such as if compilation fails, are things we should
     //       also think hard on what details we do/don't want to be expressed in unit tests
 
-    // IMPORTANT: the memory underlying type objects is guaranteed to be valid for the
+    // IMPORTANT: the memory underlying item_ref objects is guaranteed to be valid for the
     //            lifetime of the domain, and to be entirely thread-safe, due to said type
     //            info memory being immutable
 
@@ -88,19 +87,21 @@ namespace yama {
         // TODO: make our unit tests for syntax rules for load/import use more robust, as
         //       right now they're, I feel, fairly loose
 
-        std::optional<yama::module> import(const str& import_path);
+        // TODO: add import/load overload accepting mid_t/gid_t which *fetch* modules/items
 
-        std::optional<type> load(const str& fullname);
+        std::optional<yama::module_ref> import(const str& import_path);
+
+        std::optional<item_ref> load(const str& fullname);
 
         // load builtins w/ minimal overhead
 
-        type none_type();
-        type int_type();
-        type uint_type();
-        type float_type();
-        type bool_type();
-        type char_type();
-        type type_type();
+        item_ref none_type();
+        item_ref int_type();
+        item_ref uint_type();
+        item_ref float_type();
+        item_ref bool_type();
+        item_ref char_type();
+        item_ref type_type();
 
 
     private:

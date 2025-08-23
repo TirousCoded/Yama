@@ -23,11 +23,11 @@ namespace yama::internal {
 
     private:
         std::optional<yama::parcel_metadata> md;
-        std::shared_ptr<module_info> _root_modinf, _util_modinf;
+        std::shared_ptr<module> _root_modinf, _util_modinf;
 
 
-        res<module_info> _get_root_modinf();
-        res<module_info> _get_util_modinf();
+        res<module> _get_root_modinf();
+        res<module> _get_util_modinf();
     };
 }
 

@@ -10,8 +10,8 @@ yama::internal::type_mem yama::internal::get_type_mem(const internal::type_insta
     return x._mem;
 }
 
-yama::internal::type_instance::type_instance(str fullname, res<type_info> info)
-    : _mem(_create_mem(fullname, info)) {}
+yama::internal::type_instance::type_instance(str fullname, mid_t mid, module::item info)
+    : _mem(_create_mem(fullname, mid, info)) {}
 
 yama::internal::type_instance::type_instance(str new_fullname, const type_instance& other)
     : _mem(_create_mem(new_fullname, other)) {}
@@ -20,7 +20,8 @@ yama::internal::type_instance::~type_instance() noexcept {
 #if _DUMP_LOG
     std::cerr << std::format("~type_instance @ {}\n", (void*)this);
 #endif
-    _destroy_mem(_mem); // RAII cleanup of _mem
+    // RAII cleanup of _mem.
+    _destroy_mem(_mem);
 }
 
 bool yama::internal::type_instance::complete() const noexcept {
@@ -31,14 +32,17 @@ const yama::str& yama::internal::type_instance::fullname() const noexcept {
     return _mem->fullname;
 }
 
-yama::internal::type_mem yama::internal::type_instance::_create_mem(str fullname, res<type_info> info) {
+yama::internal::type_mem yama::internal::type_instance::_create_mem(str fullname, mid_t mid, module::item info) {
     internal::type_mem_header header{
         .fullname = fullname,
-        .len = info->consts().size(),
-        .stubs = info->consts().size(),
+        .len = info.consts().size(),
+        .stubs = info.consts().size(),
         .info = info,
-        .kind = info->kind(),
-        .ptype = info->ptype(),
+        .mid = mid,
+        .kind = info.kind(),
+        .ptype = info.ptype(),
+        .cf = info.call_fn(),
+        .max_locals = info.max_locals(),
     };
     return internal::type_mem::create(std::allocator<void>{}, std::move(header));
 }

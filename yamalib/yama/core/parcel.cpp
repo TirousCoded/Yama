@@ -16,31 +16,31 @@ void yama::parcel_metadata::add_dep_name(const str& name) {
     dep_names.insert(name);
 }
 
-yama::import_result::import_result(module_info&& x)
-    : import_result(make_res<module_info>(std::forward<module_info>(x))) {}
+yama::import_result::import_result(module&& x)
+    : import_result(make_res<module>(std::forward<module>(x))) {}
 
-yama::import_result::import_result(res<module_info>&& x)
-    : _data(std::in_place_type<res<module_info>>, std::forward<res<module_info>>(x)) {}
+yama::import_result::import_result(res<module>&& x)
+    : _data(std::in_place_type<res<module>>, std::forward<res<module>>(x)) {}
 
 yama::import_result::import_result(taul::source_code&& x)
     : _data(std::in_place_type<taul::source_code>, std::forward<taul::source_code>(x)) {}
 
 bool yama::import_result::holds_module() const noexcept {
-    return std::holds_alternative<res<module_info>>(_data);
+    return std::holds_alternative<res<module>>(_data);
 }
 
 bool yama::import_result::holds_source() const noexcept {
     return std::holds_alternative<taul::source_code>(_data);
 }
 
-yama::res<yama::module_info>& yama::import_result::get_module() {
+yama::res<yama::module>& yama::import_result::get_module() {
     YAMA_ASSERT(holds_module());
-    return std::get<res<module_info>>(_data);
+    return std::get<res<module>>(_data);
 }
 
-const yama::res<yama::module_info>& yama::import_result::get_module() const {
+const yama::res<yama::module>& yama::import_result::get_module() const {
     YAMA_ASSERT(holds_module());
-    return std::get<res<module_info>>(_data);
+    return std::get<res<module>>(_data);
 }
 
 taul::source_code& yama::import_result::get_source() {

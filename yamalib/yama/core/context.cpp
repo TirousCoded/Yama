@@ -4,7 +4,7 @@
 
 #include "general.h"
 #include "kind-features.h"
-#include "callsig.h"
+#include "callsig_ref.h"
 
 
 using namespace yama::string_literals;
@@ -26,35 +26,35 @@ yama::domain& yama::context::dm() const noexcept {
     return *_dm;
 }
 
-std::optional<yama::type> yama::context::load(const str& fullname) {
+std::optional<yama::item_ref> yama::context::load(const str& fullname) {
     return _dm->load(fullname);
 }
 
-yama::type yama::context::none_type() {
+yama::item_ref yama::context::none_type() {
     return _dm->none_type();
 }
 
-yama::type yama::context::int_type() {
+yama::item_ref yama::context::int_type() {
     return _dm->int_type();
 }
 
-yama::type yama::context::uint_type() {
+yama::item_ref yama::context::uint_type() {
     return _dm->uint_type();
 }
 
-yama::type yama::context::float_type() {
+yama::item_ref yama::context::float_type() {
     return _dm->float_type();
 }
 
-yama::type yama::context::bool_type() {
+yama::item_ref yama::context::bool_type() {
     return _dm->bool_type();
 }
 
-yama::type yama::context::char_type() {
+yama::item_ref yama::context::char_type() {
     return _dm->char_type();
 }
 
-yama::type yama::context::type_type() {
+yama::item_ref yama::context::type_type() {
     return _dm->type_type();
 }
 
@@ -82,10 +82,10 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
         // check for symbol info, and if so, add it to result
         if (callframe.t) {
             const auto info = internal::get_type_mem(deref_assert(callframe.t))->info;
-            if (info->uses_bcode()) {
+            if (const auto bcode = info.try_one<bcode_desc>()) {
                 // remember that program counter will be incr when fetching instr, meaning
                 // we need to decr it to get current instr index
-                result += std::format(" {}", deref_assert(info->bsyms()).fmt_sym(callframe.pc - 1));
+                result += std::format(" {}", bcode->bsyms.fmt_sym(callframe.pc - 1));
             }
         }
         number--;
@@ -175,14 +175,14 @@ yama::canonical_ref yama::context::new_char(char_t v) {
     };
 }
 
-yama::canonical_ref yama::context::new_type(type v) {
+yama::canonical_ref yama::context::new_type(item_ref v) {
     return canonical_ref{
         .t = type_type(),
         .v{ .t = v },
     };
 }
 
-std::optional<yama::canonical_ref> yama::context::new_fn(type f) {
+std::optional<yama::canonical_ref> yama::context::new_fn(item_ref f) {
     if (!is_callable(f.kind())) return std::nullopt;
     return canonical_ref{
         .t = f,
@@ -210,7 +210,7 @@ size_t yama::context::max_call_frames() noexcept {
     return yama::max_call_frames;
 }
 
-yama::const_table yama::context::consts() noexcept {
+yama::const_table_ref yama::context::consts() noexcept {
     return _curr_type().consts();
 }
 
@@ -287,11 +287,11 @@ yama::cmd_status yama::context::put_char(local_t x, char_t v) {
     return put(x, new_char(v));
 }
 
-yama::cmd_status yama::context::put_type(local_t x, type v) {
+yama::cmd_status yama::context::put_type(local_t x, item_ref v) {
     return put(x, new_type(v));
 }
 
-yama::cmd_status yama::context::put_fn(local_t x, type f) {
+yama::cmd_status yama::context::put_fn(local_t x, item_ref f) {
     return _put_fn(x, f);
 }
 
@@ -315,7 +315,7 @@ yama::cmd_status yama::context::copy(local_t src, local_t dest) {
     return _copy(src, dest);
 }
 
-yama::cmd_status yama::context::default_init(local_t x, type t) {
+yama::cmd_status yama::context::default_init(local_t x, item_ref t) {
     auto obj = _gen_default_initialized(t);
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), obj);
     return _default_init(x, obj);
@@ -455,7 +455,7 @@ yama::context::_cf_view_t yama::context::_view_below_top_cf() {
     };
 }
 
-yama::type yama::context::_curr_type() noexcept {
+yama::item_ref yama::context::_curr_type() noexcept {
     return deref_assert(_top_cf().t);
 }
 
@@ -463,7 +463,7 @@ bool yama::context::_has_curr_type() noexcept {
     return _top_cf().t.has_value();
 }
 
-bool yama::context::_push_cf(std::optional<type> t, local_t args_start, size_t args_n, size_t max_locals) {
+bool yama::context::_push_cf(std::optional<item_ref> t, local_t args_start, size_t args_n, size_t max_locals) {
     if (call_frames() == max_call_frames()) return false; // overflow
     YAMA_LOG(dbg(), ctx_llcmd_c, " > call frame {}: *enter*", call_frames());
     const bool has_top_cf = !_callstk.empty();
@@ -603,14 +603,14 @@ bool yama::context::_put_err_x_out_of_bounds(local_t x, borrowed_ref v, const ch
     return true;
 }
 
-yama::cmd_status yama::context::_put_fn(local_t x, type f) {
+yama::cmd_status yama::context::_put_fn(local_t x, item_ref f) {
     if (_put_fn_err_f_not_callable_type(f)) {
         return cmd_status::init(false);
     }
     return _put(x, new_fn(f).value());
 }
 
-bool yama::context::_put_fn_err_f_not_callable_type(type f) {
+bool yama::context::_put_fn_err_f_not_callable_type(item_ref f) {
     if (is_callable(f.kind())) return false;
     _panic(
         "error: panic from attempt to load function object of non-callable type {}!",
@@ -710,7 +710,7 @@ yama::cmd_status yama::context::_put_type_const(local_t x, const_t c) {
         return cmd_status::init(false);
     }
     return _put(x, new_type(
-        [&]() -> type {
+        [&]() -> item_ref {
             static_assert(const_types == 9);
             const auto& cc = consts();
             if (const auto r = cc.get<primitive_type_const>(c))     return r.value();
@@ -807,7 +807,7 @@ yama::cmd_status yama::context::_default_init(local_t x, const_t c) {
     return _default_init(x, _gen_default_initialized(deref_assert(consts().type(c))));
 }
 
-yama::object_ref yama::context::_gen_default_initialized(type t) {
+yama::object_ref yama::context::_gen_default_initialized(item_ref t) {
     static_assert(kinds == 4);
     if (is_primitive(t.kind())) {
         if (t.ptype() == ptype::none)           return new_none();
@@ -862,7 +862,7 @@ std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
         return std::nullopt;
     }
     const borrowed_ref callobj = _view_top_cf().locals[args_start];
-    const type callobj_type = callobj.t;
+    const item_ref callobj_type = callobj.t;
     if (_call_err_callobj_not_callable_type(callobj)) {
         return std::nullopt;
     }
@@ -870,13 +870,14 @@ std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
     if (_call_err_param_arg_count_mismatch(callobj, param_args)) {
         return std::nullopt;
     }
+    const auto callobj_mem = internal::get_type_mem(callobj_type);
     // push our new call frame
-    const bool push_cf_result = _push_cf(std::make_optional(callobj_type), args_start, args_n, callobj_type.max_locals());
+    const bool push_cf_result = _push_cf(std::make_optional(callobj_type), args_start, args_n, callobj_mem->max_locals);
     if (_call_err_push_cf_would_overflow(callobj, push_cf_result)) {
         return std::nullopt;
     }
     // fire call behaviour
-    const call_fn callobj_call_fn = deref_assert(callobj_type.call_fn());
+    const call_fn callobj_call_fn = callobj_mem->cf;
     if (callobj_call_fn != bcode_call_fn) { // fire non-bcode-based call behaviour
         callobj_call_fn(*this);
     }
@@ -1041,7 +1042,7 @@ void yama::context::_bcode_setup() {
 }
 
 const yama::bc::code* yama::context::_bcode_acquire_bcode() {
-    return internal::get_type_mem(_curr_type())->info->bcode();
+    return internal::get_type_mem(_curr_type())->info.bcode();
 }
 
 yama::bc::instr yama::context::_bcode_fetch_instr() {

@@ -9,10 +9,12 @@
 #include "../core/general.h"
 #include "../core/concepts.h"
 #include "../core/res.h"
-#include "../core/module_info.h"
+#include "../core/ids.h"
+#include "../core/module.h"
 
 #include "specifiers.h"
 #include "type_instance.h"
+#include "imported_module.h"
 
 
 namespace yama::internal {
@@ -215,7 +217,7 @@ namespace yama::internal {
     //       way of discerning the env to use to parse the fullname str
 
     using type_area = res_area<fullname, type_instance>;
-    using module_area = res_area<import_path, module_info>;
+    using module_area = res_area<import_path, imported_module>;
 
 
     class res_state final {

@@ -5,29 +5,33 @@
 #include "util.h"
 #include "domain_data.h"
 
+#include "../internals/imported_module.h"
+
 
 yama::internal::importer::importer(std::shared_ptr<debug> dbg, domain_data& dd)
     : api_component(dbg),
     _dd(dd) {}
 
-std::optional<yama::module> yama::internal::importer::import(const env& e, const str& path, res_state& upstream) {
+std::optional<yama::module_ref> yama::internal::importer::import(const env& e, const str& path, res_state& upstream) {
     state.set_upstream(upstream.modules);
     const auto resolved_path = _resolve_import_path(e, path);
     if (!resolved_path) return std::nullopt;
     _last_was_success = _import(e, *resolved_path);
     return
         _last_was_success
-        ? std::make_optional(create_module(state.pull(*resolved_path).get()))
+        ? std::make_optional(create_module(deref_assert(state.pull(*resolved_path))))
         : std::nullopt;
 }
 
 void yama::internal::importer::commit_or_discard() {
     state.commit_or_discard(_last_was_success);
+    mids.commit_or_discard(_last_was_success);
     _unlock(); // can't forget
 }
 
 void yama::internal::importer::commit_or_discard(std::shared_mutex& protects_upstream) {
     state.commit_or_discard(_last_was_success, protects_upstream);
+    mids.commit_or_discard(_last_was_success);
     _unlock(); // can't forget
 }
 
@@ -40,7 +44,7 @@ std::optional<yama::import_result> yama::internal::importer::import_for_import_d
         return std::nullopt;
     }
     if (const auto result = state.pull(path)) {
-        return import_result(res(result));
+        return import_result(res(result->m));
     }
     YAMA_LOG(dbg(), import_c, "importing {}...", path.fmt(e));
     auto imported = parcel->import(path.relative_path());
@@ -49,15 +53,15 @@ std::optional<yama::import_result> yama::internal::importer::import_for_import_d
         return std::nullopt;
     }
     if (imported->holds_module()) {
-        if (!_verify_and_memoize(imported->get_module(), path)) {
+        if (!_verify_and_memoize(imported->get_module(), mids.pull(), path)) {
             return std::nullopt;
         }
     }
     return *imported;
 }
 
-bool yama::internal::importer::upload_compiled_module(const import_path& path, res<module_info> new_module) {
-    return _verify_and_memoize(new_module, path);
+bool yama::internal::importer::upload_compiled_module(const import_path& path, res<module> new_module) {
+    return _verify_and_memoize(new_module, mids.pull(), path);
 }
 
 void yama::internal::importer::_lock() {
@@ -114,7 +118,7 @@ bool yama::internal::importer::_handle_fresh_import_and_memoize(const env& e, co
     YAMA_LOG(dbg(), import_c, "importing {}...", path.fmt(e));
     if (auto imported = deref_assert(p).import(path.relative_path())) {
         if (imported->holds_module()) {
-            if (!_verify_and_memoize(imported->get_module(), path)) {
+            if (!_verify_and_memoize(imported->get_module(), mids.pull(), path)) {
                 return false;
             }
         }
@@ -132,13 +136,13 @@ bool yama::internal::importer::_handle_fresh_import_and_memoize(const env& e, co
     return true; // if we got this far, return successful
 }
 
-bool yama::internal::importer::_verify_and_memoize(const res<module_info>& m, const import_path& path) {
+bool yama::internal::importer::_verify_and_memoize(const res<module>& m, mid_t mid, const import_path& path) {
     if (!_verify(*m, path)) return false;
-    state.push(path, m); // memoize
+    _memoize(m, mid, path);
     return true;
 }
 
-bool yama::internal::importer::_verify(const module_info& m, const import_path& path) {
+bool yama::internal::importer::_verify(const module& m, const import_path& path) {
     const auto e = _dd->installs.parcel_env(path.head()).value();
     const auto parcel = res(_dd->installs.get_installed(path.head()));
     if (_dd->verif.verify(m, parcel->metadata(), path.str(e))) return true;
@@ -157,5 +161,13 @@ void yama::internal::importer::_report_module_not_found(const import_path& path)
         dbg(), import_error_c,
         "error: module {} not found!",
         path.fmt(e));
+}
+
+void yama::internal::importer::_memoize(const res<module>& m, mid_t mid, const import_path& path) {
+    imported_module im{
+        .m = m,
+        .id = mid,
+    };
+    state.push(path, make_res<imported_module>(std::move(im)));
 }
 
