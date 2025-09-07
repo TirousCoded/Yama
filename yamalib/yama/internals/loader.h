@@ -63,8 +63,8 @@ namespace yama::internal {
 
         std::optional<module::item> _acquire_info(const fullname& fullname, mid_t& mid_out);
         bool _create_and_link_instance(const fullname& fullname, mid_t mid, module::item info);
-        res<type_instance> _create_instance(const fullname& fullname, mid_t mid, module::item info);
-        void _add_instance_to_state(const fullname& fullname, res<type_instance> instance);
+        res<item_instance> _create_instance(const fullname& fullname, mid_t mid, module::item info);
+        void _add_instance_to_state(const fullname& fullname, res<item_instance> instance);
 
         // herein, 'resolving' refers to the act of linking new types in the batch, w/
         // new types being added recursively as needed
@@ -72,12 +72,12 @@ namespace yama::internal {
         // resolving does not check the validity of links (ie. whether the type linked
         // against a given type constant symbol is reasonable to do so w/)
         
-        bool _resolve_consts(const env& e, type_instance& instance, module::item info);
-        bool _resolve_const(const env& e, type_instance& instance, module::item info, const_t index);
+        bool _resolve_consts(const env& e, item_instance& instance, module::item info);
+        bool _resolve_const(const env& e, item_instance& instance, module::item info, const_t index);
         template<const_type C>
-        inline bool _resolve_scalar_const(type_instance& instance, module::item info, const_t index);
+        inline bool _resolve_scalar_const(item_instance& instance, module::item info, const_t index);
         template<const_type C>
-        inline bool _resolve_type_const(const env& e, type_instance& instance, module::item info, const_t index);
+        inline bool _resolve_type_const(const env& e, item_instance& instance, module::item info, const_t index);
 
         // herein, 'checking' refers to the act of checking to see whether or not the
         // type constant links established during resolving are reasonable
@@ -87,15 +87,15 @@ namespace yama::internal {
         // (ie. it will never encounter partially linked type instances)
 
         bool _check();
-        bool _check_instance(const env& e, type_instance& instance);
-        bool _check_consts(const env& e, type_instance& instance, module::item info);
-        bool _check_const(const env& e, type_instance& instance, module::item info, const_t index);
+        bool _check_instance(const env& e, item_instance& instance);
+        bool _check_consts(const env& e, item_instance& instance, module::item info);
+        bool _check_const(const env& e, item_instance& instance, module::item info, const_t index);
         template<const_type C>
-        inline bool _check_scalar_const(type_instance& instance, module::item info, const_t index);
+        inline bool _check_scalar_const(item_instance& instance, module::item info, const_t index);
         template<const_type C>
-        inline bool _check_type_const(const env& e, type_instance& instance, module::item info, const_t index);
-        bool _check_no_kind_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved);
-        bool _check_no_callsig_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved);
+        inline bool _check_type_const(const env& e, item_instance& instance, module::item info, const_t index);
+        bool _check_no_kind_mismatch(item_instance& instance, module::item info, const_t index, const item_ref& resolved);
+        bool _check_no_callsig_mismatch(item_instance& instance, module::item info, const_t index, const item_ref& resolved);
 
 
         str _str_fullname(const fullname& fullname) const;
@@ -103,7 +103,7 @@ namespace yama::internal {
     };
 
     template<const_type C>
-    inline bool loader::_resolve_scalar_const(type_instance& instance, module::item info, const_t index) {
+    inline bool loader::_resolve_scalar_const(item_instance& instance, module::item info, const_t index) {
         if (const auto x = info.consts().get<C>(index)) {
             instance.put<C>(index, x->v);
         }
@@ -112,7 +112,7 @@ namespace yama::internal {
     }
 
     template<const_type C>
-    inline bool loader::_resolve_type_const(const env& e, type_instance& instance, module::item info, const_t index) {
+    inline bool loader::_resolve_type_const(const env& e, item_instance& instance, module::item info, const_t index) {
         // TODO: when we add *incomplete type cloning*-using stuff, this
         //       method may need to be revised
         YAMA_ASSERT(create_type(instance).consts().is_stub(index));
@@ -129,12 +129,12 @@ namespace yama::internal {
     }
 
     template<const_type C>
-    inline bool loader::_check_scalar_const(type_instance& instance, module::item info, const_t index) {
+    inline bool loader::_check_scalar_const(item_instance& instance, module::item info, const_t index) {
         return true; // nothing to check
     }
     
     template<const_type C>
-    inline bool loader::_check_type_const(const env& e, type_instance& instance, module::item info, const_t index) {
+    inline bool loader::_check_type_const(const env& e, item_instance& instance, module::item info, const_t index) {
         YAMA_ASSERT(!create_type(instance).consts().is_stub(index));
         const fullname fullname = fullname::parse(e, info.consts().qualified_name(index).value()).value();
         const item_ref resolved = _pull_type(fullname).value();

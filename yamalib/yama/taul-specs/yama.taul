@@ -128,6 +128,8 @@ lexer section:
 
     L_ROUND                         : '(' ;
     R_ROUND                         : ')' ;
+    L_SQUARE                        : '[' ;
+    R_SQUARE                        : ']' ;
     L_CURLY                         : '{' ;
     R_CURLY                         : '}' ;
 
@@ -194,8 +196,11 @@ parser section:
     ReturnStmt                      : RETURN Expr? SEMI ;
 
     precedence Expr                 : Expr Args                         # call-like expr
-                                    | Expr TypeMemberAccess             # type member access expr
-                                    | Expr ObjectMemberAccess           # object member access expr
+                                    | Expr DBL_COLON TypeMember         # type member access expr
+                                    | Expr DOT
+                                        ( ObjectMember                  # object member access expr
+                                        | Conv                          # conversion expr
+                                        )
                                     | CONST Args                        # constexpr guarantee expr
                                     | PrimaryExpr                       # primary expr
                                     ;
@@ -218,10 +223,10 @@ parser section:
     CharLit                         : CHAR ;
 
     Assign                          : ASSIGN Expr ;
-
     Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
-    TypeMemberAccess                : DBL_COLON IDENTIFIER ;
-    ObjectMemberAccess              : DOT IDENTIFIER ;
+    Conv                            : L_SQUARE Expr R_SQUARE ;
+    TypeMember                      : IDENTIFIER ;
+    ObjectMember                    : IDENTIFIER ;
 
     TypeAnnot                       : COLON TypeSpec ;
     TypeSpec                        : Expr ;

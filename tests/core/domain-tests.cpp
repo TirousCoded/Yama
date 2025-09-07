@@ -772,9 +772,9 @@ TEST_F(DomainTests, Load) {
 
         EXPECT_EQ(result_f->consts().size(), 3);
         if (result_f->consts().size() == 3) {
-            EXPECT_EQ(result_f->consts().type(0), result_a);
-            EXPECT_EQ(result_f->consts().type(1), result_b);
-            EXPECT_EQ(result_f->consts().type(2), result_c);
+            EXPECT_EQ(result_f->consts().item(0), result_a);
+            EXPECT_EQ(result_f->consts().item(1), result_b);
+            EXPECT_EQ(result_f->consts().item(2), result_c);
         }
     }
 

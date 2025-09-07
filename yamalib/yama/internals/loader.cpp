@@ -6,7 +6,7 @@
 #include "../core/const_table_ref.h"
 #include "../core/callsig_ref.h"
 
-#include "type_instance.h"
+#include "item_instance.h"
 #include "specifiers.h"
 #include "domain_data.h"
 
@@ -140,16 +140,16 @@ bool yama::internal::loader::_create_and_link_instance(const fullname& fullname,
     return _resolve_consts(e, *new_instance, info); // link
 }
 
-yama::res<yama::internal::type_instance> yama::internal::loader::_create_instance(const fullname& fullname, mid_t mid, module::item info) {
-    return make_res<type_instance>(_str_fullname(fullname), mid, info);
+yama::res<yama::internal::item_instance> yama::internal::loader::_create_instance(const fullname& fullname, mid_t mid, module::item info) {
+    return make_res<item_instance>(_str_fullname(fullname), mid, info);
 }
 
-void yama::internal::loader::_add_instance_to_state(const fullname& fullname, res<type_instance> instance) {
+void yama::internal::loader::_add_instance_to_state(const fullname& fullname, res<item_instance> instance) {
     const bool result = state.types.push(fullname, instance);
     YAMA_ASSERT(result);
 }
 
-bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instance, module::item info) {
+bool yama::internal::loader::_resolve_consts(const env& e, item_instance& instance, module::item info) {
     const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_resolve_const(e, instance, info, i)) return false;
@@ -157,7 +157,7 @@ bool yama::internal::loader::_resolve_consts(const env& e, type_instance& instan
     return true;
 }
 
-bool yama::internal::loader::_resolve_const(const env& e, type_instance& instance, module::item info, const_t index) {
+bool yama::internal::loader::_resolve_const(const env& e, item_instance& instance, module::item info, const_t index) {
     static_assert(const_types == 9);
     switch (info.consts().const_type(index).value()) {
     case int_const:             return _resolve_scalar_const<int_const>(instance, info, index);                 break;
@@ -183,11 +183,11 @@ bool yama::internal::loader::_check() {
     return true;
 }
 
-bool yama::internal::loader::_check_instance(const env& e, type_instance& instance) {
-    return _check_consts(e, instance, get_type_mem(instance)->info);
+bool yama::internal::loader::_check_instance(const env& e, item_instance& instance) {
+    return _check_consts(e, instance, get_item_mem(instance)->info);
 }
 
-bool yama::internal::loader::_check_consts(const env& e, type_instance& instance, module::item info) {
+bool yama::internal::loader::_check_consts(const env& e, item_instance& instance, module::item info) {
     const auto n = create_type(instance).consts().size();
     for (const_t i = 0; i < n; i++) {
         if (!_check_const(e, instance, info, i)) return false;
@@ -195,7 +195,7 @@ bool yama::internal::loader::_check_consts(const env& e, type_instance& instance
     return true;
 }
 
-bool yama::internal::loader::_check_const(const env& e, type_instance& instance, module::item info, const_t index) {
+bool yama::internal::loader::_check_const(const env& e, item_instance& instance, module::item info, const_t index) {
     static_assert(const_types == 9);
     switch (info.consts().const_type(index).value()) {
     case int_const:             return _check_scalar_const<int_const>(instance, info, index);               break;
@@ -213,7 +213,7 @@ bool yama::internal::loader::_check_const(const env& e, type_instance& instance,
     return bool();
 }
 
-bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved) {
+bool yama::internal::loader::_check_no_kind_mismatch(item_instance& instance, module::item info, const_t index, const item_ref& resolved) {
     const auto  t               = create_type(instance);
     const str   symbol_fullname = info.consts().qualified_name(index).value();
     const auto  symbol_kind     = info.consts().kind(index).value();
@@ -230,7 +230,7 @@ bool yama::internal::loader::_check_no_kind_mismatch(type_instance& instance, mo
     return success;
 }
 
-bool yama::internal::loader::_check_no_callsig_mismatch(type_instance& instance, module::item info, const_t index, const item_ref& resolved) {
+bool yama::internal::loader::_check_no_callsig_mismatch(item_instance& instance, module::item info, const_t index, const item_ref& resolved) {
     const auto t                = create_type(instance);
     const auto symbol_callsig   = info.consts().callsig(index);
     const auto resolved_callsig = resolved.callsig();

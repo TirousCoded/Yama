@@ -60,7 +60,7 @@ namespace yama::internal {
         first_pass(translation_unit& tu);
 
 
-        static_assert(ast_types == 32); // reminder
+        static_assert(ast_types == 33); // reminder
 
         void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_Decl> x) override final;
@@ -90,12 +90,13 @@ namespace yama::internal {
         //void visit_begin(res<ast_CharLit> x) override final;
         void visit_begin(res<ast_Assign> x) override final;
         void visit_begin(res<ast_Args> x) override final;
-        void visit_begin(res<ast_TypeMemberAccess> x) override final;
-        void visit_begin(res<ast_ObjectMemberAccess> x) override final;
+        void visit_begin(res<ast_Conv> x) override final;
+        void visit_begin(res<ast_TypeMember> x) override final;
+        void visit_begin(res<ast_ObjectMember> x) override final;
         void visit_begin(res<ast_TypeAnnot> x) override final;
         //void visit_begin(res<ast_TypeSpec> x) override final;
 
-        static_assert(ast_types == 32); // reminder
+        static_assert(ast_types == 33); // reminder
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
@@ -125,8 +126,9 @@ namespace yama::internal {
         //void visit_end(res<ast_CharLit> x) override final;
         //void visit_end(res<ast_Assign> x) override final;
         //void visit_end(res<ast_Args> x) override final;
-        //void visit_end(res<ast_TypeMemberAccess> x) override final;
-        //void visit_end(res<ast_ObjectMemberAccess> x) override final;
+        //void visit_end(res<ast_Conv> x) override final;
+        //void visit_end(res<ast_TypeMember> x) override final;
+        //void visit_end(res<ast_ObjectMember> x) override final;
         //void visit_end(res<ast_TypeAnnot> x) override final;
         //void visit_end(res<ast_TypeSpec> x) override final;
 

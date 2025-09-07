@@ -18,7 +18,7 @@
 namespace yama::internal {
 
 
-    struct type_mem_header final {
+    struct item_mem_header final {
         str                     fullname;
         size_t                  len;                    // size of constant table
         size_t                  stubs;                  // constant table stubs
@@ -37,16 +37,16 @@ namespace yama::internal {
     };
 
     // NOTE: ran into NASTY cyclical include problems by trying to use std::variant
-    //       for type_mem_elem, so instead we're gonna just use a type-erased thing
+    //       for item_mem_elem, so instead we're gonna just use a type-erased thing
     //       to get around the issue
 
-    // type_mem_elem will use 'index' to encode the const_type value, w/ const_types
+    // item_mem_elem will use 'index' to encode the const_type value, w/ const_types
     // being a special value encapsulating a 'stub' entry
 
-    // type_mem_elem will use 'data' to encode the constant value, which will be 
+    // item_mem_elem will use 'data' to encode the constant value, which will be 
     // reinterpreted as whatever data is encoded by the constant
 
-    struct type_mem_elem final {
+    struct item_mem_elem final {
         size_t      index   = stub_index;
         uint64_t    data    = 0;
 
@@ -81,14 +81,14 @@ namespace yama::internal {
 
         template<const_type C>
             requires std::is_trivially_copyable_v<const_data_of_t<C>>
-        static inline type_mem_elem init(const const_data_of_t<C>& v) noexcept {
-            type_mem_elem result{};
+        static inline item_mem_elem init(const const_data_of_t<C>& v) noexcept {
+            item_mem_elem result{};
             result.index = size_t(C);
             result.as<C>() = v;
             return result;
         }
     };
 
-    using type_mem = ha_struct<type_mem_header, type_mem_elem>;
+    using item_mem = ha_struct<item_mem_header, item_mem_elem>;
 }
 

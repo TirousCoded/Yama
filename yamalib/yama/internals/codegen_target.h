@@ -76,7 +76,7 @@ namespace yama::internal {
         }
 
 
-        void add_cvalue_put_instr(uint8_t reg, const cvalue& x);
+        void add_cvalue_put_instr(uint8_t reg, const cvalue& x, bool reinit = false);
 
 
     private:

@@ -20,12 +20,12 @@ size_t yama::callsig_ref::params() const noexcept {
 std::optional<yama::item_ref> yama::callsig_ref::param_type(size_t index) const noexcept {
     return
         index < info().params.size()
-        ? _consts.type(info().params[index])
+        ? _consts.item(info().params[index])
         : std::nullopt;
 }
 
 std::optional<yama::item_ref> yama::callsig_ref::return_type() const noexcept {
-    return _consts.type(info().ret);
+    return _consts.item(info().ret);
 }
 
 bool yama::callsig_ref::operator==(const callsig_ref& other) const noexcept {

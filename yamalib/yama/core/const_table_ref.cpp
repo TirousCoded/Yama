@@ -6,7 +6,7 @@
 
 
 yama::const_table_ref::const_table_ref(const yama::item_ref& x) noexcept
-    : _mem(internal::get_type_mem(x)) {}
+    : _mem(internal::get_item_mem(x)) {}
 
 size_t yama::const_table_ref::size() const noexcept {
     return _mem->length();
@@ -23,7 +23,7 @@ std::optional<yama::const_type> yama::const_table_ref::const_type(const_t x) con
     return _mem->info.consts().const_type(x);
 }
 
-std::optional<yama::item_ref> yama::const_table_ref::type(const_t x) const noexcept {
+std::optional<yama::item_ref> yama::const_table_ref::item(const_t x) const noexcept {
     static_assert(const_types == 9);
     if (auto r = get<primitive_type_const>(x))      return r;
     else if (auto r = get<function_type_const>(x))  return r;
@@ -49,10 +49,10 @@ std::string yama::const_table_ref::fmt_const(const_t x) const {
     return std::format("({}) {}", const_type(x).value(), a);
 }
 
-std::string yama::const_table_ref::fmt_type_const(const_t x) const {
+std::string yama::const_table_ref::fmt_item_const(const_t x) const {
     if (x >= size())        return std::format("<illegal({})>", x);
     else if (is_stub(x))    return std::format("<stub({})>", x);
-    else                    return type(x).value().fmt();
+    else                    return item(x).value().fmt();
 }
 
 std::string yama::const_table_ref::fmt(const char* tab) const {

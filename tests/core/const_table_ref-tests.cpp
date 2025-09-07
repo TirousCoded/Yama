@@ -307,7 +307,7 @@ TEST_F(ConstTableRefTests, ConstType_OutOfBounds) {
     EXPECT_EQ(a.const_type(4), std::nullopt); // out-of-bounds
 }
 
-TEST_F(ConstTableRefTests, Type) {
+TEST_F(ConstTableRefTests, Item) {
     auto abc_consts =
         yama::const_table()
         .add_int(-3)
@@ -324,16 +324,16 @@ TEST_F(ConstTableRefTests, Type) {
 
     yama::const_table_ref a = dm->load("a:abc"_str).value();
 
-    EXPECT_EQ(a.type(0), std::nullopt);
-    EXPECT_EQ(a.type(1), std::nullopt);
-    EXPECT_EQ(a.type(2), std::nullopt);
-    EXPECT_EQ(a.type(3), std::nullopt);
-    EXPECT_EQ(a.type(4), std::nullopt);
-    EXPECT_EQ(a.type(5), dm->load("yama:Int"_str));
-    EXPECT_EQ(a.type(6), dm->load("yama:Float"_str));
+    EXPECT_EQ(a.item(0), std::nullopt);
+    EXPECT_EQ(a.item(1), std::nullopt);
+    EXPECT_EQ(a.item(2), std::nullopt);
+    EXPECT_EQ(a.item(3), std::nullopt);
+    EXPECT_EQ(a.item(4), std::nullopt);
+    EXPECT_EQ(a.item(5), dm->load("yama:Int"_str));
+    EXPECT_EQ(a.item(6), dm->load("yama:Float"_str));
 }
 
-TEST_F(ConstTableRefTests, Type_OutOfBounds) {
+TEST_F(ConstTableRefTests, Item_OutOfBounds) {
     auto abc_consts =
         yama::const_table()
         .add_int(-3)
@@ -350,7 +350,7 @@ TEST_F(ConstTableRefTests, Type_OutOfBounds) {
 
     yama::const_table_ref a = dm->load("a:abc"_str).value();
 
-    EXPECT_EQ(a.type(7), std::nullopt); // out-of-bounds
+    EXPECT_EQ(a.item(7), std::nullopt); // out-of-bounds
 }
 
 TEST_F(ConstTableRefTests, Equality) {

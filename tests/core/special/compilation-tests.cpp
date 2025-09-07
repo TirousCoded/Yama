@@ -7688,6 +7688,183 @@ fn f() {
 }
 
 
+// Conversion Expr
+//
+//      - Given form '<x>.[<target>]', returns the value of <x> converted to type <target>,
+//        panicking if the conversion fails.
+//
+//      - Non-Assignable
+//      - Non-Constexpr
+//          * TODO: Look into making this 'Conditionally Constexpr' later.
+//
+//      - Illegal if <target> is not constexpr.
+//      - Illegal if <target> is not yama:Type.
+//          * TODO: What about fn and method type values which aren't yama:Type yet?
+
+// Basic usage.
+
+TEST_F(CompilationTests, ConversionExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    var a: Float = 10.0;
+    observeInt(a.[Int]);
+    observeUInt(a.[UInt]);
+    observeInt(a.[UInt].[Int].[UInt].[Int].[Int]);
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    sidefx_t expected{};
+    expected.observe_int(10);
+    expected.observe_uint(10);
+    expected.observe_int(10);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// Panic if conversion fails.
+
+TEST_F(CompilationTests, ConversionExpr_PanicIfConversionFails) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+fn f() {
+    var a: Int = 10;
+    observeInt(1);
+    // IMPORTANT: Using conv expr w/out something like a local var init wrapping it
+    //            helps test that impl doesn't mistakenly cut out the conversion's
+    //            side-effects.
+    //              * This can be removed later if we can statically verify conversions.
+    a.[None]; // Panic!
+    observeInt(2); // Shouldn't reach.
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    EXPECT_EQ(ctx->panics(), 0);
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_FALSE(ctx->call(1, yama::newtop).good()); // <- Should panic.
+
+    // Expected return value.
+    //EXPECT_EQ(ctx->local(0).value(), ctx->new_none()); <- n/a due to panic.
+
+    EXPECT_EQ(ctx->panics(), 1);
+
+    // Expected side effects.
+    sidefx_t expected{};
+    expected.observe_int(1);
+    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+}
+
+// Conversion expr is non-assignable.
+
+TEST_F(CompilationTests, ConversionExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: Int = 10;
+    a.[Int] = 11;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// Conversion expr is non-constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: Int = 10;
+    const(a.[Int]);
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// Illegal if <target> is not constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_Target_NonConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: Int = 10;
+    var b: Type = Int;
+    a.[b]; // 'b' is not constexpr.
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// Illegal if <target> is not yama:Type.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_Target_TypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    var a: Int = 10;
+    a.[100]; // '100' is not yama:Type.
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+
 // type member access expr
 //
 //      - type member access exprs are homomorphic exprs for exprs of the form '<owner>::<member>'

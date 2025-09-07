@@ -8,7 +8,7 @@
 #include "const_table.h"
 #include "const_type.h"
 
-#include "../internals/type_mem.h"
+#include "../internals/item_mem.h"
 
 
 namespace yama {
@@ -31,11 +31,11 @@ namespace yama {
         const_table_ref& operator=(const_table_ref&&) noexcept = default;
 
 
-        // TODO: The unit tests for methods like 'get', 'const_type', 'type', etc.
+        // TODO: The unit tests for methods like 'get', 'const_type', 'item', etc.
         //       haven't really been expanded as we've adding things like new kinds
         //       of items.
 
-        // TODO: Update our is_stub unit tests when we add types w/ stubs in their
+        // TODO: Update our is_stub unit tests when we add items w/ stubs in their
         //       otherwise resolved constant table (also update Get_Stub!)
 
         // Returns the size of the constant table.
@@ -50,14 +50,14 @@ namespace yama {
         inline std::optional<const_data_of_t<C>> get(const_t x) const noexcept;
         // Returns the const_type of constant at x.
         std::optional<const_type> const_type(const_t x) const noexcept;
-        // Returns type of constant at x, or std::nullopt if cannot.
-        std::optional<item_ref> type(const_t x) const noexcept;
+        // Returns item of constant at x, or std::nullopt if cannot.
+        std::optional<item_ref> item(const_t x) const noexcept;
 
         // Compares by reference.
         bool operator==(const const_table_ref&) const noexcept = default;
 
         std::string fmt_const(const_t x) const;
-        std::string fmt_type_const(const_t x) const;
+        std::string fmt_item_const(const_t x) const;
         std::string fmt(const char* tab = default_tab) const;
 
 
@@ -65,7 +65,7 @@ namespace yama {
         friend class yama::item_ref;
 
 
-        internal::type_mem _mem;
+        internal::item_mem _mem;
     };
 
 

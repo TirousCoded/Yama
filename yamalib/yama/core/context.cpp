@@ -81,7 +81,7 @@ std::string yama::context::fmt_stacktrace(size_t skip, const char* tab) const {
         }
         // check for symbol info, and if so, add it to result
         if (callframe.t) {
-            const auto info = internal::get_type_mem(deref_assert(callframe.t))->info;
+            const auto info = internal::get_item_mem(deref_assert(callframe.t))->info;
             if (const auto bcode = info.try_one<bcode_desc>()) {
                 // remember that program counter will be incr when fetching instr, meaning
                 // we need to decr it to get current instr index
@@ -228,20 +228,28 @@ size_t yama::context::max_locals() noexcept {
     return _top_cf().max_locals;
 }
 
-std::optional<yama::object_ref> yama::context::arg(arg_t x) {
+std::optional<yama::borrowed_ref> yama::context::arg(arg_t x) {
     const auto view = _view_top_cf();
     return
         view.args_bounds_check(x)
-        ? std::make_optional(clone_ref(view.args[x]))
+        ? std::make_optional(view.args[x])
         : std::nullopt;
 }
 
-std::optional<yama::object_ref> yama::context::local(local_t x) {
+std::optional<yama::object_ref> yama::context::arg_c(arg_t x) {
+    return clone_ref(arg(x));
+}
+
+std::optional<yama::borrowed_ref> yama::context::local(local_t x) {
     const auto view = _view_top_cf();
     return
         view.locals_bounds_check(x)
-        ? std::make_optional(clone_ref(view.locals[x]))
+        ? std::make_optional(view.locals[x])
         : std::nullopt;
+}
+
+std::optional<yama::object_ref> yama::context::local_c(arg_t x) {
+    return clone_ref(local(x));
 }
 
 void yama::context::panic() {
@@ -324,6 +332,16 @@ yama::cmd_status yama::context::default_init(local_t x, item_ref t) {
 yama::cmd_status yama::context::default_init(local_t x, const_t c) {
     YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(x), _fmt_Kt(c));
     return _default_init(x, c);
+}
+
+yama::cmd_status yama::context::conv(local_t src, local_t dest, item_ref t) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, " > conversion {} -> {}", _fmt_R(src), t);
+    return _conv(src, dest, t);
+}
+
+yama::cmd_status yama::context::conv(local_t src, local_t dest, const_t c) {
+    YAMA_LOG(dbg(), ctx_llcmd_c, " > conversion {} -> {}", _fmt_R(src), _fmt_Kt(c));
+    return _conv(src, dest, c);
 }
 
 yama::cmd_status yama::context::call(size_t args_n, local_t ret) {
@@ -756,7 +774,7 @@ yama::cmd_status yama::context::_put_arg(local_t x, arg_t arg) {
     if (_put_arg_err_arg_out_of_bounds(arg)) {
         return cmd_status::init(false);
     }
-    return _put(x, this->arg(arg).value());
+    return _put(x, this->arg_c(arg).value());
 }
 
 bool yama::context::_put_arg_err_in_user_call_frame() {
@@ -804,7 +822,7 @@ yama::cmd_status yama::context::_default_init(local_t x, const_t c) {
     if (_default_init_err_c_is_not_type_constant(c)) {
         return cmd_status::init(false);
     }
-    return _default_init(x, _gen_default_initialized(deref_assert(consts().type(c))));
+    return _default_init(x, _gen_default_initialized(deref_assert(consts().item(c))));
 }
 
 yama::object_ref yama::context::_gen_default_initialized(item_ref t) {
@@ -853,6 +871,124 @@ bool yama::context::_default_init_err_c_is_not_type_constant(const_t c) {
     return true;
 }
 
+yama::cmd_status yama::context::_conv(local_t src, local_t dest, item_ref t) {
+    if (_conv_err_src_out_of_bounds(src)) {
+        return cmd_status::init(false);
+    }
+    if (std::optional<stolen_ref> result = _gen_conv_result(local(src).value(), t)) {
+        YAMA_LOG(dbg(), ctx_llcmd_c, " >       {: <13} = {}", _fmt_R_no_preview(dest), _fmt_R(src), t);
+        return _put(dest, std::move(*result), "put conv result");
+    }
+    else {
+        _panic(
+            "error: panic from attempting illegal {} -> {} conversion!",
+            local(src).value().t,
+            t);
+        return cmd_status::init(false);
+    }
+}
+
+yama::cmd_status yama::context::_conv(local_t src, local_t dest, const_t c) {
+    if (_conv_err_in_user_call_frame()) {
+        return cmd_status::init(false);
+    }
+    if (_conv_err_c_out_of_bounds(c)) {
+        return cmd_status::init(false);
+    }
+    if (_conv_err_c_is_not_type_constant(c)) {
+        return cmd_status::init(false);
+    }
+    return _conv(src, dest, deref_assert(consts().item(c)));
+}
+
+std::optional<yama::object_ref> yama::context::_gen_conv_result(borrowed_ref x, item_ref t) {
+    const item_ref& in = x.t;
+    const item_ref& out = t;
+    // Identity Conv
+    if (in == out) {
+        return clone_ref(x);
+    }
+    // Prim-To-Prim Conv
+    if (in.kind() == kind::primitive && out.kind() == in.kind()) {
+        if (in == int_type()) {
+            if (out == uint_type())         return new_uint(uint_t(x.as_int()));
+            else if (out == float_type())   return new_float(float_t(x.as_int()));
+            else if (out == bool_type())    return new_bool(bool_t(x.as_int()));
+            else if (out == char_type())    return new_char(char_t(x.as_int()));
+            else                            YAMA_ASSERT(out == none_type() || out == type_type());
+        }
+        else if (in == uint_type()) {
+            if (out == int_type())          return new_int(int_t(x.as_uint()));
+            else if (out == float_type())   return new_float(float_t(x.as_uint()));
+            else if (out == bool_type())    return new_bool(bool_t(x.as_uint()));
+            else if (out == char_type())    return new_char(char_t(x.as_uint()));
+            else                            YAMA_ASSERT(out == none_type() || out == type_type());
+        }
+        else if (in == float_type()) {
+            if (out == int_type())          return new_int(int_t(x.as_float()));
+            else if (out == uint_type())    return new_uint(uint_t(x.as_float()));
+            else if (out == bool_type())    return new_bool(bool_t(x.as_float()));
+            else if (out == char_type())    return new_char(char_t(x.as_float()));
+            else                            YAMA_ASSERT(out == none_type() || out == type_type());
+        }
+        else if (in == bool_type()) {
+            if (out == int_type())          return new_int(int_t(x.as_bool()));
+            else if (out == uint_type())    return new_uint(uint_t(x.as_bool()));
+            else if (out == float_type())   return new_float(float_t(x.as_bool()));
+            else if (out == char_type())    return new_char(char_t(x.as_bool()));
+            else                            YAMA_ASSERT(out == none_type() || out == type_type());
+        }
+        else if (in == char_type()) {
+            if (out == int_type())          return new_int(int_t(x.as_char()));
+            else if (out == uint_type())    return new_uint(uint_t(x.as_char()));
+            else if (out == float_type())   return new_float(float_t(x.as_char()));
+            else if (out == bool_type())    return new_bool(bool_t(x.as_char()));
+            else                            YAMA_ASSERT(out == none_type() || out == type_type());
+        }
+        else                                YAMA_ASSERT(in == none_type() || in == type_type());
+    }
+    // Fn/Method To yama:Type Conv
+    if ((in.kind() == kind::function || in.kind() == kind::method) && out == type_type()) {
+        return new_type(in);
+    }
+    return std::nullopt;
+}
+
+bool yama::context::_conv_err_in_user_call_frame() {
+    if (!is_user()) return false;
+    _panic(
+        "error: panic from attempt to load type constant from the user call frame!");
+    return true;
+}
+
+bool yama::context::_conv_err_src_out_of_bounds(local_t src) {
+    if (_view_top_cf().locals_bounds_check(src)) return false;
+    _panic(
+        "error: panic from attempt to conv object from out-of-bounds register index {}!",
+        src);
+    return true;
+}
+
+bool yama::context::_conv_err_c_out_of_bounds(const_t c) {
+    if (c < consts().size()) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from out-of-bounds constant index {}!",
+        c);
+    return true;
+}
+
+bool yama::context::_conv_err_c_is_not_type_constant(const_t c) {
+    if (is_type_const(consts().const_type(c).value())) {
+        return false;
+    }
+    _panic(
+        "error: panic from attempt to load type constant from constant index {}, but the constant is not a type constant!",
+        c);
+    return true;
+}
+
 std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
     if (_call_err_no_callobj(args_n)) {
         return std::nullopt;
@@ -870,7 +1006,7 @@ std::optional<yama::object_ref> yama::context::_call(size_t args_n) {
     if (_call_err_param_arg_count_mismatch(callobj, param_args)) {
         return std::nullopt;
     }
-    const auto callobj_mem = internal::get_type_mem(callobj_type);
+    const auto callobj_mem = internal::get_item_mem(callobj_type);
     // push our new call frame
     const bool push_cf_result = _push_cf(std::make_optional(callobj_type), args_start, args_n, callobj_mem->max_locals);
     if (_call_err_push_cf_would_overflow(callobj, push_cf_result)) {
@@ -999,7 +1135,7 @@ yama::cmd_status yama::context::_ret(local_t x) {
         return cmd_status::init(false);
     }
     // perform actual return value object cache
-    top_cf.returned = std::move(local(x));
+    top_cf.returned = std::move(local_c(x));
     return cmd_status::init(true);
 }
 
@@ -1042,7 +1178,7 @@ void yama::context::_bcode_setup() {
 }
 
 const yama::bc::code* yama::context::_bcode_acquire_bcode() {
-    return internal::get_type_mem(_curr_type())->info.bcode();
+    return internal::get_item_mem(_curr_type())->info.bcode();
 }
 
 yama::bc::instr yama::context::_bcode_fetch_instr() {
@@ -1056,7 +1192,7 @@ yama::bc::instr yama::context::_bcode_fetch_instr() {
 
 void yama::context::_bcode_exec_instr(bc::instr x) {
     YAMA_LOG(dbg(), bcode_exec_c, "{}", deref_assert(_top_cf().bcode_ptr).fmt_instr(_top_cf().pc - 1));
-    static_assert(bc::opcodes == 14);
+    static_assert(bc::opcodes == 15);
     switch (x.opc) {
     case bc::opcode::noop:
     {
@@ -1098,6 +1234,11 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
         if (default_init(_maybe_newtop(x.A), x.B).bad()) return;
     }
     break;
+    case bc::opcode::conv:
+    {
+        if (conv(x.A, _maybe_newtop(x.B), x.C).bad()) return;
+    }
+    break;
     case bc::opcode::call:
     {
         if (call(x.A, _maybe_newtop(x.B)).bad()) return;
@@ -1121,7 +1262,7 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
     break;
     case bc::opcode::jump_true:
     {
-        const auto& top = deref_assert(local(locals() - 1));
+        const auto top = local(locals() - 1).value();
         const bool should_jump = top.as_bool();
         if (should_jump) {
             _bcode_jump(x.sBx);
@@ -1131,7 +1272,7 @@ void yama::context::_bcode_exec_instr(bc::instr x) {
     break;
     case bc::opcode::jump_false:
     {
-        const auto& top = deref_assert(local(locals() - 1));
+        const auto top = local(locals() - 1).value();
         const bool should_jump = !top.as_bool();
         if (should_jump) {
             _bcode_jump(x.sBx);

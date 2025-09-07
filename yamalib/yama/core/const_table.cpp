@@ -115,7 +115,7 @@ std::string yama::const_table::fmt_const(const_t x) const {
         : std::format("<illegal({})>", x);
 }
 
-std::string yama::const_table::fmt_type_const(const_t x) const {
+std::string yama::const_table::fmt_item_const(const_t x) const {
     const auto qualified_name = this->qualified_name(x);
     if (!qualified_name)                        return std::format("<illegal({})>", x);
     else if (!is_type_const(*const_type(x)))    return std::format("<illegal({})>", x);

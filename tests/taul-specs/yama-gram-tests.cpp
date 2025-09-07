@@ -53,7 +53,7 @@ TEST_F(YamaGramTests, GrammarLoads) {
 TEST_F(YamaGramTests, LPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->nonsupport_lprs(), 38);
+    EXPECT_EQ(gram->nonsupport_lprs(), 40);
 
     ASSERT_TRUE(gram->has_lpr("TRUE"_str));
     ASSERT_TRUE(gram->has_lpr("FALSE"_str));
@@ -92,6 +92,8 @@ TEST_F(YamaGramTests, LPRs) {
     //ASSERT_TRUE(gram->has_lpr("MINUS"_str));
     ASSERT_TRUE(gram->has_lpr("L_ROUND"_str));
     ASSERT_TRUE(gram->has_lpr("R_ROUND"_str));
+    ASSERT_TRUE(gram->has_lpr("L_SQUARE"_str));
+    ASSERT_TRUE(gram->has_lpr("R_SQUARE"_str));
     ASSERT_TRUE(gram->has_lpr("L_CURLY"_str));
     ASSERT_TRUE(gram->has_lpr("R_CURLY"_str));
     ASSERT_TRUE(gram->has_lpr("DOT"_str));
@@ -105,6 +107,8 @@ TEST_F(YamaGramTests, LPRs) {
     //EXPECT_EQ(gram->lpr("MINUS"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("L_ROUND"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("R_ROUND"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("L_SQUARE"_str)->qualifier(), taul::qualifier::none);
+    EXPECT_EQ(gram->lpr("R_SQUARE"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("L_CURLY"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("R_CURLY"_str)->qualifier(), taul::qualifier::none);
     EXPECT_EQ(gram->lpr("DOT"_str)->qualifier(), taul::qualifier::none);
@@ -264,6 +268,8 @@ _OP_TEST(ASSIGN, "="_str, 1);
 //_OP_TEST(MINUS, "-"_str, 1);
 _OP_TEST(L_ROUND, "("_str, 1);
 _OP_TEST(R_ROUND, ")"_str, 1);
+_OP_TEST(L_SQUARE, "["_str, 1);
+_OP_TEST(R_SQUARE, "]"_str, 1);
 _OP_TEST(L_CURLY, "{"_str, 1);
 _OP_TEST(R_CURLY, "}"_str, 1);
 _OP_TEST(DOT, "."_str, 1);
@@ -1030,7 +1036,7 @@ static bool pprs_ready = false;
 TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->pprs(), 32);
+    EXPECT_EQ(gram->pprs(), 33);
 
     EXPECT_TRUE(gram->has_ppr("Chunk"_str));
 
@@ -1069,10 +1075,10 @@ TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram->has_ppr("CharLit"_str));
     
     ASSERT_TRUE(gram->has_ppr("Assign"_str));
-
     ASSERT_TRUE(gram->has_ppr("Args"_str));
-    ASSERT_TRUE(gram->has_ppr("TypeMemberAccess"_str));
-    ASSERT_TRUE(gram->has_ppr("ObjectMemberAccess"_str));
+    ASSERT_TRUE(gram->has_ppr("Conv"_str));
+    ASSERT_TRUE(gram->has_ppr("TypeMember"_str));
+    ASSERT_TRUE(gram->has_ppr("ObjectMember"_str));
 
     ASSERT_TRUE(gram->has_ppr("TypeAnnot"_str));
     ASSERT_TRUE(gram->has_ppr("TypeSpec"_str));
@@ -2407,7 +2413,7 @@ TEST_F(YamaGramTests, Expr_CallLikeExpr) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, Expr_TypeMemberAccessExpr) {
+TEST_F(YamaGramTests, Expr_TypeMemberExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2421,9 +2427,12 @@ TEST_F(YamaGramTests, Expr_TypeMemberAccessExpr) {
     {
         auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
         pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
-        pattern.loose_syntactic("TypeMemberAccess"_str, cntr, 3);
-        pattern.loose_syntactic("TypeMemberAccess"_str, cntr, 3);
-        pattern.loose_syntactic("TypeMemberAccess"_str, cntr, 3);
+        pattern.lexical("DBL_COLON"_str, cntr, 2);
+        pattern.loose_syntactic("TypeMember"_str, cntr, 1);
+        pattern.lexical("DBL_COLON"_str, cntr, 2);
+        pattern.loose_syntactic("TypeMember"_str, cntr, 1);
+        pattern.lexical("DBL_COLON"_str, cntr, 2);
+        pattern.loose_syntactic("TypeMember"_str, cntr, 1);
     }
 
     auto result = parser->parse("Expr"_str);
@@ -2434,7 +2443,7 @@ TEST_F(YamaGramTests, Expr_TypeMemberAccessExpr) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, Expr_ObjectMemberAccessExpr) {
+TEST_F(YamaGramTests, Expr_ObjectMemberExpr) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
@@ -2448,9 +2457,40 @@ TEST_F(YamaGramTests, Expr_ObjectMemberAccessExpr) {
     {
         auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
         pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
-        pattern.loose_syntactic("ObjectMemberAccess"_str, cntr, 2);
-        pattern.loose_syntactic("ObjectMemberAccess"_str, cntr, 2);
-        pattern.loose_syntactic("ObjectMemberAccess"_str, cntr, 2);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("ObjectMember"_str, cntr, 1);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("ObjectMember"_str, cntr, 1);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("ObjectMember"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("Expr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, Expr_ConvExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "a.[T].[U]"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("Conv"_str, cntr, 3);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("Conv"_str, cntr, 3);
     }
 
     auto result = parser->parse("Expr"_str);
@@ -2501,11 +2541,14 @@ TEST_F(YamaGramTests, Expr_SuffixNesting) {
         auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
         pattern.loose_syntactic("PrimaryExpr"_str, cntr, 1);
         pattern.loose_syntactic("Args"_str, cntr, 2);
-        pattern.loose_syntactic("TypeMemberAccess"_str, cntr, 5);
+        pattern.lexical("DBL_COLON"_str, cntr, 2);
+        pattern.loose_syntactic("TypeMember"_str, cntr, 3);
         pattern.loose_syntactic("Args"_str, cntr, 2);
         pattern.loose_syntactic("Args"_str, cntr, 2);
-        pattern.loose_syntactic("ObjectMemberAccess"_str, cntr, 4);
-        pattern.loose_syntactic("TypeMemberAccess"_str, cntr, 5);
+        pattern.lexical("DOT"_str, cntr, 1);
+        pattern.loose_syntactic("ObjectMember"_str, cntr, 3);
+        pattern.lexical("DBL_COLON"_str, cntr, 2);
+        pattern.loose_syntactic("TypeMember"_str, cntr, 3);
     }
 
     auto result = parser->parse("Expr"_str);
@@ -3081,11 +3124,11 @@ TEST_F(YamaGramTests, Args_NonEmpty) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, TypeMemberAccess) {
+TEST_F(YamaGramTests, Conv) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
-    input.add_str(""_str, "::abc"_str);
+    input.add_str(""_str, "[T]"_str);
 
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
@@ -3093,12 +3136,13 @@ TEST_F(YamaGramTests, TypeMemberAccess) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = pattern.syntactic_autoclose("TypeMemberAccess"_str, cntr);
-        pattern.lexical("DBL_COLON"_str, cntr, 2);
-        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+        auto node0 = pattern.syntactic_autoclose("Conv"_str, cntr);
+        pattern.lexical("L_SQUARE"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 1);
+        pattern.lexical("R_SQUARE"_str, cntr, 1);
     }
 
-    auto result = parser->parse("TypeMemberAccess"_str);
+    auto result = parser->parse("Conv"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 
@@ -3106,11 +3150,11 @@ TEST_F(YamaGramTests, TypeMemberAccess) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, ObjectMemberAccess) {
+TEST_F(YamaGramTests, TypeMember) {
     ASSERT_TRUE(pprs_ready);
 
     taul::source_code input{};
-    input.add_str(""_str, ".abc"_str);
+    input.add_str(""_str, "abc"_str);
 
     auto parser = prep_for_ppr_test(lgr, *gram, input);
     ASSERT_TRUE(parser);
@@ -3118,12 +3162,35 @@ TEST_F(YamaGramTests, ObjectMemberAccess) {
     taul::source_pos_counter cntr{};
     taul::parse_tree_pattern pattern(*gram);
     {
-        auto node0 = pattern.syntactic_autoclose("ObjectMemberAccess"_str, cntr);
-        pattern.lexical("DOT"_str, cntr, 1);
+        auto node0 = pattern.syntactic_autoclose("TypeMember"_str, cntr);
         pattern.lexical("IDENTIFIER"_str, cntr, 3);
     }
 
-    auto result = parser->parse("ObjectMemberAccess"_str);
+    auto result = parser->parse("TypeMember"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ObjectMember) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "abc"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("ObjectMember"_str, cntr);
+        pattern.lexical("IDENTIFIER"_str, cntr, 3);
+    }
+
+    auto result = parser->parse("ObjectMember"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 

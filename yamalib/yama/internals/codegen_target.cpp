@@ -100,20 +100,20 @@ void yama::internal::codegen_target::autosym(taul::source_pos pos) {
     cw.autosym(loc.origin, loc.chr, loc.line);
 }
 
-void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cvalue& x) {
+void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cvalue& x, bool reinit) {
     YAMA_ASSERT(has_target());
-    if (x.is(tu->types.none_type()))            tu->cgt.cw.add_put_none(reg);
-    else if (const auto v = x.as<int_t>())      tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_int(*v)));
-    else if (const auto v = x.as<uint_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_uint(*v)));
-    else if (const auto v = x.as<float_t>())    tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_float(*v)));
-    else if (const auto v = x.as<bool_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_bool(*v)));
-    else if (const auto v = x.as<char_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_char(*v)));
+    if (x.is(tu->types.none_type()))            tu->cgt.cw.add_put_none(reg, reinit);
+    else if (const auto v = x.as<int_t>())      tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_int(*v)), reinit);
+    else if (const auto v = x.as<uint_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_uint(*v)), reinit);
+    else if (const auto v = x.as<float_t>())    tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_float(*v)), reinit);
+    else if (const auto v = x.as<bool_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_bool(*v)), reinit);
+    else if (const auto v = x.as<char_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_char(*v)), reinit);
     else if (const auto v = x.to_type()) {
         static_assert(kinds == 4); // reminder
-        if (is_primitive(v->kind()))            tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)));
-        else if (is_function(v->kind()))        tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)));
-        else if (is_method(v->kind()))          tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_method_type(*v)));
-        else if (is_struct(v->kind()))          tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)));
+        if (is_primitive(v->kind()))            tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
+        else if (is_function(v->kind()))        tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)), reinit);
+        else if (is_method(v->kind()))          tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_method_type(*v)), reinit);
+        else if (is_struct(v->kind()))          tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
         else                                    YAMA_DEADEND;
     }
     else                                        YAMA_DEADEND;

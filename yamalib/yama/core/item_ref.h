@@ -15,7 +15,7 @@
 #include "const_table_ref.h"
 #include "ids.h"
 
-#include "../internals/type_mem.h"
+#include "../internals/item_mem.h"
 
 
 namespace yama {
@@ -26,9 +26,9 @@ namespace yama {
     class item_ref;
 
     namespace internal {
-        class type_instance;
-        type_mem get_type_mem(item_ref x) noexcept;
-        item_ref create_type(const type_instance& x) noexcept;
+        class item_instance;
+        item_mem get_item_mem(item_ref x) noexcept;
+        item_ref create_type(const item_instance& x) noexcept;
     }
 
 
@@ -67,15 +67,15 @@ namespace yama {
 
 
     private:
-        friend class internal::type_instance;
-        friend internal::type_mem internal::get_type_mem(item_ref x) noexcept;
-        friend item_ref internal::create_type(const internal::type_instance& x) noexcept;
+        friend class internal::item_instance;
+        friend internal::item_mem internal::get_item_mem(item_ref x) noexcept;
+        friend item_ref internal::create_type(const internal::item_instance& x) noexcept;
 
 
-        internal::type_mem _mem;
+        internal::item_mem _mem;
 
 
-        explicit item_ref(const internal::type_instance& instance) noexcept;
+        explicit item_ref(const internal::item_instance& instance) noexcept;
     };
 
     static_assert(sizeof(const_table_ref) <= sizeof(void*)); // Guarantee no more than a pointer in size.

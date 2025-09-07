@@ -50,6 +50,7 @@ namespace yama::internal {
             call,
             unbound_method,
             bound_method,
+            conv,
             default_init,
             constexpr_guarantee,
 
@@ -59,7 +60,7 @@ namespace yama::internal {
         static constexpr size_t categories = size_t(category::num);
 
         static inline std::string fmt_category(category x) {
-            static_assert(categories == 14);
+            static_assert(categories == 15);
             switch (x) {
             case category::param_id:                return "param id expr";
             case category::var_id:                  return "local var id expr";
@@ -73,6 +74,7 @@ namespace yama::internal {
             case category::call:                    return "call expr";
             case category::unbound_method:          return "unbound method expr";
             case category::bound_method:            return "bound method expr";
+            case category::conv:                    return "conversion expr";
             case category::default_init:            return "default initialize expr";
             case category::constexpr_guarantee:     return "constexpr guarantee expr";
             default: YAMA_DEADEND; break;
@@ -194,36 +196,51 @@ namespace yama::internal {
         bool _resolve(const ast_expr& x);
         bool _resolve(const ast_PrimaryExpr& x);
         bool _resolve(const ast_Args& x);
-        bool _resolve(const ast_TypeMemberAccess& x);
-        bool _resolve(const ast_ObjectMemberAccess& x);
+        bool _resolve(const ast_Conv& x);
+        bool _resolve(const ast_TypeMember& x);
+        bool _resolve(const ast_ObjectMember& x);
         bool _resolve(const ast_Expr& x);
 
         bool _resolve_children(const ast_Args& x);
-        bool _resolve_children(const ast_TypeMemberAccess& x);
-        bool _resolve_children(const ast_ObjectMemberAccess& x);
+        bool _resolve_children(const ast_Conv& x);
+        bool _resolve_children(const ast_TypeMember& x);
+        bool _resolve_children(const ast_ObjectMember& x);
         bool _resolve_children(const ast_Expr& x);
 
         category _discern_category(const ast_PrimaryExpr& x);
         category _discern_category(const ast_Args& x);
-        category _discern_category(const ast_TypeMemberAccess& x);
-        category _discern_category(const ast_ObjectMemberAccess& x);
+        category _discern_category(const ast_Conv& x);
+        category _discern_category(const ast_TypeMember& x);
+        category _discern_category(const ast_ObjectMember& x);
         category _discern_category(const ast_Expr& x);
 
         bool _resolve_expr(const ast_PrimaryExpr& x);
         bool _resolve_expr(const ast_Args& x);
-        bool _resolve_expr(const ast_TypeMemberAccess& x);
-        bool _resolve_expr(const ast_ObjectMemberAccess& x);
+        bool _resolve_expr(const ast_Conv& x);
+        bool _resolve_expr(const ast_TypeMember& x);
+        bool _resolve_expr(const ast_ObjectMember& x);
         bool _resolve_expr(const ast_Expr& x);
 
-        // below, ret == std::nullopt means no result
+        // Below, ret == std::nullopt means no result.
+
+        // Below, ret_puts_must_reinit gives the caller the ability to dictate situations where the
+        // codegen in child must, for instrs writing to ret, be flagged as reinit.
+        // 
+        // ret_puts_must_reinit may be ignored by callee if ret is newtop.
+        //
+        // It is the CALLER'S RESPONSIBILITY to call reinit_temp (and not call it if not needed!)
+        //
+        // It is also the caller's responsibility to try and avoid situations where flagging as
+        // reinit is not necessary (as this lowers quality of static verif a little bit.)
 
         void _codegen(const ast_Expr& root, std::optional<size_t> ret);
-        void _codegen_step(const ast_expr& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_Args& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_TypeMemberAccess& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_ObjectMemberAccess& x, std::optional<size_t> ret);
-        void _codegen_step(const ast_Expr& x, std::optional<size_t> ret);
+        void _codegen_step(const ast_expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_Args& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_Conv& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_TypeMember& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_ObjectMember& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_Expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
 
         mode _discern_mode(const ast_base_expr& x) const noexcept;
         mode _discern_mode(const ast_suffix_expr& x) const noexcept;
@@ -248,6 +265,7 @@ namespace yama::internal {
         bool _raise_invalid_operation_due_to_noncallable_type_if(bool x, metadata& md, ctype t);
         bool _raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number);
         bool _raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md);
+        bool _raise_type_mismatch_for_conv_target_if(ctype actual, metadata& md);
 
 
         static str _remove_quotes(const str& x) noexcept;

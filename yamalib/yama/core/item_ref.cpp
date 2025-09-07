@@ -6,14 +6,14 @@
 #include "callsig_ref.h"
 #include "const_table_ref.h"
 
-#include "../internals/type_instance.h"
+#include "../internals/item_instance.h"
 
 
-yama::internal::type_mem yama::internal::get_type_mem(item_ref x) noexcept {
+yama::internal::item_mem yama::internal::get_item_mem(item_ref x) noexcept {
     return x._mem;
 }
 
-yama::item_ref yama::internal::create_type(const type_instance& x) noexcept {
+yama::item_ref yama::internal::create_type(const item_instance& x) noexcept {
     return item_ref(x);
 }
 
@@ -52,6 +52,6 @@ std::string yama::item_ref::fmt() const {
     return fullname().fmt();
 }
 
-yama::item_ref::item_ref(const internal::type_instance& instance) noexcept
+yama::item_ref::item_ref(const internal::item_instance& instance) noexcept
     : _mem(instance._mem) {}
 

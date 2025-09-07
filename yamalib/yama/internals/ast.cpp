@@ -690,11 +690,15 @@ void yama::internal::ast_Expr::do_give(res<ast_Args> x) {
     _push_suffix(x);
 }
 
-void yama::internal::ast_Expr::do_give(res<ast_TypeMemberAccess> x) {
+void yama::internal::ast_Expr::do_give(res<ast_Conv> x) {
     _push_suffix(x);
 }
 
-void yama::internal::ast_Expr::do_give(res<ast_ObjectMemberAccess> x) {
+void yama::internal::ast_Expr::do_give(res<ast_TypeMember> x) {
+    _push_suffix(x);
+}
+
+void yama::internal::ast_Expr::do_give(res<ast_ObjectMember> x) {
     _push_suffix(x);
 }
 
@@ -919,24 +923,45 @@ void yama::internal::ast_Args::do_give(res<ast_Expr> x) {
     args.push_back(x);
 }
 
-void yama::internal::ast_TypeMemberAccess::fmt(ast_formatter& x) {
-    x.open("TypeMemberAccess", low_pos(), high_pos(), id);
+void yama::internal::ast_Conv::fmt(ast_formatter& x) {
+    x.open("Conv", low_pos(), high_pos(), id);
+    if (target) {
+        x.next("target");
+        target->fmt(x);
+    }
+    x.close();
+}
+
+void yama::internal::ast_Conv::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_Conv>());
+    if (target) {
+        target->accept(x);
+    }
+    x.visit_end(expect<ast_Conv>());
+}
+
+void yama::internal::ast_Conv::do_give(res<ast_Expr> x) {
+    target = x;
+}
+
+void yama::internal::ast_TypeMember::fmt(ast_formatter& x) {
+    x.open("TypeMember", low_pos(), high_pos(), id);
     x.next("member_name", member_name);
     x.close();
 }
 
-void yama::internal::ast_TypeMemberAccess::accept(ast_visitor& x) {
-    x.visit_begin(expect<ast_TypeMemberAccess>());
-    x.visit_end(expect<ast_TypeMemberAccess>());
+void yama::internal::ast_TypeMember::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_TypeMember>());
+    x.visit_end(expect<ast_TypeMember>());
 }
 
-void yama::internal::ast_TypeMemberAccess::do_give(taul::token x) {
+void yama::internal::ast_TypeMember::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
         member_name = x;
     }
 }
 
-bool yama::internal::ast_ObjectMemberAccess::is_callobj_of_args() const noexcept {
+bool yama::internal::ast_ObjectMember::is_callobj_of_args() const noexcept {
     const auto s = next_suffix();
     return
         s
@@ -944,18 +969,18 @@ bool yama::internal::ast_ObjectMemberAccess::is_callobj_of_args() const noexcept
         : false;
 }
 
-void yama::internal::ast_ObjectMemberAccess::fmt(ast_formatter& x) {
-    x.open("ObjectMemberAccess", low_pos(), high_pos(), id);
+void yama::internal::ast_ObjectMember::fmt(ast_formatter& x) {
+    x.open("ObjectMember", low_pos(), high_pos(), id);
     x.next("member_name", member_name);
     x.close();
 }
 
-void yama::internal::ast_ObjectMemberAccess::accept(ast_visitor& x) {
-    x.visit_begin(expect<ast_ObjectMemberAccess>());
-    x.visit_end(expect<ast_ObjectMemberAccess>());
+void yama::internal::ast_ObjectMember::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_ObjectMember>());
+    x.visit_end(expect<ast_ObjectMember>());
 }
 
-void yama::internal::ast_ObjectMemberAccess::do_give(taul::token x) {
+void yama::internal::ast_ObjectMember::do_give(taul::token x) {
     if (x.is_normal() && x.lpr->name() == "IDENTIFIER"_str) {
         member_name = x;
     }
@@ -1028,7 +1053,7 @@ void yama::internal::ast_parser::listener::on_syntactic(taul::ppr_ref ppr, taul:
 #define _YAMA_UNIT_(nm) \
 if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()._next_id))
 
-    static_assert(ast_types == 32); // reminder
+    static_assert(ast_types == 33); // reminder
 
     _YAMA_UNIT_(Chunk);
     else _YAMA_UNIT_(Decl);
@@ -1058,8 +1083,9 @@ if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()
     else _YAMA_UNIT_(CharLit);
     else _YAMA_UNIT_(Assign);
     else _YAMA_UNIT_(Args);
-    else _YAMA_UNIT_(TypeMemberAccess);
-    else _YAMA_UNIT_(ObjectMemberAccess);
+    else _YAMA_UNIT_(Conv);
+    else _YAMA_UNIT_(TypeMember);
+    else _YAMA_UNIT_(ObjectMember);
     else _YAMA_UNIT_(TypeAnnot);
     else _YAMA_UNIT_(TypeSpec);
 

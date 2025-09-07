@@ -50,23 +50,21 @@ void BCodeVerifTests::should_fail(const yama::callsig& callsig, size_t max_local
     EXPECT_FALSE(_test(callsig, max_locals));
 }
 bool BCodeVerifTests::_test(const yama::callsig& callsig, size_t max_locals) {
-#if 1
+    // Reset dbg dsignal counts so they just reflect outcome of this round.
+    dbg->reset();
     yama::println("{}", bcode.fmt_disassembly());
     yama::module m{};
     EXPECT_TRUE(m.add_function("f"_str, consts, callsig, max_locals, yama::bcode_call_fn));
     EXPECT_TRUE(m.bind_bcode("f"_str, bcode));
-    return yama::verifier(dbg).verify(
+    const bool success = yama::verifier(dbg).verify(
         m,
         // Map names 'yama' and 'abc' to arbitrary parcel IDs.
         yama::parcel_metadata{ "self"_str, { "yama"_str, "abc"_str } },
         "abc"_str);
-#else
-    return yama::verifier(dbg).verify(
-        yama::make_function("f"_str, consts, callsig, max_locals, bcode),
-        // Map names 'yama' and 'abc' to arbitrary parcel IDs.
-        yama::parcel_metadata{ "self"_str, { "yama"_str, "abc"_str } },
-        "abc"_str);
-#endif
+    // Cleanup for next should_[pass|fail] call.
+    bcode = yama::bc::code{};
+    consts = yama::const_table{};
+    return success;
 }
 
 
@@ -259,7 +257,7 @@ TEST_F(BCodeVerifTests, Fail_FinalBlockFallthroughToOutOfBoundsInstrs) {
     EXPECT_EQ(dbg->count(yama::dsignal::verif_fallthrough_puts_PC_out_of_bounds), 1);
 }
 
-static_assert(yama::bc::opcodes == 14);
+static_assert(yama::bc::opcodes == 15);
 
 // TODO: is there a reason to have both #_RA_IsNewtopButPushingOverflows and
 //       #_PushingMustNotOverflow tests? or is this unneeded duplication?
@@ -1181,6 +1179,159 @@ TEST_F(BCodeVerifTests, DefaultInit_Fail_PushingMustNotOverflow) {
         .add_primitive_type("yama:Float"_str)
         .add_float(10.0);
     
+    should_fail(yama::make_callsig({}, 0), 1);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_put_const(yama::newtop, 2) // Inits R(1) (to Int 0).
+        .add_conv(0, 1, 0) // No reinit, so R(1) MUST be Int already.
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0)
+        .add_int(0);
+
+    should_pass(yama::make_callsig({}, 0), 2);
+}
+
+TEST_F(BCodeVerifTests, Conv_Reinit) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_put_none(yama::newtop) // Inits R(1) (to None).
+        .add_conv(0, 1, 0, true) // Reinit R(1) (to Int 10).
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_pass(yama::make_callsig({}, 0), 2);
+}
+
+TEST_F(BCodeVerifTests, Conv_Newtop) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_conv(0, yama::newtop, 0) // Init R(1) (to Int 10).
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_pass(yama::make_callsig({}, 0), 2);
+}
+
+TEST_F(BCodeVerifTests, Conv_Newtop_MayBeMarkedReinit) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_conv(0, yama::newtop, 0, true) // Init R(1) (to Int 10).
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_pass(yama::make_callsig({}, 0), 2);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_RA_OutOfBounds) {
+    bcode
+        // block #1
+        .add_put_none(yama::newtop) // Inits R(0) (to None).
+        // Push then pop R(1) to better test impl robustness.
+        .add_put_const(yama::newtop, 1) // Inits R(1) (to Float 10.0).
+        .add_pop(1) // pops R(1)
+        .add_conv(1, 0, 0, true) // R(1) out-of-bounds.
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_fail(yama::make_callsig({}, 0), 2);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RA_out_of_bounds), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_RB_OutOfBounds) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        // Push then pop R(1) to better test impl robustness.
+        .add_put_none(yama::newtop) // Inits R(1) (to None).
+        .add_pop(1) // pops R(1)
+        .add_conv(0, 1, 0, true) // R(1) out-of-bounds.
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_fail(yama::make_callsig({}, 0), 2);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_out_of_bounds), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_KtC_OutOfBounds) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_conv(0, yama::newtop, 2, true) // Kt(2) out-of-bounds.
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_fail(yama::make_callsig({}, 0), 2);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KtC_out_of_bounds), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_KtC_NotATypeConst) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_conv(0, yama::newtop, 1, true) // Kt(1) not a type constant.
+        .add_ret(1);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
+    should_fail(yama::make_callsig({}, 0), 2);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_KtC_not_type_const), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_RB_And_KtC_TypesDiffer) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_put_const(yama::newtop, 2) // Inits R(1) (to Bool false).
+        .add_conv(0, 1, 0) // Kt(0) not type Int.
+        .add_ret(0);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0)
+        .add_bool(false);
+
+    should_fail(yama::make_callsig({}, 0), 2);
+
+    EXPECT_EQ(dbg->count(yama::dsignal::verif_RB_and_KtC_types_differ), 1);
+}
+
+TEST_F(BCodeVerifTests, Conv_Fail_PushingMustNotOverflow) {
+    bcode
+        // block #1
+        .add_put_const(yama::newtop, 1) // Inits R(0) (to Float 10.0).
+        .add_conv(0, yama::newtop, 0) // Overflow!
+        .add_ret(0);
+    consts
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+
     should_fail(yama::make_callsig({}, 0), 1);
 
     EXPECT_EQ(dbg->count(yama::dsignal::verif_pushing_overflows), 1);

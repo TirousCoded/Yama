@@ -144,6 +144,7 @@ namespace yama {
         bool _verify_RA_is_type_type_skip_if_reinit(module::item subject, _cfg_block& block, size_t i);
         // NOTE: 'this call' refers to the call the instruction is in, for verifying ret instrs.
         bool _verify_RA_is_return_type_of_this_call(module::item subject, _cfg_block& block, size_t i);
+        bool _verify_RB_in_bounds(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RB_in_bounds_for_copy_instr(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RB_in_bounds_for_call_instr(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RB_is_return_type_of_call_object(module::item subject, _cfg_block& block, size_t i);
@@ -152,6 +153,8 @@ namespace yama {
         bool _verify_KoB_is_object_const(module::item subject, size_t i);
         bool _verify_KtB_in_bounds(module::item subject, size_t i);
         bool _verify_KtB_is_type_const(module::item subject, size_t i);
+        bool _verify_KtC_in_bounds(module::item subject, size_t i);
+        bool _verify_KtC_is_type_const(module::item subject, size_t i);
         bool _verify_ArgB_in_bounds(module::item subject, size_t i);
         bool _verify_RA_and_RB_agree_on_type(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RA_and_RB_agree_on_type_skip_if_reinit(module::item subject, _cfg_block& block, size_t i);
@@ -161,6 +164,8 @@ namespace yama {
         bool _verify_RA_and_KtB_agree_on_type_skip_if_reinit(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type(module::item subject, _cfg_block& block, size_t i);
         bool _verify_RA_and_ArgB_agree_on_type_skip_if_reinit(module::item subject, _cfg_block& block, size_t i);
+        bool _verify_RB_and_KtC_agree_on_type(module::item subject, _cfg_block& block, size_t i);
+        bool _verify_RB_and_KtC_agree_on_type_skip_if_reinit(module::item subject, _cfg_block& block, size_t i);
         bool _verify_ArgRs_legal_call_object(module::item subject, _cfg_block& block, size_t i);
         bool _verify_ArgRs_in_bounds(module::item subject, _cfg_block& block, size_t i);
         bool _verify_ArgRs_have_at_least_one_object(module::item subject, size_t i);

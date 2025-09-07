@@ -242,8 +242,8 @@ TEST_F(LoadingTests, WithDeps) {
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
-    EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
-    EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
+    EXPECT_EQ(aa.consts().item(0), std::make_optional(bb));
+    EXPECT_EQ(aa.consts().item(1), std::make_optional(cc));
 
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
@@ -305,19 +305,19 @@ TEST_F(LoadingTests, WithDeps_WithIndirectlyReferencedTypes) {
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
-    EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
-    EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
+    EXPECT_EQ(aa.consts().item(0), std::make_optional(bb));
+    EXPECT_EQ(aa.consts().item(1), std::make_optional(cc));
 
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 2);
-    EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
-    EXPECT_EQ(bb.consts().type(1), std::make_optional(ee));
+    EXPECT_EQ(bb.consts().item(0), std::make_optional(dd));
+    EXPECT_EQ(bb.consts().item(1), std::make_optional(ee));
 
     EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 1);
-    EXPECT_EQ(cc.consts().type(0), std::make_optional(ff));
+    EXPECT_EQ(cc.consts().item(0), std::make_optional(ff));
 
     EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
@@ -377,20 +377,20 @@ TEST_F(LoadingTests, WithDeps_TypeReferencedMultipleTimesInAcyclicDepGraph) {
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
-    EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
-    EXPECT_EQ(aa.consts().type(1), std::make_optional(cc));
+    EXPECT_EQ(aa.consts().item(0), std::make_optional(bb));
+    EXPECT_EQ(aa.consts().item(1), std::make_optional(cc));
 
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);
-    EXPECT_EQ(bb.consts().type(0), std::make_optional(dd));
+    EXPECT_EQ(bb.consts().item(0), std::make_optional(dd));
 
     EXPECT_EQ(cc.fullname(), "p:c"_str);
     EXPECT_EQ(cc.kind(), yama::kind::primitive);
     EXPECT_EQ(cc.consts().size(), 3);
-    EXPECT_EQ(cc.consts().type(0), std::make_optional(dd));
-    EXPECT_EQ(cc.consts().type(1), std::make_optional(dd));
-    EXPECT_EQ(cc.consts().type(2), std::make_optional(dd));
+    EXPECT_EQ(cc.consts().item(0), std::make_optional(dd));
+    EXPECT_EQ(cc.consts().item(1), std::make_optional(dd));
+    EXPECT_EQ(cc.consts().item(2), std::make_optional(dd));
 
     EXPECT_EQ(dd.fullname(), "p:d"_str);
     EXPECT_EQ(dd.kind(), yama::kind::primitive);
@@ -427,13 +427,13 @@ TEST_F(LoadingTests, WithDeps_DepGraphCycle) {
     EXPECT_EQ(aa.fullname(), "p:a"_str);
     EXPECT_EQ(aa.kind(), yama::kind::primitive);
     EXPECT_EQ(aa.consts().size(), 2);
-    EXPECT_EQ(aa.consts().type(0), std::make_optional(bb));
-    EXPECT_EQ(aa.consts().type(1), std::make_optional(aa));
+    EXPECT_EQ(aa.consts().item(0), std::make_optional(bb));
+    EXPECT_EQ(aa.consts().item(1), std::make_optional(aa));
 
     EXPECT_EQ(bb.fullname(), "p:b"_str);
     EXPECT_EQ(bb.kind(), yama::kind::primitive);
     EXPECT_EQ(bb.consts().size(), 1);
-    EXPECT_EQ(bb.consts().type(0), std::make_optional(aa));
+    EXPECT_EQ(bb.consts().item(0), std::make_optional(aa));
 }
 
 TEST_F(LoadingTests, Fail_OriginalTypeNotFound) {

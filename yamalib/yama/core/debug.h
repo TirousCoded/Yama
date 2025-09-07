@@ -16,6 +16,43 @@
 namespace yama {
 
 
+    // TODO:
+    //      Our notion of 'debug logging' is REALLY CONFUSED at the moment...
+    //
+    //      The below notion of 'layers' didn't really end up happening.
+    //
+    //      Right now debug categories just turn on/off certain categories of
+    //      logged messages from the domain/context/etc.
+    //
+    //      We're currently facing an issue where I'm REALLY not sure what we
+    //      should be logging, in that I'm not sure if we should be logging only
+    //      frontend info, or if debug logging should include impl details.
+    //
+    //      Right now 'compile_c' prints a behavioural trace of compiler behaviour
+    //      (though NOT all types of behaviour), but other categories DO NOT
+    //      do likewise... w/ me not being sure what we want this to be...
+    //
+    //      So ya, gonna have to rip-up this current 'debug logging' system at
+    //      some point and completely replace it w/ something better realized, w/
+    //      us actually figuring out what our priorities are/aren't.
+    //
+    //      When we do the rewrite, consider also doing the following:
+    // 
+    //          1) Make system callback-based, as this'll be how C frontend will work.
+    // 
+    //          2) Consider breaking up 'debug signals' into seperate event signal
+    //             systems for each category, each w/ its own enum + callback.
+    //
+    //          3) Maybe make impl detail logging categorized by string tags which
+    //             can be registered, w/ us then not needing to keep track of a centralized
+    //             enum to add new ones, and likewise we needn't modify frontend when
+    //             doing so.
+    //              * We can optimize by having entire impl detail logging thing be
+    //                enabled/disabled via bool, and this flag being false lets us
+    //                skip ALL hash-set lookups which would be used to check if a
+    //                given impl detail debug log should occur.
+
+
     // Yama uses 'debug layers' to report diagnostics to the end-user
 
     // debug layers are placed *in between* API components and the end-user,
@@ -215,11 +252,14 @@ namespace yama {
         verif_KoB_not_object_const,
         verif_KtB_out_of_bounds,
         verif_KtB_not_type_const,
+        verif_KtC_out_of_bounds,
+        verif_KtC_not_type_const,
         verif_ArgB_out_of_bounds,
         verif_RA_and_RB_types_differ,
         verif_RA_and_KoB_types_differ,
         verif_RA_and_KtB_types_differ,
         verif_RA_and_ArgB_types_differ,
+        verif_RB_and_KtC_types_differ,
         verif_ArgRs_out_of_bounds,
         verif_ArgRs_zero_objects,
         verif_ArgRs_illegal_callobj,
@@ -250,7 +290,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 74);
+        static_assert(dsignals == 77);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -306,11 +346,14 @@ namespace yama {
             _YAMA_ENTRY_(verif_KoB_not_object_const);
             _YAMA_ENTRY_(verif_KtB_out_of_bounds);
             _YAMA_ENTRY_(verif_KtB_not_type_const);
+            _YAMA_ENTRY_(verif_KtC_out_of_bounds);
+            _YAMA_ENTRY_(verif_KtC_not_type_const);
             _YAMA_ENTRY_(verif_ArgB_out_of_bounds);
             _YAMA_ENTRY_(verif_RA_and_RB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_KoB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_KtB_types_differ);
             _YAMA_ENTRY_(verif_RA_and_ArgB_types_differ);
+            _YAMA_ENTRY_(verif_RB_and_KtC_types_differ);
             _YAMA_ENTRY_(verif_ArgRs_out_of_bounds);
             _YAMA_ENTRY_(verif_ArgRs_zero_objects);
             _YAMA_ENTRY_(verif_ArgRs_illegal_callobj);

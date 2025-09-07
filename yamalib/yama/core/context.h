@@ -160,132 +160,148 @@ namespace yama {
         item_ref char_type();
         item_ref type_type();
 
+        // TODO: fmt_stacktrace has not been unit tested.
 
-        // TODO: fmt_stacktrace has not been unit tested
-
-        // fmt_stacktrace returns a formatted string of a trace of the current
-        // state of the call stack of the context
-
-        // skip tells fmt_stacktrace how many of the top call frames of the
-        // call stack should be ignored
-
+        // Returns a formatted string of a trace of the current state of the call stack of the context.
+        // Skip tells fmt_stacktrace how many of the top call frames of the call stack should be ignored.
         std::string fmt_stacktrace(size_t skip = 0, const char* tab = default_tab) const;
 
 
         // LOW-LEVEL COMMAND INTERFACE
         
         // IMPORTANT:
-        //      for the methods below, it's always undefined behaviour to
-        //      use a yama::object_ref, yama::item_ref, etc. which is associated
+        //      For these methods, it's always undefined behaviour to use a
+        //      yama::object_ref, yama::item_ref, etc. which is associated
         //      w/ another context, or w/ a domain other than the one this
-        //      context is associated w/
+        //      context is associated w/.
 
-        // TODO: the ref counting methods below haven't been unit tested due
+        // TODO: The ref counting methods below haven't been unit tested due
         //       to the MVP of Yama not providing enough nuances to really
-        //       be able to do so yet
+        //       be able to do so yet.
 
-        // TODO: if later on remove_ref will fire destructors, what happens
-        //       if doing so causes remove_ref to *panic*
+        // TODO: If later on remove_ref will fire destructors, what happens
+        //       if doing so causes remove_ref to *panic*?
         //
-        //       should remove_ref return cmd_status?
+        //       Should remove_ref return cmd_status?
 
-        // TODO: if we have finalizers instead of destructors, I don't think
-        //       above TODO should be an issue
+        // TODO: If we have finalizers instead of destructors, I don't think
+        //       above TODO should be an issue.
 
-        // these perform ref count incr/decr for x, w/ associated cleanup 
-        // of x in the event of it's ref count reaching 0
-
-        // behaviour is undefined if x is used improperly w/ these methods
-
+        // Incrs ref count for x.
+        // Behaviour is undefined if x is improper to use here.
         void add_ref(const object_ref& x);
+        // Decrs ref count for x, performing cleanup upon reaching 0.
+        // Behaviour is undefined if x is improper to use here.
         void remove_ref(const object_ref& x);
 
-        // these methods are used to simplify the process of incr/decr of
-        // object ref counts in common circumstances
+        // These methods automate the incrs/decrs needed for common operations, as well
+        // as more generally helping communicate intent.
 
-        // drop_ref is for dissociating a object_ref from an object, 
-        // putting the object_ref in a semantically indeterminate state
-        // (sorta like if you move-assigned its contents away)
-
-        // copy_ref, move_ref, and swap_ref are for assisting
-        // in copy/move assignment and swapping, respectively
-
-        // clone_ref is for creating a object_ref which is a clone
-        // of another object_ref
-
-        // clone_ref overload taking an std::optional is monadic,
-        // returning std::nullopt if argument was std::nullopt
-
-        // behaviour is undefined if x is used improperly w/ these methods
-
+        // Performs ref count decr to dissociate x from its object, dropping its reference.
+        // Puts x in an indeterminate state (ie. like when move-assigning its contents away.)
+        // Behaviour is undefined if x is improper to use here.
         void drop_ref(object_ref& x);
+        // Performs ref count incrs/decrs needed to copy-assign src onto dest.
+        // Behaviour is undefined if src/dest is improper to use here.
         void copy_ref(const object_ref& src, object_ref& dest);
+        // Performs ref count incrs/decrs needed to move-assign src onto dest.
+        // Behaviour is undefined if src/dest is improper to use here.
         void move_ref(object_ref& src, object_ref& dest);
+        // Performs ref count incrs/decrs needed to swap a and b.
+        // Behaviour is undefined if a/b is improper to use here.
         void swap_ref(object_ref& a, object_ref& b);
 
+        // Clones a borrowed reference to create a new owned one.
+        // Behaviour is undefined if x is improper to use here.
         object_ref clone_ref(borrowed_ref x);
+        // Clones a borrowed reference to create a new owned one.
+        // This overload is monadic.
+        // Behaviour is undefined if x is improper to use here.
         std::optional<object_ref> clone_ref(std::optional<borrowed_ref> x);
 
         // IMPORTANT:
-        //      for all methods below, all ref count incr/decr relating to
+        //      For all methods below, all ref count incr/decr relating to
         //      the passing of passing of objects into, or out from, the
-        //      methods, will be handled automatically by said methods
+        //      methods, will be handled automatically by said methods.
         //
-        //      this means that if a returned object_ref is used to
+        //      This means that if a returned object_ref is used to
         //      move-construct another object_ref variable, the variable's 
-        //      object's ref count is guaranteed to be correct
+        //      object's ref count is guaranteed to be correct.
 
-        // these new_# methods are used for the quick creation of objects
+        // These new_# methods are used for the quick creation of objects.
 
+        // Returns a new None object.
         canonical_ref new_none();
+        // Returns a new Int object.
         canonical_ref new_int(int_t v);
+        // Returns a new UInt object.
         canonical_ref new_uint(uint_t v);
+        // Returns a new Float object.
         canonical_ref new_float(float_t v);
+        // Returns a new Bool object.
         canonical_ref new_bool(bool_t v);
+        // Returns a new Char object.
         canonical_ref new_char(char_t v);
+        // Returns a new Type object.
         canonical_ref new_type(item_ref v);
+        // Returns a new fn type object.
+        // Fails if f is not a callable type.
+        std::optional<canonical_ref> new_fn(item_ref f);
 
-        std::optional<canonical_ref> new_fn(item_ref f);        // new_fn returns std::nullopt if f is not a callable type
+        // IMPORTANT:
+        //      It's okay to use panicking and panics while panicking,
+        //      as the whole point of it is to detect it.
 
-        // it's okay to use panicking and panics while panicking,
-        // as the whole point of it is to detect it
+        // Returns the number of times the context has panicked.
+        size_t panics() noexcept;
+        // Returns if the context is panicking.
+        bool panicking() noexcept;
+        // Returns if the current call frame is the user call frame.
+        bool is_user() noexcept;
+        // Returns the call stack height.
+        size_t call_frames() noexcept;
+        // Returns the max call stack height.
+        size_t max_call_frames() noexcept;
 
-        size_t panics() noexcept;                           // panics returns the number of times the context has panicked
-        bool panicking() noexcept;                          // panicking queries if the context is panicking
-        bool is_user() noexcept;                            // is_user returns if the current call frame is the user call frame
-        size_t call_frames() noexcept;                      // call_frames returns the call stack height
-        size_t max_call_frames() noexcept;                  // call_frames returns the max call stack height
+        // Returns the constant table of the current call.
+        // Behaviour is undefined if in the user call frame.
+        const_table_ref consts() noexcept;
 
-        // consts behaviour is undefined if in the user call frame
+        // Returns the number of args available.
+        size_t args() noexcept;
+        // Returns the height of the current local object stack.
+        size_t locals() noexcept;
+        // Returns the max height of the current local object stack.
+        size_t max_locals() noexcept;
+        // Returns the object, if any, at x in the arg slice.
+        std::optional<borrowed_ref> arg(arg_t x);
+        // Returns clone_ref(arg(x)).
+        std::optional<object_ref> arg_c(arg_t x);
+        // Returns the object, if any, at x in the local object stack.
+        std::optional<borrowed_ref> local(local_t x);
+        // Returns clone_ref(local(x)).
+        std::optional<object_ref> local_c(arg_t x);
 
-        const_table_ref consts() noexcept;                  // consts returns the constant table of the current call
+        // Induces a panic.
+        void panic();
 
-        size_t args() noexcept;                             // args returns the number of args available
-        size_t locals() noexcept;                           // locals returns the height of the current local object stack
-        size_t max_locals() noexcept;                       // max_locals returns the max height of the current local object stack
-        std::optional<object_ref> arg(arg_t x);             // args returns the object, if any, at x in the arg slice
-        std::optional<object_ref> local(local_t x);         // local returns the object, if any, at x in the local object stack
-
-        void panic();                                       // panic induces a panic, failing quietly if already panicking
-
-        // pop pops the top n local object stack registers, stopping prematurely
-        // if the stack is emptied
-
+        // pop pops the top n local object stack objects.
+        // 
+        // pop stops prematurely if the stack is emptied.
         cmd_status pop(size_t n = 1);
 
-        // put loads v into the local object register at x (x may be newtop)
-
-        // put does not care what type the x object is, as it overwrites it
-
-        // panic conditions:
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-
+        // put loads v into the local object register at x (x may be newtop.)
+        // 
+        // put does not care what type the x object is, as it overwrites it.
+        // 
+        // Panic Conditions:
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
         cmd_status put(local_t x, borrowed_ref v);
 
         inline cmd_status push(borrowed_ref v) { return put(newtop, v); }
 
-        // these methods wrap put calls composed w/ new_# method calls
+        // These methods wrap put calls composed w/ new_# method calls.
 
         cmd_status put_none(local_t x);
         cmd_status put_int(local_t x, int_t v);
@@ -303,156 +319,215 @@ namespace yama {
         inline cmd_status push_char(char_t v) { return put_char(newtop, v); }
         inline cmd_status push_type(item_ref v) { return put_type(newtop, v); }
 
-        // put_fn loads fn object of type f into the local object register at x (x may be newtop)
-
-        // panic conditions:
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-        //      - if f is not a function type
-
+        // put_fn loads fn object of type f into the local object register at x (x may be newtop.)
+        //
+        // Panic Conditions:
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
+        //      - If f is not a callable type.
         cmd_status put_fn(local_t x, item_ref f);
 
         inline cmd_status push_fn(item_ref f) { return put_fn(newtop, f); }
 
         // put_const loads the object constant at c, in the constant table
         // of the current call, into the local object register at x (x may be newtop)
-
+        //
         // put_const does not care what type the x object is, as it overwrites it
-
-        // panic conditions:
-        //      - if in the user call frame
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-        //      - if c is out-of-bounds
-        //      - if the constant at c is not an object constant
-
+        //
+        // Panic Conditions:
+        //      - If in the user call frame.
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
+        //      - If c is out-of-bounds.
+        //      - If the constant at c is not an object constant.
         cmd_status put_const(local_t x, const_t c);
 
         inline cmd_status push_const(const_t c) { return put_const(newtop, c); }
 
         // put_type_const loads a yama:Type object of the type constant at c, in the
         // constant table of the current call, into the local object register at x
-        // (x may be newtop)
-
-        // put_type_const does not care what type the x object is, as it overwrites it
-
-        // panic conditions:
-        //      - if in the user call frame
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-        //      - if c is out-of-bounds
-        //      - if the constant at c is not a type constant
-
+        // (x may be newtop.)
+        //
+        // put_type_const does not care what type the x object is, as it overwrites it.
+        //
+        // Panic Conditions:
+        //      - If in the user call frame.
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
+        //      - If c is out-of-bounds.
+        //      - If the constant at c is not a type constant.
         cmd_status put_type_const(local_t x, const_t c);
 
         inline cmd_status push_type_const(const_t c) { return put_type_const(newtop, c); }
 
         // put_arg loads the argument at index arg into the local object
-        // register at x (x may be newtop)
-
-        // put_arg does not care what type the x object is, as it overwrites it
-
-        // panic conditions:
-        //      - if in the user call frame
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-        //      - if arg is out-of-bounds
-
+        // register at x (x may be newtop.)
+        //
+        // put_arg does not care what type the x object is, as it overwrites it.
+        //
+        // Panic Conditions:
+        //      - If in the user call frame.
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
+        //      - If arg is out-of-bounds.
         cmd_status put_arg(local_t x, arg_t arg);
 
         inline cmd_status push_arg(arg_t arg) { return put_arg(newtop, arg); }
 
-        // copy copies object at src onto object at dest (dest may be newtop)
-
-        // copy does not care what type the dest object is, as it overwrites it
-
-        // panic conditions:
-        //      - if src is out-of-bounds
-        //      - if dest is out-of-bounds (unless newtop)
-        //      - if (dest == newtop, but) pushing would overflow
-
+        // copy copies object at src onto object at dest (dest may be newtop.)
+        //
+        // copy does not care what type the dest object is, as it overwrites it.
+        //
+        // Panic Conditions:
+        //      - If src is out-of-bounds.
+        //      - If dest is out-of-bounds (unless newtop.)
+        //      - If (dest == newtop, but) pushing would overflow.
         cmd_status copy(local_t src, local_t dest = newtop);
 
-        // TODO: add a 'explicit_init' command method later on when we add the ability to
-        //       construct things like structs w/ stored properties which need to be initialized
+        // TODO: Add a 'explicit_init' command method later on when we add the ability to
+        //       construct things like structs w/ stored properties which need to be initialized.
 
-        // TODO: be sure to, when we add types which cannot be default initialized, make it
-        //       so default_init panics
+        // TODO: Be sure to, when we add types which cannot be default initialized, make it
+        //       so default_init panics.
 
         // default_init loads a default initialized object of type t into the local
-        // object register at x (x may be newtop)
-
-        // the const_t overload initializes w/ type from the type constant at c
-
-        // panic conditions:
-        //      - if in the user call frame
-        //          * const_t overload
-        //      - if x is out-of-bounds (unless newtop)
-        //      - if (x == newtop, but) pushing would overflow
-        //      - if c is out-of-bounds
-        //          * const_t overload
-        //      - if the constant at c is not a type constant
-        //          * const_t overload
-
+        // object register at x (x may be newtop.)
+        //
+        // The const_t overload initializes w/ type from the type constant at c.
+        //
+        // Panic Conditions:
+        //      - If in the user call frame.
+        //          * const_t overload.
+        //      - If x is out-of-bounds (unless newtop.)
+        //      - If (x == newtop, but) pushing would overflow.
+        //      - If c is out-of-bounds.
+        //          * const_t overload.
+        //      - If the constant at c is not a type constant.
+        //          * const_t overload.
         cmd_status default_init(local_t x, item_ref t);
         cmd_status default_init(local_t x, const_t c);
 
-        // NOTE: due to the existence of the callobj, plus the limit to only one return value
-        //       object, it's not possible for callobj to overflow when ret == newtop
+        // TODO: Right now, ALL checks for conversion validity are performed at runtime, even
+        //       though there are plenty of them which COULD be statically verified instead.
+        //
+        //       If we do try to do this, which I tried to do initially, be mindful of the fact
+        //       that one problem we'll face is that, unless we add conversions to the constant
+        //       table, the lack of context static verification has to work w/ will cause it to
+        //       be hard to 100% be able to deduce all the info needed about types for it to work.
 
-        // below, let
-        //      - 'args' refer to the inclusive object range [R(top-args_n), R(top)]
-        //      - 'callobj' refer to the first object in args
-        //      - 'param args' refer to args excluding callobj
+        // TODO: Right now, all primitive conversions are *unsafe*, meaning it's possible to
+        //       do things like creating Char objects for *illegal* Unicode codepoints!
+        // 
+        //       We also lack comprehensive testing of things like conversion between primitive
+        //       values *extremes*. Nor do we properly test NaNs and subnormals.
+        //
+        //       Do we want this? Or should these conversions always be safe, and panicking
+        //       otherwise?
+
+        // TODO: We also don't have unit tests covering general conversion failures, such as
+        //       between struct types, or between struct types and primitives, or between
+        //       fn/method types, nor between struct and fn/method types, etc.
+        //
+        //       So ya, gotta figure out how comprehensive I want testing to be.
+
+        // TODO: The specifics of 'Primitive Type Convs', both in terms of semantics, and
+        //       our UNIT TESTS, are NOT well defined and can be VASTLY improved!
+        //
+        //       At present, we simply test that C++ conversions occur between values.
+
+        // TODO: Our compilation-tests.cpp tests likewise do not cover the details WHAT constitutes
+        //       a valid conversion, w/ checks being done at runtime, and w/ the details of what
+        //       constitutes a valid conversion currently being punted to yama::context::conv tests.
+
+        // TODO: Currently, due to ALL checks being done at runtime, it's impossible for the Yama
+        //       compiler to remove otherwise 100% transparent conversion operations due to the
+        //       fact that the *potential panic* from the conversion failing means that the expr
+        //       could still have observable side-effects.
+        //
+        //       So when we add static checking of conversions, be sure to update this aspect of
+        //       the Yama compiler, as well as maybe updating our unit tests also.
+
+        // IMPORTANT:
+        //      The following conversions are defined:
+        //          - T -> T, where T is any type.
+        //              * Identity Convs
+        //          - T -> U, where T != U, and T and U are Int, UInt, Float, Bool, or Char.
+        //              * Primitive Type Convs
+        //          - T -> U, where T is any fn or method type, and U is Type.
+        //              * Fn/Method Type Narrowed To yama:Type Conv
+
+        // conv loads an object into register dest (dest may be newtop) produced by converting
+        // the value of the object at src into type t.
+        //
+        // The const_t overload converts to the type of the type constant at c.
+        //
+        // Panic Conditions:
+        //      - If the target cannot be converted to t.
+        //          * Or type constant at c.
+        //      - If in the user call frame.
+        //          * const_t overload.
+        //      - If src is out-of-bounds.
+        //      - If dest is out-of-bounds (unless newtop.)
+        //      - If c is out-of-bounds.
+        //          * const_t overload.
+        //      - If the constant at c is not a type constant.
+        //          * const_t overload.
+        cmd_status conv(local_t src, local_t dest, item_ref t);
+        cmd_status conv(local_t src, local_t dest, const_t c);
+
+        // NOTE: Due to the existence of the callobj, plus the limit to only one return value
+        //       object, it's not possible for callobj to overflow when ret == newtop.
+
+        // Below, let
+        //      - 'args' refer to the inclusive object range [R(top-args_n), R(top)];
+        //      - 'callobj' refer to the first object in args; and
+        //      - 'param args' refer to args excluding callobj.
 
         // call performs a Yama call of callobj using args, writing the return value
-        // object to object ret (ret may be newtop), then consuming args
-
-        // call does not care what type the ret object is, as it overwrites it
-
-        // call does not check if args types are correct to use in a callobj call
-
-        // panic conditions:
-        //      - if args provides no callobj (ie. if args_n == 0)
-        //      - if args index range is out-of-bounds
-        //      - if ret will be out-of-bounds after the call (unless newtop)
-        //      - if callobj is not of a callable type
-        //      - if args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
-        //        excludes callobj from argument count)
-        //      - if the call stack would overflow
-        //      - if, after call behaviour has completed execution, no return value object has been provided
-
+        // object to object ret (ret may be newtop), then consuming args.
+        //
+        // call does not care what type the ret object is, as it overwrites it.
+        //
+        // call does not check if args types are correct to use in a callobj call.
+        //
+        // Panic Conditions:
+        //      - If args provides no callobj (ie. if args_n == 0.)
+        //      - If args index range is out-of-bounds.
+        //      - If ret will be out-of-bounds after the call (unless newtop.)
+        //      - If callobj is not of a callable type.
+        //      - If args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
+        //        excludes callobj from argument count.)
+        //      - If the call stack would overflow.
+        //      - If, after call behaviour has completed execution, no return value object has been provided.
         cmd_status call(size_t args_n, local_t ret);
 
         // call_nr performs a Yama call of callobj using args, discarding the return
-        // value object, then consuming args
-
-        // the '_nr' in call_nr stands for 'no result'
-
-        // call_nr does not check if args types are correct to use in a callobj call
-
-        // panic conditions:
-        //      - if args provides no callobj (ie. if args_n == 0)
-        //      - if args index range is out-of-bounds
-        //      - if callobj is not of a callable type
-        //      - if args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
-        //        excludes callobj from argument count)
-        //      - if the call stack would overflow
-        //      - if, after call behaviour has completed execution, no return value object has been provided
-
+        // value object, then consuming args.
+        //
+        // The '_nr' in call_nr stands for 'no result'.
+        //
+        // call_nr does not check if args types are correct to use in a callobj call.
+        //
+        // Panic Conditions:
+        //      - If args provides no callobj (ie. if args_n == 0.)
+        //      - If args index range is out-of-bounds.
+        //      - If callobj is not of a callable type.
+        //      - If args_n-1 is not equal to the argument count expected for a call to callobj (here, the -1
+        //        excludes callobj from argument count.)
+        //      - If the call stack would overflow.
+        //      - If, after call behaviour has completed execution, no return value object has been provided.
         cmd_status call_nr(size_t args_n);
 
         // ret is used within calls to perform the act of returning object x
-        // as the return value object of the call
-
+        // as the return value object of the call.
+        //
         // ret does not check if the type of the return value object returned
-        // is correct for a call to the call object in question
-
-        // panic conditions:
-        //      - if in the user call frame
-        //      - if x is out-of-bounds
-        //      - if called multiple times
-
+        // is correct for a call to the call object in question.
+        //
+        // Panic Conditions:
+        //      - If in the user call frame.
+        //      - If x is out-of-bounds.
+        //      - If called multiple times.
         cmd_status ret(local_t x);
 
 
@@ -591,6 +666,17 @@ namespace yama {
         bool _default_init_err_in_user_call_frame();
         bool _default_init_err_c_out_of_bounds(const_t c);
         bool _default_init_err_c_is_not_type_constant(const_t c);
+
+
+        cmd_status _conv(local_t src, local_t dest, item_ref t);
+        cmd_status _conv(local_t src, local_t dest, const_t c);
+
+        std::optional<object_ref> _gen_conv_result(borrowed_ref x, item_ref t);
+
+        bool _conv_err_in_user_call_frame();
+        bool _conv_err_src_out_of_bounds(local_t src);
+        bool _conv_err_c_out_of_bounds(const_t c);
+        bool _conv_err_c_is_not_type_constant(const_t c);
 
 
         std::optional<object_ref> _call(size_t args_n);

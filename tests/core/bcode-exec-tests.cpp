@@ -80,7 +80,7 @@ protected:
 
 // PER-INSTRUCTION TESTS
 
-static_assert(yama::bc::opcodes == 14);
+static_assert(yama::bc::opcodes == 15);
 
 TEST_F(BCodeExecTests, Noop) {
     ASSERT_TRUE(ready);
@@ -597,6 +597,118 @@ TEST_F(BCodeExecTests, DefaultInit_Newtop) {
 
 static bool was_called_0 = false;
 static bool was_called_1 = false;
+
+TEST_F(BCodeExecTests, Conv) {
+    ASSERT_TRUE(ready);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1)
+        .add_put_const(yama::newtop, 2)
+        .add_conv(0, 1, 0)
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table()
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0)
+        .add_int(0);
+    our_parcel->mh.add_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_bcode);
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+}
+
+TEST_F(BCodeExecTests, Conv_Newtop) {
+    ASSERT_TRUE(ready);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 1)
+        .add_conv(0, yama::newtop, 0)
+        .add_ret(1);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table()
+        .add_primitive_type("yama:Int"_str)
+        .add_float(10.0);
+    our_parcel->mh.add_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_bcode);
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
+}
+
+TEST_F(BCodeExecTests, Conv_PanicIfConversionFails) {
+    ASSERT_TRUE(ready);
+
+    auto never_reached_fn =
+        [](yama::context& ctx) {
+        was_called_1 = true;
+        if (ctx.push_none().bad()) return;
+        if (ctx.ret(0).bad()) return;
+        };
+    const auto never_reached_consts =
+        yama::const_table()
+        .add_primitive_type("yama:None"_str);
+    our_parcel->mh.add_function(
+        "never_reached"_str,
+        never_reached_consts,
+        yama::make_callsig({}, 0),
+        1,
+        never_reached_fn);
+
+    const auto f_bcode =
+        yama::bc::code()
+        // block #1
+        .add_put_const(yama::newtop, 2)
+        .add_conv(0, yama::newtop, 1) // Panic! Illegal Float -> Type conversion!
+        // Shouldn't reach this point.
+        .add_pop(2)
+        .add_put_const(yama::newtop, 3)
+        .add_call_nr(1)
+        .add_put_none(yama::newtop)
+        .add_ret(0);
+    std::cerr << f_bcode.fmt_disassembly() << "\n";
+    const auto f_consts =
+        yama::const_table()
+        .add_primitive_type("yama:None"_str)
+        .add_primitive_type("yama:Type"_str)
+        .add_float(10.0)
+        .add_function_type("self:never_reached"_str, yama::make_callsig({}, 0));
+    our_parcel->mh.add_function(
+        "f"_str,
+        f_consts,
+        yama::make_callsig({}, 0),
+        2,
+        f_bcode);
+
+    const auto f = ctx->load("abc:f"_str).value();
+
+    ASSERT_EQ(ctx->panics(), 0);
+    ASSERT_TRUE(ctx->push_fn(f).good());
+    ASSERT_FALSE(ctx->call(1, yama::newtop).good()); // Expect panic!
+    ASSERT_EQ(ctx->panics(), 1);
+}
 
 static_assert(yama::kinds == 4); // one Call_# test for each callable kind
 
@@ -1689,7 +1801,7 @@ TEST_F(BCodeExecTests, Example_Factorial) {
         ASSERT_TRUE(ctx->push_uint(i).good());
         ASSERT_TRUE(ctx->call(2, yama::newtop).good());
 
-        const auto result = ctx->local(0).value();
+        const auto result = ctx->local_c(0).value();
 
         ASSERT_TRUE(ctx->pop(1).good());
 
@@ -1787,7 +1899,7 @@ TEST_F(BCodeExecTests, Example_Counter) {
     ASSERT_TRUE(ctx->push_uint(n).good()); \
     ASSERT_TRUE(ctx->call(2, yama::newtop).good()); \
     \
-    const auto result = ctx->local(0).value(); \
+    const auto result = ctx->local_c(0).value(); \
     \
     ASSERT_TRUE(ctx->pop(1).good()); \
     \

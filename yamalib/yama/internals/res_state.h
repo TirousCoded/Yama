@@ -13,7 +13,7 @@
 #include "../core/module.h"
 
 #include "specifiers.h"
-#include "type_instance.h"
+#include "item_instance.h"
 #include "imported_module.h"
 
 
@@ -216,7 +216,7 @@ namespace yama::internal {
     //       that we'll run into an issue in ~::loader::_check where we'll not have a clear
     //       way of discerning the env to use to parse the fullname str
 
-    using type_area = res_area<fullname, type_instance>;
+    using type_area = res_area<fullname, item_instance>;
     using module_area = res_area<import_path, imported_module>;
 
 

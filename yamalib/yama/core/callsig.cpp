@@ -13,10 +13,10 @@ std::string yama::callsig::fmt(const const_table& consts) const {
         if (!first) {
             params_s += ", ";
         }
-        params_s += consts.fmt_type_const(I);
+        params_s += consts.fmt_item_const(I);
         first = false;
     }
-    std::string ret_s = consts.fmt_type_const(ret);
+    std::string ret_s = consts.fmt_item_const(ret);
     return std::format("fn({}) -> {}", params_s, ret_s);
 }
 
@@ -27,10 +27,10 @@ std::string yama::callsig::fmt(const const_table_ref& consts) const {
         if (!first) {
             params_s += ", ";
         }
-        params_s += consts.fmt_type_const(I);
+        params_s += consts.fmt_item_const(I);
         first = false;
     }
-    std::string ret_s = consts.fmt_type_const(ret);
+    std::string ret_s = consts.fmt_item_const(ret);
     return std::format("fn({}) -> {}", params_s, ret_s);
 }
 

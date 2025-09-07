@@ -98,11 +98,15 @@ void yama::internal::first_pass::visit_begin(res<ast_Args> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
-void yama::internal::first_pass::visit_begin(res<ast_TypeMemberAccess> x) {
+void yama::internal::first_pass::visit_begin(res<ast_Conv> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
-void yama::internal::first_pass::visit_begin(res<ast_ObjectMemberAccess> x) {
+void yama::internal::first_pass::visit_begin(res<ast_TypeMember> x) {
+    tu->cs->ea.acknowledge(*tu, *x);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_ObjectMember> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 

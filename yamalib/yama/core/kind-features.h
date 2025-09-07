@@ -60,8 +60,8 @@ namespace yama {
 
     // Returns if objects of types of kind x are 'callable' objects.
     //
-    // Being callable means a type's objects may be used as call objects
-    // for calls, and that the type MUST be defined w/ a call signature.
+    // Being callable means a item's objects may be used as call objects
+    // for calls, and that the item MUST be defined w/ a call signature.
     //
     // Non-callable types MUST NOT be defined w/ a call signature.
     constexpr bool is_callable(kind x) noexcept {
