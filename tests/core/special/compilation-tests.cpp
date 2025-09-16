@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <optional>
+#include <variant>
+#include <ranges>
 
 #include <yama/core/general.h>
 #include <yama/core/res.h>
@@ -171,35 +173,86 @@ protected:
 
 
 namespace {
-    // for checking side-effects, we'll define a datastructure for recording a sequence
+    // For checking side-effects, we'll define a datastructure for recording a sequence
     // of side effect outputs, and comparing sequences, and then we'll define some
-    // special Yama functions which then produce these observable side-effects
+    // special Yama functions which then produce these observable side-effects.
+    struct SideFx final {
+        struct None {
+            bool operator==(const None&) const noexcept = default;
+        };
+        struct Float {
+            yama::float_t v;
+            bool operator==(const Float& x) const {
+                bool success{};
+                _check(x, success);
+                return success;
+            }
+        private:
+            void _check(const Float& x, bool& success) const {
+                success = false;
+                ASSERT_DOUBLE_EQ(v, x.v);
+                success = true; // Won't reach if assert fails.
+            }
+        };
+        struct Misc {
+            std::string msg;
+            bool operator==(const Misc&) const noexcept = default;
+        };
+        using Entry = std::variant<
+            None,
+            yama::int_t,
+            yama::uint_t,
+            Float,
+            yama::bool_t,
+            yama::char_t,
+            yama::item_ref,
+            Misc
+        >;
 
-    struct sidefx_t final {
-        std::string seq;
+        static std::string fmt_entry(const Entry& x) {
+            switch (x.index()) {
+            case 0: return std::format("None");
+            case 1: return std::format("Int {}", yama::fmt_int(std::get<1>(x)));
+            case 2: return std::format("UInt {}", yama::fmt_uint(std::get<2>(x)));
+            case 3: return std::format("Float {}", yama::fmt_float(std::get<3>(x).v));
+            case 4: return std::format("Bool {}", yama::fmt_bool(std::get<4>(x)));
+            case 5: return std::format("Char {}", yama::fmt_char(std::get<5>(x)));
+            case 6: return std::format("Type {}", std::get<6>(x).fmt());
+            case 7: return std::format("Misc {}", std::get<7>(x).msg);
+            default: return "???";
+            }
+        }
 
 
-        // in our tests, compare by fmt() return value, as googletest will produce a
-        // really nice diff for us to debug w/
-
-        std::string fmt() const { return seq; }
+        std::vector<Entry> entries;
 
 
-        // gonna exclude observing Float side-effect details as I worry asserting those
-        // details could lead to issues
+        // Use this to perform the check.
+        bool compare(const SideFx& other) const {
+            if (entries.size() != other.entries.size()) {
+                yama::println("[SideFx] side mismatch: {} != {}", entries.size(), other.entries.size());
+            }
+            for (size_t i = 0; i < entries.size(); i++) {
+                if (entries[i] == other.entries[i]) continue;
+                yama::println("[SideFx] entry mismatch: (index {}) {} != {}", i, fmt_entry(entries[i]), fmt_entry(other.entries[i]));
+                return false;
+            }
+            return true;
+        }
 
-        void observe_none() { seq += std::format("none n/a\n"); }
-        void observe_int(yama::int_t x) { seq += std::format("int {}\n", yama::fmt_int(x)); }
-        void observe_uint(yama::uint_t x) { seq += std::format("uint {}\n", yama::fmt_uint(x)); }
-        void observe_float(yama::float_t) { seq += std::format("float n/a\n"); }
-        void observe_bool(yama::bool_t x) { seq += std::format("bool {}\n", yama::fmt_bool(x)); }
-        void observe_char(yama::char_t x) { seq += std::format("char {}\n", yama::fmt_char(x)); }
-        void observe_type(yama::item_ref x) { seq += std::format("type {}\n", x); }
 
-        void observe_misc(std::string_view msg) { seq += std::format("misc {}\n", msg); }
+        void observe_none() { entries.push_back(Entry(std::in_place_type_t<None>{})); }
+        void observe_int(yama::int_t x) { entries.push_back(Entry(std::in_place_type_t<yama::int_t>{}, x)); }
+        void observe_uint(yama::uint_t x) { entries.push_back(Entry(std::in_place_type_t<yama::uint_t>{}, x)); }
+        void observe_float(yama::float_t x) { entries.push_back(Entry(std::in_place_type_t<Float>{}, Float{ .v = x })); }
+        void observe_bool(yama::bool_t x) { entries.push_back(Entry(std::in_place_type_t<yama::bool_t>{}, x)); }
+        void observe_char(yama::char_t x) { entries.push_back(Entry(std::in_place_type_t<yama::char_t>{}, x)); }
+        void observe_type(yama::item_ref x) { entries.push_back(Entry(std::in_place_type_t<yama::item_ref>{}, x)); }
+
+        void observe_misc(std::string_view msg) { entries.push_back(Entry(std::in_place_type_t<Misc>{}, Misc{ .msg = std::string(msg) })); }
     };
 
-    sidefx_t sidefx; // global so our Yama functions can reference it
+    SideFx sidefx; // global so our Yama functions can reference it
 
 
     // our Yama functions for side-effects + misc
@@ -486,7 +539,7 @@ void CompilationTests::SetUp() {
     dm = std::make_shared<yama::domain>(dbg);
     ctx = std::make_shared<yama::context>(yama::res(dm), dbg);
 
-    sidefx = sidefx_t{}; // can't forget to reset this each time
+    sidefx = SideFx{}; // can't forget to reset this each time
 
     yama::install_batch ib{};
     ib
@@ -597,11 +650,11 @@ fn f() {
     EXPECT_EQ(ctx->local(2).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(100);
     expected.observe_int(41);
     expected.observe_int(1001);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 TEST_F(CompilationTests, Fail_LexicalError) {
@@ -730,8 +783,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init None
@@ -764,8 +817,8 @@ fn f() -> None {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init Int
@@ -798,8 +851,8 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(0));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init UInt
@@ -832,8 +885,8 @@ fn f() -> UInt {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_uint(0));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init Float
@@ -866,8 +919,8 @@ fn f() -> Float {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_float(0.0));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init Bool
@@ -900,8 +953,8 @@ fn f() -> Bool {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_bool(false));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init Char
@@ -934,8 +987,8 @@ fn f() -> Char {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_char('\0'));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init Type
@@ -968,8 +1021,8 @@ fn f() -> Type {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_type(ctx->none_type()));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init function
@@ -1008,8 +1061,8 @@ fn f() -> g {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init method
@@ -1050,8 +1103,8 @@ fn f() -> A::g {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init struct
@@ -1089,8 +1142,8 @@ fn f() -> G {
     EXPECT_EQ(ctx->local(0).value().t, *G);
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // None is non-callable
@@ -1264,9 +1317,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // methods are callable
@@ -1310,9 +1363,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // structs are non-callable
@@ -1384,9 +1437,9 @@ fn f() {
     //EXPECT_EQ(ctx->local(0).value(), ctx->new_none()); <- irrelevant due to panic
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(0);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to compile w/out a 'yama' module being available
@@ -1529,11 +1582,11 @@ fn ccc() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // multi-source compilation where compiling modules added to compilation by import decls
@@ -1602,11 +1655,11 @@ fn ccc() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // multi-parcel multi-source compilation
@@ -1686,12 +1739,12 @@ fn ddd() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
     expected.observe_char(U'd');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // multi-source compilation where import graph cycles between compiling modules do not cause issues
@@ -1789,11 +1842,11 @@ fn ccc() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // multi-source compilation failure (including w/ the error arising in another parcel!)
@@ -1860,6 +1913,238 @@ fn ddd() {
     ASSERT_FALSE(perform_compile(txt, txt_multi_a, txt_multi_b, txt_multi_c, txt_multi_d));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_undeclared_name), 1);
+}
+
+
+// Conversions
+//
+//      - Yama currently only supports explicit conversions, not implicit ones.
+// 
+//      - Conversions are checked at compile-time.
+//          * TODO: We'll need to add nuances for things like conversions to protocol types
+//                  also involving a runtime check, when we add protocols.
+// 
+//      - Certain conversions may be 'constexpr', in which case they may be precomputed.
+//
+//      - Defined Conversions (ie. all others are illegal):
+//
+//          - T -> T, where T is any type.
+//              * Identity Conversions
+//              * Explicit Only
+//              * Constexpr
+//
+//          - T -> U, where T != U, and T and U are Int, UInt, Float, Bool or Char.
+//              * Primitive Type Conversions
+//              * Explicit Only
+//              * Constexpr
+//
+//          - T -> U, where T is any fn or method type, and U is Type.
+//              * Fn/Method Type Narrowed To yama:Type Conversions
+//              * Explicit Only
+//              * Constexpr
+
+// Identity Conversions
+
+TEST_F(CompilationTests, Conversions_IdentityConvs) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct Struct {}
+fn Struct::m() {}
+fn Fn() {}
+
+fn f() {
+    // Wrap in 'const(<x>)' to ensure they're constexpr.
+    observeInt(const(10.[Int]));
+    observeUInt(const(10u.[UInt]));
+    observeFloat(const(10.313.[Float]));
+    observeBool(const(true.[Bool]));
+    observeChar(const('&'.[Char]));
+    observeType(const(Struct.[Type]));
+
+    // Ensure these compile too.
+    const(None().[None]);
+    Struct().[Struct]; // 'Struct()' can't be constexpr.
+    const(Struct::m.[Struct::m.[Type]]);
+    const(Fn.[Fn.[Type]]);
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto Struct = dm->load("a:Struct"_str);
+    const auto Struct_m = dm->load("a:Struct::m"_str);
+    const auto Fn = dm->load("a:Fn"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(Struct);
+    ASSERT_TRUE(Struct_m);
+    ASSERT_TRUE(Fn);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    expected.observe_int(10);
+    expected.observe_uint(10);
+    expected.observe_float(10.313);
+    expected.observe_bool(true);
+    expected.observe_char(U'&');
+    expected.observe_type(Struct.value());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Primitive Type Conversions
+
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct Struct {}
+fn Struct::m() {}
+fn Fn() {}
+
+fn f() {
+    // Wrap in 'const(<x>)' to ensure they're constexpr.
+    observeUInt(const(10.[UInt]));
+    observeFloat(const(10.[Float]));
+    observeBool(const(10.[Bool]));
+    observeChar(const(10.[Char]));
+
+    observeInt(const(10u.[Int]));
+    observeFloat(const(10u.[Float]));
+    observeBool(const(10u.[Bool]));
+    observeChar(const(10u.[Char]));
+
+    observeInt(const(10.313.[Int]));
+    observeUInt(const(10.313.[UInt]));
+    observeBool(const(10.313.[Bool]));
+    observeChar(const(10.313.[Char]));
+
+    observeInt(const(true.[Int]));
+    observeUInt(const(true.[UInt]));
+    observeFloat(const(true.[Float]));
+    observeChar(const(true.[Char]));
+
+    observeInt(const('&'.[Int]));
+    observeUInt(const('&'.[UInt]));
+    observeFloat(const('&'.[Float]));
+    observeBool(const('&'.[Bool]));
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto Struct = dm->load("a:Struct"_str);
+    const auto Struct_m = dm->load("a:Struct::m"_str);
+    const auto Fn = dm->load("a:Fn"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(Struct);
+    ASSERT_TRUE(Struct_m);
+    ASSERT_TRUE(Fn);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    expected.observe_uint(10);
+    expected.observe_float(10);
+    expected.observe_bool(yama::bool_t(10));
+    expected.observe_char(yama::char_t(10));
+
+    expected.observe_int(10);
+    expected.observe_float(10);
+    expected.observe_bool(yama::bool_t(10));
+    expected.observe_char(yama::char_t(10));
+
+    expected.observe_int(yama::int_t(10.313));
+    expected.observe_uint(yama::uint_t(10.313));
+    expected.observe_bool(yama::bool_t(10.313));
+    expected.observe_char(yama::char_t(10.313));
+
+    expected.observe_int(yama::int_t(true));
+    expected.observe_uint(yama::uint_t(true));
+    expected.observe_float(yama::float_t(true));
+    expected.observe_char(yama::char_t(true));
+
+    expected.observe_int(yama::int_t(U'&'));
+    expected.observe_uint(yama::uint_t(U'&'));
+    expected.observe_float(yama::float_t(U'&'));
+    expected.observe_bool(yama::bool_t(U'&'));
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Fn/Method Type Narrowed To yama:Type Conversions
+
+TEST_F(CompilationTests, Conversions_FnOrMethodTypeNarrowedToTypeTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+import fns.abc;
+
+struct Struct {}
+fn Struct::m() {}
+fn Fn() {}
+
+fn f() {
+    // Wrap in 'const(<x>)' to ensure they're constexpr.
+    observeType(const(Struct::m.[Type]));
+    observeType(const(Fn.[Type]));
+}
+
+)";
+
+    //dbg->add_cat(yama::compile_c);
+    
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto Struct = dm->load("a:Struct"_str);
+    const auto Struct_m = dm->load("a:Struct::m"_str);
+    const auto Fn = dm->load("a:Fn"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(Struct);
+    ASSERT_TRUE(Struct_m);
+    ASSERT_TRUE(Fn);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    expected.observe_type(Struct_m.value());
+    expected.observe_type(Fn.value());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -1978,8 +2263,8 @@ fn f() {}
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // types loaded from outside modules (ie. extern types) should be available to Yama code
@@ -2033,14 +2318,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_none();
     expected.observe_int(0);
     expected.observe_uint(0);
     expected.observe_float(0.0);
     expected.observe_bool(false);
     expected.observe_char(U'\0');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // types defined by Yama code should be available for use by said Yama code
@@ -2100,11 +2385,11 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // types defined in Yama code may share unqualified name w/ extern type
@@ -2149,8 +2434,8 @@ fn observeInt() -> Char { // shares unqualified name w/ fns.abc:observeInt
     EXPECT_EQ(ctx->local(1).value(), ctx->new_char(U'b'));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // IMPORTANT: this test mainly covers the coexistence between *shadower* and *shadowed*
@@ -2206,13 +2491,13 @@ fn f(a: Int) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(21);
     expected.observe_int(101);
     expected.observe_int(1001);
     expected.observe_int(101);
     expected.observe_int(21);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // IMPORTANT: like w/ shadowing, coexistence is tested here, but the particulars of referencing
@@ -2258,9 +2543,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(3);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // test to ensure impl properly impls parameter scope not starting until after the
@@ -2511,8 +2796,8 @@ fn f() -> Int { // <- yama:Type crvalue
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(100));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // type spec w/ fn type crvalue (ad hoc implicit convert)
@@ -2550,8 +2835,8 @@ fn g() {}
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // type spec w/ method type crvalue (ad hoc implicit convert)
@@ -2591,8 +2876,8 @@ fn A::g() {}
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal type spec due to expr not yama:Type, fn or method type
@@ -2717,9 +3002,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // explicit import decl, unnamed, module imported from same parcel as compiling module
@@ -2753,9 +3038,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_misc("ack");
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // explicit import decl, named, module imported from dependency
@@ -2789,9 +3074,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // explicit import decl, named, module imported from same parcel as compiling module
@@ -2825,9 +3110,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_misc("ack");
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // extern type set contains types w/ same unqualified name
@@ -2860,8 +3145,8 @@ fn f() {}
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // implicit yama import decl
@@ -2897,8 +3182,8 @@ fn f() -> Int { // Int exposed by implicit yama import
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // redundant import decls are tolerated
@@ -2937,9 +3222,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // redundant import decls are tolerated, for implicit yama import decl
@@ -2976,8 +3261,8 @@ fn f() -> Int { // Int exposed by implicit yama import
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // redundant import decls are tolerated, type accessed via multiple import decl name qualifiers
@@ -3015,8 +3300,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // import decls importing the compiling module itself are tolerated
@@ -3065,8 +3350,8 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to import non-existent module
@@ -3210,9 +3495,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'\0');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // local var w/ just <init-assign>
@@ -3247,9 +3532,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'y');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // local var w/ <type-annot> and <init-assign>
@@ -3284,9 +3569,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'y');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal local var w/out <type-annot> nor <init-assign>
@@ -3347,13 +3632,13 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(4);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to declare non-local var
@@ -3459,8 +3744,8 @@ fn f() -> None {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ implicit return type, which is None, may use 'return;'
@@ -3492,8 +3777,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ explicit return type, which is NOT None, w/ all control paths exiting
@@ -3537,9 +3822,9 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(1));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ explicit return type, which is NOT None, but w/ no return stmt on any
@@ -3591,9 +3876,9 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
     EXPECT_EQ(ctx->panics(), 1);
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ explicit return type, which is None, w/ all control paths exiting
@@ -3637,9 +3922,9 @@ fn f() -> None {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ explicit return type, which is None, w/ all control paths NOT exiting
@@ -3682,10 +3967,10 @@ fn f() -> None {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
     expected.observe_int(2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/out explicit return type (so has implicit return type None), w/ all control
@@ -3729,9 +4014,9 @@ fn f() { // <- implies return type is None
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/out explicit return type (so has implicit return type None), w/ all control
@@ -3774,10 +4059,10 @@ fn f() { // <- implies return type is None
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(1);
     expected.observe_int(2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ param list '(a, b, c: Int, d: Float, e: Char)', which tests all the nuances
@@ -3821,13 +4106,13 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(11);
     expected.observe_int(909);
     expected.observe_int(-13);
     expected.observe_bool(true);
     expected.observe_char(U'y');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // function w/ 24 parameters, and params are actually usable
@@ -3908,7 +4193,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(24);
     expected.observe_int(23);
     expected.observe_int(22);
@@ -3933,7 +4218,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
     expected.observe_int(3);
     expected.observe_int(2);
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to declare local fn
@@ -4113,9 +4398,9 @@ fn A::g(x: Int) -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(51));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(51);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // self parameters
@@ -4209,10 +4494,10 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(100);
     expected.observe_int(200);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to declare local method
@@ -4306,8 +4591,8 @@ fn f(x: G) -> G {
     EXPECT_EQ(ctx->local(0).value().t, *G);
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal to declare local struct
@@ -4369,10 +4654,10 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
     expected.observe_int(20);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal assignment of non-assignable expr
@@ -4453,9 +4738,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -4503,7 +4788,7 @@ fn f(a: Bool) {
     ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Bool) -> yama:None");
 
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_bool(true).good());
@@ -4515,14 +4800,14 @@ fn f(a: Bool) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_bool(true);
         expected.observe_int(-1);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_bool(false).good());
@@ -4534,10 +4819,10 @@ fn f(a: Bool) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_bool(false);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
 }
 
@@ -4573,7 +4858,7 @@ fn f(a: Bool) {
     ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Bool) -> yama:None");
 
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_bool(true).good());
@@ -4585,14 +4870,14 @@ fn f(a: Bool) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_bool(true);
         expected.observe_int(-1);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_bool(false).good());
@@ -4604,11 +4889,11 @@ fn f(a: Bool) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_bool(false);
         expected.observe_int(-2);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
 }
 
@@ -4650,7 +4935,7 @@ fn f(a: Char) {
     ASSERT_EQ(f->callsig().value().fmt(), "fn(yama:Char) -> yama:None");
 
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_char(U'a').good());
@@ -4662,14 +4947,14 @@ fn f(a: Char) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_char(U'a');
         expected.observe_int(-1);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_char(U'b').good());
@@ -4681,14 +4966,14 @@ fn f(a: Char) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_char(U'b');
         expected.observe_int(-2);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_char(U'c').good());
@@ -4700,14 +4985,14 @@ fn f(a: Char) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_char(U'c');
         expected.observe_int(-3);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_char(U'd').good());
@@ -4719,14 +5004,14 @@ fn f(a: Char) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_char(U'd');
         expected.observe_int(-4);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
     {
-        sidefx = sidefx_t{};
+        sidefx = SideFx{};
 
         ASSERT_TRUE(ctx->push_fn(*f).good());
         ASSERT_TRUE(ctx->push_char(U'&').good());
@@ -4738,11 +5023,11 @@ fn f(a: Char) {
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        sidefx_t expected{};
+        SideFx expected{};
         expected.observe_char(U'&');
         expected.observe_int(-4);
         expected.observe_int(0);
-        EXPECT_EQ(sidefx.fmt(), expected.fmt());
+        EXPECT_TRUE(sidefx.compare(expected));
     }
 }
 
@@ -4811,14 +5096,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(-2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // basic usage, exit via return
@@ -4861,13 +5146,13 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -4919,14 +5204,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(-2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // local var in loop body block, w/ this test existing to ensure impl
@@ -4972,14 +5257,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(-2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal use outside loop stmt
@@ -5050,14 +5335,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(-2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // local var in loop body block, w/ this test existing to ensure impl
@@ -5104,14 +5389,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-1);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(3);
     expected.observe_int(-2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal use outside loop stmt
@@ -5173,8 +5458,8 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // basic usage, w/ None return type, w/ None return stmt
@@ -5209,8 +5494,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // basic usage, w/ None return type, w/ None return stmt
@@ -5251,8 +5536,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal return stmt due to type mismatch, non-None return stmt
@@ -5377,8 +5662,8 @@ fn g() -> Type {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_type(ctx->int_type()));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // compute value of fn type reference
@@ -5427,8 +5712,8 @@ fn g() -> observeInt {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_fn(*observeInt));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // compute value of struct type reference
@@ -5476,8 +5761,8 @@ fn g() -> Type {
     EXPECT_EQ(ctx->local(1).value().as_type(), *SomeStruct);
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // compute value of parameter reference
@@ -5513,9 +5798,9 @@ fn f(a: Int) -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-21));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-21);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // compute value of local var reference
@@ -5551,9 +5836,9 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(-21));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-21);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // TODO: since fn types resolve to objects w/ fn type instead of yama:Type, should
@@ -5597,8 +5882,8 @@ fn f() -> observeInt { // return fn value to see if it works
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(observeInt.value()).value());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // type shadowed by parameter
@@ -5639,9 +5924,9 @@ fn f(g: Int) {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-21);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // type shadowed by local var
@@ -5682,9 +5967,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-21);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // local var shadowed by another local var
@@ -5724,11 +6009,11 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(101);
     expected.observe_int(-21);
     expected.observe_int(101);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // qualified id expr bypasses shadowing by type defined in Yama code
@@ -5766,9 +6051,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // qualified id expr bypasses shadowing by parameter
@@ -5806,9 +6091,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // qualified id expr bypasses shadowing by local var
@@ -5843,9 +6128,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // reference w/ qualifier which names an import which shares an unqualified name
@@ -5882,9 +6167,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(100);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // reference something w/ id expr which is not declared until later in module
@@ -5922,8 +6207,8 @@ fn g() {} // <- not declared until AFTER first reference to it
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal reference to undeclared name
@@ -6113,9 +6398,9 @@ fn f() -> Int {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_int(10));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // primitive type identifier expr is constexpr
@@ -6148,8 +6433,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // fn type identifier expr is constexpr
@@ -6184,8 +6469,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // struct type identifier expr is constexpr
@@ -6220,8 +6505,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // parameter identifier expr is non-constexpr
@@ -6322,7 +6607,7 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(10);
@@ -6343,7 +6628,7 @@ fn f() {
     expected.observe_int(9'223'372'036'854'775'807);
     expected.observe_int(-9'223'372'036'854'775'808i64);
     expected.observe_int(-9'223'372'036'854'775'808i64);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal if Int literal overflows
@@ -6430,8 +6715,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -6484,7 +6769,7 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_uint(0);
     expected.observe_uint(1);
     expected.observe_uint(10);
@@ -6495,7 +6780,7 @@ fn f() {
     expected.observe_uint(0b110101);
     expected.observe_uint(18'446'744'073'709'551'615);
     expected.observe_uint(18'446'744'073'709'551'615);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal if UInt literal overflows
@@ -6564,8 +6849,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -6659,7 +6944,7 @@ fn f6() -> Float { return nan; }
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        EXPECT_EQ(sidefx.fmt(), sidefx_t{}.fmt());
+        EXPECT_TRUE(sidefx.compare(SideFx{}));
     }
 
     {
@@ -6676,7 +6961,7 @@ fn f6() -> Float { return nan; }
         ASSERT_TRUE(ctx->pop(1).good()); // cleanup
 
         // expected side effects
-        EXPECT_EQ(sidefx.fmt(), sidefx_t{}.fmt());
+        EXPECT_TRUE(sidefx.compare(SideFx{}));
     }
 }
 
@@ -6712,8 +6997,8 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
     }
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // -inf if underflows
@@ -6748,8 +7033,8 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
     }
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // Float literal is non-assignable
@@ -6800,8 +7085,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -6844,10 +7129,10 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_bool(true);
     expected.observe_bool(false);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // Bool literal is non-assignable
@@ -6898,8 +7183,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -6975,7 +7260,7 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'a');
     expected.observe_char(U'b');
     expected.observe_char(U'c');
@@ -7005,7 +7290,7 @@ fn f() {
     expected.observe_char(U'Γ');
     expected.observe_char(U'魂');
     expected.observe_char(U'💩');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal multi-codepoint char literal
@@ -7110,8 +7395,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -7168,11 +7453,11 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(4);
     expected.observe_int(100);
     expected.observe_char(U'\0');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // invalid selection
@@ -7256,10 +7541,10 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-3);
     expected.observe_int(12);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // evaluation order
@@ -7307,12 +7592,12 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'o');
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal call due to too many args
@@ -7484,10 +7769,10 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(-3);
     expected.observe_int(12);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // evaluation order
@@ -7531,14 +7816,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_char(U'c');
     expected.observe_int(0);
     expected.observe_int(0);
     expected.observe_int(1);
     expected.observe_int(2);
     expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // call expr nesting
@@ -7577,14 +7862,14 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
     expected.observe_int(20);
     expected.observe_int(30);
     expected.observe_int(40);
     expected.observe_int(50);
     expected.observe_int(60);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal call due to too many args
@@ -7688,18 +7973,21 @@ fn f() {
 }
 
 
+// IMPORTANT: The 'Conversions' section above covers details about what conversions are/aren't
+//            legal. They are not covered below.
+
 // Conversion Expr
 //
-//      - Given form '<x>.[<target>]', returns the value of <x> converted to type <target>,
-//        panicking if the conversion fails.
+//      - Given form '<x>.[<target>]', where <x> is a rvalue, and <target> is a crvalue of type
+//        yama:Type, this expr specifies an explicit conversion of <x> to type <target>.
 //
 //      - Non-Assignable
-//      - Non-Constexpr
-//          * TODO: Look into making this 'Conditionally Constexpr' later.
+//      - Conditionally Constexpr, based on the conversion.
 //
 //      - Illegal if <target> is not constexpr.
 //      - Illegal if <target> is not yama:Type.
 //          * TODO: What about fn and method type values which aren't yama:Type yet?
+//      - Illegal if cannot convert <x> to <target>.
 
 // Basic usage.
 
@@ -7714,6 +8002,7 @@ fn f() {
     var a: Float = 10.0;
     observeInt(a.[Int]);
     observeUInt(a.[UInt]);
+    // Test that chaining works.
     observeInt(a.[UInt].[Int].[UInt].[Int].[Int]);
 }
 
@@ -7734,57 +8023,11 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // Expected side effects.
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
     expected.observe_uint(10);
     expected.observe_int(10);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
-}
-
-// Panic if conversion fails.
-
-TEST_F(CompilationTests, ConversionExpr_PanicIfConversionFails) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-fn f() {
-    var a: Int = 10;
-    observeInt(1);
-    // IMPORTANT: Using conv expr w/out something like a local var init wrapping it
-    //            helps test that impl doesn't mistakenly cut out the conversion's
-    //            side-effects.
-    //              * This can be removed later if we can statically verify conversions.
-    a.[None]; // Panic!
-    observeInt(2); // Shouldn't reach.
-}
-
-)";
-
-    EXPECT_TRUE(perform_compile(txt));
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    EXPECT_EQ(ctx->panics(), 0);
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_FALSE(ctx->call(1, yama::newtop).good()); // <- Should panic.
-
-    // Expected return value.
-    //EXPECT_EQ(ctx->local(0).value(), ctx->new_none()); <- n/a due to panic.
-
-    EXPECT_EQ(ctx->panics(), 1);
-
-    // Expected side effects.
-    sidefx_t expected{};
-    expected.observe_int(1);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // Conversion expr is non-assignable.
@@ -7806,9 +8049,41 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// Conversion expr is non-constexpr.
+// Conversion expr is conditionally constexpr. Test converted expr which is constexpr.
 
-TEST_F(CompilationTests, ConversionExpr_NonConstExpr) {
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ConvertedExprIsConstExpr) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    const(10.[Int]);
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Conversion expr is conditionally constexpr. Test converted expr which is non-constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ConvertedExprIsNonConstExpr) {
     ASSERT_TRUE(ready);
 
     std::string txt = R"(
@@ -7823,6 +8098,15 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// Conversion expr is conditionally constexpr. Test converted expr which is constexpr, but the
+// conversion itself is non-constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ExprIsConstExprButConversionItselfIsNot) {
+    ASSERT_TRUE(ready);
+
+    // TODO: Stub
 }
 
 // Illegal if <target> is not constexpr.
@@ -7862,6 +8146,24 @@ fn f() {
     EXPECT_FALSE(perform_compile(txt));
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// Illegal if cannot convert <x> to <target>.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_CannotConvertXToTarget) {
+    ASSERT_TRUE(ready);
+
+    std::string txt = R"(
+
+fn f() {
+    10.[None]; // Cannot convert Int to None!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
 }
 
 
@@ -7912,9 +8214,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(100);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // invalid selection
@@ -8020,8 +8322,8 @@ fn f() -> A::g {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // unbound method expr is non-assignable
@@ -8080,8 +8382,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 
@@ -8133,9 +8435,9 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(100);
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // invalid selection
@@ -8214,8 +8516,8 @@ fn f() -> A::g {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // bound method expr is non-assignable
@@ -8385,7 +8687,7 @@ fn f() {
     EXPECT_EQ(ctx->local(1).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_none();
     expected.observe_int(0);
     expected.observe_uint(0);
@@ -8393,7 +8695,7 @@ fn f() {
     expected.observe_bool(false);
     expected.observe_char(U'\0');
     expected.observe_type(ctx->none_type());
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal if x is not constexpr
@@ -8487,8 +8789,8 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // default init expr is non-constexpr, if struct type
@@ -8587,12 +8889,12 @@ fn f2() -> Type {
     EXPECT_EQ(ctx->local(2).value(), ctx->new_type(ctx->int_type()));
 
     // expected side effects
-    sidefx_t expected{};
+    SideFx expected{};
     expected.observe_int(10);
     expected.observe_uint(10);
     expected.observe_bool(true);
     expected.observe_char(U'y');
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // illegal due to non-constexpr subexpr
@@ -8700,7 +9002,7 @@ fn f() {
     EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
     // expected side effects
-    sidefx_t expected{};
-    EXPECT_EQ(sidefx.fmt(), expected.fmt());
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 

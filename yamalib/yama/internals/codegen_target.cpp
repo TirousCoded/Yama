@@ -110,10 +110,11 @@ void yama::internal::codegen_target::add_cvalue_put_instr(uint8_t reg, const cva
     else if (const auto v = x.as<char_t>())     tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_char(*v)), reinit);
     else if (const auto v = x.to_type()) {
         static_assert(kinds == 4); // reminder
-        if (is_primitive(v->kind()))            tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
-        else if (is_function(v->kind()))        tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)), reinit);
-        else if (is_method(v->kind()))          tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_method_type(*v)), reinit);
-        else if (is_struct(v->kind()))          tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
+        // IMPORTANT: Test w/ the original cvalue x, and NOT the ctype v!
+        if (is_primitive(x.t.kind()))           tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
+        else if (is_function(x.t.kind()))       tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_fn_type(*v)), reinit);
+        else if (is_method(x.t.kind()))         tu->cgt.cw.add_put_const(reg, uint8_t(tu->ctp.pull_method_type(*v)), reinit);
+        else if (is_struct(x.t.kind()))         tu->cgt.cw.add_put_type_const(reg, uint8_t(tu->ctp.pull_type(*v)), reinit);
         else                                    YAMA_DEADEND;
     }
     else                                        YAMA_DEADEND;

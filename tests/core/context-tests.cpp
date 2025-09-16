@@ -2236,22 +2236,95 @@ TEST_F(ContextTests, DefaultInit_ConstOverload_PanicIfCIsNotIndexOfATypeConstant
     EXPECT_EQ(ctx->panics(), 1);
 }
 
+namespace conv_helpers {
+    size_t number = 0;
+
+    // IMPORTANT: Gotta call conv_helpers::setup at start of EVERY RELEVANT UNIT TEST!
+
+    void setup(module_helper& mh) {
+        number = 0; // MAKE SURE this gets reset!
+
+        mh.add_function("Fn"_str,
+            yama::const_table{}.add_primitive_type("yama:None"_str),
+            yama::make_callsig({}, 0),
+            0,
+            yama::noop_call_fn);
+        mh.add_function("Fn2"_str,
+            yama::const_table{}.add_primitive_type("yama:None"_str),
+            yama::make_callsig({}, 0),
+            0,
+            yama::noop_call_fn);
+        mh.add_method("Struct"_str, "m"_str,
+            yama::const_table{}.add_primitive_type("yama:None"_str),
+            yama::make_callsig({}, 0),
+            0,
+            yama::noop_call_fn);
+        mh.add_method("Struct"_str, "m2"_str,
+            yama::const_table{}.add_primitive_type("yama:None"_str),
+            yama::make_callsig({}, 0),
+            0,
+            yama::noop_call_fn);
+        mh.add_struct("Struct"_str, yama::const_table{});
+        mh.add_struct("Struct2"_str, yama::const_table{});
+    }
+
+    void succeed_body(yama::context& ctx, yama::borrowed_ref before, yama::borrowed_ref after, yama::item_ref t) {
+        ASSERT_TRUE(ctx.push(before).good()) << "number == " << number - 1;
+        globals.even_reached = true;
+        ASSERT_TRUE(ctx.conv(0, yama::newtop, t).good()) << "number == " << number - 1;
+        EXPECT_EQ(ctx.local(1), std::make_optional(after)) << "number == " << number - 1;
+        ASSERT_TRUE(ctx.pop(2).good()) << "number == " << number - 1;
+    }
+    void succeed(yama::context& ctx, yama::borrowed_ref before, yama::borrowed_ref after, yama::item_ref t) {
+        number++;
+        globals.even_reached = false; // Gotta manually reset this!
+        ASSERT_FALSE(globals.even_reached) << "number == " << number - 1;
+        succeed_body(ctx, before, after, t);
+        ASSERT_EQ(ctx.locals(), 0); // Ensure was reset.
+        ASSERT_TRUE(globals.even_reached) << "number == " << number - 1;
+    }
+    void fail_body(yama::context& ctx, yama::borrowed_ref before, yama::item_ref t) {
+        ASSERT_TRUE(ctx.push(before).good()) << "number == " << number - 1;
+        globals.even_reached = true;
+        ASSERT_FALSE(ctx.conv(0, yama::newtop, t).good()) << "number == " << number - 1;
+    }
+    void fail(yama::context& ctx, yama::borrowed_ref before, yama::item_ref t) {
+        number++;
+        globals.even_reached = false; // Gotta manually reset this!
+        ASSERT_FALSE(globals.even_reached) << "number == " << number - 1;
+        fail_body(ctx, before, t);
+        ASSERT_EQ(ctx.locals(), 0); // Ensure was reset.
+        ASSERT_TRUE(globals.even_reached) << "number == " << number - 1;
+    }
+    void fail_body(yama::context& ctx, yama::item_ref before_as_t_to_default_init, yama::item_ref t) {
+        ASSERT_TRUE(ctx.default_init(yama::newtop, before_as_t_to_default_init).good()) << "number == " << number - 1;
+        globals.even_reached = true;
+        ASSERT_FALSE(ctx.conv(0, yama::newtop, t).good()) << "number == " << number - 1;
+    }
+    void fail(yama::context& ctx, yama::item_ref before_as_t_to_default_init, yama::item_ref t) {
+        number++;
+        globals.even_reached = false; // Gotta manually reset this!
+        ASSERT_FALSE(globals.even_reached) << "number == " << number - 1;
+        fail_body(ctx, before_as_t_to_default_init, t);
+        ASSERT_EQ(ctx.locals(), 0); // Ensure was reset.
+        ASSERT_TRUE(globals.even_reached) << "number == " << number - 1;
+    }
+
+    constexpr auto max_i = std::numeric_limits<yama::int_t>::max();
+    constexpr auto max_u = std::numeric_limits<yama::uint_t>::max();
+    constexpr auto max_f = std::numeric_limits<yama::float_t>::max();
+
+    constexpr auto min_i = std::numeric_limits<yama::int_t>::min();
+    constexpr auto min_f = std::numeric_limits<yama::float_t>::min();
+}
+
 // These cover the specific conversions defined.
 
 TEST_F(ContextTests, Conv_IdentityConvs) {
     ASSERT_TRUE(ready);
 
-    our_parcel->mh.add_function("Fn"_str,
-        yama::const_table{}.add_primitive_type("yama:None"_str),
-        yama::make_callsig({}, 0),
-        0,
-        yama::noop_call_fn);
-    our_parcel->mh.add_method("Struct"_str, "m"_str,
-        yama::const_table{}.add_primitive_type("yama:None"_str),
-        yama::make_callsig({}, 0),
-        0,
-        yama::noop_call_fn);
-    our_parcel->mh.add_struct("Struct"_str, yama::const_table{});
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
 
     const yama::item_ref Fn = dm->load("abc:Fn"_str).value();
     const yama::item_ref Struct_m = dm->load("abc:Struct::m"_str).value();
@@ -2302,136 +2375,95 @@ TEST_F(ContextTests, Conv_IdentityConvs) {
 TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     ASSERT_TRUE(ready);
 
-    size_t number = 0;
-    auto succeed_body = [&](yama::borrowed_ref before, yama::borrowed_ref after, yama::item_ref t) {
-        ASSERT_TRUE(ctx->push(before).good()) << "number == " << number - 1;
-        globals.even_reached = true;
-        ASSERT_TRUE(ctx->conv(0, yama::newtop, t).good()) << "number == " << number - 1;
-        EXPECT_EQ(ctx->local(1), std::make_optional(after)) << "number == " << number - 1;
-        ASSERT_TRUE(ctx->pop(2).good()) << "number == " << number - 1;
-        };
-    auto succeed = [&](yama::borrowed_ref before, yama::borrowed_ref after, yama::item_ref t) {
-        number++;
-        globals.even_reached = false; // Gotta manually reset this!
-        ASSERT_FALSE(globals.even_reached) << "number == " << number - 1;
-        succeed_body(before, after, t);
-        ASSERT_EQ(ctx->locals(), 0); // Ensure was reset.
-        ASSERT_TRUE(globals.even_reached) << "number == " << number - 1;
-        };
-    auto fail_body = [&](yama::borrowed_ref before, yama::item_ref t) {
-        ASSERT_TRUE(ctx->push(before).good()) << "number == " << number - 1;
-        globals.even_reached = true;
-        ASSERT_FALSE(ctx->conv(0, yama::newtop, t).good()) << "number == " << number - 1;
-        };
-    auto fail = [&](yama::borrowed_ref before, yama::item_ref t) {
-        number++;
-        globals.even_reached = false; // Gotta manually reset this!
-        ASSERT_FALSE(globals.even_reached) << "number == " << number - 1;
-        fail_body(before, t);
-        ASSERT_EQ(ctx->locals(), 0); // Ensure was reset.
-        ASSERT_TRUE(globals.even_reached) << "number == " << number - 1;
-        };
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
 
-    constexpr auto max_i = std::numeric_limits<yama::int_t>::max();
-    constexpr auto max_u = std::numeric_limits<yama::uint_t>::max();
-    constexpr auto max_f = std::numeric_limits<yama::float_t>::max();
+    static_assert(yama::ptypes == 7);
 
-    constexpr auto min_i = std::numeric_limits<yama::int_t>::min();
-    constexpr auto min_f = std::numeric_limits<yama::float_t>::min();
+    fail(*ctx, ctx->new_int(0), dm->none_type());
+    fail(*ctx, ctx->new_uint(0), dm->none_type());
+    fail(*ctx, ctx->new_float(0.0), dm->none_type());
+    fail(*ctx, ctx->new_bool(false), dm->none_type());
+    fail(*ctx, ctx->new_char(U'&'), dm->none_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->none_type());
 
-    fail(ctx->new_int(0), dm->none_type());
-    fail(ctx->new_uint(0), dm->none_type());
-    fail(ctx->new_float(0.0), dm->none_type());
-    fail(ctx->new_bool(false), dm->none_type());
-    fail(ctx->new_char(U'&'), dm->none_type());
-    fail(ctx->new_type(ctx->int_type()), dm->none_type());
+    fail(*ctx, ctx->new_none(), dm->int_type());
+    succeed(*ctx, ctx->new_uint(0), ctx->new_int(0), dm->int_type());
+    succeed(*ctx, ctx->new_uint(10), ctx->new_int(10), dm->int_type());
+    succeed(*ctx, ctx->new_uint(yama::uint_t(max_i)), ctx->new_int(max_i), dm->int_type());
+    succeed(*ctx, ctx->new_uint(max_u), ctx->new_int(yama::int_t(max_u)), dm->int_type());
+    succeed(*ctx, ctx->new_float(3.14159), ctx->new_int(3), dm->int_type());
+    succeed(*ctx, ctx->new_float(-3.14159), ctx->new_int(yama::int_t(-3.14159)), dm->int_type());
+    succeed(*ctx, ctx->new_bool(true), ctx->new_int(1), dm->int_type());
+    succeed(*ctx, ctx->new_bool(false), ctx->new_int(0), dm->int_type());
+    succeed(*ctx, ctx->new_char(U'&'), ctx->new_int(yama::int_t(U'&')), dm->int_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->int_type());
 
-    fail(ctx->new_none(), dm->int_type());
-    succeed(ctx->new_uint(0), ctx->new_int(0), dm->int_type());
-    succeed(ctx->new_uint(10), ctx->new_int(10), dm->int_type());
-    succeed(ctx->new_uint(yama::uint_t(max_i)), ctx->new_int(max_i), dm->int_type());
-    succeed(ctx->new_uint(max_u), ctx->new_int(yama::int_t(max_u)), dm->int_type());
-    succeed(ctx->new_float(3.14159), ctx->new_int(3), dm->int_type());
-    succeed(ctx->new_float(-3.14159), ctx->new_int(yama::int_t(-3.14159)), dm->int_type());
-    succeed(ctx->new_bool(true), ctx->new_int(1), dm->int_type());
-    succeed(ctx->new_bool(false), ctx->new_int(0), dm->int_type());
-    succeed(ctx->new_char(U'&'), ctx->new_int(yama::int_t(U'&')), dm->int_type());
-    fail(ctx->new_type(ctx->int_type()), dm->int_type());
+    fail(*ctx, ctx->new_none(), dm->uint_type());
+    succeed(*ctx, ctx->new_int(0), ctx->new_uint(0), dm->uint_type());
+    succeed(*ctx, ctx->new_int(-14), ctx->new_uint(yama::uint_t(-14)), dm->uint_type());
+    succeed(*ctx, ctx->new_int(min_i), ctx->new_uint(yama::uint_t(min_i)), dm->uint_type());
+    succeed(*ctx, ctx->new_int(14), ctx->new_uint(14), dm->uint_type());
+    succeed(*ctx, ctx->new_int(max_i), ctx->new_uint(max_i), dm->uint_type());
+    succeed(*ctx, ctx->new_int(max_u), ctx->new_uint(max_u), dm->uint_type());
+    succeed(*ctx, ctx->new_float(3.14159), ctx->new_uint(3), dm->uint_type());
+    succeed(*ctx, ctx->new_float(-3.14159), ctx->new_uint(yama::uint_t(-3.14159)), dm->uint_type());
+    succeed(*ctx, ctx->new_bool(true), ctx->new_uint(1), dm->uint_type());
+    succeed(*ctx, ctx->new_bool(false), ctx->new_uint(0), dm->uint_type());
+    succeed(*ctx, ctx->new_char(U'&'), ctx->new_uint(yama::uint_t(U'&')), dm->uint_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->uint_type());
 
-    fail(ctx->new_none(), dm->uint_type());
-    succeed(ctx->new_int(0), ctx->new_uint(0), dm->uint_type());
-    succeed(ctx->new_int(-14), ctx->new_uint(yama::uint_t(-14)), dm->uint_type());
-    succeed(ctx->new_int(min_i), ctx->new_uint(yama::uint_t(min_i)), dm->uint_type());
-    succeed(ctx->new_int(14), ctx->new_uint(14), dm->uint_type());
-    succeed(ctx->new_int(max_i), ctx->new_uint(max_i), dm->uint_type());
-    succeed(ctx->new_int(max_u), ctx->new_uint(max_u), dm->uint_type());
-    succeed(ctx->new_float(3.14159), ctx->new_uint(3), dm->uint_type());
-    succeed(ctx->new_float(-3.14159), ctx->new_uint(yama::uint_t(-3.14159)), dm->uint_type());
-    succeed(ctx->new_bool(true), ctx->new_uint(1), dm->uint_type());
-    succeed(ctx->new_bool(false), ctx->new_uint(0), dm->uint_type());
-    succeed(ctx->new_char(U'&'), ctx->new_uint(yama::uint_t(U'&')), dm->uint_type());
-    fail(ctx->new_type(ctx->int_type()), dm->uint_type());
+    fail(*ctx, ctx->new_none(), dm->float_type());
+    succeed(*ctx, ctx->new_int(0), ctx->new_float(0.0), dm->float_type());
+    succeed(*ctx, ctx->new_int(1), ctx->new_float(1.0), dm->float_type()); // 32
+    succeed(*ctx, ctx->new_int(max_i), ctx->new_float(yama::float_t(max_i)), dm->float_type());
+    succeed(*ctx, ctx->new_int(-1), ctx->new_float(-1.0), dm->float_type());
+    succeed(*ctx, ctx->new_int(min_i), ctx->new_float(yama::float_t(min_i)), dm->float_type());
+    succeed(*ctx, ctx->new_uint(0), ctx->new_float(0.0), dm->float_type());
+    succeed(*ctx, ctx->new_uint(1), ctx->new_float(1.0), dm->float_type());
+    succeed(*ctx, ctx->new_uint(max_u), ctx->new_float(yama::float_t(max_u)), dm->float_type());
+    succeed(*ctx, ctx->new_bool(true), ctx->new_float(1), dm->float_type());
+    succeed(*ctx, ctx->new_bool(false), ctx->new_float(0), dm->float_type());
+    succeed(*ctx, ctx->new_char(U'&'), ctx->new_float(yama::float_t(U'&')), dm->float_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->float_type());
 
-    fail(ctx->new_none(), dm->float_type());
-    succeed(ctx->new_int(0), ctx->new_float(0.0), dm->float_type());
-    succeed(ctx->new_int(1), ctx->new_float(1.0), dm->float_type()); // 32
-    succeed(ctx->new_int(max_i), ctx->new_float(yama::float_t(max_i)), dm->float_type());
-    succeed(ctx->new_int(-1), ctx->new_float(-1.0), dm->float_type());
-    succeed(ctx->new_int(min_i), ctx->new_float(yama::float_t(min_i)), dm->float_type());
-    succeed(ctx->new_uint(0), ctx->new_float(0.0), dm->float_type());
-    succeed(ctx->new_uint(1), ctx->new_float(1.0), dm->float_type());
-    succeed(ctx->new_uint(max_u), ctx->new_float(yama::float_t(max_u)), dm->float_type());
-    succeed(ctx->new_bool(true), ctx->new_float(1), dm->float_type());
-    succeed(ctx->new_bool(false), ctx->new_float(0), dm->float_type());
-    succeed(ctx->new_char(U'&'), ctx->new_float(yama::float_t(U'&')), dm->float_type());
-    fail(ctx->new_type(ctx->int_type()), dm->float_type());
+    fail(*ctx, ctx->new_none(), dm->bool_type());
+    succeed(*ctx, ctx->new_int(0), ctx->new_bool(false), dm->bool_type());
+    succeed(*ctx, ctx->new_int(1), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_int(max_i), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_int(-1), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_int(min_i), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_uint(0), ctx->new_bool(false), dm->bool_type());
+    succeed(*ctx, ctx->new_uint(1), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_uint(max_u), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_float(0), ctx->new_bool(false), dm->bool_type());
+    succeed(*ctx, ctx->new_float(1), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_float(yama::float_t(max_i)), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_float(-1), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_float(min_i), ctx->new_bool(true), dm->bool_type());
+    succeed(*ctx, ctx->new_char(U'&'), ctx->new_bool(yama::bool_t(U'&')), dm->bool_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->bool_type());
 
-    fail(ctx->new_none(), dm->bool_type());
-    succeed(ctx->new_int(0), ctx->new_bool(false), dm->bool_type());
-    succeed(ctx->new_int(1), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_int(max_i), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_int(-1), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_int(min_i), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_uint(0), ctx->new_bool(false), dm->bool_type());
-    succeed(ctx->new_uint(1), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_uint(max_u), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_float(0), ctx->new_bool(false), dm->bool_type());
-    succeed(ctx->new_float(1), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_float(yama::float_t(max_i)), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_float(-1), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_float(min_i), ctx->new_bool(true), dm->bool_type());
-    succeed(ctx->new_char(U'&'), ctx->new_bool(yama::bool_t(U'&')), dm->bool_type());
-    fail(ctx->new_type(ctx->int_type()), dm->bool_type());
+    fail(*ctx, ctx->new_none(), dm->char_type());
+    succeed(*ctx, ctx->new_int(yama::int_t(U'&')), ctx->new_char(U'&'), dm->char_type());
+    succeed(*ctx, ctx->new_uint(yama::uint_t(U'&')), ctx->new_char(U'&'), dm->char_type());
+    succeed(*ctx, ctx->new_float(yama::float_t(U'&')), ctx->new_char(U'&'), dm->char_type());
+    succeed(*ctx, ctx->new_bool(true), ctx->new_char(yama::char_t(true)), dm->char_type());
+    fail(*ctx, ctx->new_type(ctx->int_type()), dm->char_type());
 
-    fail(ctx->new_none(), dm->char_type());
-    succeed(ctx->new_int(yama::int_t(U'&')), ctx->new_char(U'&'), dm->char_type());
-    succeed(ctx->new_uint(yama::uint_t(U'&')), ctx->new_char(U'&'), dm->char_type());
-    succeed(ctx->new_float(yama::float_t(U'&')), ctx->new_char(U'&'), dm->char_type());
-    succeed(ctx->new_bool(true), ctx->new_char(yama::char_t(true)), dm->char_type());
-    fail(ctx->new_type(ctx->int_type()), dm->char_type());
-
-    fail(ctx->new_none(), dm->type_type());
-    fail(ctx->new_int(0), dm->type_type());
-    fail(ctx->new_uint(0), dm->type_type());
-    fail(ctx->new_float(0.0), dm->type_type());
-    fail(ctx->new_bool(false), dm->type_type());
-    fail(ctx->new_char(U'&'), dm->type_type());
+    fail(*ctx, ctx->new_none(), dm->type_type());
+    fail(*ctx, ctx->new_int(0), dm->type_type());
+    fail(*ctx, ctx->new_uint(0), dm->type_type());
+    fail(*ctx, ctx->new_float(0.0), dm->type_type());
+    fail(*ctx, ctx->new_bool(false), dm->type_type());
+    fail(*ctx, ctx->new_char(U'&'), dm->type_type());
 }
 
 TEST_F(ContextTests, Conv_FnOrMethodTypeNarrowedToTypeTypeConvs) {
     ASSERT_TRUE(ready);
 
-    our_parcel->mh.add_function("Fn"_str,
-        yama::const_table{}.add_primitive_type("yama:None"_str),
-        yama::make_callsig({}, 0),
-        0,
-        yama::noop_call_fn);
-    our_parcel->mh.add_method("Struct"_str, "m"_str,
-        yama::const_table{}.add_primitive_type("yama:None"_str),
-        yama::make_callsig({}, 0),
-        0,
-        yama::noop_call_fn);
-    our_parcel->mh.add_struct("Struct"_str, yama::const_table{});
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
 
     const yama::item_ref Fn = dm->load("abc:Fn"_str).value();
     const yama::item_ref Struct_m = dm->load("abc:Struct::m"_str).value();
@@ -2447,6 +2479,95 @@ TEST_F(ContextTests, Conv_FnOrMethodTypeNarrowedToTypeTypeConvs) {
 
     ASSERT_EQ(ctx->local(offset + 0).value(), ctx->new_type(Fn));
     ASSERT_EQ(ctx->local(offset + 1).value(), ctx->new_type(Struct_m));
+}
+
+// These cover illegal conversions.
+
+TEST_F(ContextTests, Conv_IllegalConvsInvolvingNonPrimitiveTypes) {
+    ASSERT_TRUE(ready);
+
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
+
+    const yama::item_ref Fn = dm->load("abc:Fn"_str).value();
+    const yama::item_ref Fn2 = dm->load("abc:Fn2"_str).value();
+    const yama::item_ref Struct_m = dm->load("abc:Struct::m"_str).value();
+    const yama::item_ref Struct_m2 = dm->load("abc:Struct::m2"_str).value();
+    const yama::item_ref Struct = dm->load("abc:Struct"_str).value();
+    const yama::item_ref Struct2 = dm->load("abc:Struct2"_str).value();
+
+    // Below is for covering illegal conversions between
+    //      1) prim and non-prim types;
+    //      2) non-prim types of different kinds;
+    //      3) incompatible non-prim types of the same kind.
+
+    for (auto t : { Fn, Struct_m, Struct }) {
+        static_assert(yama::ptypes == 7);
+
+        // prim -> non-prim
+        fail(*ctx, ctx->new_none(), t);
+        fail(*ctx, ctx->new_int(0), t);
+        fail(*ctx, ctx->new_uint(0), t);
+        fail(*ctx, ctx->new_float(0.0), t);
+        fail(*ctx, ctx->new_bool(false), t);
+        fail(*ctx, ctx->new_char(U'&'), t);
+        fail(*ctx, ctx->new_type(ctx->int_type()), t);
+
+        // non-prim -> prim
+        fail(*ctx, t, dm->none_type());
+        fail(*ctx, t, dm->int_type());
+        fail(*ctx, t, dm->uint_type());
+        fail(*ctx, t, dm->float_type());
+        fail(*ctx, t, dm->bool_type());
+        fail(*ctx, t, dm->char_type());
+        if (t != Fn && t != Struct_m) { // Skip if should actually succeed.
+            fail(*ctx, t, dm->type_type());
+        }
+
+        fail(*ctx, Fn2, t);
+        fail(*ctx, Struct_m2, t);
+        fail(*ctx, Struct2, t);
+
+        fail(*ctx, t, Fn2);
+        fail(*ctx, t, Struct_m2);
+        fail(*ctx, t, Struct2);
+    }
+}
+
+TEST_F(ContextTests, Conv_FnTypeToDiffFnTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
+
+    const yama::item_ref Fn = dm->load("abc:Fn"_str).value();
+    const yama::item_ref Fn2 = dm->load("abc:Fn2"_str).value();
+
+    fail(*ctx, Fn, Fn2);
+}
+
+TEST_F(ContextTests, Conv_MethodTypeToDiffMethodTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
+
+    const yama::item_ref Struct_m = dm->load("abc:Struct::m"_str).value();
+    const yama::item_ref Struct_m2 = dm->load("abc:Struct::m2"_str).value();
+
+    fail(*ctx, Struct_m, Struct_m2);
+}
+
+TEST_F(ContextTests, Conv_StructTypeToDiffStructTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    using namespace conv_helpers;
+    setup(our_parcel->mh);
+
+    const yama::item_ref Struct = dm->load("abc:Struct"_str).value();
+    const yama::item_ref Struct2 = dm->load("abc:Struct2"_str).value();
+
+    fail(*ctx, Struct, Struct2);
 }
 
 // These cover the mechanics of conv method generally.

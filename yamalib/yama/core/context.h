@@ -406,14 +406,40 @@ namespace yama {
         //          * const_t overload.
         cmd_status default_init(local_t x, item_ref t);
         cmd_status default_init(local_t x, const_t c);
-
-        // TODO: Right now, ALL checks for conversion validity are performed at runtime, even
-        //       though there are plenty of them which COULD be statically verified instead.
+        
+        // IMPORTANT:
+        //      This details some important notes about conversions and unit testing.
         //
-        //       If we do try to do this, which I tried to do initially, be mindful of the fact
-        //       that one problem we'll face is that, unless we add conversions to the constant
-        //       table, the lack of context static verification has to work w/ will cause it to
-        //       be hard to 100% be able to deduce all the info needed about types for it to work.
+        //      context::conv and the conv instr are unit tested, w/ EACH AND EVERY legal and
+        //      illegal conversion case being intended to be covered.
+        //
+        //      Static verification DOES NOT verify the validity of conversions. The reason for
+        //      this is that any illegal conversions will cleanly panic at runtime, w/out
+        //      compromising the system.
+        //          * We'd need to introduce static verif for conversion if this ever changes.
+        //
+        //      Compiler unit tests (ie. in compilation-tests.cpp) cover EACH AND EVERY legal
+        //      and illegal conversion case, JUST LIKE w/ 'conv'.
+        //          * Keep these tests up-to-date (they're under 'Conversions'.)
+        //
+        //      Compiler unit tests raise compilation errors for certain conversions which are
+        //      known at compile-time to be illegal, meaning these are guaranteed to never be
+        //      able cause a panic.
+        // 
+        //      Compiler unit tests also introduce the notion of *constexpr* conversions, which
+        //      are resolved during compilation.
+        //          * Keep these tests up-to-date (they're under 'Conversions'.)
+
+        // IMPORTANT:
+        //      The following conversions are defined:
+        //          - T -> T, where T is any type.
+        //              * Identity Convs
+        //          - T -> U, where T != U, and T and U are Int, UInt, Float, Bool, or Char.
+        //              * Primitive Type Convs
+        //          - T -> U, where T is any fn or method type, and U is Type.
+        //              * Fn/Method Type Narrowed To yama:Type Conv
+        //
+        //      All other conversions are illegal.
 
         // TODO: Right now, all primitive conversions are *unsafe*, meaning it's possible to
         //       do things like creating Char objects for *illegal* Unicode codepoints!
@@ -424,37 +450,19 @@ namespace yama {
         //       Do we want this? Or should these conversions always be safe, and panicking
         //       otherwise?
 
-        // TODO: We also don't have unit tests covering general conversion failures, such as
-        //       between struct types, or between struct types and primitives, or between
-        //       fn/method types, nor between struct and fn/method types, etc.
-        //
-        //       So ya, gotta figure out how comprehensive I want testing to be.
-
         // TODO: The specifics of 'Primitive Type Convs', both in terms of semantics, and
         //       our UNIT TESTS, are NOT well defined and can be VASTLY improved!
+        // 
+        //       This is to say that we don't really specifically assert what kinds of values
+        //       should be mapped to specific other values during conversion, w/ us just broadly
+        //       testing that it does *something*, and we presume it's a C++ conversion.
         //
-        //       At present, we simply test that C++ conversions occur between values.
+        //       This critique also goes for our compilation-tests.cpp 'Conversions' section
+        //       unit tests also.
 
-        // TODO: Our compilation-tests.cpp tests likewise do not cover the details WHAT constitutes
-        //       a valid conversion, w/ checks being done at runtime, and w/ the details of what
-        //       constitutes a valid conversion currently being punted to yama::context::conv tests.
-
-        // TODO: Currently, due to ALL checks being done at runtime, it's impossible for the Yama
-        //       compiler to remove otherwise 100% transparent conversion operations due to the
-        //       fact that the *potential panic* from the conversion failing means that the expr
-        //       could still have observable side-effects.
-        //
-        //       So when we add static checking of conversions, be sure to update this aspect of
-        //       the Yama compiler, as well as maybe updating our unit tests also.
-
-        // IMPORTANT:
-        //      The following conversions are defined:
-        //          - T -> T, where T is any type.
-        //              * Identity Convs
-        //          - T -> U, where T != U, and T and U are Int, UInt, Float, Bool, or Char.
-        //              * Primitive Type Convs
-        //          - T -> U, where T is any fn or method type, and U is Type.
-        //              * Fn/Method Type Narrowed To yama:Type Conv
+        // TODO: The unit test 'ConversionExpr_ConditionallyConstExpr_ExprIsConstExprButConversionItselfIsNot'
+        //       is currently a stub until we add support for conversions which are themselves
+        //       not able to be constexpr, even if the converted expr is constexpr.
 
         // conv loads an object into register dest (dest may be newtop) produced by converting
         // the value of the object at src into type t.

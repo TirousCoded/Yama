@@ -158,7 +158,8 @@ parser section:
     Decl                            : ImportDecl
                                     | VarDecl
                                     | FnDecl
-                                    | StructDecl ;
+                                    | StructDecl
+                                    ;
 
     ImportDecl                      : IMPORT IDENTIFIER ( COLON IDENTIFIER )? RelativePath? SEMI ;
     RelativePath                    : ( DOT IDENTIFIER )+ ;

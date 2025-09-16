@@ -246,7 +246,22 @@ namespace yama::internal {
         mode _discern_mode(const ast_suffix_expr& x) const noexcept;
         mode _discern_mode(const ast_Expr& x) const noexcept;
 
-        std::optional<cvalue> _default_init_crvalue(const ctype& type, metadata& md);
+        std::optional<cvalue> _default_init_crvalue(ctype type, metadata& md);
+        std::optional<cvalue> _conv_crvalue(std::optional<cvalue> x, ctype target, metadata& md);
+
+        enum class _conv_type : uint8_t {
+            identity,
+            primitive_type,
+            fn_or_method_type_narrowed_to_type_type,
+            illegal,
+        };
+
+        _conv_type _discern_conv_type(ctype from, ctype to, metadata& md);
+        bool _conv_is_legal(ctype from, ctype to, metadata& md);
+        bool _conv_has_side_effects(ctype from, ctype to, metadata& md);
+        bool _is_identity_conv(ctype from, ctype to);
+        bool _is_primitive_type_conv(ctype from, ctype to, metadata& md);
+        bool _is_fn_or_method_type_narrowed_to_type_type_conv(ctype from, ctype to, metadata& md);
 
         bool _is_type_ref_id_expr(const ast_PrimaryExpr& x);
 
@@ -263,6 +278,7 @@ namespace yama::internal {
         bool _raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t expected_args);
         bool _raise_wrong_arg_count_for_bound_method_call_if(bool x, metadata& md, ctype method, size_t expected_args);
         bool _raise_invalid_operation_due_to_noncallable_type_if(bool x, metadata& md, ctype t);
+        bool _raise_invalid_operation_due_to_illegal_conv_if(ctype from, ctype to, metadata& md);
         bool _raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number);
         bool _raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md);
         bool _raise_type_mismatch_for_conv_target_if(ctype actual, metadata& md);
