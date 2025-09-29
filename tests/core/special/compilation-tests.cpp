@@ -31,11 +31,11 @@ public:
 
 
     std::optional<yama::module_ref> perform_compile(
-        const std::string& txt,
-        const std::string& txt_multi_a = "",
-        const std::string& txt_multi_b = "",
-        const std::string& txt_multi_c = "",
-        const std::string& txt_multi_d = "");
+        const std::u8string& txt,
+        const std::u8string& txt_multi_a = u8"",
+        const std::u8string& txt_multi_b = u8"",
+        const std::u8string& txt_multi_c = u8"",
+        const std::u8string& txt_multi_d = u8"");
 
 
 protected:
@@ -521,16 +521,16 @@ namespace {
 
 
 std::optional<yama::module_ref> CompilationTests::perform_compile(
-    const std::string& txt,
-    const std::string& txt_multi_a,
-    const std::string& txt_multi_b,
-    const std::string& txt_multi_c,
-    const std::string& txt_multi_d) {
-    our_test_parcel->our_src = txt;
-    our_test_parcel->our_src_multi_a = txt_multi_a;
-    our_test_parcel->our_src_multi_b = txt_multi_b;
-    our_test_parcel->our_src_multi_c = txt_multi_c;
-    our_other_test_parcel->our_src_multi_d = txt_multi_d;
+    const std::u8string& txt,
+    const std::u8string& txt_multi_a,
+    const std::u8string& txt_multi_b,
+    const std::u8string& txt_multi_c,
+    const std::u8string& txt_multi_d) {
+    our_test_parcel->our_src = taul::utf8_s(txt);
+    our_test_parcel->our_src_multi_a = taul::utf8_s(txt_multi_a);
+    our_test_parcel->our_src_multi_b = taul::utf8_s(txt_multi_b);
+    our_test_parcel->our_src_multi_c = taul::utf8_s(txt_multi_c);
+    our_other_test_parcel->our_src_multi_d = taul::utf8_s(txt_multi_d);
     return dm->import("a"_str);
 }
 
@@ -563,7 +563,7 @@ void CompilationTests::SetUp() {
 TEST_F(CompilationTests, Empty) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 // empty
 
@@ -582,7 +582,7 @@ TEST_F(CompilationTests, MultipleRoundsOfCompilation) {
     // multiple rounds of compilation due to failing to cleanup properly between each,
     // so I decided to create this test to cover this behaviour
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -593,7 +593,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 import fns.abc;
 
@@ -604,7 +604,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 import fns.abc;
 
@@ -619,9 +619,9 @@ fn f() {
 
     // also, we're gonna use dm->load instead of dm->import
 
-    our_test_parcel->our_src = txt;
-    our_test_parcel->our_src_multi_a = txt_multi_a;
-    our_test_parcel->our_src_multi_b = txt_multi_b;
+    our_test_parcel->our_src = taul::utf8_s(txt);
+    our_test_parcel->our_src_multi_a = taul::utf8_s(txt_multi_a);
+    our_test_parcel->our_src_multi_b = taul::utf8_s(txt_multi_b);
 
     auto f1 = dm->load("a:f"_str);
     auto f2 = dm->load("a.multi.a:f"_str);
@@ -660,7 +660,7 @@ fn f() {
 TEST_F(CompilationTests, Fail_LexicalError) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     $$$$$$ // <- lexical error
@@ -680,7 +680,7 @@ fn f() {
 TEST_F(CompilationTests, Fail_SyntaxError) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     fn // <- lexically sound, but syntax error
@@ -751,7 +751,7 @@ static_assert(yama::kinds == 4); // reminder
 TEST_F(CompilationTests, General_BuiltIns) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // implicit yama import makes expected builtins available
@@ -792,7 +792,7 @@ fn f() {
 TEST_F(CompilationTests, General_DefaultInit_None) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> None {
     var a: None; // default inits a
@@ -826,7 +826,7 @@ fn f() -> None {
 TEST_F(CompilationTests, General_DefaultInit_Int) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     var a: Int; // default inits a
@@ -860,7 +860,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, General_DefaultInit_UInt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> UInt {
     var a: UInt; // default inits a
@@ -894,7 +894,7 @@ fn f() -> UInt {
 TEST_F(CompilationTests, General_DefaultInit_Float) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Float {
     var a: Float; // default inits a
@@ -928,7 +928,7 @@ fn f() -> Float {
 TEST_F(CompilationTests, General_DefaultInit_Bool) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Bool {
     var a: Bool; // default inits a
@@ -962,7 +962,7 @@ fn f() -> Bool {
 TEST_F(CompilationTests, General_DefaultInit_Char) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Char {
     var a: Char; // default inits a
@@ -996,7 +996,7 @@ fn f() -> Char {
 TEST_F(CompilationTests, General_DefaultInit_Type) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Type {
     var a: Type; // default inits a
@@ -1030,7 +1030,7 @@ fn f() -> Type {
 TEST_F(CompilationTests, General_DefaultInit_Fn) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn g() {}
 
@@ -1070,7 +1070,7 @@ fn f() -> g {
 TEST_F(CompilationTests, General_DefaultInit_Method) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct A {}
 
@@ -1112,7 +1112,7 @@ fn f() -> A::g {
 TEST_F(CompilationTests, General_DefaultInit_Struct) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct G {}
 
@@ -1151,7 +1151,7 @@ fn f() -> G {
 TEST_F(CompilationTests, General_None_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn get_none() {}
 
@@ -1171,7 +1171,7 @@ fn f() {
 TEST_F(CompilationTests, General_Int_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     300(); // not callable
@@ -1189,7 +1189,7 @@ fn f() {
 TEST_F(CompilationTests, General_UInt_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     300u(); // not callable
@@ -1207,7 +1207,7 @@ fn f() {
 TEST_F(CompilationTests, General_Float_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     3.14159(); // not callable
@@ -1225,7 +1225,7 @@ fn f() {
 TEST_F(CompilationTests, General_Bool_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     true(); // not callable
@@ -1243,7 +1243,7 @@ fn f() {
 TEST_F(CompilationTests, General_Char_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     'a'(); // not callable
@@ -1261,7 +1261,7 @@ fn f() {
 TEST_F(CompilationTests, General_Type_IsNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // gotta use an arg '10' to avoid forming default init expr
@@ -1283,7 +1283,7 @@ fn f() {
 TEST_F(CompilationTests, General_Fns_AreCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -1327,7 +1327,7 @@ fn f() {
 TEST_F(CompilationTests, General_Methods_AreCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -1373,7 +1373,7 @@ fn f() {
 TEST_F(CompilationTests, General_Structs_AreNonCallable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct A {}
 
@@ -1405,7 +1405,7 @@ TEST_F(CompilationTests, General_ExprPrecedenceOrder) {
 TEST_F(CompilationTests, General_PanicBehaviour) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -1460,13 +1460,13 @@ TEST_F(CompilationTests, General_Fail_InvalidParcelEnv_NoYamaModuleAvailable) {
     // perfectly valid Yama code, but should fail compile up-front due to
     // no 'yama' dep to use for implicit import decl
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {}
 
 )";
 
-    our_invalid_parcel->our_src = txt;
+    our_invalid_parcel->our_src = taul::utf8_s(txt);
     ASSERT_FALSE(dm->import("bad"_str).has_value());
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_env), 1);
@@ -1499,13 +1499,13 @@ TEST_F(CompilationTests, General_Fail_InvalidParcelEnv_YamaModuleIsNotFromYamaPa
     // perfectly valid Yama code, but should fail compile up-front due to
     // 'yama' dep to use for implicit import decl being *wrong*
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {}
 
 )";
 
-    our_parcel->our_src = txt;
+    our_parcel->our_src = taul::utf8_s(txt);
     ASSERT_FALSE(dm->import("bad"_str).has_value());
 
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_env), 1);
@@ -1522,7 +1522,7 @@ fn f() {}
 TEST_F(CompilationTests, MultiSourceCompilation_DirectCompilingModuleAddition) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.multi.a; // add new src to compilation
 import self.multi.b; // add new src to compilation
@@ -1536,7 +1536,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 import fns.abc;
 
@@ -1546,7 +1546,7 @@ fn aaa() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 import fns.abc;
 
@@ -1556,7 +1556,7 @@ fn bbb() {
 
 )";
 
-    std::string txt_multi_c = R"(
+    std::u8string txt_multi_c = u8R"(
 
 import fns.abc;
 
@@ -1595,7 +1595,7 @@ fn ccc() {
 TEST_F(CompilationTests, MultiSourceCompilation_IndirectCompilingModuleAddition) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.multi.a; // add new src to compilation
 
@@ -1605,7 +1605,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 import self.multi.b; // add new src to compilation
 import fns.abc;
@@ -1617,7 +1617,7 @@ fn aaa() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 import self.multi.c; // add new src to compilation
 import fns.abc;
@@ -1629,7 +1629,7 @@ fn bbb() {
 
 )";
 
-    std::string txt_multi_c = R"(
+    std::u8string txt_multi_c = u8R"(
 
 import fns.abc;
 
@@ -1667,7 +1667,7 @@ fn ccc() {
 TEST_F(CompilationTests, MultiSourceCompilation_MultiParcel) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.multi.a; // add new src to compilation
 import self.multi.b; // add new src to compilation
@@ -1683,7 +1683,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 import fns.abc;
 
@@ -1693,7 +1693,7 @@ fn aaa() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 import fns.abc;
 
@@ -1703,7 +1703,7 @@ fn bbb() {
 
 )";
 
-    std::string txt_multi_c = R"(
+    std::u8string txt_multi_c = u8R"(
 
 import fns.abc;
 
@@ -1713,7 +1713,7 @@ fn ccc() {
 
 )";
 
-    std::string txt_multi_d = R"(
+    std::u8string txt_multi_d = u8R"(
 
 import fns.abc;
 
@@ -1755,7 +1755,7 @@ fn ddd() {
 TEST_F(CompilationTests, MultiSourceCompilation_TolerateCompilingModuleImportGraphCycles) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.multi.a; // add new src to compilation
 import self.multi.b; // add new src to compilation
@@ -1769,7 +1769,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 // will form dep graph cycles w/ other compiling modules
 
@@ -1788,7 +1788,7 @@ fn aaa() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 // will form dep graph cycles w/ other compiling modules
 
@@ -1807,7 +1807,7 @@ fn bbb() {
 
 )";
 
-    std::string txt_multi_c = R"(
+    std::u8string txt_multi_c = u8R"(
 
 // will form dep graph cycles w/ other compiling modules
 
@@ -1854,7 +1854,7 @@ fn ccc() {
 TEST_F(CompilationTests, MultiSourceCompilation_Fail_InducedCompilationFails) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.multi.a; // add new src to compilation
 import self.multi.b; // add new src to compilation
@@ -1870,7 +1870,7 @@ fn f() {
 
 )";
 
-    std::string txt_multi_a = R"(
+    std::u8string txt_multi_a = u8R"(
 
 import fns.abc;
 
@@ -1880,7 +1880,7 @@ fn aaa() {
 
 )";
 
-    std::string txt_multi_b = R"(
+    std::u8string txt_multi_b = u8R"(
 
 import fns.abc;
 
@@ -1890,7 +1890,7 @@ fn bbb() {
 
 )";
 
-    std::string txt_multi_c = R"(
+    std::u8string txt_multi_c = u8R"(
 
 import fns.abc;
 
@@ -1900,7 +1900,7 @@ fn ccc() {
 
 )";
 
-    std::string txt_multi_d = R"(
+    std::u8string txt_multi_d = u8R"(
 
 import fns.abc;
 
@@ -1918,7 +1918,9 @@ fn ddd() {
 
 // Conversions
 //
-//      - Yama currently only supports explicit conversions, not implicit ones.
+//      - Yama supports both explicit and implicit conversions.
+//          * Each statement/expression which contains a location where implicit conversion
+//            can occur is unit tested w/ regards to this.
 // 
 //      - Conversions are checked at compile-time.
 //          * TODO: We'll need to add nuances for things like conversions to protocol types
@@ -1929,26 +1931,46 @@ fn ddd() {
 //      - Defined Conversions (ie. all others are illegal):
 //
 //          - T -> T, where T is any type.
-//              * Identity Conversions
-//              * Explicit Only
-//              * Constexpr
+//              - Identity Conversions
+//              - Explicit Only
+//                  * We don't need *implicit* identity convs.
+//              - Constexpr
 //
 //          - T -> U, where T != U, and T and U are Int, UInt, Float, Bool or Char.
-//              * Primitive Type Conversions
-//              * Explicit Only
-//              * Constexpr
+//              - Primitive Type Conversions
+//              - Explicit Only
+//              - Constexpr
 //
-//          - T -> U, where T is any fn or method type, and U is Type.
-//              * Fn/Method Type Narrowed To yama:Type Conversions
-//              * Explicit Only
-//              * Constexpr
+//          - T -> U, where T is any fn type and U is Type.
+//              - Fn Type Narrowed To yama:Type Conversions
+//              - Explicit/Implicit
+//              - Constexpr
+//
+//          - T -> U, where T is any method type and U is Type.
+//              - Method Type Narrowed To yama:Type Conversions
+//              - Explicit/Implicit
+//              - Constexpr
+
+// IMPORTANT: In unit tests involving implicit conversions involved in exprs/stmts,
+//            take note of the following terminology:
+//
+//              1) The term 'coerce' refers to implicit conversion.
+//
+//              2) The term 'coerced type mismatch' refers to a type mismatch error
+//                 which arises AFTER attempting an implicit conversion to resolve
+//                 the error.
+
+// NOTE: For conversions which may be implicit, the main test for them should test
+//       BOTH explicit and implicit conversions!
 
 // Identity Conversions
+
+// NOTE: We don't need a implicit conversion failure test for identity convs.
 
 TEST_F(CompilationTests, Conversions_IdentityConvs) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -1962,7 +1984,7 @@ fn f() {
     observeUInt(const(10u.[UInt]));
     observeFloat(const(10.313.[Float]));
     observeBool(const(true.[Bool]));
-    observeChar(const('&'.[Char]));
+    observeChar(const('魂'.[Char])); // '魂' to *stress test* a bit.
     observeType(const(Struct.[Type]));
 
     // Ensure these compile too.
@@ -2000,7 +2022,7 @@ fn f() {
     expected.observe_uint(10);
     expected.observe_float(10.313);
     expected.observe_bool(true);
-    expected.observe_char(U'&');
+    expected.observe_char(U'魂');
     expected.observe_type(Struct.value());
     EXPECT_TRUE(sidefx.compare(expected));
 }
@@ -2010,7 +2032,7 @@ fn f() {
 TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -2040,10 +2062,10 @@ fn f() {
     observeFloat(const(true.[Float]));
     observeChar(const(true.[Char]));
 
-    observeInt(const('&'.[Int]));
-    observeUInt(const('&'.[UInt]));
-    observeFloat(const('&'.[Float]));
-    observeBool(const('&'.[Bool]));
+    observeInt(const('魂'.[Int])); // '魂' to *stress test* a bit.
+    observeUInt(const('魂'.[UInt])); // '魂' to *stress test* a bit.
+    observeFloat(const('魂'.[Float])); // '魂' to *stress test* a bit.
+    observeBool(const('魂'.[Bool])); // '魂' to *stress test* a bit.
 }
 
 )";
@@ -2090,30 +2112,107 @@ fn f() {
     expected.observe_float(yama::float_t(true));
     expected.observe_char(yama::char_t(true));
 
-    expected.observe_int(yama::int_t(U'&'));
-    expected.observe_uint(yama::uint_t(U'&'));
-    expected.observe_float(yama::float_t(U'&'));
-    expected.observe_bool(yama::bool_t(U'&'));
+    expected.observe_int(yama::int_t(U'魂'));
+    expected.observe_uint(yama::uint_t(U'魂'));
+    expected.observe_float(yama::float_t(U'魂'));
+    expected.observe_bool(yama::bool_t(U'魂'));
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// Fn/Method Type Narrowed To yama:Type Conversions
+// Primitive type convs may not be implicit.
+// We have one test for each: Int, UInt, Float, Bool and Char.
 
-TEST_F(CompilationTests, Conversions_FnOrMethodTypeNarrowedToTypeTypeConvs) {
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs_MayNotBeImplicit_Int) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Int = 3.14159;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs_MayNotBeImplicit_UInt) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: UInt = 3.14159;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs_MayNotBeImplicit_Float) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Float = 'y';
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs_MayNotBeImplicit_Bool) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Bool = 3.14159;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+TEST_F(CompilationTests, Conversions_PrimitiveTypeConvs_MayNotBeImplicit_Char) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Char = 3.14159;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// Fn Type Narrowed To yama:Type Conversions
+
+TEST_F(CompilationTests, Conversions_FnTypeNarrowedToTypeTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
-struct Struct {}
-fn Struct::m() {}
 fn Fn() {}
 
 fn f() {
     // Wrap in 'const(<x>)' to ensure they're constexpr.
-    observeType(const(Struct::m.[Type]));
     observeType(const(Fn.[Type]));
+    observeType(const(Fn)); // Implicit
 }
 
 )";
@@ -2122,12 +2221,8 @@ fn f() {
     
     EXPECT_TRUE(perform_compile(txt));
 
-    const auto Struct = dm->load("a:Struct"_str);
-    const auto Struct_m = dm->load("a:Struct::m"_str);
     const auto Fn = dm->load("a:Fn"_str);
     const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(Struct);
-    ASSERT_TRUE(Struct_m);
     ASSERT_TRUE(Fn);
     ASSERT_TRUE(f);
 
@@ -2142,8 +2237,55 @@ fn f() {
 
     // Expected side effects.
     SideFx expected{};
-    expected.observe_type(Struct_m.value());
     expected.observe_type(Fn.value());
+    expected.observe_type(Fn.value());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Method Type Narrowed To yama:Type Conversions
+
+TEST_F(CompilationTests, Conversions_MethodTypeNarrowedToTypeTypeConvs) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct Struct {}
+fn Struct::m() {}
+
+fn f() {
+    // Wrap in 'const(<x>)' to ensure they're constexpr.
+    observeType(const(Struct::m.[Type]));
+    observeType(const(Struct::m)); // Implicit
+}
+
+)";
+
+    //dbg->add_cat(yama::compile_c);
+    
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto Struct = dm->load("a:Struct"_str);
+    const auto Struct_m = dm->load("a:Struct::m"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(Struct);
+    ASSERT_TRUE(Struct_m);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    expected.observe_type(Struct_m.value());
+    expected.observe_type(Struct_m.value());
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
@@ -2241,7 +2383,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_DeclaredTypesBecomeAvailableToDomainUponCompiledModuleImport) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {}
 
@@ -2272,7 +2414,7 @@ fn f() {}
 TEST_F(CompilationTests, DeclAndScope_ExternTypes_MayBeUsedByYamaCode) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -2333,7 +2475,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_TypesDefinedInYamaCode_MayBeUsedByYamaCode) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -2397,7 +2539,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_TypeDefinedInYamaCode_SharesUnqualifiedName_WithExternType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -2448,7 +2590,7 @@ fn observeInt() -> Char { // shares unqualified name w/ fns.abc:observeInt
 TEST_F(CompilationTests, DeclAndScope_DeclShadowingBehaviour) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -2509,7 +2651,7 @@ fn f(a: Int) {
 TEST_F(CompilationTests, DeclAndScope_TypeAndImportWithCommonUnqualifiedNameDoNotCauseNameConflict) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 
@@ -2555,7 +2697,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_ParamScopeBeginsWhenExpected_ForTypeAnnotExpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 // param 'a' won't come into scope until at least 'd'
 
@@ -2575,7 +2717,7 @@ fn f(a, b, c: a, d: Int) {}
 TEST_F(CompilationTests, DeclAndScope_LocalVarScopeBeginsWhenExpected_ForTypeAnnotExpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a: a; // <- local var 'a' hasn't come into scope yet!
@@ -2595,7 +2737,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_LocalVarScopeBeginsWhenExpected_ForInitExpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a: Int = a; // <- local var 'a' hasn't come into scope yet!
@@ -2613,7 +2755,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Import_Import) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 import a: yama; // error! name 'a' already taken
@@ -2630,7 +2772,7 @@ import a: yama; // error! name 'a' already taken
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Import_Import_OneIsImplicitYamaImport) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import yama: fns.abc; // error! name 'yama' already taken
 
@@ -2646,7 +2788,7 @@ import yama: fns.abc; // error! name 'yama' already taken
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Type_Type_BothFromYamaCode) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {}
 
@@ -2665,7 +2807,7 @@ fn f(a: Int) {}
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_Param_Param) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(a, a: Int) {}
 
@@ -2682,7 +2824,7 @@ fn f(a, a: Int) {}
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_Param) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(a: Int) {
     var a = 3.14159;
@@ -2701,7 +2843,7 @@ fn f(a: Int) {
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_LocalVar_BothInFnBodyBlock) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = 10;
@@ -2721,7 +2863,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_Fail_NameConflict_LocalVar_LocalVar_BothInNestedBlock) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     if (true) {
@@ -2742,7 +2884,7 @@ fn f() {
 TEST_F(CompilationTests, DeclAndScope_Fail_IfDeadCodeIsInError) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     return;
@@ -2759,20 +2901,22 @@ fn f() {
 }
 
 
-// type specifier
-// 
-//      - accepts a yama:Type crvalue to resolve something's type
-//
-//      - if crvalue is a fn type, this will be *ad hoc* implicit converted into a yama:Type
-//      - if crvalue is a method type, this will be *ad hoc* implicit converted into a yama:Type
-//          TODO: replace these w/ proper (constexpr!) implicit converts later
+// TODO: At some point maybe dissolve this section and add individual unit tests
+//       for this stuff to all parts of the language that involve a type specifier.
 
-// type spec w/ yama:Type crvalue
+// Type Specifier
+// 
+//      - Accepts a crvalue coerced to yama:Type to resolve something's type.
+//
+//      - Illegal if expr is non-constexpr.
+//      - Illegal if expr cannot coerce to yama:Type.
+
+// Type spec w/ yama:Type crvalue.
 
 TEST_F(CompilationTests, TypeSpecifier_ExprIsTypeType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int { // <- yama:Type crvalue
     return 100;
@@ -2800,14 +2944,14 @@ fn f() -> Int { // <- yama:Type crvalue
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// type spec w/ fn type crvalue (ad hoc implicit convert)
+// Type spec coerces to yama:Type crvalue.
 
-TEST_F(CompilationTests, TypeSpecifier_ExprIsFnType_AdHocImplicitConvert) {
+TEST_F(CompilationTests, TypeSpecifier_ExprCoercesToTypeType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
-fn f() -> g { // <- fn type crvalue
+fn f() -> g { // <- Coerces to yama:Type.
     return g;
 }
 
@@ -2824,86 +2968,25 @@ fn g() {}
     ASSERT_TRUE(g);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(g->kind(), yama::kind::function);
     ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
-    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*g));
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(g.value()).value());
 
     // expected side effects
     SideFx expected{};
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// type spec w/ method type crvalue (ad hoc implicit convert)
+// Illegal if expr not constexpr.
 
-TEST_F(CompilationTests, TypeSpecifier_ExprIsMethodType_AdHocImplicitConvert) {
+TEST_F(CompilationTests, TypeSpecifier_Fail_Expr_NonConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-fn f() -> A::g { // <- method type crvalue
-    return A::g;
-}
-
-struct A {}
-
-fn A::g() {}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    const auto A_g = dm->load("a:A::g"_str);
-    ASSERT_TRUE(f);
-    ASSERT_TRUE(A_g);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_g->kind(), yama::kind::method);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
-    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
-
-    // expected side effects
-    SideFx expected{};
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// illegal type spec due to expr not yama:Type, fn or method type
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_ExprTypeIsNotTypeType_FnType_OrMethodType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() -> 100 { // <- '100' is valid crvalue, but is not yama:Type nor fn/method type
-    //
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_not_a_type), 1);
-}
-
-// illegal type spec due to expr not constexpr
-
-TEST_F(CompilationTests, TypeSpecifier_Fail_ExprIsNonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn g() -> Type {
     return None;
@@ -2920,8 +3003,26 @@ fn f() -> g() { // <- valid Type value, but not constexpr
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
+// Illegal if expr cannot coerce to yama:Type.
 
-// IMPORTANT: multi-source compilation is tested elsewhere
+TEST_F(CompilationTests, TypeSpecifier_Fail_Expr_CoercedTypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() -> 100 { // <- '100' is valid crvalue, but cannot coerce to yama:Type.
+    //
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+
+// IMPORTANT: Multi-source compilation is tested elsewhere.
 
 // import decl
 // 
@@ -2976,7 +3077,7 @@ fn f() -> g() { // <- valid Type value, but not constexpr
 TEST_F(CompilationTests, ExplicitImportDecl_Unnamed_ModuleImportedFromDep) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3012,7 +3113,7 @@ fn f() {
 TEST_F(CompilationTests, ExplicitImportDecl_Unnamed_ModuleImportedFromSameParcelAsCompilingModule) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self.abc;
 
@@ -3048,7 +3149,7 @@ fn f() {
 TEST_F(CompilationTests, ExplicitImportDecl_Named_ModuleImportedFromDep) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import abc: fns.abc;
 
@@ -3084,7 +3185,7 @@ fn f() {
 TEST_F(CompilationTests, ExplicitImportDecl_Named_ModuleImportedFromSameParcelAsCompilingModule) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import abc: self.abc;
 
@@ -3120,7 +3221,7 @@ fn f() {
 TEST_F(CompilationTests, ImportDecl_ExternTypeSetContainsTypesWithSameUnqualifiedName) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 import fns2.abc; // <- won't conflict
@@ -3154,7 +3255,7 @@ fn f() {}
 TEST_F(CompilationTests, ImportDecl_ImplicitYamaImportDecl) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn g() -> yama:Int { // 'yama' name is used by implicit import decl
     return 10;
@@ -3191,7 +3292,7 @@ fn f() -> Int { // Int exposed by implicit yama import
 TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 import fns.abc;
@@ -3232,7 +3333,7 @@ fn f() {
 TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated_ForImplicitYamaImportDecl) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import yama;
 import yama;
@@ -3270,7 +3371,7 @@ fn f() -> Int { // Int exposed by implicit yama import
 TEST_F(CompilationTests, ImportDecl_RedundantImportDeclsAreTolerated_TypeAccessedViaMultipleImportDeclNameQualifiers) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import abc1: fns.abc;
 import abc2: fns.abc;
@@ -3314,7 +3415,7 @@ fn f() {
 TEST_F(CompilationTests, ImportDecl_ImportDeclsImportingTheCompilingModuleItselfAreTolerated) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import self;
 import self;
@@ -3359,7 +3460,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, ImportDecl_Fail_ImportNonExistentModule) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns; // error! fns parcel has no root module!
 
@@ -3383,7 +3484,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, ImportDecl_Fail_ImportInvalidModule) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.bad; // error! fns.bad was invalid!
 
@@ -3403,7 +3504,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, ImportDecl_Fail_ImportDeclExistsInLocalScope) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     import fns.abc; // error! illegal in local scope!
@@ -3421,7 +3522,7 @@ fn f() {
 TEST_F(CompilationTests, ImportDecl_Fail_ImportDeclExistsAfterFirstTypeDecl) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     //...
@@ -3437,38 +3538,37 @@ import fns.abc; // error! illegal after first type decl
 }
 
 
-// variable decl
-//
-//      - defines non-local var if appears in global block
-//          * illegal in current version of Yama
+// Variable Decl
 // 
-//      - defines local var if appears in local block
+//      - Defines non-local var if appears in global block.
+//          * Illegal in current version of Yama.
+//      - Defines local var if appears in local block.
 // 
-//      - variable decls w/ just <type-annot> are legal
-//          * type specified explicitly by <type-annot>
-//          * default inits
+//      - Variable decls w/ just <type-annot> are legal.
+//          - Type specified by <type-annot> (coerced to yama:Type.)
+//          - Default inits.
 //      
-//      - variable decls w/ just <init-assign> are legal
-//          * type implied by <init-assign> expr type
-//          * inits to value of <init-assign> expr
+//      - Variable decls w/ just <init-assign> are legal.
+//          - Type implied by <init-assign> expr type.
+//          - Inits to value of <init-assign> expr.
 // 
-//      - variable decls w/ both <type-annot> and <init-assign> are legal
-//          * type specified explicitly by <type-annot>
-//          * inits to value of <init-assign> expr
-//          * <type-annot> and <init-assign> MUST agree on type
+//      - Variable decls w/ both <type-annot> and <init-assign> are legal.
+//          - Type specified by <type-annot> (coerced to yama:Type.)
+//          - Inits to value of <init-assign> expr coerced the variable type.
 // 
-//      - variable decls w/out <type-annot> or <init-assign> are illegal
+//      - Variable decls w/out <type-annot> or <init-assign> are illegal.
 // 
-//      - local vars are initialized upon entering scope
-// 
-//      - local vars are mutable
+//      - Local vars are initialized upon entering scope.
+//      - Local vars are mutable.
+//
+//      - Illegal if <init-assign> cannot coerce to variable type.
 
-// local var w/ just <type-annot>
+// Local var w/ just <type-annot>.
 
 TEST_F(CompilationTests, VariableDecl_TypeAnnot_NoInitAssign) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3500,12 +3600,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// local var w/ just <init-assign>
+// Local var w/ just <init-assign>.
 
 TEST_F(CompilationTests, VariableDecl_NoTypeAnnot_InitAssign) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3537,12 +3637,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// local var w/ <type-annot> and <init-assign>
+// Local var w/ <type-annot> and <init-assign>.
 
 TEST_F(CompilationTests, VariableDecl_TypeAnnot_InitAssign) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3574,12 +3674,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// illegal local var w/out <type-annot> nor <init-assign>
+// Illegal local var w/out <type-annot> nor <init-assign>.
 
 TEST_F(CompilationTests, VariableDecl_Fail_If_NoTypeAnnot_NoInitAssign) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a;
@@ -3592,12 +3692,12 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_local_var), 1);
 }
 
-// local var initialization and mutability
+// Local var initialization and mutability.
 
 TEST_F(CompilationTests, VariableDecl_InitializationAndMutability) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3641,12 +3741,93 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// illegal to declare non-local var
+// <type-annot> coerced to yama:Type.
+
+TEST_F(CompilationTests, VariableDecl_TypeSpecCoercedToTypeType) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() -> g {
+    var a: g; // g gets coerced to Type.
+    return a;
+}
+
+fn g() {}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:g");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(g.value()).value());
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// <init-assign> value coerced to variable type (specified by <type-annot>.)
+
+TEST_F(CompilationTests, VariableDecl_InitAssignValueCoercedToVariableType) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    var a: Type = g; // g gets coerced to Type.
+    observeType(a);
+}
+
+fn g() {}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    const auto g = dm->load("a:g"_str);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(g);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_type(g.value());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Illegal to declare non-local var.
 
 TEST_F(CompilationTests, VariableDecl_Fail_IfNonLocalVar) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 var a = 10;
 
@@ -3657,12 +3838,12 @@ var a = 10;
     EXPECT_EQ(dbg->count(yama::dsignal::compile_illegal_nonlocal_decl), 1);
 }
 
-// illegal to initialize local var w/ wrong typed expr
+// Illegal if <init-assign> value cannot coerce to variable type.
 
-TEST_F(CompilationTests, VariableDecl_Fail_InitExprIsWrongType) {
+TEST_F(CompilationTests, VariableDecl_Fail_InitAssignValue_CoercedTypeMismatch) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a: Int = 3.14159;
@@ -3720,7 +3901,7 @@ fn f() {
 TEST_F(CompilationTests, FunctionDecl_ExplicitReturnType_WhichIsNone_MayUseNoneReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> None {
     return;
@@ -3753,7 +3934,7 @@ fn f() -> None {
 TEST_F(CompilationTests, FunctionDecl_ImplicitReturnType_WhichIsNone_MayUseNoneReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     return;
@@ -3787,7 +3968,7 @@ fn f() {
 TEST_F(CompilationTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_AllControlPathsExitViaReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3833,7 +4014,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, FunctionDecl_ExplicitReturnType_WhichIsNotNone_NoReturnStmtOnAnyControlPath_InsteadEnterInfiniteLoop_ExitViaPanic) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3887,7 +4068,7 @@ fn f() -> Int { // <- non-None return type, so normally would need explicit retu
 TEST_F(CompilationTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3933,7 +4114,7 @@ fn f() -> None {
 TEST_F(CompilationTests, FunctionDecl_ExplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -3979,7 +4160,7 @@ fn f() -> None {
 TEST_F(CompilationTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4025,7 +4206,7 @@ fn f() { // <- implies return type is None
 TEST_F(CompilationTests, FunctionDecl_ImplicitReturnType_WhichIsNone_AllControlPathsExitViaImplicitReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4071,7 +4252,7 @@ fn f() { // <- implies return type is None
 TEST_F(CompilationTests, FunctionDecl_ParamList) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4120,7 +4301,7 @@ fn f(a, b, c: Int, d: Bool, e: Char) {
 TEST_F(CompilationTests, FunctionDecl_ParamList_WithMaxParams) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4226,7 +4407,7 @@ fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, 
 TEST_F(CompilationTests, FunctionDecl_Fail_IfLocalFn) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     fn g() {}
@@ -4245,7 +4426,7 @@ fn f() {
 TEST_F(CompilationTests, FunctionDecl_Fail_IfNonNoneReturnType_AndControlPathFromEntrypointNotEndingInReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     // test w/ slightly *nuanced* control flow
@@ -4278,7 +4459,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, FunctionDecl_Fail_IfInvalidParamList) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(a, b: Int, c) {}
 
@@ -4294,7 +4475,7 @@ fn f(a, b: Int, c) {}
 TEST_F(CompilationTests, FunctionDecl_Fail_IfInvalidParamList_MoreThanTwentyFourParams) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24: Int) {}
 
@@ -4362,12 +4543,12 @@ TEST_F(CompilationTests, FunctionDecl_Fail_IfReturnTypeIsNotObjectType) {
 //            first param
 //          * 'fn A::f() {}' wouldn't be affected, as it has no params
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, MethodDecl_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4408,7 +4589,7 @@ fn A::g(x: Int) -> Int {
 TEST_F(CompilationTests, MethodDecl_SelfParameters) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct A {}
 
@@ -4457,7 +4638,7 @@ fn A::no3() {}
 TEST_F(CompilationTests, MethodDecl_SelfParameters_WorkWhenReferencedByIdentifierExprs) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4505,7 +4686,7 @@ fn f() {
 TEST_F(CompilationTests, MethodDecl_Fail_IfLocalMethod) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct A {}
 
@@ -4525,7 +4706,7 @@ fn f() {
 TEST_F(CompilationTests, MethodDecl_Fail_NonExistentOwnerType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn Missing::g() {} // error! no type 'Missing'
 
@@ -4556,12 +4737,12 @@ TEST_F(CompilationTests, MethodDecl_Fail_NonObjectOwnerType) {
 //      - defines local struct if appears in local block
 //          * illegal in current version of Yama
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, StructDecl_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct G {}
 
@@ -4600,7 +4781,7 @@ fn f(x: G) -> G {
 TEST_F(CompilationTests, StructDecl_Fail_IfLocalStruct) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     struct G {}
@@ -4614,18 +4795,20 @@ fn f() {
 }
 
 
-// assignment stmt
+// Assignment Stmt
 // 
-//      - performs assignment of the expr value to an assignable expr
+//      - Performs assignment of an <assigner-expr> onto an <assignee-expr>,
+//        coercing <assigner-expr> value to <assignee-expr> type.
 // 
-//      - the expr value assigned and the assignable expr must agree on type
+//      - Illegal if <assignee-expr> is non-assignable.
+//      - Illegal if <assigner-expr> value cannot coerce to <assignee-expr> type.
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, AssignmentStmt_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4660,12 +4843,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// illegal assignment of non-assignable expr
+// Illegal if <assignee-expr> is non-assignable.
 
-TEST_F(CompilationTests, AssignmentStmt_Fail_IfAssignNonAssignableExpr) {
+TEST_F(CompilationTests, AssignmentStmt_Fail_AssigneeExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     3 = 10;
@@ -4678,12 +4861,12 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// illegal assignment type mismatch
+// Illegal if <assigner-expr> value cannot coerce to <assignee-expr> type.
 
-TEST_F(CompilationTests, AssignmentStmt_Fail_IfTypeMismatch) {
+TEST_F(CompilationTests, AssignmentStmt_Fail_AssigneeExpr_CoercedTypeMismatch) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = 10;
@@ -4698,20 +4881,20 @@ fn f() {
 }
 
 
-// IMPORTANT: strictly speaking, the assignment stmt syntactically operates via an
+// IMPORTANT: Strictly speaking, the assignment stmt syntactically operates via an
 //            expr stmt, but this aspect will be handled by assignment stmt tests,
-//            and not covered here
+//            and not covered here.
 
-// expr stmt
+// Expr Stmt
 //
-//      - evaluates the nested expr, discarding its return value
+//      - Evaluates the nested expr, discarding its return value.
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, ExprStmt_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4744,6 +4927,11 @@ fn f() {
 }
 
 
+// TODO: Add coercion to the eval of the conditional expr of the if stmt when we add in
+//       implicit conversions to Bool.
+//
+//       Don't forget to update the wording to say 'coerced type mismatch'!
+
 // if stmt
 //
 //      - evaluates a Bool returning expr, branching according to its value
@@ -4764,7 +4952,7 @@ fn f() {
 TEST_F(CompilationTests, IfStmt_NoElse) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4831,7 +5019,7 @@ fn f(a: Bool) {
 TEST_F(CompilationTests, IfStmt_Else) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -4902,7 +5090,7 @@ fn f(a: Bool) {
 TEST_F(CompilationTests, IfStmt_ElseIfChain) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5036,7 +5224,7 @@ fn f(a: Char) {
 TEST_F(CompilationTests, IfStmt_Fail_TypeMismatch) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     if ('y') {}
@@ -5056,12 +5244,12 @@ fn f() {
 //        by branching into a new instance of it, and repeating this process, forming an infinite
 //        loop, one which continues until exited by either a break or return stmt
 
-// basic usage, exit via break
+// Basic Usage, exit via break
 
 TEST_F(CompilationTests, LoopStmt_BasicUsage_ExitViaBreak) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5106,12 +5294,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// basic usage, exit via return
+// Basic Usage, exit via return
 
 TEST_F(CompilationTests, LoopStmt_BasicUsage_ExitViaReturn) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5164,12 +5352,12 @@ fn f() {
 // 
 //      - illegal if there is no inner-most nested loop stmt
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, BreakStmt_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5220,7 +5408,7 @@ fn f() {
 TEST_F(CompilationTests, BreakStmt_LocalVarInLoopBody) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5272,7 +5460,7 @@ fn f() {
 TEST_F(CompilationTests, BreakStmt_Fail_IfUsedOutsideLoopStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     break;
@@ -5294,12 +5482,12 @@ fn f() {
 // 
 //      - illegal if there is no inner-most nested loop stmt
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, ContinueStmt_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5351,7 +5539,7 @@ fn f() {
 TEST_F(CompilationTests, ContinueStmt_LocalVarInLoopBody) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5404,7 +5592,7 @@ fn f() {
 TEST_F(CompilationTests, ContinueStmt_Fail_IfUsedOutsideLoopStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     continue;
@@ -5418,20 +5606,22 @@ fn f() {
 }
 
 
-// return stmt
+// Return Stmt
 //
-//      - returns from the currently executing function invocation, exiting the scope of
+//      - Returns from the currently executing function invocation, exiting the scope of
 //        all local blocks thereof, and transferring control back to the caller, and passing
-//        a return value to them specified by the expr of the return stmt
+//        a return value to them specified by the expr of the return stmt.
 // 
-//      - illegal if the return value expr is not the expected return type (ie. type mismatch)
+//      - The returned expr's value is coerced into expected return type.
+// 
+//      - Illegal if return value cannot coerce into expected return type.
 
-// basic usage, w/ non-None return type
+// Basic Usage, w/ non-None return type.
 
 TEST_F(CompilationTests, ReturnStmt_BasicUsage_NonNoneReturnType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5462,12 +5652,12 @@ fn f() -> Int {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// basic usage, w/ None return type, w/ None return stmt
+// Basic Usage, w/ None return type, w/ None return stmt.
 
 TEST_F(CompilationTests, ReturnStmt_BasicUsage_NoneReturnType_NoneReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5498,12 +5688,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// basic usage, w/ None return type, w/ None return stmt
+// Basic Usage, w/ None return type, w/ None return stmt.
 
 TEST_F(CompilationTests, ReturnStmt_BasicUsage_NoneReturnType_NonNoneReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5540,12 +5730,51 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// illegal return stmt due to type mismatch, non-None return stmt
+// Return value coerces to expected return type.
 
-TEST_F(CompilationTests, ReturnStmt_Fail_TypeMismatch_NonNoneReturnStmt) {
+TEST_F(CompilationTests, ReturnStmt_ReturnValueCoercesToExpectedReturnType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
+
+fn f() -> Type {
+    return g; // Coerces to yama:Type.
+}
+
+fn g() {}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto g = dm->load("a:g"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(g);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(g->kind(), yama::kind::function);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Type");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_type(*g));
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Illegal if return value cannot coerce to expected return type (non-None return stmt.)
+
+TEST_F(CompilationTests, ReturnStmt_Fail_ReturnValue_CoercedTypeMismatch_NonNoneReturnStmt) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     return 3.14159;
@@ -5558,12 +5787,12 @@ fn f() -> Int {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
 }
 
-// illegal return stmt due to type mismatch, None return stmt
+// Illegal if return value cannot coerce to expected return type (None return stmt.)
 
-TEST_F(CompilationTests, ReturnStmt_Fail_TypeMismatch_NoneReturnStmt) {
+TEST_F(CompilationTests, ReturnStmt_Fail_ReturnValue_CoercedTypeMismatch_NoneReturnStmt) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     return;
@@ -5608,7 +5837,7 @@ static_assert(yama::kinds == 4); // reminder
 //          parameter           illegal                 (non-assignable)
 //          local var           assigns local var       (assignable)
 // 
-//      - constexpr status:
+//      - Constexpr status:
 // 
 //          primitive type      constexpr
 //          fn type             constexpr
@@ -5627,7 +5856,7 @@ static_assert(yama::kinds == 4); // reminder
 TEST_F(CompilationTests, IdentifierExpr_Compute_PrimitiveType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Type {
     return yama:Int; // w/ qualifier
@@ -5671,7 +5900,7 @@ fn g() -> Type {
 TEST_F(CompilationTests, IdentifierExpr_Compute_FnType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import abc: fns.abc;
 
@@ -5721,7 +5950,7 @@ fn g() -> observeInt {
 TEST_F(CompilationTests, IdentifierExpr_Compute_StructType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import abc: fns.abc;
 
@@ -5770,7 +5999,7 @@ fn g() -> Type {
 TEST_F(CompilationTests, IdentifierExpr_Compute_Param) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5808,7 +6037,7 @@ fn f(a: Int) -> Int {
 TEST_F(CompilationTests, IdentifierExpr_Compute_LocalVar) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5850,7 +6079,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, IdentifierExpr_TypeDefinedInYamaCodeShadowsExternType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5891,7 +6120,7 @@ fn f() -> observeInt { // return fn value to see if it works
 TEST_F(CompilationTests, IdentifierExpr_ParamShadowsType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5934,7 +6163,7 @@ fn f(g: Int) {
 TEST_F(CompilationTests, IdentifierExpr_LocalVarShadowsType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -5977,7 +6206,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_LocalVarShadowsAnotherLocalVar) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -6021,7 +6250,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByTypeDefinedInYamaCode) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 
@@ -6061,7 +6290,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByParameter) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 
@@ -6101,7 +6330,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_QualifiedIdExprBypassesShadowingByLocalVar) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 
@@ -6139,7 +6368,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_QualifierNameAlsoUsedByType) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import a: fns.abc;
 
@@ -6177,7 +6406,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_CanRefSomethingNotDeclaredUntilLaterInModule) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> g {
     return g;
@@ -6216,7 +6445,7 @@ fn g() {} // <- not declared until AFTER first reference to it
 TEST_F(CompilationTests, IdentifierExpr_Fail_RefsUndeclaredName) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = abc; // no decl named 'abc'
@@ -6234,7 +6463,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_Fail_RefsWithUndeclaredQualifier) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = missing:T; // no import decl named 'missing:T'
@@ -6253,7 +6482,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_Fail_RefsLocalVarNotYetInScope) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = abc; // 'abc' isn't in scope yet
@@ -6272,7 +6501,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_Fail_RefsLocalVarWhichIsOutOfScope) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     if (true) {
@@ -6293,7 +6522,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     Int = Int; // 'Int' is not assignable
@@ -6311,7 +6540,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_FnType_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn g() {}
 
@@ -6331,7 +6560,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_StructType_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct Dummy {}
 
@@ -6351,7 +6580,7 @@ fn f() {
 TEST_F(CompilationTests, IdentifierExpr_Param_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(a: Int) {
     a = 10; // 'a' is not assignable
@@ -6369,7 +6598,7 @@ fn f(a: Int) {
 TEST_F(CompilationTests, IdentifierExpr_LocalVar_Assignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -6405,10 +6634,10 @@ fn f() -> Int {
 
 // primitive type identifier expr is constexpr
 
-TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_ConstExpr) {
+TEST_F(CompilationTests, IdentifierExpr_PrimitiveType_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(Int)' MUST be constexpr
@@ -6439,10 +6668,10 @@ fn f() {
 
 // fn type identifier expr is constexpr
 
-TEST_F(CompilationTests, IdentifierExpr_FnType_ConstExpr) {
+TEST_F(CompilationTests, IdentifierExpr_FnType_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn g() {}
 
@@ -6475,10 +6704,10 @@ fn f() {
 
 // struct type identifier expr is constexpr
 
-TEST_F(CompilationTests, IdentifierExpr_StructType_ConstExpr) {
+TEST_F(CompilationTests, IdentifierExpr_StructType_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct Dummy {}
 
@@ -6511,10 +6740,10 @@ fn f() {
 
 // parameter identifier expr is non-constexpr
 
-TEST_F(CompilationTests, IdentifierExpr_Param_NonConstExpr) {
+TEST_F(CompilationTests, IdentifierExpr_Param_NonConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f(a: Int) {
     const(a);
@@ -6529,10 +6758,10 @@ fn f(a: Int) {
 
 // local var identifier expr is non-constexpr
 
-TEST_F(CompilationTests, IdentifierExpr_LocalVar_NonConstExpr) {
+TEST_F(CompilationTests, IdentifierExpr_LocalVar_NonConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a: Int = 0;
@@ -6547,22 +6776,22 @@ fn f() {
 }
 
 
-// Int literal expr
+// Int Literal Expr
 //
-//      - returns a Int value specified by a literal
+//      - Returns a Int value specified by a literal.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 // 
-//      - illegal if Int literal overflows
-//      - illegal if Int literal underflows
+//      - Illegal if Int literal overflows.
+//      - Illegal if Int literal underflows.
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, IntLiteralExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -6631,12 +6860,51 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
+// Ensure literal works w/ '<x>.<y>' syntax.
+
+TEST_F(CompilationTests, IntLiteralExpr_WorksWithDotSyntax) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    // Ensure '100.~' is interpreted correctly.
+    observeInt(100.[Int]);
+    observeInt(-100.[Int]);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(100);
+    expected.observe_int(-100);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
 // illegal if Int literal overflows
 
 TEST_F(CompilationTests, IntLiteralExpr_Fail_IfNumericOverflow) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     return 9_223_372_036_854_775_808;
@@ -6654,7 +6922,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, IntLiteralExpr_Fail_IfNumericUnderflow) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     return -9_223_372_036_854_775_809;
@@ -6672,7 +6940,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, IntLiteralExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     1 = 2;
@@ -6687,10 +6955,10 @@ fn f() {
 
 // Int literal is constexpr
 
-TEST_F(CompilationTests, IntLiteralExpr_ConstExpr) {
+TEST_F(CompilationTests, IntLiteralExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(10)' MUST be constexpr
@@ -6720,21 +6988,21 @@ fn f() {
 }
 
 
-// UInt literal expr
+// UInt Literal Expr
 //
-//      - returns a UInt value specified by a literal
+//      - Returns a UInt value specified by a literal.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 // 
-//      - illegal if UInt literal overflows
+//      - Illegal if UInt literal overflows.
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, UIntLiteralExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -6783,12 +7051,49 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
+// Ensure literal works w/ '<x>.<y>' syntax.
+
+TEST_F(CompilationTests, UIntLiteralExpr_WorksWithDotSyntax) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    // Ensure '100u.~' is interpreted correctly.
+    observeUInt(100u.[UInt]);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_uint(100);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
 // illegal if UInt literal overflows
 
 TEST_F(CompilationTests, UIntLiteralExpr_Fail_IfNumericOverflow) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Int {
     return 18_446_744_073_709_551_616u;
@@ -6806,7 +7111,7 @@ fn f() -> Int {
 TEST_F(CompilationTests, UIntLiteralExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     1u = 2u;
@@ -6821,10 +7126,10 @@ fn f() {
 
 // UInt literal is constexpr
 
-TEST_F(CompilationTests, UIntLiteralExpr_ConstExpr) {
+TEST_F(CompilationTests, UIntLiteralExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(10u)' MUST be constexpr
@@ -6858,111 +7163,148 @@ fn f() {
 //       later, when we add more complex operations in constexprs, that floats should
 //       probably be excluded, restricted more-or-less only to literals for constants
 
-// Float literal expr
+// Float Literal Expr
 //
-//      - returns a Float value specified by a literal, including inf/nan keywords
+//      - Returns a Float value specified by a literal, including inf/nan keywords.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 // 
-//      - out-of-bounds Float literals resolve to inf/-inf values
+//      - Out-of-bounds Float literals resolve to inf/-inf values.
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, FloatLiteralExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
-fn f0() -> Float { return 0.0; }
-fn f1() -> Float { return 1.0; }
-fn f2() -> Float { return 1_000_000.0; }
-fn f3() -> Float { return .1324; }
-fn f4() -> Float { return .1324e2; } // 13.24
-fn f5() -> Float { return inf; }
-fn f6() -> Float { return nan; }
+import fns.abc;
+
+fn f() {
+    // NaN values are tested seperately due to them being annoying.
+    observeFloat(0.0);
+    observeFloat(-0.0);
+    observeFloat(1.0);
+    observeFloat(-1.0);
+    observeFloat(1_000_000.0);
+    observeFloat(-1_000_000.0);
+    observeFloat(.1324);
+    observeFloat(-.1324);
+    observeFloat(.1324e2); // 13.24
+    observeFloat(-.1324e2); // -13.24
+    observeFloat(inf);
+}
 
 )";
 
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
 
-    const auto f0 = dm->load("a:f0"_str);
-    const auto f1 = dm->load("a:f1"_str);
-    const auto f2 = dm->load("a:f2"_str);
-    const auto f3 = dm->load("a:f3"_str);
-    const auto f4 = dm->load("a:f4"_str);
-    const auto f5 = dm->load("a:f5"_str);
-    const auto f6 = dm->load("a:f6"_str);
-    ASSERT_TRUE(f0);
-    ASSERT_TRUE(f1);
-    ASSERT_TRUE(f2);
-    ASSERT_TRUE(f3);
-    ASSERT_TRUE(f4);
-    ASSERT_TRUE(f5);
-    ASSERT_TRUE(f6);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
 
-    ASSERT_EQ(f0->kind(), yama::kind::function);
-    ASSERT_EQ(f1->kind(), yama::kind::function);
-    ASSERT_EQ(f2->kind(), yama::kind::function);
-    ASSERT_EQ(f3->kind(), yama::kind::function);
-    ASSERT_EQ(f4->kind(), yama::kind::function);
-    ASSERT_EQ(f5->kind(), yama::kind::function);
-    ASSERT_EQ(f6->kind(), yama::kind::function);
-    ASSERT_EQ(f0->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f1->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f2->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f3->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f4->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f5->callsig().value().fmt(), "fn() -> yama:Float");
-    ASSERT_EQ(f6->callsig().value().fmt(), "fn() -> yama:Float");
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
 
-    // f6 is handled seperately, due to NAN values being annoying
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
-    std::initializer_list<std::pair<yama::item_ref, yama::float_t>> cases{
-        { *f0, 0.0 },
-        { *f1, 1.0 },
-        { *f2, 1'000'000.0 },
-        { *f3, 0.1324 },
-        { *f4, 0.1324e2 },
-        { *f5, yama::inf },
-    };
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
 
-    for (const auto& I : cases) {
-        const auto& f = I.first;
-        const yama::float_t v = I.second;
+    // expected side effects
+    SideFx expected{};
+    expected.observe_float(0.0);
+    expected.observe_float(0.0);
+    expected.observe_float(1.0);
+    expected.observe_float(-1.0);
+    expected.observe_float(1'000'000.0);
+    expected.observe_float(-1'000'000.0);
+    expected.observe_float(.1324);
+    expected.observe_float(-.1324);
+    expected.observe_float(13.24);
+    expected.observe_float(-13.24);
+    expected.observe_float(yama::inf);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
 
-        ASSERT_TRUE(ctx->push_fn(f).good());
-        ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+// Basic usage, testing NaN.
 
-        // expected return value
-        const auto lhs = ctx->local(0).value();
-        const auto rhs = ctx->new_float(v);
-        EXPECT_TRUE(lhs.t == ctx->float_type());
-        if (lhs.t == ctx->float_type()) EXPECT_DOUBLE_EQ(lhs.as_float(), rhs.as_float());
+TEST_F(CompilationTests, FloatLiteralExpr_BasicUsage_TestingNaN) {
+    ASSERT_TRUE(ready);
 
-        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
+    std::u8string txt = u8R"(
 
-        // expected side effects
-        EXPECT_TRUE(sidefx.compare(SideFx{}));
+fn f() -> Float {
+    return nan;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Float");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    if (const auto lhs = ctx->local(0)) {
+        EXPECT_TRUE(lhs->t == dm->float_type());
+        if (lhs->t == dm->float_type()) {
+            EXPECT_TRUE(std::isnan(lhs->as_float()));
+        }
+        ASSERT_TRUE(ctx->pop(1).good()); // Cleanup.
     }
 
-    {
-        const auto& f = *f6;
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
 
-        ASSERT_TRUE(ctx->push_fn(f).good());
-        ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+// Ensure literal works w/ '<x>.<y>' syntax.
 
-        // expected return value
-        const auto lhs = ctx->local(0).value();
-        EXPECT_TRUE(lhs.t == dm->float_type());
-        if (lhs.t == dm->float_type()) EXPECT_TRUE(std::isnan(lhs.as_float()));
+TEST_F(CompilationTests, FloatLiteralExpr_WorksWithDotSyntax) {
+    ASSERT_TRUE(ready);
 
-        ASSERT_TRUE(ctx->pop(1).good()); // cleanup
+    std::u8string txt = u8R"(
 
-        // expected side effects
-        EXPECT_TRUE(sidefx.compare(SideFx{}));
-    }
+import fns.abc;
+
+fn f() {
+    // We'll not bother w/ things like 'inf' and 'nan', as we know the lexer
+    // will handle those properly.
+    // Ensure '3.14159.~' is interpreted correctly.
+    observeFloat(3.14159.[Float]);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_float(3.14159);
+    EXPECT_TRUE(sidefx.compare(expected));
 }
 
 // inf if overflows
@@ -6970,7 +7312,7 @@ fn f6() -> Float { return nan; }
 TEST_F(CompilationTests, FloatLiteralExpr_InfIfOverflows) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 
@@ -7006,7 +7348,7 @@ fn f() -> Float { return 1.7976931348723158e+308; } // should overflow to inf
 TEST_F(CompilationTests, FloatLiteralExpr_NegativeInfIfUnderflows) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 
@@ -7042,7 +7384,7 @@ fn f() -> Float { return -1.7976931348723158e+308; } // should underflow to -inf
 TEST_F(CompilationTests, FloatLiteralExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     1.0 = 2.0;
@@ -7057,10 +7399,10 @@ fn f() {
 
 // Float literal is constexpr
 
-TEST_F(CompilationTests, FloatLiteralExpr_ConstExpr) {
+TEST_F(CompilationTests, FloatLiteralExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(3.14159)' MUST be constexpr
@@ -7090,19 +7432,19 @@ fn f() {
 }
 
 
-// Bool literal expr
+// Bool Literal Expr
 //
-//      - returns a Bool value specified by a literal
+//      - Returns a Bool value specified by a literal.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, BoolLiteralExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -7135,12 +7477,51 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
+// Ensure literal works w/ '<x>.<y>' syntax.
+
+TEST_F(CompilationTests, BoolLiteralExpr_WorksWithDotSyntax) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    // Ensure below are interpreted correctly.
+    observeBool(true.[Bool]);
+    observeBool(false.[Bool]);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_bool(true);
+    expected.observe_bool(false);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
 // Bool literal is non-assignable
 
 TEST_F(CompilationTests, BoolLiteralExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     true = false;
@@ -7155,10 +7536,10 @@ fn f() {
 
 // Bool literal is constexpr
 
-TEST_F(CompilationTests, BoolLiteralExpr_ConstExpr) {
+TEST_F(CompilationTests, BoolLiteralExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(true)' MUST be constexpr
@@ -7188,20 +7569,19 @@ fn f() {
 }
 
 
-// Char literal expr
+// Char Literal Expr
 //
-//      - returns a Char value specified by a literal
+//      - Returns a Char value specified by a literal.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 
-// basic usage
+// Basic Usage
 
 TEST_F(CompilationTests, CharLiteralExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    // IMPORTANT: for Unicode input to work, we gotta use a UTF-8 string literal
-    std::u8string txt0 = u8R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -7242,7 +7622,6 @@ fn f() {
 }
 
 )";
-    std::string txt = taul::utf8_s(txt0);
 
     const auto result = perform_compile(txt);
     ASSERT_TRUE(result);
@@ -7293,12 +7672,49 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
+// Ensure literal works w/ '<x>.<y>' syntax.
+
+TEST_F(CompilationTests, CharLiteralExpr_WorksWithDotSyntax) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    // Ensure ''魂'.~' is interpreted correctly.
+    observeChar('魂'.[Char]);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_char(U'魂');
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
 // illegal multi-codepoint char literal
 
 TEST_F(CompilationTests, CharLiteralExpr_Fail_IllegalMultiCodepointCharLiteral) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = 'ab';
@@ -7316,7 +7732,7 @@ fn f() {
 TEST_F(CompilationTests, CharLiteralExpr_Fail_IllegalUnicode_UTF16Surrogate) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = '\ud8a2';
@@ -7334,7 +7750,7 @@ fn f() {
 TEST_F(CompilationTests, CharLiteralExpr_Fail_IllegalUnicode_OutOfBounds) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = '\U00110000';
@@ -7352,7 +7768,7 @@ fn f() {
 TEST_F(CompilationTests, CharLiteralExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     'a' = 'b';
@@ -7367,10 +7783,10 @@ fn f() {
 
 // Char literal is constexpr
 
-TEST_F(CompilationTests, CharLiteralExpr_ConstExpr) {
+TEST_F(CompilationTests, CharLiteralExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const('y')' MUST be constexpr
@@ -7400,800 +7816,30 @@ fn f() {
 }
 
 
-// call-like expr
+// Parenthesized Expr
 //
-//      - call-like exprs are homomorphic exprs for exprs of the form '<f>(<args>)'
-//      
-//      - selection rules:
-// 
-//          1) if <f> is a bound method expr, the expr is a 'bound method call expr'
-//          2) if <f> is of a callable type, the expr is a 'call expr'
-//          3) if <f> is type yama:Type, the expr is a 'default init expr'
-//          4) invalid otherwise
-
-// valid selection
-
-TEST_F(CompilationTests, CallLikeExpr_Valid) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-struct A {}
-
-fn A::g(self, x: Int) {
-    observeInt(x);
-}
-
-fn f() {
-    var a = A();
-    a.g(4); // method call expr
-
-    observeInt(100); // call expr
-
-    observeChar(Char()); // default init expr (tested w/ call expr)
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_int(4);
-    expected.observe_int(100);
-    expected.observe_char(U'\0');
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// invalid selection
-
-TEST_F(CompilationTests, CallLikeExpr_Invalid) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    300(); // error!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-
-// bound method call expr
-//
-//      - given form '<owner>.<method>(<args>)', bound method call exprs designates callsites
-//        equivalent to writing 'T::<method>(<owner>, <args>)', where T is the the same
-//        type as <owner>
-//          * here '<owner>.<method>' is a bound method expr, which has a special semantic
-//            relationship w/ bound method call expr
-// 
-//      - eval order:
-// 
-//          1) <owner> eval
-//          2) <args> eval, going left-to-right
-//          3) call is performed
-// 
-//      - non-assignable
-//      - non-constexpr
-// 
-//      - illegal if '<owner>, <args>' has wrong number/types for a call to T::<method>
-
-// basic usage
-
-TEST_F(CompilationTests, BoundMethodCallExpr_BasicUsage) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-struct A {}
-
-fn A::choose(self, which: Bool, a, b: Int) -> Int {
-    if (which) {
-        return a;
-    }
-    else {
-        return b;
-    }
-}
-
-fn f() {
-    observeInt(A().choose(true, -3, 12));
-    observeInt(A().choose(false, -3, 12));
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_int(-3);
-    expected.observe_int(12);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// evaluation order
-
-TEST_F(CompilationTests, BoundMethodCallExpr_EvalOrder) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-// NOTE: this version differs quite a bit from the regular call expr one
-
-import fns.abc;
-
-fn foo() -> Int { observeInt(0); return 0; }
-fn bar() -> Int { observeInt(1); return 0; }
-fn baz() -> Int { observeInt(2); return 0; }
-
-struct A {}
-
-fn A::g(self, x, y, z: Int) {}
-
-fn get_owner() -> A { observeChar('o'); return A(); }
-
-fn f() {
-    // Yama has well defined eval order
-
-    get_owner().g(foo(), bar(), baz());
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_char(U'o');
-    expected.observe_int(0);
-    expected.observe_int(1);
-    expected.observe_int(2);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// illegal call due to too many args
-
-TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooMany) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self, a: Int) {}
-
-fn f() {
-    A().g('a', 'b');
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// illegal call due to too few args
-
-TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooFew) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self, a: Int) {}
-
-fn f() {
-    A().g();
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// illegal call due to incorrect arg type(s) (ie. type mismatch)
-
-TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TypeMismatch) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self, a: Int) {}
-
-fn f() {
-    A().g('a');
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
-}
-
-// bound method call expr is non-assignable
-
-TEST_F(CompilationTests, BoundMethodCallExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self, a, b: Int) -> Int { return 0; }
-
-fn f() {
-    A().g(3, 2) = 4;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// bound method call expr is non-constexpr
-
-TEST_F(CompilationTests, BoundMethodCallExpr_NonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self, a, b: Int) -> Int { return 0; }
-
-fn f() {
-    const(A().g(3, 2));
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-
-// call expr
-// 
-//      - given form '<callobj>(<args>)', call exprs designate callsites, w/ <callobj>
-//        being the call object, and <args> being the args to it, it returns the result
-//        of the call
-// 
-//      - eval order:
-// 
-//          1) <callobj> eval
-//          2) <args> eval, going left-to-right
-//          3) call is performed
-// 
-//      - non-assignable
-//      - non-constexpr
-// 
-//      - illegal if <args> has wrong number/types for a call to <callobj>
-
-// basic usage
-
-TEST_F(CompilationTests, CallExpr_BasicUsage) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-fn choose(which: Bool, a, b: Int) -> Int {
-    if (which) {
-        return a;
-    }
-    else {
-        return b;
-    }
-}
-
-fn f() {
-    observeInt(choose(true, -3, 12));
-    observeInt(choose(false, -3, 12));
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_int(-3);
-    expected.observe_int(12);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// evaluation order
-
-TEST_F(CompilationTests, CallExpr_EvalOrder) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-fn get_callobj() -> g { observeChar('c'); return g; }
-
-fn foo() -> Int { observeInt(0); return 0; }
-fn bar() -> Int { observeInt(1); return 0; }
-fn baz() -> Int { observeInt(2); return 0; }
-
-fn g(a, b, c: Int) -> Int { return 0; }
-
-fn f() {
-    // Yama has well defined eval order
-
-    get_callobj()(foo(), g(foo(), bar(), baz()), bar());
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_char(U'c');
-    expected.observe_int(0);
-    expected.observe_int(0);
-    expected.observe_int(1);
-    expected.observe_int(2);
-    expected.observe_int(1);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// call expr nesting
-
-// this isn't needed to formally define call expr behaviour, but is here for
-// comprehensiveness
-
-TEST_F(CompilationTests, CallExpr_Nesting) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-fn foo(x: Int) -> foo { observeInt(x); return foo; }
-
-fn f() {
-    foo(10)(20)(30)(40)(50)(60);
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_int(10);
-    expected.observe_int(20);
-    expected.observe_int(30);
-    expected.observe_int(40);
-    expected.observe_int(50);
-    expected.observe_int(60);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// illegal call due to too many args
-
-TEST_F(CompilationTests, CallExpr_Fail_Args_TooMany) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g(a: Int) {}
-
-fn f() {
-    g('a', 'b');
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// illegal call due to too few args
-
-TEST_F(CompilationTests, CallExpr_Fail_Args_TooFew) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g(a: Int) {}
-
-fn f() {
-    g();
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// illegal call due to incorrect arg type(s) (ie. type mismatch)
-
-TEST_F(CompilationTests, CallExpr_Fail_Args_TypeMismatch) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g(a: Int) {}
-
-fn f() {
-    g('a');
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
-}
-
-// call expr is non-assignable
-
-TEST_F(CompilationTests, CallExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g(a, b: Int) -> Int { return 0; }
-
-fn f() {
-    g(3, 2) = 4;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// call expr is non-constexpr
-
-TEST_F(CompilationTests, CallExpr_NonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn g(a, b: Int) -> Int { return 0; }
-
-fn f() {
-    const(g(3, 2));
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-
-// IMPORTANT: The 'Conversions' section above covers details about what conversions are/aren't
-//            legal. They are not covered below.
-
-// Conversion Expr
-//
-//      - Given form '<x>.[<target>]', where <x> is a rvalue, and <target> is a crvalue of type
-//        yama:Type, this expr specifies an explicit conversion of <x> to type <target>.
+//      - Given the form '(<x>)', where <x> is a rvalue, parenthesized exprs are
+//        equivalent in compute behaviour to their <x>.
 //
 //      - Non-Assignable
-//      - Conditionally Constexpr, based on the conversion.
-//
-//      - Illegal if <target> is not constexpr.
-//      - Illegal if <target> is not yama:Type.
-//          * TODO: What about fn and method type values which aren't yama:Type yet?
-//      - Illegal if cannot convert <x> to <target>.
+//      - Conditionally Constexpr, if <x> is constexpr.
 
-// Basic usage.
+// Basic Usage
 
-TEST_F(CompilationTests, ConversionExpr_BasicUsage) {
+TEST_F(CompilationTests, ParenthesizedExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
-fn f() {
-    var a: Float = 10.0;
-    observeInt(a.[Int]);
-    observeUInt(a.[UInt]);
-    // Test that chaining works.
-    observeInt(a.[UInt].[Int].[UInt].[Int].[Int]);
+fn foo(x: Int) -> Int {
+    observeInt(x);
+    return x;
 }
 
-)";
-
-    EXPECT_TRUE(perform_compile(txt));
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // Expected return value.
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // Expected side effects.
-    SideFx expected{};
-    expected.observe_int(10);
-    expected.observe_uint(10);
-    expected.observe_int(10);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// Conversion expr is non-assignable.
-
-TEST_F(CompilationTests, ConversionExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: Int = 10;
-    a.[Int] = 11;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// Conversion expr is conditionally constexpr. Test converted expr which is constexpr.
-
-TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ConvertedExprIsConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    const(10.[Int]);
-}
-
-)";
-
-    EXPECT_TRUE(perform_compile(txt));
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // Expected return value.
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // Expected side effects.
-    SideFx expected{};
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// Conversion expr is conditionally constexpr. Test converted expr which is non-constexpr.
-
-TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ConvertedExprIsNonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: Int = 10;
-    const(a.[Int]);
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-// Conversion expr is conditionally constexpr. Test converted expr which is constexpr, but the
-// conversion itself is non-constexpr.
-
-TEST_F(CompilationTests, ConversionExpr_ConditionallyConstExpr_ExprIsConstExprButConversionItselfIsNot) {
-    ASSERT_TRUE(ready);
-
-    // TODO: Stub
-}
-
-// Illegal if <target> is not constexpr.
-
-TEST_F(CompilationTests, ConversionExpr_Fail_Target_NonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: Int = 10;
-    var b: Type = Int;
-    a.[b]; // 'b' is not constexpr.
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-// Illegal if <target> is not yama:Type.
-
-TEST_F(CompilationTests, ConversionExpr_Fail_Target_TypeMismatch) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a: Int = 10;
-    a.[100]; // '100' is not yama:Type.
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
-}
-
-// Illegal if cannot convert <x> to <target>.
-
-TEST_F(CompilationTests, ConversionExpr_Fail_CannotConvertXToTarget) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    10.[None]; // Cannot convert Int to None!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-
-// type member access expr
-//
-//      - type member access exprs are homomorphic exprs for exprs of the form '<owner>::<member>'
-//      
-//      - selection rules:
-// 
-//          1) if <owner> is yama:Type crvalue, and <member> is a method of type <owner>,
-//             then expr is an 'unbound method expr'
-//          2) invalid otherwise
-
-// valid selection
-
-TEST_F(CompilationTests, TypeMemberAccessExpr_Valid) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-struct A {}
-
-fn A::g() {
-    observeInt(100);
-}
-
-fn f() {
-    A::g(); // unbound method expr (tested w/ call expr)
+fn f() -> Int {
+    return (foo(100));
 }
 
 )";
@@ -8205,13 +7851,13 @@ fn f() {
     ASSERT_TRUE(f);
 
     ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:Int");
 
     ASSERT_TRUE(ctx->push_fn(*f).good());
     ASSERT_TRUE(ctx->call(1, yama::newtop).good());
 
     // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_int(100));
 
     // expected side effects
     SideFx expected{};
@@ -8219,119 +7865,12 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// invalid selection
+// Parenthesized expr is non-assignable.
 
-TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid) {
+TEST_F(CompilationTests, ParenthesizedExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-fn f() {
-    const(10)::abc; // error!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButUnknownMember) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn f() {
-    A::missing; // error! A is valid Type crvalue, but no member 'missing'!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButNotCRValue) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g() {}
-
-fn f() {
-    var x = A();
-    x::g; // error! x is valid Type rvalue, but is not crvalue!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-
-// unbound method expr
-// 
-//      - given form '<type>::<method>', unbound method exprs eval to crvalues
-//        of the <method> of <type> specified (where <type> is a yama:Type crvalue)
-// 
-//      - non-assignable
-//      - constexpr
-
-// basic usage
-
-TEST_F(CompilationTests, UnboundMethodExpr_BasicUsage) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g() {}
-
-fn f() -> A::g {
-    return A::g;
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto A_g = dm->load("a:A::g"_str);
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(A_g);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(A_g->kind(), yama::kind::method);
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
-
-    // expected side effects
-    SideFx expected{};
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// unbound method expr is non-assignable
-
-TEST_F(CompilationTests, UnboundMethodExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 struct A {}
 
@@ -8348,20 +7887,15 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// unbound method expr is constexpr
+// Parenthesized expr is conditionally constexpr. Test w/ constexpr <x>.
 
-TEST_F(CompilationTests, UnboundMethodExpr_ConstExpr) {
+TEST_F(CompilationTests, ParenthesizedExpr_ConditionallyConstexpr_XIsConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g() {}
+    std::u8string txt = u8R"(
 
 fn f() {
-    // enforce 'A::g' MUST be constexpr
-    const(A::g);
+    const((100));
 }
 
 )";
@@ -8386,424 +7920,16 @@ fn f() {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
+// Parenthesized expr is conditionally constexpr. Test w/ non-constexpr <x>.
 
-// object member access expr
-//
-//      - object member access exprs are homomorphic exprs for exprs of the form '<owner>.<member>'
-//      
-//      - selection rules:
-// 
-//          1) if <owner> is a rvalue, and <member> is a method of the type of object <owner>,
-//             then expr is a 'bound method expr'
-//          2) invalid otherwise
-
-// valid selection
-
-TEST_F(CompilationTests, ObjectMemberAccessExpr_Valid) {
+TEST_F(CompilationTests, ParenthesizedExpr_ConditionallyConstexpr_XIsNonConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-import fns.abc;
-
-struct A {}
-
-fn A::g(self) {
-    observeInt(100);
-}
+    std::u8string txt = u8R"(
 
 fn f() {
-    var a = A();
-    a.g(); // bound method expr (tested w/ bound method call expr)
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_int(100);
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// invalid selection
-
-TEST_F(CompilationTests, ObjectMemberAccessExpr_Invalid_UnknownMember) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn f() {
-    var a = A();
-    a.missing; // error! unknown member 'missing'
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-
-// bound method expr
-//
-//      - given form '<object>.<method>', bound method exprs eval to rvalues
-//        of the <method> of the type of <object> specified (where <object> is
-//        a rvalue)
-//          * TODO: later on, when we are able to have fn objects which can store
-//                  references to owner objects, we want to revise bound method
-//                  exprs to return these instead
-// 
-//      - non-assignable
-//      - non-constexpr
-//
-//      - illegal if <method> does not have any parameters
-//      - illegal if first parameter of <method> is not same type as <owner>
-
-
-// basic usage
-
-TEST_F(CompilationTests, BoundMethodExpr_BasicUsage) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self) {}
-
-fn f() -> A::g {
-    var a = A();
-    return a.g;
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto A_g = dm->load("a:A::g"_str);
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(A_g);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(A_g->kind(), yama::kind::method);
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(A_g->callsig().value().fmt(), "fn(a:A) -> yama:None");
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
-
-    // expected side effects
-    SideFx expected{};
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// bound method expr is non-assignable
-
-TEST_F(CompilationTests, BoundMethodExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self) {}
-
-fn f() {
-    var a = A();
-    a.g = 4;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// bound method expr is non-constexpr
-
-TEST_F(CompilationTests, BoundMethodExpr_NonConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(self) {}
-
-fn f() {
-    var a = A();
-    const(a.g); // error! a.g is not constexpr
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-// illegal if <method> does not have any parameters
-
-TEST_F(CompilationTests, BoundMethodExpr_Fail_NoParams) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g() {}
-
-fn f() {
-    var a = A();
-    a.g; // error! g has no first param
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-// illegal if first parameter of <method> is not same type as <owner>
-
-TEST_F(CompilationTests, BoundMethodExpr_Fail_FirstParamNotOwnerType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct A {}
-
-fn A::g(invalid_self: Int) {}
-
-fn f() {
-    var a = A();
-    a.g; // error! g first param is not type A, and so cannot be used as *self* param
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
-}
-
-
-static_assert(yama::ptypes == 7); // reminder
-static_assert(yama::kinds == 4); // reminder
-
-// default init expr
-// 
-//      - given form '<type>()', where <type> is a crvalue of type yama:Type,
-//        default init expr evals to a default initialized object of the
-//        type specified by <type>
-//          * the default values of types are specified in 'general'
-//
-//      - non-assignable
-// 
-//      - constexpr status:
-// 
-//          primitive type      constexpr
-//          fn type             n/a
-//          struct type         non-constexpr
-//
-//      - illegal if <type> is not constexpr
-//      - illegal if arg count is >=1
-
-// basic usage
-
-TEST_F(CompilationTests, DefaultInitExpr_BasicUsage) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-import fns.abc;
-
-struct SomeStruct {}
-
-fn get_SomeStruct() -> SomeStruct {
-    return SomeStruct();
-}
-
-fn f() {
-    observeNone(None());
-    observeInt(Int());
-    observeUInt(UInt());
-    observeFloat(Float());
-    observeBool(Bool());
-    observeChar(Char());
-    observeType(Type());
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto SomeStruct = dm->load("a:SomeStruct"_str);
-    const auto get_SomeStruct = dm->load("a:get_SomeStruct"_str);
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(SomeStruct);
-    ASSERT_TRUE(get_SomeStruct);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(SomeStruct->kind(), yama::kind::struct0);
-    ASSERT_EQ(get_SomeStruct->kind(), yama::kind::function);
-    ASSERT_EQ(get_SomeStruct->callsig().value().fmt(), "fn() -> a:SomeStruct");
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*get_SomeStruct).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return values
-    EXPECT_EQ(ctx->local(0).value().t, *SomeStruct);
-    EXPECT_EQ(ctx->local(1).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    expected.observe_none();
-    expected.observe_int(0);
-    expected.observe_uint(0);
-    expected.observe_float(0.0);
-    expected.observe_bool(false);
-    expected.observe_char(U'\0');
-    expected.observe_type(ctx->none_type());
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// illegal if x is not constexpr
-
-TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotAConstExpr) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    var a = Int;
-    var b = a(); // error! 'a' is Type, but it's not constexpr!
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
-}
-
-// illegal if arg count >=1
-
-TEST_F(CompilationTests, DefaultInitExpr_Fail_ArgCountIsNonZero) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    Int(10); // error! cannot have '10'
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// default init expr is non-assignable
-
-TEST_F(CompilationTests, DefaultInitExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    Int() = 4;
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
-}
-
-// default init expr is constexpr, if primitive type
-
-TEST_F(CompilationTests, DefaultInitExpr_ConstExpr_IfPrimitiveType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    // enforce 'const(<TYPE>())' MUST be constexpr
-    const(None());
-    const(Int());
-    const(UInt());
-    const(Float());
-    const(Bool());
-    const(Char());
-    const(Type());
-}
-
-)";
-
-    const auto result = perform_compile(txt);
-    ASSERT_TRUE(result);
-
-    const auto f = dm->load("a:f"_str);
-    ASSERT_TRUE(f);
-
-    ASSERT_EQ(f->kind(), yama::kind::function);
-    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
-
-    ASSERT_TRUE(ctx->push_fn(*f).good());
-    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
-
-    // expected return value
-    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
-
-    // expected side effects
-    SideFx expected{};
-    EXPECT_TRUE(sidefx.compare(expected));
-}
-
-// default init expr is non-constexpr, if struct type
-
-TEST_F(CompilationTests, DefaultInitExpr_NonConstExpr_IfStructType) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-struct G {}
-
-fn f() {
-    const(G());
+    var a = 100;
+    const((a));
 }
 
 )";
@@ -8814,25 +7940,23 @@ fn f() {
 }
 
 
-// constexpr guarantee expr
+// Constexpr Guarantee Expr
 //
-//      - given form 'const(<x>)', where <x> is a crvalue, the constexpr
-//        guarantee expr evals <x>, returning its result
-//          * this expr exists to enforce that an expr must be constexpr
+//      - Given form 'const(<x>)', where <x> is a crvalue, the constexpr
+//        guarantee expr evals <x>, returning its result.
+//          * This expr exists to enforce that an expr must be constexpr.
 // 
-//      - non-assignable
-//      - constexpr
+//      - Non-Assignable
+//      - Constexpr
 //
-//      - illegal if x is not constexpr
-//
-//      - illegal if multiple or zero args are provided for x
+//      - Illegal if <x> is not constexpr.
 
-// basic usage
+// Basic Usage
 
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_BasicUsage) {
+TEST_F(CompilationTests, ConstexprGuaranteeExpr_BasicUsage) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 import fns.abc;
 
@@ -8897,12 +8021,12 @@ fn f2() -> Type {
     EXPECT_TRUE(sidefx.compare(expected));
 }
 
-// illegal due to non-constexpr subexpr
+// Illegal due to non-constexpr subexpr.
 
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_SubExprNotAConstExpr) {
+TEST_F(CompilationTests, ConstexprGuaranteeExpr_Fail_SubExprNotAConstexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     var a = 10;
@@ -8916,48 +8040,12 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 
-// illegal due to too many args
+// Constexpr guarantee expr is non-assignable.
 
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_Args_TooMany) {
+TEST_F(CompilationTests, ConstexprGuaranteeExpr_NonAssignable) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
-
-fn f() {
-    const(3, 10);
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// illegal due to too few args
-
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_Fail_Args_TooFew) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
-
-fn f() {
-    const();
-}
-
-)";
-
-    EXPECT_FALSE(perform_compile(txt));
-
-    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
-}
-
-// constexpr guarantee expr is non-assignable
-
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_NonAssignable) {
-    ASSERT_TRUE(ready);
-
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // can't really test 'const(x)' w/ an assignable x as it's a crvalue,
@@ -8972,12 +8060,12 @@ fn f() {
     EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
 }
 
-// constexpr guarantee expr is constexpr
+// Constexpr guarantee expr is constexpr.
 
-TEST_F(CompilationTests, ConstExprGuaranteeExpr_ConstExpr) {
+TEST_F(CompilationTests, ConstexprGuaranteeExpr_Constexpr) {
     ASSERT_TRUE(ready);
 
-    std::string txt = R"(
+    std::u8string txt = u8R"(
 
 fn f() {
     // enforce 'const(10)' MUST be constexpr
@@ -9004,5 +8092,1528 @@ fn f() {
     // expected side effects
     SideFx expected{};
     EXPECT_TRUE(sidefx.compare(expected));
+}
+
+
+// Call-like Expr
+//
+//      - Call-like exprs are homomorphic exprs for exprs of the form '<f>(<args>)'.
+//      
+//      - Selection Rules:
+// 
+//          1) If <f> is a bound method expr, the expr is a 'bound method call expr'.
+//          2) If <f> is of a callable type, the expr is a 'call expr'.
+//          3) If <f> is type yama:Type, the expr is a 'default init expr'.
+//          4) Invalid otherwise.
+
+// Valid Selection
+
+TEST_F(CompilationTests, CallLikeExpr_Valid) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::g(self, x: Int) {
+    observeInt(x);
+}
+
+fn f() {
+    var a = A();
+    a.g(4); // method call expr
+
+    observeInt(100); // call expr
+
+    observeChar(Char()); // default init expr (tested w/ call expr)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(4);
+    expected.observe_int(100);
+    expected.observe_char(U'\0');
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Invalid Selection
+
+TEST_F(CompilationTests, CallLikeExpr_Invalid) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    300(); // error!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// Bound Method Call Expr
+//
+//      - Given form '<owner>.<method>(<args>)', bound method call exprs designates callsites
+//        equivalent to writing 'T::<method>(<owner>, <args>)', where T is the type of <owner>.
+//          * Here '<owner>.<method>' is a bound method expr, which has a special semantic
+//            relationship w/ bound method call expr.
+//          * Equivalence includes <args> coercion.
+// 
+//      - Eval Order:
+// 
+//          1) <owner> eval.
+//          2) <args> eval, going left-to-right.
+//          3) Call is performed.
+// 
+//      - Non-Assignable
+//      - Non-Constexpr
+// 
+//      - Illegal if '(<owner>, <args>)' has wrong number/types for a call to T::<method>.
+
+// Basic Usage
+
+TEST_F(CompilationTests, BoundMethodCallExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::choose(self, which: Bool, a, b: Int) -> Int {
+    if (which) {
+        return a;
+    }
+    else {
+        return b;
+    }
+}
+
+fn f() {
+    observeInt(A().choose(true, -3, 12));
+    observeInt(A().choose(false, -3, 12));
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(-3);
+    expected.observe_int(12);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Evaluation Order
+
+TEST_F(CompilationTests, BoundMethodCallExpr_EvalOrder) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+// NOTE: this version differs quite a bit from the regular call expr one
+
+import fns.abc;
+
+fn foo() -> Int { observeInt(0); return 0; }
+fn bar() -> Int { observeInt(1); return 0; }
+fn baz() -> Int { observeInt(2); return 0; }
+
+struct A {}
+
+fn A::g(self, x, y, z: Int) {}
+
+fn get_owner() -> A { observeChar('o'); return A(); }
+
+fn f() {
+    // Yama has well defined eval order
+
+    get_owner().g(foo(), bar(), baz());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_char(U'o');
+    expected.observe_int(0);
+    expected.observe_int(1);
+    expected.observe_int(2);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Args coerce as expected.
+
+TEST_F(CompilationTests, BoundMethodCallExpr_ArgsCoerceAsExpected) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn fa() {}
+fn fb() {}
+fn fc() {}
+
+struct A {}
+
+fn A::test_coercion(self, a, b, c: Type) {
+    observeType(a);
+    observeType(b);
+    observeType(c);
+}
+
+fn f() {
+    A().test_coercion(fa, fb, fc);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    const auto fa = dm->load("a:fa"_str);
+    const auto fb = dm->load("a:fb"_str);
+    const auto fc = dm->load("a:fc"_str);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(fa);
+    ASSERT_TRUE(fb);
+    ASSERT_TRUE(fc);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_type(fa.value());
+    expected.observe_type(fb.value());
+    expected.observe_type(fc.value());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Illegal call due to too many args.
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooMany) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g('a', 'b');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// Illegal call due to too few args.
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_TooFew) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g();
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// Illegal call due to incorrect arg type(s) (ie. coerced type mismatch.)
+
+TEST_F(CompilationTests, BoundMethodCallExpr_Fail_Args_CoercedTypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self, a: Int) {}
+
+fn f() {
+    A().g('a');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// Bound method call expr is non-assignable.
+
+TEST_F(CompilationTests, BoundMethodCallExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self, a, b: Int) -> Int { return 0; }
+
+fn f() {
+    A().g(3, 2) = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// Bound method call expr is non-constexpr.
+
+TEST_F(CompilationTests, BoundMethodCallExpr_NonConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self, a, b: Int) -> Int { return 0; }
+
+fn f() {
+    const(A().g(3, 2));
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+
+// Call Expr
+// 
+//      - Given form '<callobj>(<args>)', call exprs designate callsites, w/ <callobj>
+//        being the call object, and <args> being the args to it, it returns the result
+//        of the call.
+//          - <args> get coerced into the parameter types expected.
+// 
+//      - Eval Order:
+// 
+//          1) <callobj> eval.
+//          2) <args> eval, going left-to-right.
+//          3) Call is performed.
+// 
+//      - Non-Assignable
+//      - Non-Constexpr
+// 
+//      - Illegal if <args> has wrong number/types for a call to <callobj>.
+
+// Basic Usage
+
+TEST_F(CompilationTests, CallExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn choose(which: Bool, a, b: Int) -> Int {
+    if (which) {
+        return a;
+    }
+    else {
+        return b;
+    }
+}
+
+fn f() {
+    observeInt(choose(true, -3, 12));
+    observeInt(choose(false, -3, 12));
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(-3);
+    expected.observe_int(12);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Evaluation Order
+
+TEST_F(CompilationTests, CallExpr_EvalOrder) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn get_callobj() -> g { observeChar('c'); return g; }
+
+fn foo() -> Int { observeInt(0); return 0; }
+fn bar() -> Int { observeInt(1); return 0; }
+fn baz() -> Int { observeInt(2); return 0; }
+
+fn g(a, b, c: Int) -> Int { return 0; }
+
+fn f() {
+    // Yama has well defined eval order
+
+    get_callobj()(foo(), g(foo(), bar(), baz()), bar());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_char(U'c');
+    expected.observe_int(0);
+    expected.observe_int(0);
+    expected.observe_int(1);
+    expected.observe_int(2);
+    expected.observe_int(1);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Args coerce as expected.
+
+TEST_F(CompilationTests, CallExpr_ArgsCoerceAsExpected) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn fa() {}
+fn fb() {}
+fn fc() {}
+
+fn test_coercion(a, b, c: Type) {
+    observeType(a);
+    observeType(b);
+    observeType(c);
+}
+
+fn f() {
+    test_coercion(fa, fb, fc);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    const auto fa = dm->load("a:fa"_str);
+    const auto fb = dm->load("a:fb"_str);
+    const auto fc = dm->load("a:fc"_str);
+    ASSERT_TRUE(f);
+    ASSERT_TRUE(fa);
+    ASSERT_TRUE(fb);
+    ASSERT_TRUE(fc);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_type(fa.value());
+    expected.observe_type(fb.value());
+    expected.observe_type(fc.value());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Call expr nesting.
+
+// This isn't needed to formally define call expr behaviour, but is here for
+// comprehensiveness.
+
+TEST_F(CompilationTests, CallExpr_Nesting) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn foo(x: Int) -> foo { observeInt(x); return foo; }
+
+fn f() {
+    foo(10)(20)(30)(40)(50)(60);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(10);
+    expected.observe_int(20);
+    expected.observe_int(30);
+    expected.observe_int(40);
+    expected.observe_int(50);
+    expected.observe_int(60);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Illegal call due to too many args.
+
+TEST_F(CompilationTests, CallExpr_Fail_Args_TooMany) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn g(a: Int) {}
+
+fn f() {
+    g('a', 'b');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// Illegal call due to too few args.
+
+TEST_F(CompilationTests, CallExpr_Fail_Args_TooFew) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn g(a: Int) {}
+
+fn f() {
+    g();
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// Illegal call due to incorrect arg type(s) (ie. coerced type mismatch.)
+
+TEST_F(CompilationTests, CallExpr_Fail_Args_CoercedTypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn g(a: Int) {}
+
+fn f() {
+    g('a');
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// Call expr is non-assignable.
+
+TEST_F(CompilationTests, CallExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn g(a, b: Int) -> Int { return 0; }
+
+fn f() {
+    g(3, 2) = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// Call expr is non-constexpr.
+
+TEST_F(CompilationTests, CallExpr_NonConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn g(a, b: Int) -> Int { return 0; }
+
+fn f() {
+    const(g(3, 2));
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+
+// IMPORTANT: The 'Conversions' section above covers details about what conversions are/aren't
+//            legal. They are not covered below.
+
+// Conversion Expr
+//
+//      - Given form '<x>.[<target>]', where <x> is a rvalue, and <target> is a crvalue coerced
+//        to yama:Type, this expr specifies an explicit conversion of <x> to type <target>.
+//
+//      - Non-Assignable
+//      - Conditionally Constexpr, based on the conversion.
+//
+//      - Illegal if <target> is not constexpr.
+//      - Illegal if <target> cannot coerce to yama:Type.
+//      - Illegal if cannot convert <x> to <target>.
+
+// Basic Usage
+
+TEST_F(CompilationTests, ConversionExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+fn f() {
+    var a: Float = 10.0;
+    observeInt(a.[Int]);
+    observeUInt(a.[UInt]);
+    // Test that chaining works.
+    observeInt(a.[UInt].[Int].[UInt].[Int].[Int]);
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    expected.observe_int(10);
+    expected.observe_uint(10);
+    expected.observe_int(10);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Conversion expr is non-assignable.
+
+TEST_F(CompilationTests, ConversionExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Int = 10;
+    a.[Int] = 11;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// Conversion expr is conditionally constexpr. Test converted expr which is constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstexpr_ConvertedExprIsConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    const(10.[Int]);
+}
+
+)";
+
+    EXPECT_TRUE(perform_compile(txt));
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // Expected return value.
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // Expected side effects.
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Conversion expr is conditionally constexpr. Test converted expr which is non-constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstexpr_ConvertedExprIsNonConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Int = 10;
+    const(a.[Int]);
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// Conversion expr is conditionally constexpr. Test converted expr which is constexpr, but the
+// conversion itself is non-constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_ConditionallyConstexpr_ExprIsConstexprButConversionItselfIsNot) {
+    ASSERT_TRUE(ready);
+
+    // TODO: Stub
+}
+
+// Illegal if <target> is not constexpr.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_Target_NonConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Int = 10;
+    var b: Type = Int;
+    a.[b]; // 'b' is not constexpr.
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// Illegal if <target> cannot coerce to yama:Type.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_Target_CoercedTypeMismatch) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a: Int = 10;
+    a.[100]; // '100' cannot coerce to yama:Type.
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_type_mismatch), 1);
+}
+
+// Illegal if cannot convert <x> to <target>.
+
+TEST_F(CompilationTests, ConversionExpr_Fail_CannotConvertXToTarget) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    10.[None]; // Cannot convert Int to None!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// Type Member Access Expr
+//
+//      - Type member access exprs are homomorphic exprs for exprs of the form '<owner>::<member>'.
+//      
+//      - Selection Rules:
+// 
+//          1) If <owner> is yama:Type crvalue, and <member> is a method of type <owner>,
+//             then expr is an 'unbound method expr'.
+//          2) Invalid otherwise.
+
+// Valid Selection
+
+TEST_F(CompilationTests, TypeMemberAccessExpr_Valid) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::g() {
+    observeInt(100);
+}
+
+fn f() {
+    A::g(); // unbound method expr (tested w/ call expr)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(100);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Invalid Selection
+
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    const(10)::abc; // error!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButUnknownMember) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn f() {
+    A::missing; // error! A is valid Type crvalue, but no member 'missing'!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+TEST_F(CompilationTests, TypeMemberAccessExpr_Invalid_OwnerIsTypeType_ButNotCRValue) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() {
+    var x = A();
+    x::g; // error! x is valid Type rvalue, but is not crvalue!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// Unbound Method Expr
+// 
+//      - Given form '<type>::<method>', unbound method exprs eval to crvalues
+//        of the <method> of <type> specified (where <type> is a yama:Type crvalue.)
+// 
+//      - Non-Assignable
+//      - Constexpr
+
+// Basic Usage
+
+TEST_F(CompilationTests, UnboundMethodExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() -> A::g {
+    return A::g;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto A_g = dm->load("a:A::g"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(A_g);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn() -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Unbound method expr is non-assignable.
+
+TEST_F(CompilationTests, UnboundMethodExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() {
+    A::g = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// Unbound method expr is constexpr.
+
+TEST_F(CompilationTests, UnboundMethodExpr_Constexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() {
+    // enforce 'A::g' MUST be constexpr
+    const(A::g);
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+
+// Object Member Access Expr
+//
+//      - Object member access exprs are homomorphic exprs for exprs of the form '<owner>.<member>'..
+//      
+//      - Selection Rules:
+// 
+//          1) If <owner> is a rvalue, and <member> is a method of the type of object <owner>,
+//             then expr is a 'bound method expr'.
+//          2) Invalid otherwise.
+
+// Valid Selection
+
+TEST_F(CompilationTests, ObjectMemberAccessExpr_Valid) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct A {}
+
+fn A::g(self) {
+    observeInt(100);
+}
+
+fn f() {
+    var a = A();
+    a.g(); // bound method expr (tested w/ bound method call expr)
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_int(100);
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// Invalid Selection
+
+TEST_F(CompilationTests, ObjectMemberAccessExpr_Invalid_UnknownMember) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn f() {
+    var a = A();
+    a.missing; // error! unknown member 'missing'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+// bound method expr
+//
+//      - given form '<object>.<method>', bound method exprs eval to rvalues
+//        of the <method> of the type of <object> specified (where <object> is
+//        a rvalue)
+//          * TODO: later on, when we are able to have fn objects which can store
+//                  references to owner objects, we want to revise bound method
+//                  exprs to return these instead
+// 
+//      - Non-Assignable
+//      - Non-Constexpr
+//
+//      - illegal if <method> does not have any parameters
+//      - illegal if first parameter of <method> is not same type as <owner>
+
+// Basic Usage
+
+TEST_F(CompilationTests, BoundMethodExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() -> A::g {
+    var a = A();
+    return a.g;
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto A_g = dm->load("a:A::g"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(A_g);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(A_g->kind(), yama::kind::method);
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(A_g->callsig().value().fmt(), "fn(a:A) -> yama:None");
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> a:A::g");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_fn(*A_g));
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// bound method expr is non-assignable
+
+TEST_F(CompilationTests, BoundMethodExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() {
+    var a = A();
+    a.g = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// bound method expr is non-constexpr
+
+TEST_F(CompilationTests, BoundMethodExpr_NonConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(self) {}
+
+fn f() {
+    var a = A();
+    const(a.g); // error! a.g is not constexpr
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if <method> does not have any parameters
+
+TEST_F(CompilationTests, BoundMethodExpr_Fail_NoParams) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g() {}
+
+fn f() {
+    var a = A();
+    a.g; // error! g has no first param
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+// illegal if first parameter of <method> is not same type as <owner>
+
+TEST_F(CompilationTests, BoundMethodExpr_Fail_FirstParamNotOwnerType) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct A {}
+
+fn A::g(invalid_self: Int) {}
+
+fn f() {
+    var a = A();
+    a.g; // error! g first param is not type A, and so cannot be used as *self* param
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_invalid_operation), 1);
+}
+
+
+static_assert(yama::ptypes == 7); // reminder
+static_assert(yama::kinds == 4); // reminder
+
+// default init expr
+// 
+//      - given form '<type>()', where <type> is a crvalue of type yama:Type,
+//        default init expr evals to a default initialized object of the
+//        type specified by <type>
+//          * the default values of types are specified in 'general'
+//
+//      - Non-Assignable
+// 
+//      - Constexpr status:
+// 
+//          primitive type      constexpr
+//          fn type             n/a
+//          struct type         non-constexpr
+//
+//      - illegal if <type> is not constexpr
+//      - illegal if arg count is >=1
+
+// Basic Usage
+
+TEST_F(CompilationTests, DefaultInitExpr_BasicUsage) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+import fns.abc;
+
+struct SomeStruct {}
+
+fn get_SomeStruct() -> SomeStruct {
+    return SomeStruct();
+}
+
+fn f() {
+    observeNone(None());
+    observeInt(Int());
+    observeUInt(UInt());
+    observeFloat(Float());
+    observeBool(Bool());
+    observeChar(Char());
+    observeType(Type());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto SomeStruct = dm->load("a:SomeStruct"_str);
+    const auto get_SomeStruct = dm->load("a:get_SomeStruct"_str);
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(SomeStruct);
+    ASSERT_TRUE(get_SomeStruct);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(SomeStruct->kind(), yama::kind::struct0);
+    ASSERT_EQ(get_SomeStruct->kind(), yama::kind::function);
+    ASSERT_EQ(get_SomeStruct->callsig().value().fmt(), "fn() -> a:SomeStruct");
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*get_SomeStruct).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return values
+    EXPECT_EQ(ctx->local(0).value().t, *SomeStruct);
+    EXPECT_EQ(ctx->local(1).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    expected.observe_none();
+    expected.observe_int(0);
+    expected.observe_uint(0);
+    expected.observe_float(0.0);
+    expected.observe_bool(false);
+    expected.observe_char(U'\0');
+    expected.observe_type(ctx->none_type());
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// illegal if x is not constexpr
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ExprXIsNotAConstexpr) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    var a = Int;
+    var b = a(); // error! 'a' is Type, but it's not constexpr!
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
+}
+
+// illegal if arg count >=1
+
+TEST_F(CompilationTests, DefaultInitExpr_Fail_ArgCountIsNonZero) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    Int(10); // error! cannot have '10'
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_wrong_arg_count), 1);
+}
+
+// default init expr is non-assignable
+
+TEST_F(CompilationTests, DefaultInitExpr_NonAssignable) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    Int() = 4;
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonassignable_expr), 1);
+}
+
+// default init expr is constexpr, if primitive type
+
+TEST_F(CompilationTests, DefaultInitExpr_Constexpr_IfPrimitiveType) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+fn f() {
+    // enforce 'const(<TYPE>())' MUST be constexpr
+    const(None());
+    const(Int());
+    const(UInt());
+    const(Float());
+    const(Bool());
+    const(Char());
+    const(Type());
+}
+
+)";
+
+    const auto result = perform_compile(txt);
+    ASSERT_TRUE(result);
+
+    const auto f = dm->load("a:f"_str);
+    ASSERT_TRUE(f);
+
+    ASSERT_EQ(f->kind(), yama::kind::function);
+    ASSERT_EQ(f->callsig().value().fmt(), "fn() -> yama:None");
+
+    ASSERT_TRUE(ctx->push_fn(*f).good());
+    ASSERT_TRUE(ctx->call(1, yama::newtop).good());
+
+    // expected return value
+    EXPECT_EQ(ctx->local(0).value(), ctx->new_none());
+
+    // expected side effects
+    SideFx expected{};
+    EXPECT_TRUE(sidefx.compare(expected));
+}
+
+// default init expr is non-constexpr, if struct type
+
+TEST_F(CompilationTests, DefaultInitExpr_NonConstexpr_IfStructType) {
+    ASSERT_TRUE(ready);
+
+    std::u8string txt = u8R"(
+
+struct G {}
+
+fn f() {
+    const(G());
+}
+
+)";
+
+    EXPECT_FALSE(perform_compile(txt));
+
+    EXPECT_EQ(dbg->count(yama::dsignal::compile_nonconstexpr_expr), 1);
 }
 

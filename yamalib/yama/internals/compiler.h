@@ -18,6 +18,7 @@
 #include "codegen_target.h"
 #include "csymtab.h"
 #include "ctypesys.h"
+#include "conv_manager.h"
 #include "expr_analyzer.h"
 #include "const_table_populator.h"
 #include "register_stk.h"
@@ -76,6 +77,7 @@ namespace yama::internal {
         codegen_target cgt;
         csymtab_group syms;
         ctypesys_local types;
+        conv_manager_local convs;
         const_table_populator ctp;
         register_stk rs;
         first_pass fp;

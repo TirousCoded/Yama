@@ -1036,7 +1036,7 @@ static bool pprs_ready = false;
 TEST_F(YamaGramTests, PPRs) {
     ASSERT_TRUE(gram);
 
-    EXPECT_EQ(gram->pprs(), 33);
+    EXPECT_EQ(gram->pprs(), 35);
 
     EXPECT_TRUE(gram->has_ppr("Chunk"_str));
 
@@ -1066,6 +1066,8 @@ TEST_F(YamaGramTests, PPRs) {
 
     ASSERT_TRUE(gram->has_ppr("Expr"_str));
     ASSERT_TRUE(gram->has_ppr("PrimaryExpr"_str));
+    ASSERT_TRUE(gram->has_ppr("ParenthesizedExpr"_str));
+    ASSERT_TRUE(gram->has_ppr("ConstexprGuaranteeExpr"_str));
     
     ASSERT_TRUE(gram->has_ppr("Lit"_str));
     ASSERT_TRUE(gram->has_ppr("IntLit"_str));
@@ -2388,6 +2390,54 @@ TEST_F(YamaGramTests, Expr_PrimaryExpr) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
+TEST_F(YamaGramTests, Expr_ParenthesizedExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "(300)"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("ParenthesizedExpr"_str, cntr, 5);
+    }
+
+    auto result = parser->parse("Expr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, Expr_ConstexprGuaranteeExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "const(300)"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
+        pattern.loose_syntactic("ConstexprGuaranteeExpr"_str, cntr, 10);
+    }
+
+    auto result = parser->parse("Expr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
 TEST_F(YamaGramTests, Expr_CallLikeExpr) {
     ASSERT_TRUE(pprs_ready);
 
@@ -2501,31 +2551,6 @@ TEST_F(YamaGramTests, Expr_ConvExpr) {
     EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
 }
 
-TEST_F(YamaGramTests, Expr_ConstExprGuaranteeExpr) {
-    ASSERT_TRUE(pprs_ready);
-
-    taul::source_code input{};
-    input.add_str(""_str, "const()"_str);
-
-    auto parser = prep_for_ppr_test(lgr, *gram, input);
-    ASSERT_TRUE(parser);
-
-    taul::source_pos_counter cntr{};
-    taul::parse_tree_pattern pattern(*gram);
-    {
-        auto node0 = pattern.syntactic_autoclose("Expr"_str, cntr);
-        pattern.lexical("CONST"_str, cntr, 5);
-        pattern.loose_syntactic("Args"_str, cntr, 2);
-    }
-
-    auto result = parser->parse("Expr"_str);
-
-    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
-
-    ASSERT_TRUE(result.is_sealed());
-    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
-}
-
 TEST_F(YamaGramTests, Expr_SuffixNesting) {
     ASSERT_TRUE(pprs_ready);
 
@@ -2626,6 +2651,59 @@ TEST_F(YamaGramTests, PrimaryExpr_LitExpr) {
     }
 
     auto result = parser->parse("PrimaryExpr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ParenthesizedExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "(300)"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("ParenthesizedExpr"_str, cntr);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 3);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("ParenthesizedExpr"_str);
+
+    YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
+
+    ASSERT_TRUE(result.is_sealed());
+    EXPECT_TRUE(pattern.match(result, taul::stderr_lgr()));
+}
+
+TEST_F(YamaGramTests, ConstexprGuaranteeExpr) {
+    ASSERT_TRUE(pprs_ready);
+
+    taul::source_code input{};
+    input.add_str(""_str, "const(300)"_str);
+
+    auto parser = prep_for_ppr_test(lgr, *gram, input);
+    ASSERT_TRUE(parser);
+
+    taul::source_pos_counter cntr{};
+    taul::parse_tree_pattern pattern(*gram);
+    {
+        auto node0 = pattern.syntactic_autoclose("ConstexprGuaranteeExpr"_str, cntr);
+        pattern.lexical("CONST"_str, cntr, 5);
+        pattern.lexical("L_ROUND"_str, cntr, 1);
+        pattern.loose_syntactic("Expr"_str, cntr, 3);
+        pattern.lexical("R_ROUND"_str, cntr, 1);
+    }
+
+    auto result = parser->parse("ConstexprGuaranteeExpr"_str);
 
     YAMA_LOG(dbg, yama::general_c, "result:\n{}", result);
 

@@ -30,3 +30,8 @@ project "Tests"
 		"TAUL"
 	}
 
+	buildoptions
+	{
+		"/bigobj" -- Fat source files were causing C1128.
+	}
+

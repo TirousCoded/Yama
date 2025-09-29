@@ -9,6 +9,7 @@
 #include "util.h"
 #include "domain_data.h"
 #include "compiler.h"
+#include "conv_manager.h"
 
 
 yama::internal::expr_analyzer::expr_analyzer(compiler& cs)
@@ -55,17 +56,33 @@ std::optional<yama::internal::ctype> yama::internal::expr_analyzer::crvalue_to_t
         : std::nullopt;
 }
 
-void yama::internal::expr_analyzer::codegen(const ast_Expr& root, size_t ret) {
-    YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result sent to {})...",
-        _tu(root).src.location_at(root.low_pos()),
-        ret == (size_t)newtop ? "*newtop*" : std::format("{}", ret));
-    _codegen(root, ret);
+void yama::internal::expr_analyzer::codegen(const ast_Expr& root, size_t ret, std::optional<ctype> convert_to) {
+    if (convert_to) {
+        YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result sent to {}) (implicit conv to {})...",
+            _tu(root).src.location_at(root.low_pos()),
+            ret == (size_t)newtop ? "*newtop*" : std::format("{}", ret),
+            convert_to->fmt(_tu(root).e()));
+    }
+    else {
+        YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result sent to {})...",
+            _tu(root).src.location_at(root.low_pos()),
+            ret == (size_t)newtop ? "*newtop*" : std::format("{}", ret));
+    }
+    _codegen(root, ret, convert_to);
     YAMA_LOG(cs->dbg(), compile_c, "expr codegen complete!");
 }
 
-void yama::internal::expr_analyzer::codegen_nr(const ast_Expr& root) {
-    YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result discarded)...", _tu(root).src.location_at(root.low_pos()));
-    _codegen(root, std::nullopt);
+void yama::internal::expr_analyzer::codegen_nr(const ast_Expr& root, std::optional<ctype> convert_to) {
+    if (convert_to) {
+        YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result discarded) (implicit conv to {})...",
+            _tu(root).src.location_at(root.low_pos()),
+            convert_to->fmt(_tu(root).e()));
+    }
+    else {
+        YAMA_LOG(cs->dbg(), compile_c, "expr codegen (root {}) (result discarded)...",
+            _tu(root).src.location_at(root.low_pos()));
+    }
+    _codegen(root, std::nullopt, convert_to);
     YAMA_LOG(cs->dbg(), compile_c, "expr codegen complete!");
 }
 
@@ -132,13 +149,15 @@ bool yama::internal::expr_analyzer::_resolve(const ast_expr& x) {
     if (_is_resolved(x)) {
         return _fetch(x).good();
     }
-    if (const auto r = x.as<ast_PrimaryExpr>())             return _resolve(*r);
-    else if (const auto r = x.as<ast_Args>())               return _resolve(*r);
-    else if (const auto r = x.as<ast_Conv>())               return _resolve(*r);
-    else if (const auto r = x.as<ast_TypeMember>())         return _resolve(*r);
-    else if (const auto r = x.as<ast_ObjectMember>())       return _resolve(*r);
-    else if (const auto r = x.as<ast_Expr>())               return _resolve(*r);
-    else                                                    YAMA_DEADEND;
+    if (const auto r = x.as<ast_PrimaryExpr>())                 return _resolve(*r);
+    else if (const auto r = x.as<ast_ParenthesizedExpr>())      return _resolve(*r);
+    else if (const auto r = x.as<ast_ConstexprGuaranteeExpr>()) return _resolve(*r);
+    else if (const auto r = x.as<ast_Args>())                   return _resolve(*r);
+    else if (const auto r = x.as<ast_Conv>())                   return _resolve(*r);
+    else if (const auto r = x.as<ast_TypeMember>())             return _resolve(*r);
+    else if (const auto r = x.as<ast_ObjectMember>())           return _resolve(*r);
+    else if (const auto r = x.as<ast_Expr>())                   return _resolve(*r);
+    else                                                        YAMA_DEADEND;
     return bool();
 }
 
@@ -148,6 +167,36 @@ bool yama::internal::expr_analyzer::_resolve(const ast_PrimaryExpr& x) {
     const bool result = _resolve_expr(x);
     _trace_result(result, x);
     YAMA_LOG(cs->dbg(), compile_c, "analyze PrimaryExpr complete!");
+    return result;
+}
+
+bool yama::internal::expr_analyzer::_resolve(const ast_ParenthesizedExpr& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing ParenthesizedExpr {}...", _tu(x).src.location_at(x.low_pos()));
+    // Skip _resolve_expr unless we can rely 100% on subexprs being valid.
+    const bool can_resolve_expr = _resolve_children(x);
+    // Call after _resolve_children for _discern_category.
+    _gen_metadata(x, x.root_expr()->low_pos(), _discern_category(x), _discern_mode(x));
+    const bool result =
+        can_resolve_expr
+        ? _resolve_expr(x)
+        : false;
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze ParenthesizedExpr complete!");
+    return result;
+}
+
+bool yama::internal::expr_analyzer::_resolve(const ast_ConstexprGuaranteeExpr& x) {
+    YAMA_LOG(cs->dbg(), compile_c, "analyzing ConstexprGuaranteeExpr {}...", _tu(x).src.location_at(x.low_pos()));
+    // Skip _resolve_expr unless we can rely 100% on subexprs being valid.
+    const bool can_resolve_expr = _resolve_children(x);
+    // Call after _resolve_children for _discern_category.
+    _gen_metadata(x, x.root_expr()->low_pos(), _discern_category(x), _discern_mode(x));
+    const bool result =
+        can_resolve_expr
+        ? _resolve_expr(x)
+        : false;
+    _trace_result(result, x);
+    YAMA_LOG(cs->dbg(), compile_c, "analyze ConstexprGuaranteeExpr complete!");
     return result;
 }
 
@@ -226,6 +275,14 @@ bool yama::internal::expr_analyzer::_resolve(const ast_Expr& x) {
     return result;
 }
 
+bool yama::internal::expr_analyzer::_resolve_children(const ast_ParenthesizedExpr& x) {
+    return _resolve(*res(x.expr));
+}
+
+bool yama::internal::expr_analyzer::_resolve_children(const ast_ConstexprGuaranteeExpr& x) {
+    return _resolve(*res(x.expr));
+}
+
 bool yama::internal::expr_analyzer::_resolve_children(const ast_Args& x) {
     bool success = true;
     // Using '&& success' ensures short-circuiting doesn't skip method call.
@@ -285,13 +342,18 @@ yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_
     return category();
 }
 
+yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_ParenthesizedExpr& x) {
+    return category::parenthesized;
+}
+
+yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_ConstexprGuaranteeExpr& x) {
+    return category::constexpr_guarantee;
+}
+
 yama::internal::expr_analyzer::category yama::internal::expr_analyzer::_discern_category(const ast_Args& x) {
-    if (x.is_constexpr_guarantee_expr_args()) {
-        return category::constexpr_guarantee;
-    }
     // TODO: the below are not checked in the order specified in compilation-tests.cpp, which
     //       shouldn't cause an issue, but a future refactor maybe should still correct this
-    else if ((*this)[deref_assert(x.get_primary_subexpr())].type == _tu(x).types.type_type()) {
+    if ((*this)[deref_assert(x.get_primary_subexpr())].type == _tu(x).types.type_type()) {
         return category::default_init;
     }
     else if ((*this)[deref_assert(x.get_primary_subexpr())].category == category::bound_method) {
@@ -460,6 +522,47 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_PrimaryExpr& x) {
     return md.good();
 }
 
+bool yama::internal::expr_analyzer::_resolve_expr(const ast_ParenthesizedExpr& x) {
+    metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving ParenthesizedExpr ({})...", fmt_category(md.category));
+    switch (md.category) {
+    case category::parenthesized:
+    {
+        if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
+            return false;
+        }
+        metadata& nested_md = _pull(*res(x.expr));
+        md.type = nested_md.type;
+        md.crvalue = nested_md.crvalue;
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+    return md.good();
+}
+
+bool yama::internal::expr_analyzer::_resolve_expr(const ast_ConstexprGuaranteeExpr& x) {
+    metadata& md = _fetch(x);
+    YAMA_LOG(cs->dbg(), compile_c, "resolving ConstexprGuaranteeExpr ({})...", fmt_category(md.category));
+    switch (md.category) {
+    case category::constexpr_guarantee:
+    {
+        if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
+            return false;
+        }
+        metadata& nested_md = _pull(*res(x.expr));
+        if (_raise_nonconstexpr_expr_if(!nested_md.crvalue, md)) {
+            return false;
+        }
+        md.type = nested_md.type;
+        md.crvalue = nested_md.crvalue;
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+    return md.good();
+}
+
 bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
     metadata& md = _fetch(x);
     YAMA_LOG(cs->dbg(), compile_c, "resolving Args ({})...", fmt_category(md.category));
@@ -475,18 +578,18 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         YAMA_ASSERT(is_callable(method_type.kind()));
         YAMA_ASSERT(method_type.param_count() >= 1);
         const ctype owner_type = method_type.owner_type().value();
-        const size_t expected_args = method_type.param_count() - 1; // '- 1' as owner will be used for first arg
+        const size_t expected_args = method_type.param_count() - 1; // '- 1' as owner will be used for first arg.
         const size_t actual_args = x.args.size();
         const bool correct_arg_count = actual_args == expected_args;
-        if (_raise_wrong_arg_count_if(!correct_arg_count, md, method_type, expected_args)) {
+        if (_raise_wrong_arg_count_if(!correct_arg_count, md, method_type, actual_args, expected_args)) {
             return false;
         }
-        for (size_t i = 0; i < actual_args; i++) { // type check the args
-            const ctype expected_type = method_type.param_type(i + 1, *cs).value(); // 'i + 1' as owner will be used for first arg
+        for (size_t i = 0; i < actual_args; i++) { // Type check the args.
+            const ctype expected_type = method_type.param_type(i + 1, *cs).value(); // 'i + 1' as owner will be used for first arg.
             const ctype actual_type = _pull(*x.args[i]).type.value();
-            (void)_raise_type_mismatch_for_arg_if(actual_type, expected_type, md, i + 1);
+            (void)_raise_coerced_type_mismatch_for_arg_if(actual_type, expected_type, md, i + 1);
         }
-        if (md.tu->err.is_fatal()) { // if arg type check failed
+        if (md.tu->err.is_fatal()) { // If arg type check failed.
             return false;
         }
         const ctype return_type = md.tu->types.default_none(method_type.return_type(*cs));
@@ -507,15 +610,15 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         const size_t expected_args = callobj_type.param_count();
         const size_t actual_args = x.args.size();
         const bool correct_arg_count = actual_args == expected_args;
-        if (_raise_wrong_arg_count_if(!correct_arg_count, md, callobj_type, expected_args)) {
+        if (_raise_wrong_arg_count_if(!correct_arg_count, md, callobj_type, actual_args, expected_args)) {
             return false;
         }
-        for (size_t i = 0; i < actual_args; i++) { // type check the args
+        for (size_t i = 0; i < actual_args; i++) { // Type check the args.
             const ctype expected_type = callobj_type.param_type(i, *cs).value();
             const ctype actual_type = _pull(*x.args[i]).type.value();
-            (void)_raise_type_mismatch_for_arg_if(actual_type, expected_type, md, i + 1);
+            (void)_raise_coerced_type_mismatch_for_arg_if(actual_type, expected_type, md, i + 1);
         }
-        if (md.tu->err.is_fatal()) { // if arg type check failed
+        if (md.tu->err.is_fatal()) { // If arg type check failed.
             return false;
         }
         const ctype return_type = md.tu->types.default_none(callobj_type.return_type(*cs));
@@ -539,23 +642,6 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Args& x) {
         }
         md.type = initialized_type;
         md.crvalue = _default_init_crvalue(initialized_type, md);
-    }
-    break;
-    case category::constexpr_guarantee:
-    {
-        if (_raise_nonassignable_expr_if(md.lvalue(), md)) {
-            return false;
-        }
-        if (_raise_wrong_arg_count_if(x.args.size() != 1, md, x.args.size(), 1)) {
-            return false;
-        }
-        const auto& first_arg = *x.args.front();
-        const auto& first_arg_md = _pull(first_arg);
-        if (_raise_nonconstexpr_expr_if(!first_arg_md.crvalue, md)) {
-            return false;
-        }
-        md.type = first_arg_md.type;
-        md.crvalue = first_arg_md.crvalue;
     }
     break;
     default: YAMA_DEADEND; break;
@@ -712,57 +798,119 @@ bool yama::internal::expr_analyzer::_resolve_expr(const ast_Expr& x) {
     return md.good();
 }
 
-void yama::internal::expr_analyzer::_codegen(const ast_Expr& root, std::optional<size_t> ret) {
+void yama::internal::expr_analyzer::_codegen(const ast_Expr& root, std::optional<size_t> ret, std::optional<ctype> convert_to) {
     const auto& md = _pull(root); // lazy load expr tree if needed
     if (md.tu->err.is_fatal()) return;
     YAMA_ASSERT(md.rvalue()); // can't be lvalue
-    _codegen_step(root, ret);
+    _codegen_step(root, ret, false, convert_to);
 }
 
-void yama::internal::expr_analyzer::_codegen_step(const ast_expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit) {
-    if (const auto r = x.as<ast_PrimaryExpr>())       _codegen_step(*r, ret, ret_puts_must_reinit);
-    else if (const auto r = x.as<ast_Args>())         _codegen_step(*r, ret, ret_puts_must_reinit);
-    else if (const auto r = x.as<ast_Conv>())         _codegen_step(*r, ret, ret_puts_must_reinit);
-    else if (const auto r = x.as<ast_TypeMember>())   _codegen_step(*r, ret, ret_puts_must_reinit);
-    else if (const auto r = x.as<ast_ObjectMember>()) _codegen_step(*r, ret, ret_puts_must_reinit);
-    else                                              YAMA_DEADEND;
+void yama::internal::expr_analyzer::_codegen_step(const ast_expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit, std::optional<ctype> convert_to) {
+    auto& md = _fetch(x);
+    YAMA_ASSERT(!md.tu->err.is_fatal());
+    if (convert_to && md.tu->convs.has_side_effects(md.type.value(), *convert_to)) {
+        // TODO: At present, we have no convs w/ side-effects, and when we add those, then the below code will
+        //       NOT BE CORRECT!!!! as when base expr can be cut entirely, it will also *incorrectly* cut out
+        //       the observable conv too!
+        //
+        //       So when we add convs w/ side-effects, be sure to change ret to, when !ret.has_value(), instead
+        //       refer to a temporary on the top of the stack which stores value for conv to use, then popping
+        //       this temporary afterwards.
+        YAMA_DEADEND;
+    }
+    if (md.crvalue) { // Constexpr base expr.
+        if (convert_to) { // Has implicit conv.
+            if (const auto crvalue = _conv_crvalue(md.crvalue, *convert_to, md)) { // Constexpr implicit conv.
+                _emit_put_crvalue(x, *crvalue, ret, ret_puts_must_reinit);
+            }
+            else { // Non-constexpr implicit conv.
+                _emit_put_crvalue(x, *md.crvalue, ret, ret_puts_must_reinit);
+                // _emit_put_crvalue does nothing if ret is empty, so conv instr can be forwent too.
+                // Also, forgo codegen for conv if identity conv.
+                if (ret && !md.tu->convs.is_identity_conv(md.crvalue->t, *convert_to)) {
+                    // Account for if ret is newtop.
+                    const auto dest = uint8_t(ret == size_t(newtop) ? md.tu->rs.top_reg().index : *ret);
+                    md.tu->rs.reinit_temp(dest, *convert_to);
+                    md.tu->cgt.cw.add_conv(dest, dest, uint8_t(md.tu->ctp.pull_type(*convert_to)), true);
+                }
+            }
+        }
+        else { // No implicit conv.
+            _emit_put_crvalue(x, *md.crvalue, ret, ret_puts_must_reinit);
+        }
+    }
+    else { // Non-constexpr base expr.
+        // Perform codegen for the rest of the expr tree.
+        if (const auto r = x.as<ast_PrimaryExpr>())                 _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_ParenthesizedExpr>())      _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_ConstexprGuaranteeExpr>()) _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_Args>())                   _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_Conv>())                   _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_TypeMember>())             _codegen_step(*r, ret, ret_puts_must_reinit);
+        else if (const auto r = x.as<ast_ObjectMember>())           _codegen_step(*r, ret, ret_puts_must_reinit);
+        else                                                        YAMA_DEADEND;
+        // Perform codegen for non-identity conv, if any.
+        if (ret && convert_to && !md.tu->convs.is_identity_conv(md.type.value(), *convert_to)) {
+            // Account for if ret is newtop.
+            const auto dest = uint8_t(ret == size_t(newtop) ? md.tu->rs.top_reg().index : *ret);
+            md.tu->rs.reinit_temp(dest, *convert_to);
+            md.tu->cgt.cw.add_conv(dest, dest, uint8_t(md.tu->ctp.pull_type(*convert_to)), true);
+        }
+    }
+    // TODO: This error check is SUPER in need of a refactor.
+    // TODO: The whole notion of putting an error check here is *iffy*, w/ me in fact needing to
+    //       put this at the end here to avoid the 'YAMA_ASSERT(!md.tu->err.is_fatal());' below.
+    if (convert_to && !md.tu->convs.is_legal(md.type.value(), *convert_to, true)) {
+        md.tu->err.error(
+            md.where,
+            dsignal::compile_type_mismatch,
+            "expr is type {0}, but expected {1}!",
+            md.type.value().fmt(md.tu->e()),
+            convert_to->fmt(md.tu->e()));
+    }
 }
 
 void yama::internal::expr_analyzer::_codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit) {
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
     auto& tu = _tu(x);
-    // TODO: below about outputting nothing may need to change if primary exprs
-    //       are added which can have side effects (ie. getters)
-    // if no result, then just output nothing
-    if (!ret) {
-        return;
-    }
-    // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
-    // if newtop, push a temporary
-    if (ret == size_t(newtop)) {
-        tu.rs.push_temp(x, type);
-    }
-    const uint8_t output_reg = uint8_t(deref_assert(ret));
-    tu.cgt.autosym(x.low_pos());
     switch (md.category) {
     case category::param_id:
     {
+        // if no result, then just output nothing
+        if (!ret) {
+            return;
+        }
+        // if newtop, push a temporary
+        if (ret == size_t(newtop)) {
+            tu.rs.push_temp(x, type);
+        }
+        const uint8_t output_reg = uint8_t(deref_assert(ret));
         const auto name = x.name->str(md.tu->src);
         // IMPORTANT: remember that the indices of the args of a call include the callobj,
         //            so we gotta incr the fn param index to account for this
         const uint8_t arg_index = uint8_t(tu.cgt.target_param_index(name).value() + 1);
+        tu.cgt.autosym(x.low_pos());
         // write put_arg loading param into output
         tu.cgt.cw.add_put_arg(output_reg, arg_index, ret_puts_must_reinit);
     }
     break;
     case category::var_id:
     {
+        // if no result, then just output nothing
+        if (!ret) {
+            return;
+        }
+        // if newtop, push a temporary
+        if (ret == size_t(newtop)) {
+            tu.rs.push_temp(x, type);
+        }
+        const uint8_t output_reg = uint8_t(deref_assert(ret));
         const auto name = x.name->str(md.tu->src);
         const auto symbol = md.tu->syms.lookup_expect<var_csym>(x, name, x.low_pos());
         const uint8_t local_var_reg = uint8_t(symbol->reg.value());
+        tu.cgt.autosym(x.low_pos());
         // write copy from local var into output
         tu.cgt.cw.add_copy(local_var_reg, output_reg, ret_puts_must_reinit);
     }
@@ -774,7 +922,37 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_PrimaryExpr& x, std:
     case category::bool_lit:
     case category::char_lit:
     {
-        tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value(), ret_puts_must_reinit);
+        YAMA_DEADEND;
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+}
+
+void yama::internal::expr_analyzer::_codegen_step(const ast_ParenthesizedExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit) {
+    auto& md = _fetch(x);
+    YAMA_ASSERT(!md.tu->err.is_fatal());
+    auto& tu = _tu(x);
+    const ctype& type = md.type.value();
+    switch (md.category) {
+    case category::parenthesized:
+    {
+        _codegen_step(*res(x.expr), ret, ret_puts_must_reinit);
+    }
+    break;
+    default: YAMA_DEADEND; break;
+    }
+}
+
+void yama::internal::expr_analyzer::_codegen_step(const ast_ConstexprGuaranteeExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit) {
+    auto& md = _fetch(x);
+    YAMA_ASSERT(!md.tu->err.is_fatal());
+    auto& tu = _tu(x);
+    const ctype& type = md.type.value();
+    switch (md.category) {
+    case category::constexpr_guarantee:
+    {
+        YAMA_DEADEND;
     }
     break;
     default: YAMA_DEADEND; break;
@@ -785,9 +963,7 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
     auto& tu = _tu(x);
-    // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
     switch (md.category) {
     case category::bound_method_call:
     {
@@ -808,8 +984,11 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
         // codegen owner expr
         _codegen_step(*owner_nd, size_t(newtop));
         // codegen arg exprs
+        size_t param_ind = 1; // Start counting from 1 as 0 is the owner param.
         for (const auto& I : x.args) {
-            _codegen_step(*I, size_t(newtop));
+            const ctype expected_param_type = method_type.param_type(param_ind, *cs).value();
+            param_ind++;
+            _codegen_step(*I, size_t(newtop), false, expected_param_type);
         }
         // autosym w/ expr this is a suffix of
         tu.cgt.autosym(x.root_expr()->low_pos());
@@ -849,11 +1028,16 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
     break;
     case category::call:
     {
+        const auto callobj_nd = res(x.get_primary_subexpr());
+        const ctype& callobj_type = _pull(*callobj_nd).type.value();
         // perform prior steps
         // (gotta do these BEFORE our autosym, as _codegen_step will overwrite it)
-        _codegen_step(*res(x.get_primary_subexpr()), size_t(newtop));
+        _codegen_step(*callobj_nd, size_t(newtop));
+        size_t param_ind = 0;
         for (const auto& I : x.args) { // codegen arg exprs
-            _codegen_step(*I, size_t(newtop));
+            const ctype expected_param_type = callobj_type.param_type(param_ind, *cs).value();
+            param_ind++;
+            _codegen_step(*I, size_t(newtop), false, expected_param_type);
         }
         // autosym w/ expr this is a suffix of
         tu.cgt.autosym(x.root_expr()->low_pos());
@@ -862,7 +1046,6 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
         const size_t param_args = x.args.size();
         const size_t args = param_args + 1; // args == param-args + callobj
         const size_t callobj_reg = tu.rs.regs() - args;
-        const ctype callobj_type = tu.rs.reg_abs(callobj_reg).type;
         if (!ret) { // no result
             // write the call_nr instr
             tu.cgt.cw.add_call_nr(uint8_t(args));
@@ -893,49 +1076,15 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
     break;
     case category::default_init:
     {
-        // autosym w/ expr this is a suffix of
-        tu.cgt.autosym(x.root_expr()->low_pos());
-        if (crvalue) { // constexpr
-            // if expr is not even gonna be used for its return value, then this expr is
-            // 100% transparent, and codegen can just be forwent altogether
-            if (!ret) {
-                return;
-            }
-            const uint8_t output_reg = uint8_t(deref_assert(ret));
-            // if newtop, push a temporary
-            if (ret == size_t(newtop)) {
-                tu.rs.push_temp(x, type);
-            }
-            // just write an instr outputting its value
-            tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value(), ret_puts_must_reinit);
-        }
-        else { // non-constexpr
-            // TODO: later on, when we add default initializers which actually involve
-            //       a ctor call, we'll in that scenario STILL be able to forgo codegen in
-            //       situations where (1) this ctor call is transparent, and (2) the result
-            //       of this default init expr isn't needed
-            //
-            //       not gonna add this now, as I don't have a way to distinguish between
-            //       these different types of initializers, and I don't wanna risk creating
-            //       bugs if later, when we add these initializers, I forget about this
-            //       part of our code
-            // if expr is not even gonna be used for its return value, then this expr is
-            // 100% transparent, and codegen can just be forwent altogether
-            if (!ret) {
-                return;
-            }
-            const uint8_t output_reg = uint8_t(deref_assert(ret));
-            // if newtop, push a temporary
-            if (ret == size_t(newtop)) {
-                tu.rs.push_temp(x, type);
-            }
-            // write default_init instr to initialize the object
-            tu.cgt.cw.add_default_init(output_reg, uint8_t(tu.ctp.pull_type(type)), ret_puts_must_reinit);
-        }
-    }
-    break;
-    case category::constexpr_guarantee:
-    {
+        // TODO: later on, when we add default initializers which actually involve
+        //       a ctor call, we'll in that scenario STILL be able to forgo codegen in
+        //       situations where (1) this ctor call is transparent, and (2) the result
+        //       of this default init expr isn't needed
+        //
+        //       not gonna add this now, as I don't have a way to distinguish between
+        //       these different types of initializers, and I don't wanna risk creating
+        //       bugs if later, when we add these initializers, I forget about this
+        //       part of our code
         // if expr is not even gonna be used for its return value, then this expr is
         // 100% transparent, and codegen can just be forwent altogether
         if (!ret) {
@@ -946,11 +1095,9 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Args& x, std::option
         if (ret == size_t(newtop)) {
             tu.rs.push_temp(x, type);
         }
-        tu.cgt.autosym(x.low_pos());
-        YAMA_ASSERT(x.args.size() == 1);
-        // arg of constexpr-guarantee is *guaranteed* to be constexpr, so we can
-        // just write an instr outputting its value
-        tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value(), ret_puts_must_reinit);
+        tu.cgt.autosym(x.root_expr()->low_pos());
+        // write default_init instr to initialize the object
+        tu.cgt.cw.add_default_init(output_reg, uint8_t(tu.ctp.pull_type(type)), ret_puts_must_reinit);
     }
     break;
     default: YAMA_DEADEND; break;
@@ -961,67 +1108,49 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_Conv& x, std::option
     auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
     auto& tu = _tu(x);
-    // Expr type and crvalue (if any.)
     const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
     switch (md.category) {
     case category::conv:
     {
-        if (crvalue) { // Constexpr
-            // If expr is not even gonna be used for its return value, then this expr is
-            // 100% transparent, and codegen can just be forwent altogether.
-            if (!ret) {
-                return;
+        const ctype converted_from = deref_assert(x.get_primary_subexpr()).get_type(*cs).value();
+        const ctype converted_to = deref_assert(x.target).get_type(*cs).value();
+        // If the return value is just gonna be discarded BUT the conversion operation itself
+        // has observable side-effects, then in that case we emit the conversion anyway.
+        const bool should_emit_conv =
+            ret ||
+            tu.convs.has_side_effects(converted_from, converted_to);
+        if (should_emit_conv) {
+            const bool should_force_reinit =
+                ret && // Need to confirm it's safe to *ret.
+                ret != size_t(newtop) &&
+                converted_to != tu.rs.reg_abs(*ret).type;
+            // It's our responsibility to do this.
+            if (should_force_reinit) {
+                tu.rs.reinit_temp(ssize_t(ret.value()), converted_to);
             }
-            const uint8_t output_reg = uint8_t(deref_assert(ret));
-            // If newtop, push a temporary.
-            if (ret == size_t(newtop)) {
-                tu.rs.push_temp(x, type);
-            }
+            // Codegen converted expr, putting it into return value register, which we'll then overwrite
+            // w/ conversion result.
+            _codegen_step(
+                *res(x.get_primary_subexpr()),
+                ret,
+                should_force_reinit || ret_puts_must_reinit);
+            // Need to handle if ret is newtop, as if ret is newtop, then instr gen will be incorrect,
+            // as newtop stuff will have already been handled by above _codegen_step for child.
+            const size_t return_value_reg =
+                (!ret || ret == size_t(newtop))
+                ? tu.rs.top_reg().index
+                : ret.value();
             tu.cgt.autosym(x.low_pos());
-            tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value(), ret_puts_must_reinit);
+            tu.rs.reinit_temp(ssize_t(return_value_reg), type);
+            tu.cgt.cw.add_conv(
+                uint8_t(return_value_reg),
+                uint8_t(return_value_reg),
+                uint8_t(tu.ctp.pull_type(type)),
+                true);
         }
-        else { // Non-Constexpr
-            const ctype converted_from = deref_assert(x.get_primary_subexpr()).get_type(*cs).value();
-            const ctype converted_to = deref_assert(x.target).get_type(*cs).value();
-            // If the return value is just gonna be discarded BUT the conversion operation itself
-            // has observable side-effects, then in that case we emit the conversion anyway.
-            const bool should_emit_conv =
-                ret ||
-                _conv_has_side_effects(converted_from, converted_to, md);
-            if (should_emit_conv) {
-                const bool should_force_reinit =
-                    ret && // Need to confirm it's safe to *ret.
-                    ret != size_t(newtop) &&
-                    converted_to != tu.rs.reg_abs(*ret).type;
-                // It's our responsibility to do this.
-                if (should_force_reinit) {
-                    tu.rs.reinit_temp(ssize_t(ret.value()), converted_to);
-                }
-                // Codegen converted expr, putting it into return value register, which we'll then overwrite
-                // w/ conversion result.
-                _codegen_step(
-                    *res(x.get_primary_subexpr()),
-                    ret,
-                    should_force_reinit || ret_puts_must_reinit);
-                // Need to handle if ret is newtop, as if ret is newtop, then instr gen will be incorrect,
-                // as newtop stuff will have already been handled by above _codegen_step for child.
-                const size_t return_value_reg =
-                    ret == size_t(newtop)
-                    ? tu.rs.top_reg().index
-                    : ret.value();
-                tu.cgt.autosym(x.low_pos());
-                tu.rs.reinit_temp(ssize_t(return_value_reg), type);
-                tu.cgt.cw.add_conv(
-                    uint8_t(return_value_reg),
-                    uint8_t(return_value_reg),
-                    uint8_t(tu.ctp.pull_type(type)),
-                    true);
-            }
-            else { // This expr is 100% transparent EXCEPT for any side-effects arising from converted expr.
-                // Codegen converted expr (we don't care about its return value, only its side-effects.)
-                _codegen_step(*res(x.get_primary_subexpr()), std::nullopt);
-            }
+        else { // This expr is 100% transparent EXCEPT for any side-effects arising from converted expr.
+            // Codegen converted expr (we don't care about its return value, only its side-effects.)
+            _codegen_step(*res(x.get_primary_subexpr()), std::nullopt);
         }
     }
     break;
@@ -1033,24 +1162,11 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_TypeMember& x, std::
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
     auto& tu = _tu(x);
-    // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
     switch (md.category) {
     case category::unbound_method:
     {
-        // if expr is not even gonna be used for its return value, then this expr is
-        // 100% transparent, and codegen can just be forwent altogether
-        if (!ret) {
-            return;
-        }
-        const uint8_t output_reg = uint8_t(deref_assert(ret));
-        // if newtop, push a temporary
-        if (ret == size_t(newtop)) {
-            tu.rs.push_temp(x, type);
-        }
-        tu.cgt.autosym(x.low_pos());
-        tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value());
+        YAMA_DEADEND;
     }
     break;
     default: YAMA_DEADEND; break;
@@ -1061,57 +1177,21 @@ void yama::internal::expr_analyzer::_codegen_step(const ast_ObjectMember& x, std
     const auto& md = _fetch(x);
     YAMA_ASSERT(!md.tu->err.is_fatal());
     auto& tu = _tu(x);
-    // expr type and crvalue (if any)
     const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
     switch (md.category) {
     case category::bound_method:
     {
         // Codegen owner (we don't care about its return value, only its side-effects.)
         _codegen_step(*res(x.get_primary_subexpr()), std::nullopt);
-        // If expr is not even gonna be used for its return value, then this expr is
-        // (excluding owner) 100% transparent, and codegen can just be forwent altogether.
-        if (!ret) {
-            return;
-        }
-        const uint8_t output_reg = uint8_t(deref_assert(ret));
-        // If newtop, push a temporary.
-        if (ret == size_t(newtop)) {
-            tu.rs.push_temp(x, type);
-        }
-        tu.cgt.autosym(x.low_pos());
-        tu.cgt.add_cvalue_put_instr(output_reg, cvalue::method_v(type));
+        _emit_put_crvalue(x, cvalue::method_v(type), ret);
     }
     break;
     default: YAMA_DEADEND; break;
     }
 }
 
-void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit) {
-    const auto& md = _fetch(x);
-    YAMA_ASSERT(!md.tu->err.is_fatal());
-    auto& tu = _tu(x);
-    // expr type and crvalue (if any)
-    const ctype& type = md.type.value();
-    const auto& crvalue = md.crvalue;
-    if (crvalue) { // constexpr
-        // if expr is not even gonna be used for its return value, then this expr is
-        // 100% transparent, and codegen can just be forwent altogether
-        if (!ret) {
-            return;
-        }
-        const uint8_t output_reg = uint8_t(deref_assert(ret));
-        // if newtop, push a temporary
-        if (ret == size_t(newtop)) {
-            tu.rs.push_temp(x, type);
-        }
-        tu.cgt.autosym(x.low_pos());
-        tu.cgt.add_cvalue_put_instr(output_reg, crvalue.value());
-    }
-    else { // non-constexpr
-        // forward to nested, including forwarding ret
-        _codegen_step(*res(x.get_primary_subexpr()), ret);
-    }
+void yama::internal::expr_analyzer::_codegen_step(const ast_Expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit, std::optional<ctype> convert_to) {
+    _codegen_step(*res(x.get_primary_subexpr()), ret, ret_puts_must_reinit, convert_to);
 }
 
 yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode(const ast_base_expr& x) const noexcept {
@@ -1127,6 +1207,22 @@ yama::internal::expr_analyzer::mode yama::internal::expr_analyzer::_discern_mode
         x.is_assign_stmt_lvalue
         ? mode::lvalue
         : mode::rvalue;
+}
+
+void yama::internal::expr_analyzer::_emit_put_crvalue(const ast_expr& x, cvalue crvalue, std::optional<size_t> ret, bool ret_puts_must_reinit) {
+    auto& tu = _tu(x);
+    // If expr is not even gonna be used for its return value, then this expr is
+    // 100% transparent, and codegen can just be forwent altogether.
+    if (!ret) {
+        return;
+    }
+    const uint8_t output_reg = uint8_t(deref_assert(ret));
+    // If newtop, push a temporary.
+    if (ret == size_t(newtop)) {
+        tu.rs.push_temp(x, crvalue.t);
+    }
+    tu.cgt.autosym(x.low_pos());
+    tu.cgt.add_cvalue_put_instr(output_reg, crvalue, ret_puts_must_reinit);
 }
 
 std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::_default_init_crvalue(ctype type, metadata& md) {
@@ -1154,11 +1250,14 @@ std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::_conv_crval
         return std::nullopt;
     }
     const cvalue& value = *x;
-    const auto conv_type = _discern_conv_type(value.t, target, md);
-    if (conv_type == _conv_type::identity) {
+    const auto conv_type = tu.convs.discern_type(value.t, target);
+#if 0
+    println("-- {} -> {} ({})", value.t.fmt(md.tu->e()), target.fmt(md.tu->e()), fmt_conv_type(conv_type));
+#endif
+    if (conv_type == conv_type::identity) {
         return x;
     }
-    else if (conv_type == _conv_type::primitive_type) {
+    else if (conv_type == conv_type::primitive_type) {
         const ctype& in = value.t;
         const ctype& out = target;
         auto _output = [&](auto v) -> std::optional<cvalue> {
@@ -1176,65 +1275,13 @@ std::optional<yama::internal::cvalue> yama::internal::expr_analyzer::_conv_crval
         else if (in == tu.types.char_type())    return _output(value.as<char_t>().value());
         else                                    return _runtime_only;
     }
-    else if (conv_type == _conv_type::fn_or_method_type_narrowed_to_type_type) {
+    else if (conv_type == conv_type::fn_type_narrow_to_type_type) {
+        return cvalue::type_v(value.t, tu.types);
+    }
+    else if (conv_type == conv_type::method_type_narrow_to_type_type) {
         return cvalue::type_v(value.t, tu.types);
     }
     else return _runtime_only;
-}
-
-yama::internal::expr_analyzer::_conv_type yama::internal::expr_analyzer::_discern_conv_type(ctype from, ctype to, metadata& md) {
-    if (_is_identity_conv(from, to)) {
-        //println("-- {} -> {} (identity)", from.fmt(md.tu->e()), to.fmt(md.tu->e()));
-        return _conv_type::identity;
-    }
-    else if (_is_primitive_type_conv(from, to, md)) {
-        //println("-- {} -> {} (primitive_type)", from.fmt(md.tu->e()), to.fmt(md.tu->e()));
-        return _conv_type::primitive_type;
-    }
-    else if (_is_fn_or_method_type_narrowed_to_type_type_conv(from, to, md)) {
-        //println("-- {} -> {} (fn_or_method_type_narrowed_to_type_type)", from.fmt(md.tu->e()), to.fmt(md.tu->e()));
-        return _conv_type::fn_or_method_type_narrowed_to_type_type;
-    }
-    else {
-        //println("-- {} -> {} (illegal)", from.fmt(md.tu->e()), to.fmt(md.tu->e()));
-        return _conv_type::illegal;
-    }
-}
-
-bool yama::internal::expr_analyzer::_conv_is_legal(ctype from, ctype to, metadata& md) {
-    return _discern_conv_type(from, to, md) != _conv_type::illegal;
-}
-
-bool yama::internal::expr_analyzer::_conv_has_side_effects(ctype from, ctype to, metadata& md) {
-    // TODO: This is for later when we add non-constexpr conversions which may have runtime
-    //       side-effects (ie. they can observably fail at runtime.)
-    return false;
-}
-
-bool yama::internal::expr_analyzer::_is_identity_conv(ctype from, ctype to) {
-    return from == to;
-}
-
-bool yama::internal::expr_analyzer::_is_primitive_type_conv(ctype from, ctype to, metadata& md) {
-    auto& tu = *md.tu;
-    auto is_correct_type = [&](ctype x) -> bool {
-        return
-            x == tu.types.int_type() ||
-            x == tu.types.uint_type() ||
-            x == tu.types.float_type() ||
-            x == tu.types.bool_type() ||
-            x == tu.types.char_type();
-        };
-    return
-        is_correct_type(from) &&
-        is_correct_type(to);
-}
-
-bool yama::internal::expr_analyzer::_is_fn_or_method_type_narrowed_to_type_type_conv(ctype from, ctype to, metadata& md) {
-    auto& tu = *md.tu;
-    return
-        (is_function(from.kind()) || is_method(from.kind())) &&
-        to == tu.types.type_type();
 }
 
 bool yama::internal::expr_analyzer::_is_type_ref_id_expr(const ast_PrimaryExpr& x) {
@@ -1357,27 +1404,14 @@ bool yama::internal::expr_analyzer::_raise_wrong_arg_count_if(bool x, metadata& 
     return x;
 }
 
-bool yama::internal::expr_analyzer::_raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t expected_args) {
+bool yama::internal::expr_analyzer::_raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t actual_args, size_t expected_args) {
     if (x) {
         md.tu->err.error(
             md.where,
             dsignal::compile_wrong_arg_count,
             "call to {} given {} args, but expected {}!",
             call_to.fmt(md.tu->e()),
-            call_to.param_count(),
-            expected_args);
-    }
-    return x;
-}
-
-bool yama::internal::expr_analyzer::_raise_wrong_arg_count_for_bound_method_call_if(bool x, metadata& md, ctype method, size_t expected_args) {
-    if (x) {
-        md.tu->err.error(
-            md.where,
-            dsignal::compile_wrong_arg_count,
-            "(bound method) call to {} given {} args, but expected {}!",
-            method.fmt(md.tu->e()),
-            method.param_count() - 1, // '- 1' as owner will be used for first arg
+            actual_args,
             expected_args);
     }
     return x;
@@ -1395,7 +1429,7 @@ bool yama::internal::expr_analyzer::_raise_invalid_operation_due_to_noncallable_
 }
 
 bool yama::internal::expr_analyzer::_raise_invalid_operation_due_to_illegal_conv_if(ctype from, ctype to, metadata& md) {
-    const bool result = !_conv_is_legal(from, to, md);
+    const bool result = !md.tu->convs.is_legal(from, to);
     if (result) {
         md.tu->err.error(
             md.where,
@@ -1407,27 +1441,14 @@ bool yama::internal::expr_analyzer::_raise_invalid_operation_due_to_illegal_conv
     return result;
 }
 
-bool yama::internal::expr_analyzer::_raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number) {
-    const bool result = actual != expected;
+bool yama::internal::expr_analyzer::_raise_coerced_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number) {
+    const bool result = !md.tu->convs.is_legal(actual, expected, true);
     if (result) {
         md.tu->err.error(
             md.where,
             dsignal::compile_type_mismatch,
             "arg {0} expr is type {1}, but expected {2}!",
             arg_display_number,
-            actual.fmt(md.tu->e()),
-            expected.fmt(md.tu->e()));
-    }
-    return result;
-}
-
-bool yama::internal::expr_analyzer::_raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md) {
-    const bool result = actual != expected;
-    if (result) {
-        md.tu->err.error(
-            md.where,
-            dsignal::compile_type_mismatch,
-            "initialized type expr is type {0}, but expected {1}!",
             actual.fmt(md.tu->e()),
             expected.fmt(md.tu->e()));
     }

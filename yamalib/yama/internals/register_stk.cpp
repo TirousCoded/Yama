@@ -137,8 +137,11 @@ void yama::internal::register_stk::promote_to_localvar(ast_VarDecl& x) {
     YAMA_ASSERT(top_reg().is_localvar());
 }
 
-bool yama::internal::register_stk::type_check_reg(ssize_t index, ctype expected) {
-    return reg(index).type == expected;
+bool yama::internal::register_stk::type_check_reg(ssize_t index, ctype expected, bool allow_coercion) {
+    return
+        allow_coercion
+        ? tu->convs.is_legal(reg(index).type, expected, true)
+        : reg(index).type == expected;
 }
 
 void yama::internal::register_stk::_update_max_locals_of_codegen_target() {

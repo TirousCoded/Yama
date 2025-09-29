@@ -132,24 +132,15 @@ void yama::internal::second_pass::_localvar(ast_VarDecl& x) {
 }
 
 void yama::internal::second_pass::_localvar_with_init(ast_VarDecl& x) {
-    // codegen initializer expr
-    tu->cs->ea.codegen(*x.assign->expr, newtop);
-    if (x.type) { // type annot (so type check initializer w/ it)
-        if (const auto type = x.type->type->get_type(*tu->cs)) {
-            // if explicit type annot, type check it against temporary of the var decl
-            if (!tu->rs.type_check_reg(-1, *type)) {
-                tu->err.error(
-                    x,
-                    dsignal::compile_type_mismatch,
-                    "var decl initializer expr is type {0}, but expected {1}!",
-                    tu->rs.top_reg().type.fmt(tu->e()),
-                    type->fmt(tu->e()));
-                return;
-            }
-        }
-        else return;
-    }
-    // promote our temporary into an actual local var
+    // Check for type annot and if so discern annotated type.
+    const auto annot_type =
+        x.type
+        ? x.type->type->get_type(*tu->cs)
+        : std::nullopt;
+    // Codegen initializer expr, w/ implicit conv to annotated type if provided.
+    // Implicit conv to annot_type will type check for us.
+    tu->cs->ea.codegen(*x.assign->expr, newtop, annot_type);
+    // Promote our temporary into an actual local var.
     tu->rs.promote_to_localvar(x);
 }
 
@@ -220,7 +211,8 @@ void yama::internal::second_pass::_end_struct(ast_StructDecl& x) {
 void yama::internal::second_pass::_begin_block(ast_Block& x) {
     if (_is_if_stmt_body(x)) { // if we're the if stmt's body block
         _mark_as_if_stmt_cond_reg(-1); // mark as if stmt's cond expr reg
-        if (!tu->rs.type_check_reg(-1, tu->types.bool_type())) { // if stmt cond expr
+        // TODO: Enable coercion for if stmts later.
+        if (!tu->rs.type_check_reg(-1, tu->types.bool_type(), false)) { // if stmt cond expr
             tu->err.error(
                 x,
                 dsignal::compile_type_mismatch,
@@ -282,20 +274,10 @@ void yama::internal::second_pass::_assign_stmt(ast_ExprStmt& x) {
     const auto name = primary->name.value().str(tu->src);
     const auto symbol = tu->syms.lookup_as<var_csym>(x, name, x.low_pos());
     YAMA_ASSERT(symbol); // assignable
-    // type check assignment before allowing it
-    const ctype assigner_type = tu->cs->ea[*x.assign->expr].type.value();
     const ctype assignee_type = symbol->get_type().value();
-    if (assigner_type != assignee_type) {
-        tu->err.error(
-            x,
-            dsignal::compile_type_mismatch,
-            "assigning expr is type {0}, but expected {1}!",
-            assigner_type.fmt(tu->e()),
-            assignee_type.fmt(tu->e()));
-        return;
-    }
     const size_t assignee_reg = symbol->reg.value();
-    tu->cs->ea.codegen(*x.assign->expr, assignee_reg);
+    // Implicit conv will type check for us.
+    tu->cs->ea.codegen(*x.assign->expr, assignee_reg, assignee_type);
 }
 
 void yama::internal::second_pass::_expr_stmt(ast_ExprStmt& x) {
@@ -362,31 +344,23 @@ void yama::internal::second_pass::_return_stmt(ast_ReturnStmt& x) {
 
 void yama::internal::second_pass::_return_stmt_with_val(ast_ReturnStmt& x) {
     const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
-    // codegen returned value expr, pushing temporary
-    tu->cs->ea.codegen(*x.expr, newtop);
-    // type check return value expr, w/ return type None if no explicit return type
     const ctype return_type = targsym.get_return_type_or_none();
-    const ctype returned_value_type = tu->cs->ea[*x.expr].type.value();
-    if (returned_value_type != return_type) {
-        tu->err.error(
-            x,
-            dsignal::compile_type_mismatch,
-            "return stmt expr is type {0}, but expected {1}!",
-            returned_value_type.fmt(tu->e()),
-            return_type.fmt(tu->e()));
-        return;
-    }
+    // Codegen returned value expr, pushing temporary.
+    // Implicit conv will type check for us.
+    tu->cs->ea.codegen(*x.expr, newtop, return_type);
     const size_t returned_value_reg = tu->rs.top_reg().index;
     tu->cgt.autosym(x.low_pos());
     tu->cgt.cw.add_ret(uint8_t(returned_value_reg));
-    tu->rs.pop_temp(1, false); // consume return value temporary + pop instr after ret would just be dead code
+    tu->rs.pop_temp(1, false); // Consume return value temporary + pop instr after ret would just be dead code.
 }
 
 void yama::internal::second_pass::_return_stmt_with_no_val(ast_ReturnStmt& x) {
     const auto& targsym = tu->cgt.target_csym<fn_like_csym>();
-    // this form may not be used if return type isn't None
+    // This form may not be used if return type isn't None.
     const ctype actual_return_type = targsym.get_return_type_or_none();
     const ctype expected_return_type = tu->types.none_type();
+    // TODO: Until our unit tests are updated for the edgecase of 'return;' attempting
+    //       an implicit conv, we're just gonna enforce NO implicit conv occurring.
     if (actual_return_type != expected_return_type) {
         tu->err.error(
             x,
@@ -400,15 +374,17 @@ void yama::internal::second_pass::_return_stmt_with_no_val(ast_ReturnStmt& x) {
     tu->rs.push_temp(x, expected_return_type);
     tu->cgt.cw.add_put_none(yama::newtop);
     tu->cgt.cw.add_ret(uint8_t(tu->rs.top_reg().index));
-    tu->rs.pop_temp(1, false); // pop instr after ret would just be dead code
+    tu->rs.pop_temp(1, false); // Pop instr after ret would just be dead code.
 }
 
 void yama::internal::second_pass::_type_spec(ast_TypeSpec& x) {
+    // TODO: Figure out how to replace below error message w/ one which is more inline w/
+    //       how type mismatch error messages *usually* appear in terms of wording.
     // expect a type to be able to be discerned
     if (!x.get_type(*tu->cs)) {
         tu->err.error(
             x.low_pos(),
-            dsignal::compile_not_a_type,
+            dsignal::compile_type_mismatch,
             "expr does not specify a type!");
     }
 }

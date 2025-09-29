@@ -211,7 +211,6 @@ namespace yama {
         compile_undeclared_qualifier,
         compile_nonexistent_owner,
         compile_type_mismatch,
-        compile_not_a_type,
         compile_not_an_expr,
         compile_illegal_nonlocal_decl,
         compile_illegal_local_decl,
@@ -290,7 +289,7 @@ namespace yama {
 
 
     inline std::string fmt_dsignal(dsignal sig) {
-        static_assert(dsignals == 77);
+        static_assert(dsignals == 76);
         std::string result{};
 #define _YAMA_ENTRY_(x) case dsignal:: x : result = #x ; break
         switch (sig) {
@@ -305,7 +304,6 @@ namespace yama {
             _YAMA_ENTRY_(compile_undeclared_qualifier);
             _YAMA_ENTRY_(compile_nonexistent_owner);
             _YAMA_ENTRY_(compile_type_mismatch);
-            _YAMA_ENTRY_(compile_not_a_type);
             _YAMA_ENTRY_(compile_not_an_expr);
             _YAMA_ENTRY_(compile_illegal_nonlocal_decl);
             _YAMA_ENTRY_(compile_illegal_local_decl);

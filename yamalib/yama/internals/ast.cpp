@@ -675,13 +675,17 @@ std::shared_ptr<yama::internal::ast_expr> yama::internal::ast_Expr::get_primary_
         : std::static_pointer_cast<ast_expr>(suffixes.back().base());
 }
 
-void yama::internal::ast_Expr::do_give(taul::token x) {
-    if (x.is_normal() && x.lpr->name() == "CONST"_str) {
-        has_const_kw = true;
-    }
+void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
+    YAMA_ASSERT(!base);
+    base = x;
 }
 
-void yama::internal::ast_Expr::do_give(res<ast_PrimaryExpr> x) {
+void yama::internal::ast_Expr::do_give(res<ast_ParenthesizedExpr> x) {
+    YAMA_ASSERT(!base);
+    base = x;
+}
+
+void yama::internal::ast_Expr::do_give(res<ast_ConstexprGuaranteeExpr> x) {
     YAMA_ASSERT(!base);
     base = x;
 }
@@ -752,6 +756,50 @@ void yama::internal::ast_PrimaryExpr::do_give(taul::token x) {
 
 void yama::internal::ast_PrimaryExpr::do_give(res<ast_Lit> x) {
     lit = x;
+}
+
+void yama::internal::ast_ParenthesizedExpr::fmt(ast_formatter& x) {
+    x.open("ParenthesizedExpr", low_pos(), high_pos(), id);
+    if (expr) {
+        x.next("expr");
+        expr->fmt(x);
+    }
+    x.close();
+}
+
+void yama::internal::ast_ParenthesizedExpr::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_ParenthesizedExpr>());
+    if (expr) {
+        expr->accept(x);
+    }
+    x.visit_end(expect<ast_ParenthesizedExpr>());
+}
+
+void yama::internal::ast_ParenthesizedExpr::do_give(res<ast_Expr> x) {
+    YAMA_ASSERT(!expr);
+    expr = x;
+}
+
+void yama::internal::ast_ConstexprGuaranteeExpr::fmt(ast_formatter& x) {
+    x.open("ConstexprGuaranteeExpr", low_pos(), high_pos(), id);
+    if (expr) {
+        x.next("expr");
+        expr->fmt(x);
+    }
+    x.close();
+}
+
+void yama::internal::ast_ConstexprGuaranteeExpr::accept(ast_visitor& x) {
+    x.visit_begin(expect<ast_ConstexprGuaranteeExpr>());
+    if (expr) {
+        expr->accept(x);
+    }
+    x.visit_end(expect<ast_ConstexprGuaranteeExpr>());
+}
+
+void yama::internal::ast_ConstexprGuaranteeExpr::do_give(res<ast_Expr> x) {
+    YAMA_ASSERT(!expr);
+    expr = x;
 }
 
 std::shared_ptr<yama::internal::ast_node> yama::internal::ast_Lit::get_lit() {
@@ -896,10 +944,6 @@ void yama::internal::ast_Assign::accept(ast_visitor& x) {
 
 void yama::internal::ast_Assign::do_give(res<ast_Expr> x) {
     expr = x;
-}
-
-bool yama::internal::ast_Args::is_constexpr_guarantee_expr_args() const noexcept {
-    return index == 0 && parent()->expect<ast_Expr>()->has_const_kw;
 }
 
 void yama::internal::ast_Args::fmt(ast_formatter& x) {
@@ -1053,7 +1097,7 @@ void yama::internal::ast_parser::listener::on_syntactic(taul::ppr_ref ppr, taul:
 #define _YAMA_UNIT_(nm) \
 if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()._next_id))
 
-    static_assert(ast_types == 33); // reminder
+    static_assert(ast_types == 35); // reminder
 
     _YAMA_UNIT_(Chunk);
     else _YAMA_UNIT_(Decl);
@@ -1075,6 +1119,8 @@ if (ppr.name() == #nm ""_str) stk().push_back(make_res<ast_ ## nm>(pos, client()
     else _YAMA_UNIT_(ReturnStmt);
     else _YAMA_UNIT_(Expr);
     else _YAMA_UNIT_(PrimaryExpr);
+    else _YAMA_UNIT_(ParenthesizedExpr);
+    else _YAMA_UNIT_(ConstexprGuaranteeExpr);
     else _YAMA_UNIT_(Lit);
     else _YAMA_UNIT_(IntLit);
     else _YAMA_UNIT_(UIntLit);

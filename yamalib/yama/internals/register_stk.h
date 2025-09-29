@@ -86,7 +86,7 @@ namespace yama::internal {
 
         void reinit_temp(ssize_t index, ctype new_type); // changes type of existing temporaries/local vars
         void promote_to_localvar(ast_VarDecl& x); // *promotes* top temporary to a local var, updating its symbol table entry
-        bool type_check_reg(ssize_t index, ctype expected); // type checks a register
+        bool type_check_reg(ssize_t index, ctype expected, bool allow_coercion); // type checks a register
 
 
     private:

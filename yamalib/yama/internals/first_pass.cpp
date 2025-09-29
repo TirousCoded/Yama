@@ -90,6 +90,14 @@ void yama::internal::first_pass::visit_begin(res<ast_PrimaryExpr> x) {
     tu->cs->ea.acknowledge(*tu, *x);
 }
 
+void yama::internal::first_pass::visit_begin(res<ast_ParenthesizedExpr> x) {
+    tu->cs->ea.acknowledge(*tu, *x);
+}
+
+void yama::internal::first_pass::visit_begin(res<ast_ConstexprGuaranteeExpr> x) {
+    tu->cs->ea.acknowledge(*tu, *x);
+}
+
 void yama::internal::first_pass::visit_begin(res<ast_Assign> x) {
     tu->cs->ea.add_root(deref_assert(x->expr));
 }

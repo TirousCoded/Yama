@@ -80,6 +80,7 @@ yama::internal::translation_unit::translation_unit(compiler& cs, taul::source_co
     cgt(*this),
     syms(*this),
     types(*this),
+    convs(*this),
     ctp(*this),
     rs(*this),
     ast(),

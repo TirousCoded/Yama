@@ -46,13 +46,14 @@ namespace yama::internal {
             float_lit,
             bool_lit,
             char_lit,
+            parenthesized,
+            constexpr_guarantee,
             bound_method_call,
             call,
             unbound_method,
             bound_method,
             conv,
             default_init,
-            constexpr_guarantee,
 
             num,
         };
@@ -60,7 +61,7 @@ namespace yama::internal {
         static constexpr size_t categories = size_t(category::num);
 
         static inline std::string fmt_category(category x) {
-            static_assert(categories == 15);
+            static_assert(categories == 16);
             switch (x) {
             case category::param_id:                return "param id expr";
             case category::var_id:                  return "local var id expr";
@@ -70,32 +71,32 @@ namespace yama::internal {
             case category::float_lit:               return "float literal expr";
             case category::bool_lit:                return "bool literal expr";
             case category::char_lit:                return "char literal expr";
+            case category::parenthesized:           return "parenthesized expr";
+            case category::constexpr_guarantee:     return "constexpr guarantee expr";
             case category::bound_method_call:       return "bound method call expr";
             case category::call:                    return "call expr";
             case category::unbound_method:          return "unbound method expr";
             case category::bound_method:            return "bound method expr";
             case category::conv:                    return "conversion expr";
             case category::default_init:            return "default initialize expr";
-            case category::constexpr_guarantee:     return "constexpr guarantee expr";
             default: YAMA_DEADEND; break;
             }
             return std::string();
         }
 
-        // TODO: if process crashes, look into if the problem is us failing to account for
-        //       if a composite expr is provided w/ invalid operand exprs
+        // TODO: If process crashes, look into if the problem is us failing to account for
+        //       if a composite expr is provided w/ invalid operand exprs.
 
         struct metadata final {
             safeptr<translation_unit>   tu;
-            taul::source_pos            where;                              // where in src is expr considered to exist
+            taul::source_pos            where;                              // Where in src is expr considered to exist.
             mode                        mode;
             category                    category;
-            std::optional<ctype>        type                = std::nullopt; // empty if invalid
-            std::optional<cvalue>       crvalue             = std::nullopt; // precomputed value, if any
+            std::optional<ctype>        type                = std::nullopt; // Empty if invalid. This is prior to implicit conv.
+            std::optional<cvalue>       crvalue             = std::nullopt; // Precomputed value, if any. This is prior to implicit conv.
 
 
-            // metadata w/out type indicates expr was in error
-
+            // metadata w/out type indicates expr was in error.
             inline bool good() const noexcept { return type.has_value(); }
 
 
@@ -132,6 +133,10 @@ namespace yama::internal {
         metadata& operator[](const ast_expr& x);
         metadata& operator[](const ast_TypeSpec& x); // forwards to expr
 
+        // TODO: crvalue_to_type currently DOES NOT use conv_manager_local to perform implicit
+        //       conversion legality checks. This is fine for now, but we may want to change
+        //       this later as part of a backend refactor.
+
         // crvalue specifically tries to query the precomputed value of the expr
 
         std::optional<cvalue> crvalue(const ast_expr& x);
@@ -150,8 +155,8 @@ namespace yama::internal {
         // codegen_nr is used for situations where the ultimate result of the expr tree
         // is not needed, enabling codegen optimization
 
-        void codegen(const ast_Expr& root, size_t ret);
-        void codegen_nr(const ast_Expr& root);
+        void codegen(const ast_Expr& root, size_t ret, std::optional<ctype> convert_to = std::nullopt);
+        void codegen_nr(const ast_Expr& root, std::optional<ctype> convert_to = std::nullopt);
 
         // IMPORTANT: analyze MUST be called after first passes, but before second passes
 
@@ -195,12 +200,16 @@ namespace yama::internal {
 
         bool _resolve(const ast_expr& x);
         bool _resolve(const ast_PrimaryExpr& x);
+        bool _resolve(const ast_ParenthesizedExpr& x);
+        bool _resolve(const ast_ConstexprGuaranteeExpr& x);
         bool _resolve(const ast_Args& x);
         bool _resolve(const ast_Conv& x);
         bool _resolve(const ast_TypeMember& x);
         bool _resolve(const ast_ObjectMember& x);
         bool _resolve(const ast_Expr& x);
 
+        bool _resolve_children(const ast_ParenthesizedExpr& x);
+        bool _resolve_children(const ast_ConstexprGuaranteeExpr& x);
         bool _resolve_children(const ast_Args& x);
         bool _resolve_children(const ast_Conv& x);
         bool _resolve_children(const ast_TypeMember& x);
@@ -208,6 +217,8 @@ namespace yama::internal {
         bool _resolve_children(const ast_Expr& x);
 
         category _discern_category(const ast_PrimaryExpr& x);
+        category _discern_category(const ast_ParenthesizedExpr& x);
+        category _discern_category(const ast_ConstexprGuaranteeExpr& x);
         category _discern_category(const ast_Args& x);
         category _discern_category(const ast_Conv& x);
         category _discern_category(const ast_TypeMember& x);
@@ -215,6 +226,8 @@ namespace yama::internal {
         category _discern_category(const ast_Expr& x);
 
         bool _resolve_expr(const ast_PrimaryExpr& x);
+        bool _resolve_expr(const ast_ParenthesizedExpr& x);
+        bool _resolve_expr(const ast_ConstexprGuaranteeExpr& x);
         bool _resolve_expr(const ast_Args& x);
         bool _resolve_expr(const ast_Conv& x);
         bool _resolve_expr(const ast_TypeMember& x);
@@ -233,35 +246,25 @@ namespace yama::internal {
         // It is also the caller's responsibility to try and avoid situations where flagging as
         // reinit is not necessary (as this lowers quality of static verif a little bit.)
 
-        void _codegen(const ast_Expr& root, std::optional<size_t> ret);
-        void _codegen_step(const ast_expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen(const ast_Expr& root, std::optional<size_t> ret, std::optional<ctype> convert_to = std::nullopt);
+        void _codegen_step(const ast_expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false, std::optional<ctype> convert_to = std::nullopt);
         void _codegen_step(const ast_PrimaryExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_ParenthesizedExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_ConstexprGuaranteeExpr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
         void _codegen_step(const ast_Args& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
         void _codegen_step(const ast_Conv& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
         void _codegen_step(const ast_TypeMember& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
         void _codegen_step(const ast_ObjectMember& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
-        void _codegen_step(const ast_Expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+        void _codegen_step(const ast_Expr& x, std::optional<size_t> ret, bool ret_puts_must_reinit = false, std::optional<ctype> convert_to = std::nullopt);
 
         mode _discern_mode(const ast_base_expr& x) const noexcept;
         mode _discern_mode(const ast_suffix_expr& x) const noexcept;
         mode _discern_mode(const ast_Expr& x) const noexcept;
 
+        void _emit_put_crvalue(const ast_expr& x, cvalue crvalue, std::optional<size_t> ret, bool ret_puts_must_reinit = false);
+
         std::optional<cvalue> _default_init_crvalue(ctype type, metadata& md);
         std::optional<cvalue> _conv_crvalue(std::optional<cvalue> x, ctype target, metadata& md);
-
-        enum class _conv_type : uint8_t {
-            identity,
-            primitive_type,
-            fn_or_method_type_narrowed_to_type_type,
-            illegal,
-        };
-
-        _conv_type _discern_conv_type(ctype from, ctype to, metadata& md);
-        bool _conv_is_legal(ctype from, ctype to, metadata& md);
-        bool _conv_has_side_effects(ctype from, ctype to, metadata& md);
-        bool _is_identity_conv(ctype from, ctype to);
-        bool _is_primitive_type_conv(ctype from, ctype to, metadata& md);
-        bool _is_fn_or_method_type_narrowed_to_type_type_conv(ctype from, ctype to, metadata& md);
 
         bool _is_type_ref_id_expr(const ast_PrimaryExpr& x);
 
@@ -275,12 +278,10 @@ namespace yama::internal {
         bool _raise_nonassignable_expr_if(bool x, metadata& md);
         bool _raise_nonconstexpr_expr_if(bool x, metadata& md);
         bool _raise_wrong_arg_count_if(bool x, metadata& md, size_t actual_args, size_t expected_args);
-        bool _raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t expected_args);
-        bool _raise_wrong_arg_count_for_bound_method_call_if(bool x, metadata& md, ctype method, size_t expected_args);
+        bool _raise_wrong_arg_count_if(bool x, metadata& md, ctype call_to, size_t actual_args, size_t expected_args);
         bool _raise_invalid_operation_due_to_noncallable_type_if(bool x, metadata& md, ctype t);
         bool _raise_invalid_operation_due_to_illegal_conv_if(ctype from, ctype to, metadata& md);
-        bool _raise_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number);
-        bool _raise_type_mismatch_for_initialized_type_if(ctype actual, ctype expected, metadata& md);
+        bool _raise_coerced_type_mismatch_for_arg_if(ctype actual, ctype expected, metadata& md, size_t arg_display_number);
         bool _raise_type_mismatch_for_conv_target_if(ctype actual, metadata& md);
 
 

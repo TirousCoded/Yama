@@ -2348,7 +2348,7 @@ TEST_F(ContextTests, Conv_IdentityConvs) {
     ASSERT_TRUE(ctx->push_uint(10).good());
     ASSERT_TRUE(ctx->push_float(3.14159).good());
     ASSERT_TRUE(ctx->push_bool(true).good());
-    ASSERT_TRUE(ctx->push_char(U'&').good());
+    ASSERT_TRUE(ctx->push_char(U'魂').good());
     ASSERT_TRUE(ctx->push_type(Struct).good());
     ASSERT_TRUE(ctx->push_fn(Fn).good());
     ASSERT_TRUE(ctx->push_fn(Struct_m).good());
@@ -2396,7 +2396,7 @@ TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     succeed(*ctx, ctx->new_float(-3.14159), ctx->new_int(yama::int_t(-3.14159)), dm->int_type());
     succeed(*ctx, ctx->new_bool(true), ctx->new_int(1), dm->int_type());
     succeed(*ctx, ctx->new_bool(false), ctx->new_int(0), dm->int_type());
-    succeed(*ctx, ctx->new_char(U'&'), ctx->new_int(yama::int_t(U'&')), dm->int_type());
+    succeed(*ctx, ctx->new_char(U'魂'), ctx->new_int(yama::int_t(U'魂')), dm->int_type());
     fail(*ctx, ctx->new_type(ctx->int_type()), dm->int_type());
 
     fail(*ctx, ctx->new_none(), dm->uint_type());
@@ -2410,7 +2410,7 @@ TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     succeed(*ctx, ctx->new_float(-3.14159), ctx->new_uint(yama::uint_t(-3.14159)), dm->uint_type());
     succeed(*ctx, ctx->new_bool(true), ctx->new_uint(1), dm->uint_type());
     succeed(*ctx, ctx->new_bool(false), ctx->new_uint(0), dm->uint_type());
-    succeed(*ctx, ctx->new_char(U'&'), ctx->new_uint(yama::uint_t(U'&')), dm->uint_type());
+    succeed(*ctx, ctx->new_char(U'魂'), ctx->new_uint(yama::uint_t(U'魂')), dm->uint_type());
     fail(*ctx, ctx->new_type(ctx->int_type()), dm->uint_type());
 
     fail(*ctx, ctx->new_none(), dm->float_type());
@@ -2424,7 +2424,7 @@ TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     succeed(*ctx, ctx->new_uint(max_u), ctx->new_float(yama::float_t(max_u)), dm->float_type());
     succeed(*ctx, ctx->new_bool(true), ctx->new_float(1), dm->float_type());
     succeed(*ctx, ctx->new_bool(false), ctx->new_float(0), dm->float_type());
-    succeed(*ctx, ctx->new_char(U'&'), ctx->new_float(yama::float_t(U'&')), dm->float_type());
+    succeed(*ctx, ctx->new_char(U'魂'), ctx->new_float(yama::float_t(U'魂')), dm->float_type());
     fail(*ctx, ctx->new_type(ctx->int_type()), dm->float_type());
 
     fail(*ctx, ctx->new_none(), dm->bool_type());
@@ -2441,13 +2441,13 @@ TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     succeed(*ctx, ctx->new_float(yama::float_t(max_i)), ctx->new_bool(true), dm->bool_type());
     succeed(*ctx, ctx->new_float(-1), ctx->new_bool(true), dm->bool_type());
     succeed(*ctx, ctx->new_float(min_i), ctx->new_bool(true), dm->bool_type());
-    succeed(*ctx, ctx->new_char(U'&'), ctx->new_bool(yama::bool_t(U'&')), dm->bool_type());
+    succeed(*ctx, ctx->new_char(U'魂'), ctx->new_bool(yama::bool_t(U'魂')), dm->bool_type());
     fail(*ctx, ctx->new_type(ctx->int_type()), dm->bool_type());
 
     fail(*ctx, ctx->new_none(), dm->char_type());
-    succeed(*ctx, ctx->new_int(yama::int_t(U'&')), ctx->new_char(U'&'), dm->char_type());
-    succeed(*ctx, ctx->new_uint(yama::uint_t(U'&')), ctx->new_char(U'&'), dm->char_type());
-    succeed(*ctx, ctx->new_float(yama::float_t(U'&')), ctx->new_char(U'&'), dm->char_type());
+    succeed(*ctx, ctx->new_int(yama::int_t(U'魂')), ctx->new_char(U'魂'), dm->char_type());
+    succeed(*ctx, ctx->new_uint(yama::uint_t(U'魂')), ctx->new_char(U'魂'), dm->char_type());
+    succeed(*ctx, ctx->new_float(yama::float_t(U'魂')), ctx->new_char(U'魂'), dm->char_type());
     succeed(*ctx, ctx->new_bool(true), ctx->new_char(yama::char_t(true)), dm->char_type());
     fail(*ctx, ctx->new_type(ctx->int_type()), dm->char_type());
 
@@ -2456,7 +2456,7 @@ TEST_F(ContextTests, Conv_PrimitiveTypeConvs) {
     fail(*ctx, ctx->new_uint(0), dm->type_type());
     fail(*ctx, ctx->new_float(0.0), dm->type_type());
     fail(*ctx, ctx->new_bool(false), dm->type_type());
-    fail(*ctx, ctx->new_char(U'&'), dm->type_type());
+    fail(*ctx, ctx->new_char(U'魂'), dm->type_type());
 }
 
 TEST_F(ContextTests, Conv_FnOrMethodTypeNarrowedToTypeTypeConvs) {
@@ -2510,7 +2510,7 @@ TEST_F(ContextTests, Conv_IllegalConvsInvolvingNonPrimitiveTypes) {
         fail(*ctx, ctx->new_uint(0), t);
         fail(*ctx, ctx->new_float(0.0), t);
         fail(*ctx, ctx->new_bool(false), t);
-        fail(*ctx, ctx->new_char(U'&'), t);
+        fail(*ctx, ctx->new_char(U'魂'), t);
         fail(*ctx, ctx->new_type(ctx->int_type()), t);
 
         // non-prim -> prim

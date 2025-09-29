@@ -36,7 +36,7 @@ namespace yama::internal {
         second_pass(translation_unit& tu);
 
 
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
 
         //void visit_begin(res<ast_Chunk> x) override final;
         //void visit_begin(res<ast_Decl> x) override final;
@@ -58,6 +58,8 @@ namespace yama::internal {
         //void visit_begin(res<ast_ReturnStmt> x) override final;
         //void visit_begin(res<ast_Expr> x) override final;
         //void visit_begin(res<ast_PrimaryExpr> x) override final;
+        //void visit_begin(res<ast_ParenthesizedExpr> x) override final;
+        //void visit_begin(res<ast_ConstexprGuaranteeExpr> x) override final;
         //void visit_begin(res<ast_Lit> x) override final;
         //void visit_begin(res<ast_IntLit> x) override final;
         //void visit_begin(res<ast_UIntLit> x) override final;
@@ -72,7 +74,7 @@ namespace yama::internal {
         //void visit_begin(res<ast_TypeAnnot> x) override final;
         void visit_begin(res<ast_TypeSpec> x) override final;
 
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
 
         //void visit_end(res<ast_Chunk> x) override final;
         //void visit_end(res<ast_Decl> x) override final;
@@ -94,6 +96,8 @@ namespace yama::internal {
         void visit_end(res<ast_ReturnStmt> x) override final;
         //void visit_end(res<ast_Expr> x) override final;
         //void visit_end(res<ast_PrimaryExpr> x) override final;
+        //void visit_end(res<ast_ParenthesizedExpr> x) override final;
+        //void visit_end(res<ast_ConstexprGuaranteeExpr> x) override final;
         //void visit_end(res<ast_Lit> x) override final;
         //void visit_end(res<ast_IntLit> x) override final;
         //void visit_end(res<ast_UIntLit> x) override final;

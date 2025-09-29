@@ -52,6 +52,8 @@ namespace yama::internal {
         ReturnStmt,
         Expr,
         PrimaryExpr,
+        ParenthesizedExpr,
+        ConstexprGuaranteeExpr,
         Lit,
         IntLit,
         UIntLit,
@@ -72,41 +74,43 @@ namespace yama::internal {
     constexpr size_t ast_types = (size_t)ast_type::num;
 
     inline std::string fmt_ast_type(ast_type x) {
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
         switch (x) {
-        case ast_type::Chunk:               return "Chunk";
-        case ast_type::Decl:                return "Decl";
-        case ast_type::ImportDecl:          return "ImportDecl";
-        case ast_type::RelativePath:        return "RelativePath";
-        case ast_type::VarDecl:             return "VarDecl";
-        case ast_type::FnDecl:              return "FnDecl";
-        case ast_type::StructDecl:          return "StructDecl";
-        case ast_type::CallSig:             return "CallSig";
-        case ast_type::ParamDecl:           return "ParamDecl";
-        case ast_type::Result:              return "Result";
-        case ast_type::Block:               return "Block";
-        case ast_type::Stmt:                return "Stmt";
-        case ast_type::ExprStmt:            return "ExprStmt";
-        case ast_type::IfStmt:              return "IfStmt";
-        case ast_type::LoopStmt:            return "LoopStmt";
-        case ast_type::BreakStmt:           return "BreakStmt";
-        case ast_type::ContinueStmt:        return "ContinueStmt";
-        case ast_type::ReturnStmt:          return "ReturnStmt";
-        case ast_type::Expr:                return "Expr";
-        case ast_type::PrimaryExpr:         return "PrimaryExpr";
-        case ast_type::Lit:                 return "Lit";
-        case ast_type::IntLit:              return "IntLit";
-        case ast_type::UIntLit:             return "UIntLit";
-        case ast_type::FloatLit:            return "FloatLit";
-        case ast_type::BoolLit:             return "BoolLit";
-        case ast_type::CharLit:             return "CharLit";
-        case ast_type::Assign:              return "Assign";
-        case ast_type::Args:                return "Args";
-        case ast_type::Conv:                return "Conv";
-        case ast_type::TypeMember:          return "TypeMember";
-        case ast_type::ObjectMember:        return "ObjectMember";
-        case ast_type::TypeAnnot:           return "TypeAnnot";
-        case ast_type::TypeSpec:            return "TypeSpec";
+        case ast_type::Chunk:                   return "Chunk";
+        case ast_type::Decl:                    return "Decl";
+        case ast_type::ImportDecl:              return "ImportDecl";
+        case ast_type::RelativePath:            return "RelativePath";
+        case ast_type::VarDecl:                 return "VarDecl";
+        case ast_type::FnDecl:                  return "FnDecl";
+        case ast_type::StructDecl:              return "StructDecl";
+        case ast_type::CallSig:                 return "CallSig";
+        case ast_type::ParamDecl:               return "ParamDecl";
+        case ast_type::Result:                  return "Result";
+        case ast_type::Block:                   return "Block";
+        case ast_type::Stmt:                    return "Stmt";
+        case ast_type::ExprStmt:                return "ExprStmt";
+        case ast_type::IfStmt:                  return "IfStmt";
+        case ast_type::LoopStmt:                return "LoopStmt";
+        case ast_type::BreakStmt:               return "BreakStmt";
+        case ast_type::ContinueStmt:            return "ContinueStmt";
+        case ast_type::ReturnStmt:              return "ReturnStmt";
+        case ast_type::Expr:                    return "Expr";
+        case ast_type::PrimaryExpr:             return "PrimaryExpr";
+        case ast_type::ParenthesizedExpr:       return "ParenthesizedExpr";
+        case ast_type::ConstexprGuaranteeExpr:  return "ConstexprGuaranteeExpr";
+        case ast_type::Lit:                     return "Lit";
+        case ast_type::IntLit:                  return "IntLit";
+        case ast_type::UIntLit:                 return "UIntLit";
+        case ast_type::FloatLit:                return "FloatLit";
+        case ast_type::BoolLit:                 return "BoolLit";
+        case ast_type::CharLit:                 return "CharLit";
+        case ast_type::Assign:                  return "Assign";
+        case ast_type::Args:                    return "Args";
+        case ast_type::Conv:                    return "Conv";
+        case ast_type::TypeMember:              return "TypeMember";
+        case ast_type::ObjectMember:            return "ObjectMember";
+        case ast_type::TypeAnnot:               return "TypeAnnot";
+        case ast_type::TypeSpec:                return "TypeSpec";
         default: YAMA_DEADEND; break;
         }
         return std::string{};
@@ -145,7 +149,7 @@ namespace yama::internal {
     class ast_base_expr;
     class ast_suffix_expr;
 
-    static_assert(ast_types == 33); // reminder
+    static_assert(ast_types == 35); // reminder
 
     class ast_Chunk;
     class ast_Decl;
@@ -167,6 +171,8 @@ namespace yama::internal {
     class ast_ReturnStmt;
     class ast_Expr;
     class ast_PrimaryExpr;
+    class ast_ParenthesizedExpr;
+    class ast_ConstexprGuaranteeExpr;
     class ast_Lit;
     class ast_IntLit;
     class ast_UIntLit;
@@ -191,7 +197,7 @@ namespace yama::internal {
 
         // visit_begin is fired before propagating to children
 
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
 
         inline virtual void visit_begin(res<ast_Chunk> x) {}
         inline virtual void visit_begin(res<ast_Decl> x) {}
@@ -213,6 +219,8 @@ namespace yama::internal {
         inline virtual void visit_begin(res<ast_ReturnStmt> x) {}
         inline virtual void visit_begin(res<ast_Expr> x) {}
         inline virtual void visit_begin(res<ast_PrimaryExpr> x) {}
+        inline virtual void visit_begin(res<ast_ParenthesizedExpr> x) {}
+        inline virtual void visit_begin(res<ast_ConstexprGuaranteeExpr> x) {}
         inline virtual void visit_begin(res<ast_Lit> x) {}
         inline virtual void visit_begin(res<ast_IntLit> x) {}
         inline virtual void visit_begin(res<ast_UIntLit> x) {}
@@ -229,7 +237,7 @@ namespace yama::internal {
 
         // visit_end is fired after propagating to children
 
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
 
         inline virtual void visit_end(res<ast_Chunk> x) {}
         inline virtual void visit_end(res<ast_Decl> x) {}
@@ -251,6 +259,8 @@ namespace yama::internal {
         inline virtual void visit_end(res<ast_ReturnStmt> x) {}
         inline virtual void visit_end(res<ast_Expr> x) {}
         inline virtual void visit_end(res<ast_PrimaryExpr> x) {}
+        inline virtual void visit_end(res<ast_ParenthesizedExpr> x) {}
+        inline virtual void visit_end(res<ast_ConstexprGuaranteeExpr> x) {}
         inline virtual void visit_end(res<ast_Lit> x) {}
         inline virtual void visit_end(res<ast_IntLit> x) {}
         inline virtual void visit_end(res<ast_UIntLit> x) {}
@@ -424,7 +434,7 @@ namespace yama::internal {
 
 
     protected:
-        static_assert(ast_types == 33); // reminder
+        static_assert(ast_types == 35); // reminder
 
         inline virtual void do_give(taul::token x) {}
         inline virtual void do_give(res<ast_Chunk> x) {}
@@ -447,6 +457,8 @@ namespace yama::internal {
         inline virtual void do_give(res<ast_ReturnStmt> x) {}
         inline virtual void do_give(res<ast_Expr> x) {}
         inline virtual void do_give(res<ast_PrimaryExpr> x) {}
+        inline virtual void do_give(res<ast_ParenthesizedExpr> x) {}
+        inline virtual void do_give(res<ast_ConstexprGuaranteeExpr> x) {}
         inline virtual void do_give(res<ast_Lit> x) {}
         inline virtual void do_give(res<ast_IntLit> x) {}
         inline virtual void do_give(res<ast_UIntLit> x) {}
@@ -992,7 +1004,6 @@ namespace yama::internal {
 
         std::shared_ptr<ast_base_expr> base;
         std::vector<res<ast_suffix_expr>> suffixes;
-        bool has_const_kw = false;
         bool is_type_spec_crvalue = false;
         bool is_assign_stmt_lvalue = false;
 
@@ -1009,8 +1020,9 @@ namespace yama::internal {
 
 
     protected:
-        void do_give(taul::token x) override final;
         void do_give(res<ast_PrimaryExpr> x) override final;
+        void do_give(res<ast_ParenthesizedExpr> x) override final;
+        void do_give(res<ast_ConstexprGuaranteeExpr> x) override final;
         void do_give(res<ast_Args> x) override final;
         void do_give(res<ast_Conv> x) override final;
         void do_give(res<ast_TypeMember> x) override final;
@@ -1046,6 +1058,48 @@ namespace yama::internal {
     protected:
         void do_give(taul::token x) override final;
         void do_give(res<ast_Lit> x) override final;
+    };
+    
+    class ast_ParenthesizedExpr final : public ast_base_expr {
+    public:
+        static constexpr auto ast_type_value = ast_type::ParenthesizedExpr;
+
+
+        std::shared_ptr<ast_Expr> expr;
+
+
+        inline ast_ParenthesizedExpr(taul::source_pos pos, ast_id_t id)
+            : ast_base_expr(pos, id, ast_type_value) {}
+
+
+        inline void give_to(ast_node& target) override final { target.dispatch_give(res<ast_ParenthesizedExpr>(shared_from_this())); }
+        void fmt(ast_formatter& x) override final;
+        void accept(ast_visitor& x) override final;
+
+
+    protected:
+        void do_give(res<ast_Expr> x) override final;
+    };
+
+    class ast_ConstexprGuaranteeExpr final : public ast_base_expr {
+    public:
+        static constexpr auto ast_type_value = ast_type::ConstexprGuaranteeExpr;
+
+
+        std::shared_ptr<ast_Expr> expr;
+
+
+        inline ast_ConstexprGuaranteeExpr(taul::source_pos pos, ast_id_t id)
+            : ast_base_expr(pos, id, ast_type_value) {}
+
+
+        inline void give_to(ast_node& target) override final { target.dispatch_give(res<ast_ConstexprGuaranteeExpr>(shared_from_this())); }
+        void fmt(ast_formatter& x) override final;
+        void accept(ast_visitor& x) override final;
+
+
+    protected:
+        void do_give(res<ast_Expr> x) override final;
     };
     
     class ast_Lit final : public ast_node {
@@ -1230,9 +1284,6 @@ namespace yama::internal {
 
         inline ast_Args(taul::source_pos pos, ast_id_t id)
             : ast_suffix_expr(pos, id, ast_type_value) {}
-
-
-        bool is_constexpr_guarantee_expr_args() const noexcept;
 
 
         inline void give_to(ast_node& target) override final { target.dispatch_give(res<ast_Args>(shared_from_this())); }

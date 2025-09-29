@@ -202,13 +202,16 @@ parser section:
                                         ( ObjectMember                  # object member access expr
                                         | Conv                          # conversion expr
                                         )
-                                    | CONST Args                        # constexpr guarantee expr
+                                    | ConstexprGuaranteeExpr            # constexpr guarantee expr
+                                    | ParenthesizedExpr                 # parenthesized expr
                                     | PrimaryExpr                       # primary expr
                                     ;
 
     PrimaryExpr                     : IDENTIFIER ( COLON IDENTIFIER )?  # identifier expr
                                     | Lit                               # literal expr
                                     ;
+    ParenthesizedExpr               : L_ROUND Expr R_ROUND ;
+    ConstexprGuaranteeExpr          : CONST L_ROUND Expr R_ROUND ;
 
     Lit                             : IntLit
                                     | UIntLit

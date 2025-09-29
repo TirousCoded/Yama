@@ -464,6 +464,18 @@ namespace yama {
         //       is currently a stub until we add support for conversions which are themselves
         //       not able to be constexpr, even if the converted expr is constexpr.
 
+        // TODO: At present, the stmt 'return;' DOES NOT attempt to perform an implicit conv
+        //       None() to the return type, meaning that it does NOT 100% line up w/ the behaviour
+        //       of a (supposedly equivalent) 'return None();' stmt.
+        //
+        //       Our unit tests don't assert either way w/ regards to whether an implicit conv is/isn't
+        //       expected.
+        //
+        //       At some point try and update our unit tests to cover this edgecase. I'm not 100%
+        //       sure if we at the moment are able to properly unit test this though, at least w/
+        //       regards to expecting an implicit conv to occur (as that would require us to be able
+        //       to coerce None *into* something else.)
+
         // conv loads an object into register dest (dest may be newtop) produced by converting
         // the value of the object at src into type t.
         //
