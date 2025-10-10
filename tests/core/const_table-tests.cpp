@@ -20,7 +20,7 @@ TEST(ConstTableTests, Construction) {
         .add_char(U'y')
         .add_primitive_type("abc"_str)
         .add_function_type("def"_str, yama::make_callsig({ 5, 6, 5 }, 5))
-        .add_method_type("abc.m"_str, yama::make_callsig({ 5, 6, 5 }, 5))
+        .add_method_type("abc:m"_str, yama::make_callsig({ 5, 6, 5 }, 5))
         .add_struct_type("ghi"_str);
 
     EXPECT_EQ(a.size(), yama::const_types);
@@ -47,7 +47,7 @@ TEST(ConstTableTests, Construction) {
     // NOTE: need 'ff' to stop the macro from messing up
     const auto ff = yama::function_type_const_info{ "def"_str, yama::make_callsig({ 5, 6, 5 }, 5) };
     EXPECT_EQ(*a.get<yama::function_type_const>(6), ff);
-    const auto mm = yama::method_type_const_info{ "abc.m"_str, yama::make_callsig({ 5, 6, 5 }, 5) };
+    const auto mm = yama::method_type_const_info{ "abc:m"_str, yama::make_callsig({ 5, 6, 5 }, 5) };
     EXPECT_EQ(*a.get<yama::method_type_const>(7), mm);
     EXPECT_EQ(*a.get<yama::struct_type_const>(8), yama::struct_type_const_info{ "ghi"_str });
 

@@ -35,7 +35,7 @@ namespace yama {
         function_type,      // function type ref constant
         method_type,        // method type ref constant
         struct_type,        // struct type ref constant
-
+        
         num,                // this is not a valid constant type
     };
 

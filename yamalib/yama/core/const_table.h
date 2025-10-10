@@ -33,7 +33,6 @@ namespace yama {
         bool operator==(const int_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct uint_const_info final {
         uint_t          v;
 
@@ -41,7 +40,6 @@ namespace yama {
         bool operator==(const uint_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct float_const_info final {
         float_t         v;
 
@@ -49,7 +47,6 @@ namespace yama {
         bool operator==(const float_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct bool_const_info final {
         bool_t          v;
 
@@ -57,7 +54,6 @@ namespace yama {
         bool operator==(const bool_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct char_const_info final {
         char_t          v;
 
@@ -65,7 +61,6 @@ namespace yama {
         bool operator==(const char_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct primitive_type_const_info final {
         str             qualified_name;
 
@@ -75,7 +70,6 @@ namespace yama {
         bool operator==(const primitive_type_const_info&) const noexcept = default;
         std::string fmt(const const_table&) const;
     };
-
     struct function_type_const_info final {
         str             qualified_name;
         callsig    callsig;
@@ -86,7 +80,6 @@ namespace yama {
         bool operator==(const function_type_const_info&) const noexcept = default;
         std::string fmt(const const_table& consts) const;
     };
-    
     struct method_type_const_info final {
         str             qualified_name;
         callsig    callsig;
@@ -97,7 +90,6 @@ namespace yama {
         bool operator==(const method_type_const_info&) const noexcept = default;
         std::string fmt(const const_table& consts) const;
     };
-
     struct struct_type_const_info final {
         str             qualified_name;
 

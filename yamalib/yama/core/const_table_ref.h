@@ -31,13 +31,6 @@ namespace yama {
         const_table_ref& operator=(const_table_ref&&) noexcept = default;
 
 
-        // TODO: The unit tests for methods like 'get', 'const_type', 'item', etc.
-        //       haven't really been expanded as we've adding things like new kinds
-        //       of items.
-
-        // TODO: Update our is_stub unit tests when we add items w/ stubs in their
-        //       otherwise resolved constant table (also update Get_Stub!)
-
         // Returns the size of the constant table.
         size_t size() const noexcept;
 
@@ -80,7 +73,7 @@ YAMA_SETUP_FORMAT(yama::const_table_ref, x.fmt());
 template<yama::const_type C>
 inline std::optional<yama::const_data_of_t<C>> yama::const_table_ref::get(const_t x) const noexcept {
     if (x >= size())                return std::nullopt; // Out-of-bounds.
-    if (!_mem.elems()[x].holds(C))  return std::nullopt; // Wrong const_type, or is a stub.
+    if (!_mem.elems()[x].holds(C))  return std::nullopt; // Wrong const_type.
     return _mem.elems()[x].as<C>();
 }
 

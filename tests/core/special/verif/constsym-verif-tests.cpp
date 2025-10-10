@@ -48,7 +48,6 @@ void ConstSymVerifTests::should_fail() {
     EXPECT_FALSE(_test());
 }
 bool ConstSymVerifTests::_test() {
-#if 1
     yama::module m{};
     EXPECT_TRUE(m.add_primitive("a"_str, consts, yama::ptype::bool0));
     return yama::verifier(dbg).verify(
@@ -56,13 +55,6 @@ bool ConstSymVerifTests::_test() {
         // Map names 'yama' and 'abc' to arbitrary parcel IDs.
         yama::parcel_metadata{ "self"_str, { "yama"_str, "abc"_str } },
         "abc"_str);
-#else
-    return yama::verifier(dbg).verify(
-        yama::make_primitive("a"_str, consts, yama::ptype::bool0),
-        // Map names 'yama' and 'abc' to arbitrary parcel IDs.
-        yama::parcel_metadata{ "self"_str, { "yama"_str, "abc"_str } },
-        "abc"_str);
-#endif
 }
 
 

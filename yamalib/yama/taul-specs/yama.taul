@@ -79,6 +79,7 @@ lexer section:
     FALSE                           : 'false' EOW ;
     INF                             : 'inf' EOW ;
     NAN                             : 'nan' EOW ;
+    SELF                            : 'Self' EOW ;
     CONST                           : 'const' EOW ;
     VAR                             : 'var' EOW ;
     FN                              : 'fn' EOW ;
@@ -202,6 +203,7 @@ parser section:
                                         ( ObjectMember                  # object member access expr
                                         | Conv                          # conversion expr
                                         )
+                                    | OwnerTypeExpr                     # owner type expr
                                     | ConstexprGuaranteeExpr            # constexpr guarantee expr
                                     | ParenthesizedExpr                 # parenthesized expr
                                     | PrimaryExpr                       # primary expr
@@ -212,6 +214,7 @@ parser section:
                                     ;
     ParenthesizedExpr               : L_ROUND Expr R_ROUND ;
     ConstexprGuaranteeExpr          : CONST L_ROUND Expr R_ROUND ;
+    OwnerTypeExpr                   : SELF ;
 
     Lit                             : IntLit
                                     | UIntLit
