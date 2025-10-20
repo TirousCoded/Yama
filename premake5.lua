@@ -49,9 +49,14 @@ workspace "Yama"
 		architecture "x86_64"
 	
 include "yamalib"
---include "yama" -- for CLI app later
 include "tests"
 include "sandbox"
+
+-- TODO: Don't forget to update 'Build > Configuration Manager' when we regen.
+
+include "Yama"
+include "Yama.Tests"
+--include "Yama.Examples"
 
 include "vendor/TAUL/taul" -- include just taul.lib part
 

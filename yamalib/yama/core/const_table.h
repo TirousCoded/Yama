@@ -72,7 +72,7 @@ namespace yama {
     };
     struct function_type_const_info final {
         str             qualified_name;
-        callsig    callsig;
+        callsig         callsig;
 
 
         kind kind() const noexcept;
@@ -82,7 +82,7 @@ namespace yama {
     };
     struct method_type_const_info final {
         str             qualified_name;
-        callsig    callsig;
+        callsig         callsig;
 
 
         kind kind() const noexcept;
