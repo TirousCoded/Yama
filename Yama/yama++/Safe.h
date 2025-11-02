@@ -2,13 +2,16 @@
 
 #pragma once
 
-#include <taul/hashing.h>
 
 #include "../yama/yama.h"
 
+#include "hash.h"
 
-namespace _ym {
 
+namespace ym {
+
+
+    // TODO: Safe throwing std::invalid_argument in release mode hasn't been unit tested.
 
     // Raw pointer guaranteed to not be nullptr.
     // Provides a std::optional-like interface.
@@ -17,7 +20,12 @@ namespace _ym {
     public:
         constexpr Safe(T& x) noexcept : _ptr(&x) {}
         // Fail asserts false or throws std::invalid_argument based on if YM_DEBUG is defined.
-        inline explicit Safe(T* x) : _ptr(x) { ymAssert(x != nullptr); } // Explicit
+        inline explicit Safe(T* x) : _ptr(x) { // Explicit
+            ymAssert(x != nullptr);
+#ifndef YM_DEBUG
+            if (!x) throw std::invalid_argument("ym::Safe cannot initialize to nullptr!");
+#endif
+        }
         // Fail asserts false or throws std::invalid_argument based on if YM_DEBUG is defined.
         template<typename U>
         inline explicit Safe(U* x) : Safe(static_cast<T*>(x)) {} // Explicit
@@ -43,12 +51,17 @@ namespace _ym {
 
         constexpr operator T* () const noexcept { return get(); } // Implicit
         template<typename U>
-        constexpr operator U* () const noexcept { return into<U>(); } // Explicit
+        constexpr explicit operator U* () const noexcept { return into<U>(); } // Explicit
 
         template<typename U>
         constexpr Safe<U> into() const noexcept { return Safe<U>(*this); }
+        template<typename U>
+        inline Safe<U> downcastInto() const noexcept {
+            ymAssert(dynamic_cast<U*>(get()) != nullptr);
+            return Safe<U>((U*)get()); // Skip safety check in release mode.
+        }
 
-        inline size_t hash() const noexcept { return taul::hash(get()); }
+        inline size_t hash() const noexcept { return ym::hash(get()); }
 
 
     private:
@@ -57,9 +70,21 @@ namespace _ym {
 }
 
 template<typename T>
-struct std::hash<_ym::Safe<T>> {
-    inline size_t operator()(const _ym::Safe<T>& x) const noexcept {
+struct std::hash<ym::Safe<T>> {
+    inline size_t operator()(const ym::Safe<T>& x) const noexcept {
         return x.hash();
     }
 };
+
+namespace ym {
+
+
+    template<typename T>
+    inline void assertSafe(T* x) noexcept {
+        // Disable if !defined(YM_DEBUG) to avoid throwing.
+#ifdef YM_DEBUG
+        (void)Safe(x);
+#endif
+    }
+}
 

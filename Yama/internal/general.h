@@ -3,73 +3,67 @@
 #pragma once
 
 
+#include <atomic>
+#include <concepts>
 #include <format>
 #include <iostream>
-#include <bitset>
-#include <concepts>
+#include <regex>
 
 #include "../yama/yama.h"
-
-#include "Safe.h"
+#include "../yama++/Safe.h"
 
 
 namespace _ym {
 
 
     void debugbreak() noexcept;
+    void crash() noexcept;
 
 
-    template<typename... Args>
-    inline void print(std::format_string<Args...> fmt, Args&&... args) {
-        std::cout << std::format(fmt, std::forward<Args>(args)...);
-    }
-    template<typename... Args>
-    inline void println(std::format_string<Args...> fmt, Args&&... args) {
-        std::cout << std::format(fmt, std::forward<Args>(args)...) << "\n";
-    }
-
+    // Destroyable is intended for the pattern of objects having static 'create'
+    // and destroy methods which handle the dynamic alloc/init and dealloc/deinit,
+    // respectively, of objects of that type.
 
     template<typename T>
     concept Destroyable =
         std::same_as<T, std::remove_cvref_t<T>> &&
-        requires (Safe<T> ptr)
+        requires (ym::Safe<T> ptr)
     {
         { T::destroy(ptr) } noexcept;
     };
     template<Destroyable T>
-    inline void destroy(Safe<T> x) noexcept {
-        (void)T::destroy(Safe(x));
+    inline void destroy(ym::Safe<T> x) noexcept {
+        (void)T::destroy(ym::Safe(x));
     }
 
 
-    enum class RType : YmUInt8 {
-        Domain,
-        Context,
+    struct ErrCallbackInfo final {
+        YmErrCallbackFn fn = nullptr;
+        void* user = nullptr;
     };
 
-    // NOTE: Turns out if we have a base class w/out virt dtor, and then derive a version
-    //       w/ one, then the vtable ptr of the ladder will be placed BEFORE fields, w/
-    //       this meaning that fields from first class, and their equiv in derived class
-    //       will NOT HAVE THE SAME MEMORY OFFSET!!!!
-    //
-    //       This means that we can't have Resource NOT have a vtable...
-
-    // Base class of all Yama resources.
-    class Resource {
+    // Static class encapsulating Yama API process-wide and thread-local data/functionality.
+    class Global final {
     public:
-        Resource(RType rtype);
-        virtual ~Resource() noexcept = default;
+        Global() = delete;
 
 
-        RType rtype() const noexcept;
+        static void setErrCallback(YmErrCallbackFn fn, void* user) noexcept;
+        static bool pathIsLegal(std::string_view path);
+
+        template<typename... Args>
+        static inline void raiseErr(YmErrCode code, std::format_string<Args...> fmt, Args&&... args) {
+            if (!_errCallbackInfo.fn) {
+                return;
+            }
+            std::string errmsg(std::format("[Yama] [{}] {}", ymFmtYmErrCode(code), std::format(fmt, std::forward<Args>(args)...)));
+            _errCallbackInfo.fn(code, errmsg.c_str(), _errCallbackInfo.user);
+        }
 
 
     private:
-        RType _rtype;
-        YmUInt16 _innerRefCount = 0; // Refs held internally.
-        YmUInt32 _outerRefCount = 0; // Refs held by end-user.
+        thread_local static ErrCallbackInfo _errCallbackInfo;
+        static const std::regex _legalPathPattern;
     };
-
-    YM_STATIC_ASSERT(sizeof(Resource) == 16);
 }
 

@@ -7,6 +7,7 @@
 #endif
 
 #include "general.h"
+#include "resources.h"
 
 
 void _ym::debugbreak() noexcept {
@@ -16,15 +17,27 @@ void _ym::debugbreak() noexcept {
 #elif defined(YM_PLATFORM_LINUX)
     raise(SIGTRAP);
 #else
-    std::abort(); // Fallback
+    crash(); // Fallback
 #endif
 #endif
 }
 
-_ym::Resource::Resource(RType rtype) :
-    _rtype(rtype) {}
+void _ym::crash() noexcept {
+    std::abort();
+}
 
-_ym::RType _ym::Resource::rtype() const noexcept {
-    return _rtype;
+thread_local _ym::ErrCallbackInfo _ym::Global::_errCallbackInfo = {};
+
+const std::regex _ym::Global::_legalPathPattern = std::regex("[^/:]+(/[^/:]+)*");
+
+void _ym::Global::setErrCallback(YmErrCallbackFn fn, void* user) noexcept {
+    _errCallbackInfo = ErrCallbackInfo{
+        .fn = fn,
+        .user = user,
+    };
+}
+
+bool _ym::Global::pathIsLegal(std::string_view path) {
+    return std::regex_match(path.begin(), path.end(), _legalPathPattern);
 }
 

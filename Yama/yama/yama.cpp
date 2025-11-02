@@ -3,63 +3,66 @@
 #include "yama.h"
 
 #include "../internal/general.h"
+#include "../internal/resources.h"
+#include "../yama++/Safe.h"
 
 
-struct YmDm final : public _ym::Resource {
-public:
-    YmDm() : Resource(_ym::RType::Domain) {}
+using namespace ym;
+using namespace _ym;
 
 
-    static _ym::Safe<YmDm> create() { return _ym::Safe(new YmDm()); }
-    static void destroy(_ym::Safe<YmDm> x) noexcept { delete x.get(); }
-};
-
-struct YmCtx final : public _ym::Resource {
-public:
-    const _ym::Safe<YmDm> domain;
-
-
-    YmCtx(_ym::Safe<YmDm> domain) : Resource(_ym::RType::Context), domain(domain) {}
-
-
-    static _ym::Safe<YmCtx> create(_ym::Safe<YmDm> domain) { return _ym::Safe(new YmCtx(domain)); }
-    static void destroy(_ym::Safe<YmCtx> x) noexcept { delete x.get(); }
-};
-
-void _ymAssert(YmBool cond, const YmChar* cond_txt, const YmChar* file, YmWord line) {
-    if (cond == YM_TRUE) return;
-    _ym::println("Yama Assert Failed:\ncond: {}\nfile: {}\nline: {}", cond_txt, file, line);
-    _ym::debugbreak();
+const YmChar* ymFmtYmRType(YmRType rtype) {
+    static_assert(YmRType_Num == 4);
+    switch (rtype) {
+    case YmRType_Dm:        return "Domain";
+    case YmRType_Ctx:       return "Context";
+    case YmRType_ParcelDef: return "Parcel Def.";
+    case YmRType_Parcel:    return "Parcel";
+    default:                return "???";
+    }
 }
 
-void _ymVerify(YmBool cond, const YmChar* cond_txt, const YmChar* file, YmWord line) {
-    if (cond == YM_TRUE) return;
-    _ym::println("Yama Assert Failed:\ncond: {}\nfile: {}\nline: {}", cond_txt, file, line);
-    _ym::debugbreak();
+YmDm* ymDm_Create(void) {
+    return _ym::cloneRef(YmDm::create());
+}
+
+YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) {
+    return Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
+}
+
+YmCtx* ymCtx_Create(YmDm* dm) {
+    return _ym::cloneRef(YmCtx::create(_ym::Res(dm)));
+}
+
+YmDm* ymCtx_Dm(YmCtx* ctx) {
+    return _ym::cloneRef(Safe(ctx)->domain);
+}
+
+YmParcel* ymCtx_Import(YmCtx* ctx, const YmChar* path) {
+    return Safe(ctx)->import(std::string(Safe(path)));
+}
+
+YmParcelDef* ymParcelDef_Create(void) {
+    return _ym::cloneRef(YmParcelDef::create());
+}
+
+const YmChar* ymParcel_Path(YmParcel* parcel) {
+    return Safe(parcel)->path.c_str();
+}
+
+YmRType _ymRType(void* x) {
+    return Safe<Resource>(x)->rtype();
+}
+
+YmRefCount _ymRefCount(void* x) {
+    return Safe<Resource>(x)->refcount();
+}
+
+void _ymAddRef(void* x) {
+    Safe<Resource>(x)->addRef();
 }
 
 void _ymDrop(void* x) {
-    auto res = _ym::Safe<_ym::Resource>(x);
-    switch (res->rtype()) {
-    case _ym::RType::Domain:
-    {
-        _ym::destroy(res.into<YmDm>());
-    }
-    break;
-    case _ym::RType::Context:
-    {
-        _ym::destroy(res.into<YmCtx>());
-    }
-    break;
-    default: YM_DEADEND; break;
-    }
-}
-
-YmDm* ymNewDm(void) {
-    return YmDm::create();
-}
-
-YmCtx* ymNewCtx(YmDm* domain) {
-    return YmCtx::create(_ym::Safe(domain));
+    Safe<Resource>(x)->drop();
 }
 
