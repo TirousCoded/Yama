@@ -61,11 +61,16 @@ namespace _ym {
 
         inline ym::Safe<T> borrow() const noexcept { return value(); }
 
-        inline operator T* () const noexcept { return get(); } // Implicit
+        // NOTE: Unlike Safe, Res isn't safe to have implicit conversion to things like raw pointers,
+        //       as doing so could result in scenarios like returning a Res resulting in a raw pointer
+        //       implicit convert, only for the Res drop resulting in the pointer quietly becoming
+        //       dangling.
+
+        inline explicit operator T* () const noexcept { return get(); } // Explicit
         template<std::derived_from<Resource> U>
         inline explicit operator U* () const noexcept { return borrow().into<U>(); } // Explicit
 
-        inline operator ym::Safe<T> () const noexcept { return borrow(); } // Implicit
+        inline explicit operator ym::Safe<T> () const noexcept { return borrow(); } // Explicit
         template<std::derived_from<Resource> U>
         inline explicit operator ym::Safe<U> () const noexcept { return borrow().into<U>(); } // Explicit
 
@@ -113,4 +118,17 @@ struct std::hash<_ym::Res<T>> {
         return x.hash();
     }
 };
+
+namespace _ym {
+
+
+    template<std::derived_from<Resource> T>
+    static inline T* disarmOrNull(std::optional<Res<T>>&& x) noexcept {
+        std::optional temp(std::forward<decltype(x)>(x));
+        return
+            temp
+            ? temp->disarm().get()
+            : nullptr;
+    }
+}
 

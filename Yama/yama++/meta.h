@@ -76,6 +76,7 @@ namespace ym {
         detail::FormattableWith<std::remove_reference_t<T>, std::basic_format_context<detail::PhonyFmtIterFor<CharT>, CharT>>;
 
 
+    // Models basic lockable types T.
     template<typename T>
     concept BasicLocakable =
         requires (std::remove_reference_t<T> v)
@@ -84,6 +85,7 @@ namespace ym {
         v.unlock();
     };
 
+    // Models lockable types T.
     template<typename T>
     concept Lockable =
         BasicLocakable<T> &&
@@ -132,13 +134,68 @@ namespace ym {
 
     // Models types T which exist in Pack.
     template<typename T, typename... Pack>
-    concept TypeInPack = validPackIndex<indexInPack<T, Pack...>, Pack...>;
+    concept PackParam = validPackIndex<indexInPack<T, Pack...>, Pack...>;
 
     // Unit Tests
-    static_assert(TypeInPack<int, int, float, char> == true);
-    static_assert(TypeInPack<int, int, float, char, int> == true); // Multiple
-    static_assert(TypeInPack<int, bool, float, char> == false); // Fail
-    static_assert(TypeInPack<int> == false); // Fail
+    static_assert(PackParam<int, int, float, char> == true);
+    static_assert(PackParam<int, int, float, char, int> == true); // Multiple
+    static_assert(PackParam<int, bool, float, char> == false); // Fail
+    static_assert(PackParam<int> == false); // Fail
+
+
+    namespace detail {
+        template<size_t I, typename Arg, typename... Args>
+        struct TypeInPackHelper {
+            // Keep recursively decrementing I, and discarding Arg, until I == 0,
+            // and that recurse's Arg is thus our answer.
+            using Type = TypeInPackHelper<I - 1, Args...>::Type;
+        };
+
+        template<typename Arg, typename... Args>
+        struct TypeInPackHelper<0, Arg, Args...> {
+            using Type = Arg;
+        };
+    }
+
+    // The parameter type at I within Pack.
+    template<size_t I, typename... Pack>
+        requires validPackIndex<I, Pack...>
+    using TypeInPack = detail::TypeInPackHelper<I, Pack...>::Type;
+
+    // Unit Tests
+    static_assert(std::same_as<int, TypeInPack<0, int, float, int, char>>);
+    static_assert(std::same_as<float, TypeInPack<1, int, float, int, char>>);
+    static_assert(std::same_as<int, TypeInPack<2, int, float, int, char>>);
+    static_assert(std::same_as<char, TypeInPack<3, int, float, int, char>>);
+
+
+    // A static class encapsulating a parameter pack, akin to std::integer_sequence.
+    template<typename... Pack>
+    class ParamPack final {
+    public:
+        static constexpr size_t size = sizeof...(Pack);
+        
+        template<size_t I>
+        static constexpr bool valid = validPackIndex<I, Pack...>;
+
+        template<typename T>
+        static constexpr bool contains = PackParam<T, Pack...>;
+
+        template<PackParam<Pack...> T>
+        static constexpr size_t indexOf = indexInPack<T, Pack...>;
+
+        template<size_t I>
+            requires valid<I>
+        using TypeAt = TypeInPack<I, Pack...>;
+
+
+        constexpr ParamPack() = default;
+        constexpr ParamPack(const ParamPack&) = default;
+        constexpr ParamPack(ParamPack&&) noexcept = default;
+        constexpr ~ParamPack() noexcept = default;
+        constexpr ParamPack& operator=(const ParamPack&) = default;
+        constexpr ParamPack& operator=(ParamPack&&) noexcept = default;
+    };
 
 
     // Returns the sum of the contents of Pack.

@@ -12,18 +12,14 @@ using namespace _ym;
 
 
 const YmChar* ymFmtYmRType(YmRType rtype) {
-    static_assert(YmRType_Num == 4);
-    switch (rtype) {
-    case YmRType_Dm:        return "Domain";
-    case YmRType_Ctx:       return "Context";
-    case YmRType_ParcelDef: return "Parcel Def.";
-    case YmRType_Parcel:    return "Parcel";
-    default:                return "???";
-    }
+    return
+        rtype < YmRType_Num
+        ? fmtRType(RType(rtype))
+        : "???";
 }
 
 YmDm* ymDm_Create(void) {
-    return _ym::cloneRef(YmDm::create());
+    return YmDm::create().disarm();
 }
 
 YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) {
@@ -31,27 +27,27 @@ YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) 
 }
 
 YmCtx* ymCtx_Create(YmDm* dm) {
-    return _ym::cloneRef(YmCtx::create(_ym::Res(dm)));
+    return YmCtx::create(Res(dm)).disarm();
 }
 
 YmDm* ymCtx_Dm(YmCtx* ctx) {
-    return _ym::cloneRef(Safe(ctx)->domain);
+    return cloneRef(Safe(ctx)->domain);
 }
 
 YmParcel* ymCtx_Import(YmCtx* ctx, const YmChar* path) {
-    return Safe(ctx)->import(std::string(Safe(path)));
+    return disarmOrNull(Safe(ctx)->import(std::string(Safe(path))));
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
-    return _ym::cloneRef(YmParcelDef::create());
+    return YmParcelDef::create().disarm();
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
-    return Safe(parcel)->path.c_str();
+    return Safe(parcel)->path().c_str();
 }
 
 YmRType _ymRType(void* x) {
-    return Safe<Resource>(x)->rtype();
+    return toYmRType(Safe<Resource>(x)->rtype);
 }
 
 YmRefCount _ymRefCount(void* x) {

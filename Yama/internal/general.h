@@ -20,6 +20,11 @@ namespace _ym {
     void crash() noexcept;
 
 
+    // By convention the Yama backend uses Num enum constants to specify the size of an enum.
+    template<typename T>
+    constexpr size_t enumSize = size_t(T::Num);
+
+
     // Destroyable is intended for the pattern of objects having static 'create'
     // and destroy methods which handle the dynamic alloc/init and dealloc/deinit,
     // respectively, of objects of that type.
@@ -27,13 +32,13 @@ namespace _ym {
     template<typename T>
     concept Destroyable =
         std::same_as<T, std::remove_cvref_t<T>> &&
-        requires (ym::Safe<T> ptr)
+        requires (ym::Safe<const T> ptr)
     {
         { T::destroy(ptr) } noexcept;
     };
     template<Destroyable T>
-    inline void destroy(ym::Safe<T> x) noexcept {
-        (void)T::destroy(ym::Safe(x));
+    inline void destroy(ym::Safe<const T> x) noexcept {
+        (void)T::destroy(x);
     }
 
 

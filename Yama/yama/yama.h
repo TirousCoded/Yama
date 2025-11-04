@@ -161,13 +161,6 @@ extern "C" {
     *        their reference count is thread-safe.
     */
 
-    /* NOTE: For RC resources, the Yama API impl is free to internally treat them as ARC instead
-    *        if the impl allows for it.
-    * 
-    *        In these cases, these are just impl details, and the end-user should still treat
-    *        said resources as RC w/ thread-unsafe reference counting.
-    */
-
     /* Domains are ARC resources encapsulating data shared between Yama contexts. */
     /* Domains are thread-safe. */
     struct YmDm;
@@ -179,11 +172,7 @@ extern "C" {
     /* Parcel defs. fully describe Yama parcels in the absence of linkage and other contextual metadata. */
     /* Parcels are Yama's unit of code distribution. */
     struct YmParcelDef;
-#error maybe make internals of below ARC
 
-#error also, make marking res as RC/ARC a static constexpr thing in class
-
-#error also, tomorrow maybe add ym::Option
     /* Parcels are RC resources encapsulating imported Yama parcels. */
     struct YmParcel;
 

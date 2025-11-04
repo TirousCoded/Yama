@@ -12,6 +12,10 @@ namespace ym {
 
 
     // TODO: Safe throwing std::invalid_argument in release mode hasn't been unit tested.
+    
+    // TODO: Safe<void>, Safe<const void>, etc. currently don't compile, and in order to fix issue
+    //       I added a quick-n'-dirty cast to void* to compensate, but the real solution would
+    //       probably be a template specialization (also, no unit tests for this yet either.)
 
     // Raw pointer guaranteed to not be nullptr.
     // Provides a std::optional-like interface.
@@ -52,6 +56,10 @@ namespace ym {
         constexpr operator T* () const noexcept { return get(); } // Implicit
         template<typename U>
         constexpr explicit operator U* () const noexcept { return into<U>(); } // Explicit
+
+        // TODO: Temporary until we resolve Safe<void> not compiling.
+        constexpr explicit operator void* () const noexcept { return (void*)get(); } // Explicit
+        constexpr explicit operator const void* () const noexcept { return (void*)get(); } // Explicit
 
         template<typename U>
         constexpr Safe<U> into() const noexcept { return Safe<U>(*this); }

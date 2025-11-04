@@ -30,9 +30,9 @@ namespace ym {
         constexpr Variant(std::variant<Types...>&& x) noexcept : // Implicit
             _state(std::forward<decltype(_state)>(x)) {}
 
-        constexpr Variant(TypeInPack<Types...> auto&& x) noexcept : // Implicit
+        constexpr Variant(PackParam<Types...> auto&& x) noexcept : // Implicit
             _state(std::forward<std::remove_reference_t<decltype(x)>>(x)) {}
-        constexpr Variant& operator=(TypeInPack<Types...> auto&& x) noexcept { // Implicit
+        constexpr Variant& operator=(PackParam<Types...> auto&& x) noexcept { // Implicit
             _state = std::forward<std::remove_reference_t<decltype(x)>>(x);
             return *this;
         }
@@ -54,7 +54,7 @@ namespace ym {
         constexpr bool valuelessByException() const noexcept { return _state.valueless_by_exception(); }
 
         // Returns if the variant holds T.
-        template<TypeInPack<Types...> T>
+        template<PackParam<Types...> T>
         constexpr bool is() const noexcept { return std::holds_alternative<T>(_state); }
 
         // Returns the variant's value as Alt<I>.
@@ -69,11 +69,11 @@ namespace ym {
         constexpr const Alt<I>& as() const { return std::get<I>(_state); }
         // Returns the variant's value as T.
         // Throws std::bad_variant_access on failure.
-        template<TypeInPack<Types...> T>
+        template<PackParam<Types...> T>
         constexpr T& as() { return std::get<T>(_state); }
         // Returns the variant's value as T.
         // Throws std::bad_variant_access on failure.
-        template<TypeInPack<Types...> T>
+        template<PackParam<Types...> T>
         constexpr const T& as() const { return std::get<T>(_state); }
 
         // Returns a pointer to the variant's value as Alt<I>, or nullptr on failure.
@@ -85,10 +85,10 @@ namespace ym {
             requires validPackIndex<I, Types...>
         constexpr const Alt<I>* tryAs() const noexcept { return std::get_if<I>(&_state); }
         // Returns a pointer to the variant's value as T, or nullptr on failure.
-        template<TypeInPack<Types...> T>
+        template<PackParam<Types...> T>
         constexpr T* tryAs() noexcept { return std::get_if<T>(&_state); }
         // Returns a pointer to the variant's value as T, or nullptr on failure.
-        template<TypeInPack<Types...> T>
+        template<PackParam<Types...> T>
         constexpr const T* tryAs() const noexcept { return std::get_if<T>(&_state); }
 
         // Unavailable if allOf<Hashable<Types>...> == false.
@@ -100,9 +100,9 @@ namespace ym {
             return _fmt();
         }
 
-        template<TypeInPack<Types...> T, typename... Args>
+        template<PackParam<Types...> T, typename... Args>
         constexpr T& emplace(Args&&... args) { return _state.emplace<T>(std::forward<Args>(args)...); }
-        template<TypeInPack<Types...> T, typename U, typename... Args>
+        template<PackParam<Types...> T, typename U, typename... Args>
         constexpr T& emplace(std::initializer_list<U> il, Args&&... args) { return _state.emplace<T>(il, std::forward<Args>(args)...); }
         template<size_t I, typename... Args>
             requires validPackIndex<I, Types...>
@@ -113,12 +113,12 @@ namespace ym {
 
 
         // Initialize a variant by type.
-        template<TypeInPack<Types...> T, typename... Args>
+        template<PackParam<Types...> T, typename... Args>
         static constexpr Variant<Types...> byType(Args&&... args) {
             return Variant(Underlying(std::in_place_type_t<T>{}, std::forward<Args>(args)...));
         }
         // Initialize a variant by type.
-        template<TypeInPack<Types...> T, typename U, typename... Args>
+        template<PackParam<Types...> T, typename U, typename... Args>
         static constexpr Variant<Types...> byType(std::initializer_list<U> il, Args&&... args) {
             return Variant(Underlying(std::in_place_type_t<T>{}, il, std::forward<Args>(args)...));
         }

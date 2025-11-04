@@ -13,26 +13,45 @@ YmBool YmDm::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parcel
             path);
         return YM_FALSE;
     }
-    _bindings.try_emplace(path, _ym::Res(YmParcel::create(path)));
+    std::scoped_lock lock(_mtx);
+    _bindings.try_emplace(path, std::move(_ym::ParcelData::create(path)));
     return YM_TRUE;
 }
 
-YmParcel* YmCtx::import(const std::string& path) {
+std::optional<_ym::Res<_ym::ParcelData>> YmDm::import(const std::string& path) {
+    ymAssert(_ym::Global::pathIsLegal(path));
+    std::scoped_lock lock(_mtx);
+    if (const auto it = _bindings.find(path); it != _bindings.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+std::optional<_ym::Res<YmParcel>> YmCtx::fetch(const std::string& path) const noexcept {
+    if (const auto it = _imports.find(path); it != _imports.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+#error TOMORROW WE MUST ORDER/PICK-UP PILLS ASAP!!!!!!
+std::optional<_ym::Res<YmParcel>> YmCtx::import(const std::string& path) {
     if (!_ym::Global::pathIsLegal(path)) {
         _ym::Global::raiseErr(
             YmErrCode_IllegalPath,
             "Import failed; path \"{}\" is illegal!",
             path);
-        return nullptr; // Fail
+        return std::nullopt; // Fail
     }
-    // Try finding existing.
-    if (const auto it = _imports.find(path); it != _imports.end()) {
-        return _ym::cloneRef(it->second);
+    if (const auto result = fetch(path)) {
+        return result;
     }
-    // Try finding bound parcel to import.
-    if (const auto it = domain->_bindings.find(path); it != domain->_bindings.end()) {
-        return _ym::cloneRef(it->second);
+    _download(path);
+    return fetch(path);
+}
+
+void YmCtx::_download(const std::string& path) {
+    if (auto data = domain->import(path)) {
+        _imports.try_emplace(path, std::move(YmParcel::create(std::move(*data))));
     }
-    return nullptr; // Fail
 }
 
