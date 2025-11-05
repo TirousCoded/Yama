@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "../yama++/print.h"
 #include "general.h"
 
 
@@ -33,109 +34,16 @@ namespace _ym {
         ymAssert(rmode < RMode::Num);
         return names[size_t(rmode)];
     }
-    
 
-    class ParcelData;
-
-    // A superset of YmRType which includes also internal resource types.
-    enum class RType : YmUInt8 {
-        Dm,
-        Ctx,
-        ParcelDef,
-        Parcel,
-
-        ParcelData,
-
-        Num,
-    };
-
-    static_assert(sizeof(RType) == sizeof(YmRType));
-    static_assert(enumSize<RType> >= YmRType_Num);
-
-    using RTypeImplTypes = ym::ParamPack<
-        YmDm,
-        YmCtx,
-        YmParcelDef,
-        YmParcel,
-
-        ParcelData
-    >;
-
-    static_assert(RTypeImplTypes::size == enumSize<RType>);
-
-    struct RTypeProperties final {
-        RType rtype;
-        RMode rmode;
-        const YmChar* name;
-        // Only applies to frontend resource types.
-        std::optional<YmRType> corresponding = std::nullopt;
-    };
-
-    // Compile-time table of resource type properties.
-    constexpr std::array<RTypeProperties, enumSize<RType>> rtypePropertiesTable{
-        RTypeProperties{ RType::Dm,         RMode::ARC, "Domain",       YmRType_Dm },
-        RTypeProperties{ RType::Ctx,        RMode::ARC, "Context",      YmRType_Ctx },
-        RTypeProperties{ RType::ParcelDef,  RMode::ARC, "Parcel Def.",  YmRType_ParcelDef },
-        RTypeProperties{ RType::Parcel,     RMode::RC,  "Parcel",       YmRType_Parcel },
-
-        RTypeProperties{ RType::ParcelData, RMode::ARC, "Parcel Data" },
-    };
-
-    inline const YmChar* fmtRType(RType rtype) {
-        ymAssert(rtype < RType::Num);
-        return rtypePropertiesTable[size_t(rtype)].name;
-    }
-
-    inline RMode rmodeOf(RType rtype) noexcept {
-        ymAssert(rtype < RType::Num);
-        return rtypePropertiesTable[size_t(rtype)].rmode;
-    }
-
-    // NOTE: The below enforces that, given a RType or YmRType which specifies a FRONTEND resource
-    //       type, that it's safe to cast between the two, w/ their integer values lining up.
-
-    static_assert([]() constexpr -> bool {
-        for (const auto& props : rtypePropertiesTable) {
-            if (props.corresponding &&
-                YmRType(props.rtype) != props.corresponding) {
-                return false;
-            }
-        }
-        return true;
-        }());
-
-    // NOTE: Given the above, the below can be used to also CHECK if RType is frontend or backend.
-
-    constexpr bool isFrontend(RType rtype) noexcept {
-        return YmRType(rtype) < YmRType_Num;
-    }
-    constexpr bool isBackend(RType rtype) noexcept {
-        return !isFrontend(rtype);
-    }
-
-    // RType to YmRType conversion w/ safety check.
-    inline YmRType toYmRType(RType rtype) noexcept {
-        ymAssert(isFrontend(rtype));
-        return YmRType(rtype);
-    }
-
-
-    // NOTE: Turns out if we have a base class w/out virt dtor, and then derive a version
-    //       w/ one, then the vtable ptr of the ladder will be placed BEFORE fields, w/
-    //       this meaning that fields from first class, and their equiv in derived class
-    //       will NOT HAVE THE SAME MEMORY OFFSET!!!!
-    //
-    //       This means that we can't have Resource NOT have a vtable...
 
     // Base class of all Yama resources.
     class Resource {
     public:
-        const RType rtype;
         const RMode rmode;
 
 
-        Resource(RType rtype);
-        virtual ~Resource() noexcept;
+        Resource(RMode rmode);
+        virtual ~Resource() noexcept = default;
 
 
         bool usesARC() const noexcept;
@@ -145,7 +53,44 @@ namespace _ym {
         void drop() const noexcept;
 
 
-        static void destroy(ym::Safe<const Resource> x) noexcept;
+        // TODO: Maybe make rtype be injected as an enum value like RMode is, if we ever find
+        //       ourselves needing to use rtype for things that are really performance-critical.
+
+        // Returns the YmRType of this resource, if any.
+        inline virtual std::optional<YmRType> rtype() const noexcept {
+            return std::nullopt;
+        }
+
+        // Returns a name for the type of resource this is, for debug purposes.
+        virtual const YmChar* debugName() const noexcept = 0;
+
+        // TODO: W/ the virtual dtor, currently resource cleanup involves DOUBLE DISPATCH,
+        //       first to destroy, then the dtor. This is not NECESSARILY too bad, as it's
+        //       only really a performance cost from a data/instr cache standpoint, but it's
+        //       still something to look into later when optimizing.
+        //
+        //       If we end up wanting to de-virtualize destroy, what we can do is something
+        //       akin to RMode where we have well-known protocols regarding resource destruction,
+        //       and then we use an enum value to specify which the resource uses.
+        //
+        //       As part of this, we could still have virtual method call for destroy, but
+        //       as an *optional* thing enabled by a certain mode.
+
+        // TODO: destroy being const method is due to drop being const method, but I'm not 100%
+        //       on how I feel about that...
+
+        // NOTE: The below destroy method is expected to be implemented alongside a STATIC
+        //       'create' method which returns a pointer to the resource.
+        //
+        //       The create methods allocs/inits a resource object, and destroy deinits/deallocs
+        //       it, such that the resource impl controls HOW resources are allocated.
+        //
+        //       This create method must return a 'Res<T>', where T is the impl type.
+        //
+        //       The reference count for this new object must start off as 1 (ie. not 0.)
+
+        // Deinitializes *this and deallocates its memory block.
+        virtual void destroy() const noexcept = 0;
 
 
     private:
@@ -165,27 +110,25 @@ namespace _ym {
         void _incrRefs() const noexcept;
         // Return if decr made reference count 0.
         bool _decrRefs() const noexcept;
-
-
-        template<size_t... Is>
-            requires (sizeof...(Is) == RTypeImplTypes::size)
-        static inline void _destroyHelper(ym::Safe<const Resource> x, std::integer_sequence<size_t, Is...>) noexcept {
-            // Here we're constructing a static constexpr table of fns (w/ a uniform signature) where each index
-            // corresponds to a RType value, and each one's entry likewise calls it's associated type's destroy method.
-            typedef void(*DestroyFn)(ym::Safe<const Resource> x) noexcept; // <- Wrapper (for our uniform signature.)
-            static constexpr std::array<DestroyFn, RTypeImplTypes::size> destroyFns{ // <- Table
-                [](ym::Safe<const Resource> x) noexcept {
-                    using ImplType = RTypeImplTypes::template TypeAt<Is>;
-                    ImplType::destroy(x.downcastInto<const ImplType>()); // <- Dispatch
-                }... // <- Notice the parameter pack expansion used to construct the table.
-            };
-            // Now we query the RType of x, acquire the appropriate destroy method wrapper, and call it.
-            destroyFns[size_t(x->rtype)](x);
-        }
     };
 
     static_assert(sizeof(Resource) == 16);
-    static_assert(Destroyable<Resource>);
+
+
+    // Helper used to summarize definition of frontend resources.
+    template<YmRType RTYPE, RMode RMODE>
+    class FrontendResource : public Resource {
+    public:
+        inline FrontendResource() : Resource(RMODE) {}
+
+
+        inline std::optional<YmRType> rtype() const noexcept override final {
+            return RTYPE;
+        }
+        inline const YmChar* debugName() const noexcept override final {
+            return ymFmtYmRType(RTYPE);
+        }
+    };
 
 
     template<std::derived_from<Resource> T>

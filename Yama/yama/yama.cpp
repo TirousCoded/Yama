@@ -2,6 +2,8 @@
 
 #include "yama.h"
 
+#include <array>
+
 #include "../internal/general.h"
 #include "../internal/resources.h"
 #include "../yama++/Safe.h"
@@ -12,9 +14,15 @@ using namespace _ym;
 
 
 const YmChar* ymFmtYmRType(YmRType rtype) {
+    constexpr std::array<const YmChar*, YmRType_Num> names{
+        "Domain",
+        "Context",
+        "Parcel Def.",
+        "Parcel",
+    };
     return
         rtype < YmRType_Num
-        ? fmtRType(RType(rtype))
+        ? names[size_t(rtype)]
         : "???";
 }
 
@@ -47,7 +55,7 @@ const YmChar* ymParcel_Path(YmParcel* parcel) {
 }
 
 YmRType _ymRType(void* x) {
-    return toYmRType(Safe<Resource>(x)->rtype);
+    return Safe<Resource>(x)->rtype().value();
 }
 
 YmRefCount _ymRefCount(void* x) {

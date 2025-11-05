@@ -16,16 +16,20 @@ namespace _ym {
 
 
         inline ParcelData(std::string path) :
-            Resource(_ym::RType::ParcelData),
+            Resource(RMode::ARC),
             path(std::move(path)) {}
 
+
+        inline const YmChar* debugName() const noexcept override {
+            return "Parcel Data";
+        }
 
         template<typename... Args>
         static inline Res<ParcelData> create(Args&&... args) {
             return Res(new ParcelData(std::forward<Args>(args)...));
         }
-        static inline void destroy(ym::Safe<const ParcelData> x) noexcept {
-            delete x;
+        inline void destroy() const noexcept override {
+            delete this;
         }
     };
 }

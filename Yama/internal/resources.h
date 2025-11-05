@@ -15,18 +15,15 @@
 
 #include "../yama/yama.h"
 #include "general.h"
+#include "ParcelData.h"
 #include "Res.h"
 #include "Resource.h"
 
-static_assert(_ym::enumSize<_ym::RType> == 5); // Reminder
-// NOTE: Include ALL our internal resources here.
-#include "ParcelData.h"
 
-
-struct YmDm final : public _ym::Resource {
+struct YmDm final : public _ym::FrontendResource<YmRType_Dm, _ym::RMode::ARC> {
 public:
     inline YmDm() :
-        Resource(_ym::RType::Dm) {}
+        FrontendResource() {}
 
 
     // TODO: Maybe add string interning later.
@@ -39,8 +36,8 @@ public:
     static inline _ym::Res<YmDm> create(Args&&... args) {
         return _ym::Res(new YmDm(std::forward<Args>(args)...));
     }
-    static inline void destroy(ym::Safe<const YmDm> x) noexcept {
-        delete x;
+    inline void destroy() const noexcept override {
+        delete this;
     }
 
 
@@ -49,13 +46,13 @@ private:
     std::unordered_map<std::string, _ym::Res<_ym::ParcelData>> _bindings;
 };
 
-struct YmCtx final : public _ym::Resource {
+struct YmCtx final : public _ym::FrontendResource<YmRType_Ctx, _ym::RMode::ARC> {
 public:
     const _ym::Res<YmDm> domain;
 
 
-    YmCtx(_ym::Res<YmDm> domain) :
-        Resource(_ym::RType::Ctx),
+    inline YmCtx(_ym::Res<YmDm> domain) :
+        FrontendResource(),
         domain(domain) {}
 
 
@@ -70,8 +67,8 @@ public:
     static inline _ym::Res<YmCtx> create(Args&&... args) {
         return _ym::Res(new YmCtx(std::forward<Args>(args)...));
     }
-    static inline void destroy(ym::Safe<const YmCtx> x) noexcept {
-        delete x;
+    inline void destroy() const noexcept override {
+        delete this;
     }
 
 
@@ -82,28 +79,28 @@ private:
     void _download(const std::string& path);
 };
 
-struct YmParcelDef final : public _ym::Resource {
+struct YmParcelDef final : public _ym::FrontendResource<YmRType_ParcelDef, _ym::RMode::ARC> {
 public:
-    YmParcelDef() :
-        _ym::Resource(_ym::RType::ParcelDef) {}
+    inline YmParcelDef() :
+        FrontendResource() {}
 
 
     template<typename... Args>
     static inline _ym::Res<YmParcelDef> create(Args&&... args) {
         return _ym::Res(new YmParcelDef(std::forward<Args>(args)...));
     }
-    static inline void destroy(ym::Safe<const YmParcelDef> x) noexcept {
-        delete x;
+    inline void destroy() const noexcept override {
+        delete this;
     }
 };
 
-struct YmParcel final : public _ym::Resource {
+struct YmParcel final : public _ym::FrontendResource<YmRType_Parcel, _ym::RMode::RC> {
 public:
     _ym::Res<_ym::ParcelData> data;
 
 
     inline YmParcel(_ym::Res<_ym::ParcelData> data) :
-        _ym::Resource(_ym::RType::Parcel),
+        FrontendResource(),
         data(std::move(data)) {}
 
 
@@ -114,8 +111,8 @@ public:
     static inline _ym::Res<YmParcel> create(Args&&... args) {
         return _ym::Res(new YmParcel(std::forward<Args>(args)...));
     }
-    static inline void destroy(ym::Safe<const YmParcel> x) noexcept {
-        delete x;
+    inline void destroy() const noexcept override {
+        delete this;
     }
 };
 

@@ -20,6 +20,28 @@
 extern "C" {
 
 
+    /* TODO: Not 100% sure where to put this so I don't forget, so I'm putting it here.
+    * 
+    *        Reading material regarding CJK, EPA, and physics constraints:
+    *           https://winter.dev/articles/gjk-algorithm
+    *           https://dyn4j.org/2010/05/epa-expanding-polytope-algorithm/#epa-alternatives
+    *           
+    *           https://en.wikipedia.org/wiki/Minkowski_Portal_Refinement
+    *           http://xenocollide.snethen.com/
+    *           https://github.com/danfis/libccd
+    * 
+    *           https://dyn4j.org/2010/07/equality-constraints/
+    *           https://dyn4j.org/2010/07/point-to-point-constraint/
+    *           https://dyn4j.org/2010/09/distance-constraint/
+    *           https://dyn4j.org/2010/12/max-distance-constraint/
+    *           https://dyn4j.org/2010/12/weld-constraint/
+    *           https://dyn4j.org/2010/12/pulley-constraint/
+    *           https://dyn4j.org/2010/12/line-constraint/
+    *           https://dyn4j.org/2010/12/angle-constraint/
+    *           https://dyn4j.org/2011/03/prismatic-constraint/
+    */
+
+
     /* TODO: I'm not 100% sure if we'll have domain item graph GC in our impl, though
     *        it could still be a cool thing to have in something like an asset manager
     *        for a game or something.
