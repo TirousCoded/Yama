@@ -92,7 +92,6 @@ extern "C" {
     *                 'kinds' (ie. RC, non-RC, subres) for the above to be added.
     */
 
-
     /* NOTE: When importing a Yama parcel, a 'path' is used to identify it in the
     *        'import environment' of the domain.
     * 
@@ -142,116 +141,143 @@ extern "C" {
     *                   are immutable like this?
     */
 
-
-    /* NOTE: Yama resource memory is managed via intrusive reference counting, sometimes
-    *        supplemented by garbage collection to deal w/ strong reference cycles.
+    /* NOTE: When loading a Yama Item a 'fullname' is used to specify the item to load.
     * 
-    *        Some resources are use non-atomic reference counting (RC) and others use
-    *        atomic reference counting (ARC).
+    *        Regular non-member item fullnames are simply identifiers paired w/ an import
+    *        path specifying their parcel, seperated by a ':'.
     * 
-    *        In either case, ymAddRef and ymDrop are used to add/remove references.
+    *           <path>:<identifier>
     * 
-    *        Resources, in truth, have two reference counts: one affected by end-use of
-    *        the Yama API ('public'), and one affected by Yama API internals ('private').
-    *        These two reference counts are combined into a single number when querying
-    *        the reference count of a resource.
-    *           * TODO: Actually decided to remove this for now, but we may add it back later.
+    *           yama:Int
+    *           yama:println
     * 
-    *        When a resource's reference count becomes 0, the Yama API internals decide
-    *        when, if ever, the resource is actually released, w/ this behaviour being
-    *        often unobservable to the end-user.
+    *        Regular member item fullnames qualify their identifier w/ an owner identifier.
     * 
-    *        Likewise, resource's in a strong reference cycle may, as a result of garbage
-    *        collection, be cleaned up while still having positive reference counts.
+    *           <path>:<owner>::<identifier>
+    * 
+    *           math:Vec3::fmt
+    * 
+    *        Assigner item fullnames suffix their identifier w/ a '=', w/ this applying
+    *        both to member and non-member item kinds.
+    * 
+    *           <path>:<identifier>=
+    *           <path>:<owner>::<identifier>=
+    * 
+    *           p:x=
+    *           p:A::x=
+    * 
+    *        TODO: Keep defining as we add item kinds.
+    *        TODO: Explain that we're gonna call the part after the '<path>:' part the 'local name'.
+    *        TODO: I think local names are gonna ALWAYS EXCLUDE any overload-related type info from
+    *              the name, so operators like '+' will have local names which don't include their
+    *              parameter types... maybe.
     */
 
-    /* NOTE: The Yama frontend uses Python's notion of RC reference ownership
-    *        rules (ie. things like 'borrowed' and 'stolen' references.)
-    *           * See https://docs.python.org/3/c-api/intro.html#objects-types-and-reference-counts.
-    *
-    *        By default, parameters to API functions are *borrowed* references,
-    *        being *stolen* references only if specified.
-    *
-    *        By default, return values from API functions (and out parameters)
-    *        are *stolen* references, being *borrowed* references only if specified.
+
+    /* TODO: Below description doesn't really work w/, for example, ymCtx_Dm.
     */
 
-
-    /* NOTE: Below, resources are to be presumed to be thread-unsafe unless specified otherwise.
+    /* NOTE: When Yama API functions accept pointers to resources (ie. domains, contexts, parcel defs., etc.)
+    *        the function DOES NOT TAKE OWNERSHIP of the resource, unless otherwise specified.
     * 
-    *        A resource being ARC does NOT imply that they are generally thread-safe, just that
-    *        their reference count is thread-safe.
+    *        When Yama API functions return pointers to resources, the function TRANSFERS OWNERSHIP of
+    *        the resource to the end-user, unless otherwise specified, or unless the resource is one that
+    *        the end-user cannot release (ie. parcels, items, etc.)
     */
 
-    /* Domains are ARC resources encapsulating data shared between Yama contexts. */
+
+    /* TODO: Need to later include 16-bit value for specifying an ID for the item argument tuple
+    *        parameterizing it in case of instantiated generic types.
+    * 
+    *        This'll mean bumping up sizeof(YmGID) to 8.
+    */
+
+    typedef YmUInt16 YmPID; /* Domain-wide stable ID of an imported parcel. */
+    typedef YmUInt16 YmLID; /* Local ID of an item within its parcel. */
+    typedef YmUInt32 YmGID; /* Domain-wide stable global ID of a loaded item, combining its LID and its parcel's PID. */
+
+#define YM_NO_LID (YmLID(-1))
+
+    /* Returns a GID created from pid and lid. */
+#define ymGID(pid, lid) (YmGID(pid) << 16 | YmGID(lid))
+
+    /* Extracts PID component of gid. */
+#define ymGID_PID(gid) (YmPID(gid >> 16))
+
+    /* Extracts LID component of gid. */
+#define ymGID_LID(gid) (YmLID(gid))
+
+
+    /* NOTE: Resources are thread-unsafe unless otherwise specified.
+    */
+
+    /* Domains are resources encapsulating data shared between Yama contexts. */
     /* Domains are thread-safe. */
     struct YmDm;
 
-    /* Contexts are ARC resources encapsulating a Yama execution environment. */
+    /* Contexts are resources encapsulating a Yama execution environment. */
     struct YmCtx;
 
-    /* Parcel defs. are ARC resources encapsulating a Yama parcel specification. */
-    /* Parcel defs. fully describe Yama parcels in the absence of linkage and other contextual metadata. */
-    /* Parcels are Yama's unit of code distribution. */
+    /* Parcel defs. are resources encapsulating a Yama parcel specification. */
     struct YmParcelDef;
 
-    /* Parcels are RC resources encapsulating imported Yama parcels. */
+    /* Parcels are resources encapsulating imported Yama parcels. */
     struct YmParcel;
+
+    /* Items are resources encapsulating loaded Yama items. */
+    struct YmItem;
 
 
     typedef enum : YmUInt8 {
-        YmRType_Dm = 0,
-        YmRType_Ctx,
-        YmRType_ParcelDef,
-        YmRType_Parcel,
+        YmKind_Fn = 0,
 
-        YmRType_Num, /* Enum size. Not a valid resource type. */
-    } YmRType;
+        YmKind_Num, /* Enum size. Not a valid type kind. */
+    } YmKind;
 
-    /* TODO: ymFmtYmRType hasn't been unit tested. */
+    /* TODO: ymFmtKind hasn't been unit tested. */
 
-    /* Returns the string name of resource type rtype, or "???" if rtype is invalid. */
+    /* Returns the string name of type kind x, or "???" if x is invalid. */
     /* The memory of the returned string is static and is valid for the lifetime of the process. */
-    const YmChar* ymFmtYmRType(YmRType rtype);
+    const YmChar* ymFmtKind(YmKind x);
 
 
-    /* Polymorphic API */
+    /* Constant table entry types. */
+    typedef enum : YmUInt8 {
+        YmConstType_Int = 0,
+        YmConstType_UInt,
+        YmConstType_Float,
+        YmConstType_Bool,
+        YmConstType_Rune,
 
-    /* NOTE: These macro-based functions are 'polymorphic' in that their exact behaviour
-    *        will depend upon the specific resource which is passed to them.
-    * 
-    *        Each resource's unit test suite should cover its unique semantics when used
-    *        w/ these functions.
-    */
+        //YmConstType_Ref,
 
-    /* Returns the YmRType of Yama resource x. */
-    /* Behaviour is undefined if x is invalid. */
-#define ymRType(x) _ymRType((void*)x)
+        YmConstType_Num, /* Enum size. Not a valid constant table entry type. */
+    } YmConstType;
 
-    /* TODO: If we ever add back public/private ref. count distinction, their combined
-    *        ref. count value should be 64-bit.
-    */
+    /* TODO: ymFmtConstType hasn't been unit tested. */
 
-    typedef YmUInt32 YmRefCount;
+    /* Returns the string name of constant type x, or "???" if x is invalid. */
+    /* The memory of the returned string is static and is valid for the lifetime of the process. */
+    const YmChar* ymFmtConstType(YmConstType x);
 
-    /* Returns the reference count of resource x. */
-    /* Behaviour is undefined if x is invalid. */
-#define ymRefCount(x) _ymRefCount((void*)x)
+    /* Index of a constant table entry. */
+    typedef YmUInt8 YmConst;
 
-    /* Increments the reference count of resource x. */
-    /* Behaviour is undefined if x is invalid. */
-#define ymAddRef(x) _ymAddRef((void*)x)
+    /* Max legal constant index. */
+#define YM_MAX_CONST (YmConst(-2))
 
-    /* Decrements the reference count of resource x, potentially releasing the resource if its reference count becomes 0. */
-    /* Behaviour is undefined if x is invalid. */
-    /* Behaviour is undefined if decrements a reference count increment held by Yama API internals. */
-#define ymDrop(x) _ymDrop((void*)x)
+    /* Sentinel index for no constant. */
+#define YM_NO_CONST (YmConst(-1))
 
 
     /* Domain API */
 
     /* Creates a new Yama domain, returning a pointer to it. */
     struct YmDm* ymDm_Create(void);
+
+    /* Destroys domain dm. */
+    /* Behaviour is undefined if dm is invalid. */
+    void ymDm_Destroy(struct YmDm* dm);
 
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
     /* Behaviour is undefined if dm is invalid. */
@@ -267,6 +293,10 @@ extern "C" {
     /* Behaviour is undefined if domain is invalid. */
     struct YmCtx* ymCtx_Create(struct YmDm* dm);
 
+    /* Destroys context ctx. */
+    /* Behaviour is undefined if ctx is invalid. */
+    void ymCtx_Destroy(struct YmCtx* ctx);
+
     /* Returns the Yama domain associated with ctx. */
     /* Behaviour is undefined if ctx is invalid. */
     struct YmDm* ymCtx_Dm(struct YmCtx* ctx);
@@ -276,27 +306,198 @@ extern "C" {
     /* Behaviour is undefined if path (as a pointer) is invalid. */
     struct YmParcel* ymCtx_Import(struct YmCtx* ctx, const YmChar* path);
 
+    /* Imports the parcel under pid, returning a pointer to it, or YM_NIL on failure. */
+    /* The parcel must first have already been imported by this context, or another under the same domain. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmParcel* ymCtx_ImportByPID(struct YmCtx* ctx, YmPID pid);
+
+    /* Loads the item with fullname, returning a pointer to it, or YM_NIL on failure. */
+    /* Loading may involve the importing of parcels or the loading of other items. */
+    /* Fails if fullname does not describe a loadable item. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if fullname (as a pointer) is invalid. */
+    struct YmItem* ymCtx_Load(struct YmCtx* ctx, const YmChar* fullname);
+
 
     /* Parcel Def. API */
 
     /* Creates a new Yama parcel def., returning a pointer to it. */
     struct YmParcelDef* ymParcelDef_Create(void);
 
+    /* Destroys parcel def. parceldef. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    void ymParcelDef_Destroy(struct YmParcelDef* parceldef);
+
+    /* Adds a new function to parceldef, returning its LID, or YM_NO_LID on failure. */
+    /* Fails if function's fullname conflicts with an existing declaration. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    YmLID ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name);
+
+    /* Given parceldef and an item therein, returns the index of the int constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_IntConst(struct YmParcelDef* parceldef, YmLID item, YmInt value);
+
+    /* Given parceldef and an item therein, returns the index of the uint constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_UIntConst(struct YmParcelDef* parceldef, YmLID item, YmUInt value);
+
+    /* Given parceldef and an item therein, returns the index of the float constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_FloatConst(struct YmParcelDef* parceldef, YmLID item, YmFloat value);
+
+    /* Given parceldef and an item therein, returns the index of the bool constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_BoolConst(struct YmParcelDef* parceldef, YmLID item, YmBool value);
+
+    /* Given parceldef and an item therein, returns the index of the runic constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_RuneConst(struct YmParcelDef* parceldef, YmLID item, YmRune value);
+
 
     /* Parcel API */
 
+    /* Returns the PID of parcel. */
+    /* Behaviour is undefined if parcel is invalid. */
+    YmPID ymParcel_PID(struct YmParcel* parcel);
+
     /* Returns the path parcel was imported under. */
-    /* The return string's memory is managed internally. */
+    /* This string's memory is managed internally. */
     /* Behaviour is undefined if parcel is invalid. */
     const YmChar* ymParcel_Path(struct YmParcel* parcel);
 
 
+    /* Item API */
+
+    /* Returns the GID of item. */
+    /* Behaviour is undefined if item is invalid. */
+    YmGID ymItem_GID(struct YmItem* item);
+
+    /* Returns the fullname of item. */
+    /* This string's memory is managed internally. */
+    /* Behaviour is undefined if item is invalid. */
+    const YmChar* ymItem_Fullname(struct YmItem* item);
+
+    /* Returns the kind of item. */
+    /* Behaviour is undefined if item is invalid. */
+    YmKind ymItem_Kind(struct YmItem* item);
+
+    /* Returns the size of the constant table of item. */
+    /* Behaviour is undefined if item is invalid. */
+    YmWord ymItem_Consts(struct YmItem* item);
+
+    /* Returns the type of the constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    YmConstType ymItem_ConstType(struct YmItem* item, YmConst index);
+
+    /* TODO: MAYBE revise below ymItem_***Const fns to return an indeterminate value
+    *        upon failure (due to invalid index or const type mismatch), rather than
+    *        having them be UB.
+    * 
+    *        These would be more testable, and less able to crash end-user's code, but
+    *        MIGHT cause subtle bugs in end-user code due to them failing quietly.
+    */
+
+    /* Returns the value of int constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not an int constant. */
+    YmInt ymItem_IntConst(struct YmItem* item, YmConst index);
+
+    /* Returns the value of uint constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not an uint constant. */
+    YmUInt ymItem_UIntConst(struct YmItem* item, YmConst index);
+
+    /* Returns the value of float constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not a float constant. */
+    YmFloat ymItem_FloatConst(struct YmItem* item, YmConst index);
+
+    /* Returns the value of bool constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not a bool constant. */
+    YmBool ymItem_BoolConst(struct YmItem* item, YmConst index);
+
+    /* Returns the value of runic constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not a runic constant. */
+    YmRune ymItem_RuneConst(struct YmItem* item, YmConst index);
+
+
+    /* Parcel Iterator API */
+
+    /* NOTE: Parcel iterator state is invalidated EVEN IF all that changes is an adding
+    *        of a new imported parcel.
+    */
+
+    /* (Re)starts parcel iteration, revalidating parcel iterator. */
+    /* Parcel iterator state is thread-local. */
+    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
+    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
+    /* Behaviour is undefined if ctx is invalid. */
+    void ymParcelIter_Start(struct YmCtx* ctx);
+
+    /* (Re)starts parcel iteration, starting from startFrom, revalidating parcel iterator. */
+    /* Parcel iterator state is thread-local. */
+    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
+    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if startFrom is invalid. */
+    /* Behaviour is undefined if startFrom was not imported from ctx. */
+    void ymParcelIter_StartFrom(struct YmCtx* ctx, struct YmParcel* startFrom);
+
+    /* Advances the parcel iterator n times. */
+    /* Parcel iterator state is thread-local. */
+    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
+    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
+    /* Behaviour is undefined if parcel iterator state is invalid. */
+    void ymParcelIter_Advance(YmWord n);
+
+    /* Queries the parcel iterator, returning a pointer to the current parcel, or YM_NIL on failure. */
+    /* Fail indicates that the parcel iterator is past-the-end, or iteration hasn't started. */
+    /* Parcel iterator state is thread-local. */
+    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
+    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
+    /* Behaviour is undefined if parcel iterator state is invalid. */
+    struct YmParcel* ymParcelIter_Get();
+
+    /* Returns if parcel iterator is past-the-end. */
+    /* Parcel iterator state is thread-local. */
+    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
+    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
+    /* Behaviour is undefined if parcel iterator state is invalid. */
+    YmBool ymParcelIter_Done();
+
+
+    /* Item Iterator API */
+
+    /* TODO */
+
+
     /* Internals */
 
-    YmRType _ymRType(void* x);
-    YmRefCount _ymRefCount(void* x);
-    void _ymAddRef(void* x);
-    void _ymDrop(void* x);
+    /* TODO */
 }
 
 

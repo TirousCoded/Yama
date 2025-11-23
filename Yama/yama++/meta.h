@@ -38,6 +38,20 @@ namespace ym {
     };
 
 
+    // Models dereferenceable types T.
+    template<typename T>
+    concept Dereferenceable =
+        requires (T v)
+    {
+        // We don't care what *v dereferences to.
+        *v;
+
+        // We need to be able to convert v to bool to test for if it can
+        // be dereferenced.
+        { (bool)v } noexcept -> std::convertible_to<bool>;
+    };
+
+
     // Models hashable types T.
     template<typename T>
     concept Hashable =

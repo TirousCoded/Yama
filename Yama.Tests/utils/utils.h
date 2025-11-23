@@ -5,7 +5,7 @@
 
 #include <string>
 #include <vector>
-#include <yama++/ScopedDrop.h>
+#include <yama++/smartptrs.h>
 
 #include "ErrCounter.h"
 
@@ -23,26 +23,56 @@ namespace {
         "abc/d:ef",
         "abc/def:",
     };
+    inline const std::vector<std::string> illegalFullnames{
+        // Illegal Path Components
+        "",
+        "/",
+        "//",
+        "/def",
+        "abc/",
+        "abc//def",
+        "abc/def", // Legal path, illegal fullname.
+
+        ":",
+        "/:",
+        "//:",
+        "/def:",
+        "abc/:",
+        "abc//def:",
+        "abc/def:",
+
+        ":xyz",
+        "/:xyz",
+        "//:xyz",
+        "/def:xyz",
+        "abc/:xyz",
+        "abc//def:xyz",
+
+        // Illegal *Head* Components
+        "abc:xyz:",
+        "abc:xy:z",
+        "abc:xyz/",
+        "abc:xy/z",
+    };
 }
 
 #define SETUP_DM \
 YmDm* dm = ymDm_Create(); \
 ASSERT_TRUE(dm); \
-ym::ScopedDrop dm_(dm)
+auto dm_ = ym::bindDm(ym::Safe(dm))
 
-#define SETUP_CTX \
-YmCtx* ctx = ymCtx_Create(dm); \
-ASSERT_TRUE(ctx); \
-ym::ScopedDrop ctx_(ctx)
+#define SETUP_CTX(name) \
+YmCtx* name = ymCtx_Create(dm); \
+ASSERT_TRUE(name); \
+auto name ## _ = ym::bindCtx(ym::Safe(name))
 
 #define SETUP_PARCELDEF(name) \
 YmParcelDef* name = ymParcelDef_Create(); \
 ASSERT_TRUE(name); \
-ym::ScopedDrop name ## _(name)
+auto name ## _ = ym::bindParcelDef(ym::Safe(name))
 
-#define SETUP_PARCEL(name, parceldef, path) \
-ymDm_BindParcelDef(dm, path.c_str(), parceldef); \
-YmParcel* name = ymCtx_Import(ctx, path.c_str()); \
-ASSERT_TRUE(name); \
-ym::ScopedDrop name ## _(name)
+#define BIND_AND_IMPORT(ctx, name, def, path_cstr) \
+EXPECT_EQ(ymDm_BindParcelDef(dm, path_cstr, def), YM_TRUE); \
+auto name = ymCtx_Import(ctx, path_cstr); \
+ASSERT_TRUE(name)
 

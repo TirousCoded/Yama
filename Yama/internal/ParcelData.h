@@ -3,34 +3,41 @@
 #pragma once
 
 
-#include "Resource.h"
+#include <atomic>
+#include <memory>
+#include <string>
+
+#include "../yama/yama.h"
+#include "ParcelInfo.h"
 
 
 namespace _ym {
 
 
-    // Encapsulates the thread-safe immutable shared data of YmParcel resources.
-    class ParcelData final : public Resource {
+    // Encapsulates parcel info bound to a path and PID.
+    class ParcelData final {
     public:
+        const YmPID pid;
         const std::string path;
+        const std::shared_ptr<ParcelInfo> info;
 
 
-        inline ParcelData(std::string path) :
-            Resource(RMode::ARC),
-            path(std::move(path)) {}
+        inline ParcelData(std::string path, std::shared_ptr<ParcelInfo> info) :
+            pid(_acquirePID()),
+            path(std::move(path)),
+            info(std::move(info)) {}
 
 
-        inline const YmChar* debugName() const noexcept override {
-            return "Parcel Data";
-        }
+        YmWord items() const noexcept;
+        const ItemInfo* item(const std::string& localName) const noexcept;
+        const ItemInfo* item(YmLID lid) const noexcept;
 
-        template<typename... Args>
-        static inline Res<ParcelData> create(Args&&... args) {
-            return Res(new ParcelData(std::forward<Args>(args)...));
-        }
-        inline void destroy() const noexcept override {
-            delete this;
-        }
+
+    private:
+        static std::atomic<YmPID> _nextPID;
+
+
+        static YmPID _acquirePID() noexcept;
     };
 }
 

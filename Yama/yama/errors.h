@@ -12,7 +12,12 @@ extern "C" {
 
 
     typedef enum : YmUInt16 {
-        YmErrCode_IllegalPath = 0, /* Failure due to an illegal import path. */
+        YmErrCode_IllegalPath = 0, /* Illegal import path. */
+        YmErrCode_IllegalFullname, /* Illegal fullname. */
+        YmErrCode_ParcelNotFound, /* Couldn't find a specific parcel. */
+        YmErrCode_ItemNotFound, /* Couldn't find a specific item. */
+        YmErrCode_ItemNameConflict, /* Parcel def. already contains item under name. */
+        YmErrCode_MaxConstsLimit, /* Adding a new constant table entry would require a constant index exceeding YM_MAX_CONST. */
 
         YmErrCode_Num, /* Enum size. Not a valid error code. */
     } YmErrCode;
