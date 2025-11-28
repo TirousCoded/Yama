@@ -249,7 +249,7 @@ extern "C" {
         YmConstType_Bool,
         YmConstType_Rune,
 
-        //YmConstType_Ref,
+        YmConstType_Ref,
 
         YmConstType_Num, /* Enum size. Not a valid constant table entry type. */
     } YmConstType;
@@ -318,6 +318,15 @@ extern "C" {
     /* Behaviour is undefined if fullname (as a pointer) is invalid. */
     struct YmItem* ymCtx_Load(struct YmCtx* ctx, const YmChar* fullname);
 
+    /* TODO: Unit test LoadByGID_AutoImportsDeps is incomplete.
+    */
+
+    /* Loads the item under gid, returning a pointer to it, or YM_NIL on failure. */
+    /* Loading may involve the importing of parcels or the loading of other items. */
+    /* Fails if gid does not describe a loadable item. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmItem* ymCtx_LoadByGID(struct YmCtx* ctx, YmGID gid);
+
 
     /* Parcel Def. API */
 
@@ -369,6 +378,13 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     YmConst ymParcelDef_RuneConst(struct YmParcelDef* parceldef, YmLID item, YmRune value);
 
+    /* Given parceldef and an item therein, returns the index of the item reference constant with value, or YM_NO_CONST on failure. */
+    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Fails if item is not the LID of an item in parceldef. */
+    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    YmConst ymParcelDef_RefConst(struct YmParcelDef* parceldef, YmLID item, const YmChar* symbol);
+
 
     /* Parcel API */
 
@@ -392,7 +408,7 @@ extern "C" {
     /* This string's memory is managed internally. */
     /* Behaviour is undefined if item is invalid. */
     const YmChar* ymItem_Fullname(struct YmItem* item);
-
+    
     /* Returns the kind of item. */
     /* Behaviour is undefined if item is invalid. */
     YmKind ymItem_Kind(struct YmItem* item);
@@ -443,6 +459,12 @@ extern "C" {
     /* Behaviour is undefined if no constant at index. */
     /* Behaviour is undefined if constant at index is not a runic constant. */
     YmRune ymItem_RuneConst(struct YmItem* item, YmConst index);
+
+    /* Returns the value of item reference constant at index in item. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if no constant at index. */
+    /* Behaviour is undefined if constant at index is not an item reference constant. */
+    YmItem* ymItem_RefConst(struct YmItem* item, YmConst index);
 
 
     /* Parcel Iterator API */

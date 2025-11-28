@@ -15,14 +15,36 @@
 namespace _ym {
 
 
+    constexpr bool isValConstType(YmConstType t) noexcept {
+        static_assert(YmConstType_Num == 6);
+        return t >= YmConstType_Int && t <= YmConstType_Rune;
+    }
+
+    constexpr bool isRefConstType(YmConstType t) noexcept {
+        return t == YmConstType_Ref;
+    }
+
+    struct RefConstInfo final {
+        std::string sym;
+
+
+        bool operator==(const RefConstInfo&) const noexcept = default;
+    };
+
     using ConstInfo = ym::Variant<
         YmInt,
         YmUInt,
         YmFloat,
         YmBool,
-        YmRune
+        YmRune,
+
+        RefConstInfo
     >;
     static_assert(ConstInfo::size == YmConstType_Num);
+
+    inline YmConstType constTypeOf(const ConstInfo& x) noexcept {
+        return YmConstType(x.index());
+    }
 
     struct ItemInfo final {
         const YmLID lid;

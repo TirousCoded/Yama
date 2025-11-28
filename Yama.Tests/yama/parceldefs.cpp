@@ -58,7 +58,11 @@ TEST(ParcelDefs, ConstAddingFns) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
+    YmLID A_lid = ymParcelDef_FnItem(p_def, "A");
+    YmLID B_lid = ymParcelDef_FnItem(p_def, "B");
     ASSERT_NE(f_lid, YM_NO_LID);
+    ASSERT_NE(A_lid, YM_NO_LID);
+    ASSERT_NE(B_lid, YM_NO_LID);
 
     // Test each of our ymParcelDef_***Const fns, testing them adding new entries, querying
     // existing entries, and that LIDs are sequential as expected.
@@ -73,27 +77,33 @@ TEST(ParcelDefs, ConstAddingFns) {
         YmConst offset = 0;
 
         // Add w/out existing of same const type.
-        static_assert(YmConstType_Num == 5);
+        static_assert(YmConstType_Num == 6);
         EXPECT_EQ(ymParcelDef_IntConst(p_def, f_lid, 10), offset++);
         EXPECT_EQ(ymParcelDef_UIntConst(p_def, f_lid, 10), offset++);
         EXPECT_EQ(ymParcelDef_FloatConst(p_def, f_lid, 3.14159), offset++);
         EXPECT_EQ(ymParcelDef_BoolConst(p_def, f_lid, true), offset++);
         EXPECT_EQ(ymParcelDef_RuneConst(p_def, f_lid, U'💩'), offset++);
+        EXPECT_EQ(ymParcelDef_RefConst(p_def, f_lid, "p:A"), offset++);
 
         // Add w/ existing of same const type.
-        static_assert(YmConstType_Num == 5);
+        static_assert(YmConstType_Num == 6);
         EXPECT_EQ(ymParcelDef_IntConst(p_def, f_lid, 11), offset++);
         EXPECT_EQ(ymParcelDef_UIntConst(p_def, f_lid, 11), offset++);
         EXPECT_EQ(ymParcelDef_FloatConst(p_def, f_lid, 5.01), offset++);
         EXPECT_EQ(ymParcelDef_BoolConst(p_def, f_lid, false), offset++);
         EXPECT_EQ(ymParcelDef_RuneConst(p_def, f_lid, U'&'), offset++);
+        EXPECT_EQ(ymParcelDef_RefConst(p_def, f_lid, "p:B"), offset++);
     }
 
     SETUP_DM;
     SETUP_CTX(ctx);
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* f = ymCtx_Load(ctx, "p:f");
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    YmItem* B = ymCtx_Load(ctx, "p:B");
     ASSERT_TRUE(f);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
 
     // Check were added.
     ASSERT_EQ(ymItem_Consts(f), YmConstType_Num * 2);
@@ -105,12 +115,14 @@ TEST(ParcelDefs, ConstAddingFns) {
         YmConstType_Float,
         YmConstType_Bool,
         YmConstType_Rune,
+        YmConstType_Ref,
 
         YmConstType_Int,
         YmConstType_UInt,
         YmConstType_Float,
         YmConstType_Bool,
         YmConstType_Rune,
+        YmConstType_Ref,
     };
     ASSERT_EQ(expected_const_types.size(), YmConstType_Num * 2);
     for (YmConst i = 0; i < YmConstType_Num * 2; i++) {
@@ -119,25 +131,27 @@ TEST(ParcelDefs, ConstAddingFns) {
     }
 
     // Check are correct values.
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
     YmConst index = 0;
     EXPECT_EQ(ymItem_IntConst(f, index++), 10);
     EXPECT_EQ(ymItem_UIntConst(f, index++), 10);
     EXPECT_DOUBLE_EQ(ymItem_FloatConst(f, index++), 3.14159);
     EXPECT_EQ(ymItem_BoolConst(f, index++), true);
     EXPECT_EQ(ymItem_RuneConst(f, index++), U'💩');
+    EXPECT_EQ(ymItem_RefConst(f, index++), A);
 
     EXPECT_EQ(ymItem_IntConst(f, index++), 11);
     EXPECT_EQ(ymItem_UIntConst(f, index++), 11);
     EXPECT_DOUBLE_EQ(ymItem_FloatConst(f, index++), 5.01);
     EXPECT_EQ(ymItem_BoolConst(f, index++), false);
     EXPECT_EQ(ymItem_RuneConst(f, index++), U'&');
+    EXPECT_EQ(ymItem_RefConst(f, index++), B);
 }
 
 TEST(ParcelDefs, ConstAddingFns_ItemNotFound) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
 
     EXPECT_EQ(ymParcelDef_IntConst(p_def, 500, 10), YM_NO_CONST);
     EXPECT_GE(err[YmErrCode_ItemNotFound], 1);
@@ -158,6 +172,10 @@ TEST(ParcelDefs, ConstAddingFns_ItemNotFound) {
     EXPECT_EQ(ymParcelDef_RuneConst(p_def, 500, U'a'), YM_NO_CONST);
     EXPECT_GE(err[YmErrCode_ItemNotFound], 1);
     err.reset();
+
+    EXPECT_EQ(ymParcelDef_RefConst(p_def, 500, "yama:Int"), YM_NO_CONST);
+    EXPECT_GE(err[YmErrCode_ItemNotFound], 1);
+    err.reset();
 }
 
 TEST(ParcelDefs, ConstAddingFns_MaxConstsLimit) {
@@ -174,7 +192,7 @@ TEST(ParcelDefs, ConstAddingFns_MaxConstsLimit) {
     }
 
     // All below should fail due to constant table being full.
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
 
     EXPECT_EQ(ymParcelDef_IntConst(p_def, f_lid, 10), YM_NO_CONST);
     EXPECT_GE(err[YmErrCode_MaxConstsLimit], 1);
@@ -193,6 +211,10 @@ TEST(ParcelDefs, ConstAddingFns_MaxConstsLimit) {
     err.reset();
 
     EXPECT_EQ(ymParcelDef_RuneConst(p_def, f_lid, U'a'), YM_NO_CONST);
+    EXPECT_GE(err[YmErrCode_MaxConstsLimit], 1);
+    err.reset();
+
+    EXPECT_EQ(ymParcelDef_RefConst(p_def, f_lid, "yama:Int"), YM_NO_CONST);
     EXPECT_GE(err[YmErrCode_MaxConstsLimit], 1);
     err.reset();
 }

@@ -31,7 +31,7 @@ const YmChar* ymFmtConstType(YmConstType x) {
         "Bool Const.",
         "Rune Const.",
 
-        //"Ref. Const.",
+        "Ref. Const.",
     };
     return
         x < YmConstType_Num
@@ -48,7 +48,7 @@ void ymDm_Destroy(YmDm* dm) {
 }
 
 YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) {
-    return Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
+    return (YmBool)Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
 }
 
 YmCtx* ymCtx_Create(YmDm* dm) {
@@ -64,15 +64,19 @@ YmDm* ymCtx_Dm(YmCtx* ctx) {
 }
 
 YmParcel* ymCtx_Import(YmCtx* ctx, const YmChar* path) {
-    return Safe(ctx)->import(std::string(Safe(path)));
+    return Safe(ctx)->import(std::string(Safe(path))).get();
 }
 
 YmParcel* ymCtx_ImportByPID(YmCtx* ctx, YmPID pid) {
-    return Safe(ctx)->import(pid);
+    return Safe(ctx)->import(pid).get();
 }
 
 YmItem* ymCtx_Load(YmCtx* ctx, const YmChar* fullname) {
-    return Safe(ctx)->load(std::string(Safe(fullname)));
+    return Safe(ctx)->load(std::string(Safe(fullname))).get();
+}
+
+YmItem* ymCtx_LoadByGID(YmCtx* ctx, YmGID gid) {
+    return Safe(ctx)->load(gid).get();
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
@@ -107,12 +111,16 @@ YmConst ymParcelDef_RuneConst(YmParcelDef* parceldef, YmLID item, YmRune value) 
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
+YmConst ymParcelDef_RefConst(YmParcelDef* parceldef, YmLID item, const YmChar* symbol) {
+    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(RefConstInfo{ .sym = symbol }));
+}
+
 YmPID ymParcel_PID(YmParcel* parcel) {
-    return Safe(parcel)->pid();
+    return Safe(parcel)->pid;
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
-    return Safe(parcel)->path().c_str();
+    return Safe(parcel)->path.c_str();
 }
 
 YmGID ymItem_GID(YmItem* item) {
@@ -154,6 +162,10 @@ YmBool ymItem_BoolConst(YmItem* item, YmConst index) {
 
 YmRune ymItem_RuneConst(YmItem* item, YmConst index) {
     return Safe(item)->constAs<YmConstType_Rune>(index);
+}
+
+YmItem* ymItem_RefConst(YmItem* item, YmConst index) {
+    return Safe(item)->constAs<YmConstType_Ref>(index);
 }
 
 void ymParcelIter_Start(YmCtx* ctx) {

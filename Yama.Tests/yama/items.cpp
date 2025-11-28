@@ -79,25 +79,28 @@ TEST(Items, ConstType) {
 
     SETUP_PARCELDEF(p_def);
     YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
+    YmLID g_lid = ymParcelDef_FnItem(p_def, "g");
     
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
     YmConst int_c = ymParcelDef_IntConst(p_def, f_lid, 10);
     YmConst uint_c = ymParcelDef_UIntConst(p_def, f_lid, 10);
     YmConst float_c = ymParcelDef_FloatConst(p_def, f_lid, 3.14159);
     YmConst bool_c = ymParcelDef_BoolConst(p_def, f_lid, true);
     YmConst rune_c = ymParcelDef_RuneConst(p_def, f_lid, U'💩');
+    YmConst ref_c = ymParcelDef_RefConst(p_def, f_lid, "p:g");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* f = ymCtx_Load(ctx, "p:f");
     ASSERT_TRUE(f);
     ASSERT_EQ(ymItem_Consts(f), YmConstType_Num);
 
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
     EXPECT_EQ(ymItem_ConstType(f, int_c), YmConstType_Int);
     EXPECT_EQ(ymItem_ConstType(f, uint_c), YmConstType_UInt);
     EXPECT_EQ(ymItem_ConstType(f, float_c), YmConstType_Float);
     EXPECT_EQ(ymItem_ConstType(f, bool_c), YmConstType_Bool);
     EXPECT_EQ(ymItem_ConstType(f, rune_c), YmConstType_Rune);
+    EXPECT_EQ(ymItem_ConstType(f, ref_c), YmConstType_Ref);
 }
 
 TEST(Items, ConstValueAccess) {
@@ -107,20 +110,22 @@ TEST(Items, ConstValueAccess) {
 
     SETUP_PARCELDEF(p_def);
     YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
+    YmLID g_lid = ymParcelDef_FnItem(p_def, "g");
 
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
     YmConst int_c = ymParcelDef_IntConst(p_def, f_lid, 10);
     YmConst uint_c = ymParcelDef_UIntConst(p_def, f_lid, 10);
     YmConst float_c = ymParcelDef_FloatConst(p_def, f_lid, 3.14159);
     YmConst bool_c = ymParcelDef_BoolConst(p_def, f_lid, true);
     YmConst rune_c = ymParcelDef_RuneConst(p_def, f_lid, U'💩');
+    YmConst ref_c = ymParcelDef_RefConst(p_def, f_lid, "p:g");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* f = ymCtx_Load(ctx, "p:f");
     ASSERT_TRUE(f);
     ASSERT_EQ(ymItem_Consts(f), YmConstType_Num);
 
-    static_assert(YmConstType_Num == 5);
+    static_assert(YmConstType_Num == 6);
     EXPECT_EQ(ymItem_IntConst(f, int_c), 10);
     EXPECT_EQ(ymItem_UIntConst(f, uint_c), 10);
     EXPECT_DOUBLE_EQ(ymItem_FloatConst(f, float_c), 3.14159);

@@ -179,13 +179,62 @@ TEST(Contexts, Load_AutoImportsDeps) {
     EXPECT_STREQ(ymItem_Fullname(item), "p:f");
     EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
 }
-#error tomorrow add ref-constants, NO MORE DELAYING!!! get to generics as soon as we can!!!
+
 TEST(Contexts, Load_AutoLoadsDeps) {
-    FAIL();
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(A_def);
+    SETUP_PARCELDEF(B_def);
+    YmLID A_f_lid = ymParcelDef_FnItem(A_def, "f");
+    YmLID B_f_lid = ymParcelDef_FnItem(B_def, "f");
+    ASSERT_NE(ymParcelDef_RefConst(B_def, B_f_lid, "A:f"), YM_NO_CONST); // First const of B:f is ref-const to A:f.
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "A", A_def), YM_TRUE);
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "B", B_def), YM_TRUE);
+    // Test that B:f auto-loads A:f as a dependency during B:f load.
+    YmItem* B_f = ymCtx_Load(ctx, "B:f"); // Should load A:f.
+    ASSERT_NE(B_f, nullptr);
+    // Having already called ymCtx_Load to auto-load A:f, and having confirmed that B_f
+    // isn't nullptr, now it's okay to load A:f explicitly to compare w/.
+    YmItem* A_f = ymCtx_Load(ctx, "A:f");
+    ASSERT_NE(A_f, nullptr);
+    // Query first const of B:f (which should be A:f.)
+    ASSERT_EQ(ymItem_Consts(B_f), 1);
+    ASSERT_EQ(ymItem_ConstType(B_f, 0), YmConstType_Ref);
+    YmItem* B_f_first_const = ymItem_RefConst(B_f, 0);
+    ASSERT_NE(B_f_first_const, nullptr);
+    // Now compare B_f_first_const against A_f to see that B:f auto-loaded A:f.
+    EXPECT_EQ(B_f_first_const, A_f);
 }
 
 TEST(Contexts, Load_DepGraphCycle) {
-    FAIL();
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(A_def);
+    SETUP_PARCELDEF(B_def);
+    // Given A:f and B:f which have first constant table ref-constants referring to one
+    // another, test that these can load successfully despite dep graph cycle.
+    YmLID A_f_lid = ymParcelDef_FnItem(A_def, "f");
+    YmLID B_f_lid = ymParcelDef_FnItem(B_def, "f");
+    ASSERT_NE(ymParcelDef_RefConst(A_def, A_f_lid, "B:f"), YM_NO_CONST); // First const of A:f is ref-const to B:f.
+    ASSERT_NE(ymParcelDef_RefConst(B_def, B_f_lid, "A:f"), YM_NO_CONST); // First const of B:f is ref-const to A:f.
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "A", A_def), YM_TRUE);
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "B", B_def), YM_TRUE);
+    YmItem* A_f = ymCtx_Load(ctx, "A:f");
+    YmItem* B_f = ymCtx_Load(ctx, "B:f");
+    ASSERT_NE(A_f, nullptr);
+    ASSERT_NE(B_f, nullptr);
+    ASSERT_EQ(ymItem_Consts(A_f), 1);
+    ASSERT_EQ(ymItem_Consts(B_f), 1);
+    ASSERT_EQ(ymItem_ConstType(A_f, 0), YmConstType_Ref);
+    ASSERT_EQ(ymItem_ConstType(B_f, 0), YmConstType_Ref);
+    YmItem* A_f_first_const = ymItem_RefConst(A_f, 0);
+    YmItem* B_f_first_const = ymItem_RefConst(B_f, 0);
+    ASSERT_NE(A_f_first_const, nullptr);
+    ASSERT_NE(B_f_first_const, nullptr);
+    EXPECT_EQ(A_f_first_const, B_f);
+    EXPECT_EQ(B_f_first_const, A_f);
 }
 
 TEST(Contexts, Load_AcrossCtxBoundaries) {
@@ -214,6 +263,139 @@ TEST(Contexts, Load_AcrossCtxBoundaries) {
         YmItem* item = ymCtx_Load(ctx2, "p:f");
         ASSERT_NE(item, nullptr);
         EXPECT_EQ(ymItem_GID(item), expected_gid);
+        EXPECT_STREQ(ymItem_Fullname(item), "p:f");
+        EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
+    }
+}
+
+TEST(Contexts, LoadByGID) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(p_def);
+    YmLID item_lid = ymParcelDef_FnItem(p_def, "abc");
+    ASSERT_NE(item_lid, YM_NO_LID);
+    BIND_AND_IMPORT(ctx, p, p_def, "p");
+    YmItem* item = ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(p), item_lid));
+    ASSERT_NE(item, nullptr);
+    EXPECT_EQ(ymItem_GID(item), ymGID(ymParcel_PID(p), item_lid));
+    EXPECT_STREQ(ymItem_Fullname(item), "p:abc");
+    EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
+}
+
+TEST(Contexts, LoadByGID_ParcelNotFound) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    EXPECT_EQ(ymCtx_LoadByGID(ctx, ymGID(500, 0)), nullptr);
+    EXPECT_GE(err[YmErrCode_ParcelNotFound], 1);
+}
+
+TEST(Contexts, LoadByGID_ItemNotFound) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(p_def);
+    BIND_AND_IMPORT(ctx, p, p_def, "p");
+    EXPECT_EQ(ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(p), 0)), nullptr);
+    EXPECT_GE(err[YmErrCode_ItemNotFound], 1);
+}
+
+TEST(Contexts, LoadByGID_AutoImportsDeps) {
+    // TODO: I don't know how to test this, as we lack a way to get the PID w/out importing.
+}
+
+TEST(Contexts, LoadByGID_AutoLoadsDeps) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(A_def);
+    SETUP_PARCELDEF(B_def);
+    YmLID A_f_lid = ymParcelDef_FnItem(A_def, "f");
+    YmLID B_f_lid = ymParcelDef_FnItem(B_def, "f");
+    ASSERT_NE(ymParcelDef_RefConst(B_def, B_f_lid, "A:f"), YM_NO_CONST); // First const of B:f is ref-const to A:f.
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "A", A_def), YM_TRUE);
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "B", B_def), YM_TRUE);
+    YmParcel* A = ymCtx_Import(ctx, "A");
+    YmParcel* B = ymCtx_Import(ctx, "B");
+    ASSERT_NE(A, nullptr);
+    ASSERT_NE(B, nullptr);
+    // Test that B:f auto-loads A:f as a dependency during B:f load.
+    YmItem* B_f = ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(B), B_f_lid)); // Should load A:f.
+    ASSERT_NE(B_f, nullptr);
+    // Having already called ymCtx_Load to auto-load A:f, and having confirmed that B_f
+    // isn't nullptr, now it's okay to load A:f explicitly to compare w/.
+    YmItem* A_f = ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(A), A_f_lid));
+    ASSERT_NE(A_f, nullptr);
+    // Query first const of B:f (which should be A:f.)
+    ASSERT_EQ(ymItem_Consts(B_f), 1);
+    ASSERT_EQ(ymItem_ConstType(B_f, 0), YmConstType_Ref);
+    YmItem* B_f_first_const = ymItem_RefConst(B_f, 0);
+    ASSERT_NE(B_f_first_const, nullptr);
+    // Now compare B_f_first_const against A_f to see that B:f auto-loaded A:f.
+    EXPECT_EQ(B_f_first_const, A_f);
+}
+
+TEST(Contexts, LoadByGID_DepGraphCycle) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx);
+    SETUP_PARCELDEF(A_def);
+    SETUP_PARCELDEF(B_def);
+    // Given A:f and B:f which have first constant table ref-constants referring to one
+    // another, test that these can load successfully despite dep graph cycle.
+    YmLID A_f_lid = ymParcelDef_FnItem(A_def, "f");
+    YmLID B_f_lid = ymParcelDef_FnItem(B_def, "f");
+    ASSERT_NE(ymParcelDef_RefConst(A_def, A_f_lid, "B:f"), YM_NO_CONST); // First const of A:f is ref-const to B:f.
+    ASSERT_NE(ymParcelDef_RefConst(B_def, B_f_lid, "A:f"), YM_NO_CONST); // First const of B:f is ref-const to A:f.
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "A", A_def), YM_TRUE);
+    ASSERT_EQ(ymDm_BindParcelDef(dm, "B", B_def), YM_TRUE);
+    YmParcel* A = ymCtx_Import(ctx, "A");
+    YmParcel* B = ymCtx_Import(ctx, "B");
+    ASSERT_NE(A, nullptr);
+    ASSERT_NE(B, nullptr);
+    YmItem* A_f = ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(A), A_f_lid));
+    YmItem* B_f = ymCtx_LoadByGID(ctx, ymGID(ymParcel_PID(B), B_f_lid));
+    ASSERT_NE(A_f, nullptr);
+    ASSERT_NE(B_f, nullptr);
+    ASSERT_EQ(ymItem_Consts(A_f), 1);
+    ASSERT_EQ(ymItem_Consts(B_f), 1);
+    ASSERT_EQ(ymItem_ConstType(A_f, 0), YmConstType_Ref);
+    ASSERT_EQ(ymItem_ConstType(B_f, 0), YmConstType_Ref);
+    YmItem* A_f_first_const = ymItem_RefConst(A_f, 0);
+    YmItem* B_f_first_const = ymItem_RefConst(B_f, 0);
+    ASSERT_NE(A_f_first_const, nullptr);
+    ASSERT_NE(B_f_first_const, nullptr);
+    EXPECT_EQ(A_f_first_const, B_f);
+    EXPECT_EQ(B_f_first_const, A_f);
+}
+
+TEST(Contexts, LoadByGID_AcrossCtxBoundaries) {
+    YmGID item_gid{};
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    SETUP_CTX(ctx1);
+    {
+        // Setup parcel p for dm.
+        SETUP_PARCELDEF(p_def);
+        YmLID item_lid = ymParcelDef_FnItem(p_def, "f");
+        ASSERT_NE(item_lid, YM_NO_LID);
+        BIND_AND_IMPORT(ctx1, p, p_def, "p");
+        item_gid = ymGID(ymParcel_PID(p), item_lid);
+
+        // Load in ctx1.
+        YmItem* item = ymCtx_LoadByGID(ctx1, item_gid);
+        ASSERT_NE(item, nullptr);
+        EXPECT_EQ(ymItem_GID(item), item_gid);
+        EXPECT_STREQ(ymItem_Fullname(item), "p:f");
+        EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
+    }
+    SETUP_CTX(ctx2);
+    {
+        // Load in ctx2 (ie. across context boundary.)
+        YmItem* item = ymCtx_LoadByGID(ctx2, item_gid);
+        ASSERT_NE(item, nullptr);
+        EXPECT_EQ(ymItem_GID(item), item_gid);
         EXPECT_STREQ(ymItem_Fullname(item), "p:f");
         EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
     }

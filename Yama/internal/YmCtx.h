@@ -12,30 +12,23 @@
 
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
+#include "Loader.h"
 #include "YmDm.h"
 
 
 struct YmCtx final {
 public:
     const ym::Safe<YmDm> domain;
+    const std::shared_ptr<_ym::CtxLoader> loader;
 
 
-    inline YmCtx(ym::Safe<YmDm> domain) :
-        domain(domain) {
-    }
+    YmCtx(ym::Safe<YmDm> domain);
 
 
-    // Fetching acquires parcel/item w/out attempting to import/load it.
-
-    YmParcel* fetchParcel(const std::string& path) const noexcept;
-    YmParcel* fetchParcel(YmPID pid) const noexcept;
-    YmItem* fetchItem(const std::string& fullname) const noexcept;
-    YmItem* fetchItem(YmGID gid) const noexcept;
-
-    YmParcel* import(const std::string& path);
-    YmParcel* import(YmPID pid);
-    YmItem* load(const std::string& fullname);
-    YmItem* load(YmGID gid);
+    std::shared_ptr<YmParcel> import(const std::string& path);
+    std::shared_ptr<YmParcel> import(YmPID pid);
+    std::shared_ptr<YmItem> load(const std::string& fullname);
+    std::shared_ptr<YmItem> load(YmGID gid);
 
 
     static void pIterStart(ym::Safe<YmCtx> ctx) noexcept;
@@ -46,22 +39,9 @@ public:
 
 
 private:
-    std::unordered_map<std::string, std::shared_ptr<YmParcel>> _importsByPath;
-    std::unordered_map<YmPID, std::shared_ptr<YmParcel>> _importsByPID;
-
-    std::unordered_map<std::string, std::shared_ptr<YmItem>> _loadsByFullname;
-    std::unordered_map<YmGID, std::shared_ptr<YmItem>> _loadsByGID;
+    //
 
 
-    static thread_local decltype(_importsByPID)::const_iterator _iter, _pastTheEndIter;
-    static thread_local YmParcel* _iterCurr;
-
-
-    void _download(const std::string& path);
-    void _download(YmPID pid);
-    void _resolve(const std::string& fullname);
-
-
-    static void _updateIterCurr() noexcept;
+    static thread_local _ym::Area<YmParcel>::Iterator _pIt, _pEnd;
 };
 
