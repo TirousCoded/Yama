@@ -23,25 +23,25 @@ namespace ym {
 	// These bind*** methods exist to enable the creation of RAII objects to automate releasing
 	// of already existing resource pointers.
 
-	inline ScopedDm bindDm(Safe<YmDm> resource) noexcept {
+	inline ScopedDm bindScoped(Safe<YmDm> resource) noexcept {
 		return ScopedDm(resource, ymDm_Destroy);
 	}
-	inline ScopedCtx bindCtx(Safe<YmCtx> resource) noexcept {
+	inline ScopedCtx bindScoped(Safe<YmCtx> resource) noexcept {
 		return ScopedCtx(resource, ymCtx_Destroy);
 	}
-	inline ScopedParcelDef bindParcelDef(Safe<YmParcelDef> resource) noexcept {
+	inline ScopedParcelDef bindScoped(Safe<YmParcelDef> resource) noexcept {
 		return ScopedParcelDef(resource, ymParcelDef_Destroy);
 	}
 
 
 	inline ScopedDm makeDm() {
-		return bindDm(Safe(ymDm_Create()));
+		return bindScoped(Safe(ymDm_Create()));
 	}
 	inline ScopedCtx makeCtx(Safe<YmDm> dm) {
-		return bindCtx(Safe(ymCtx_Create(dm)));
+		return bindScoped(Safe(ymCtx_Create(dm)));
 	}
 	inline ScopedParcelDef makeParcelDef() {
-		return bindParcelDef(Safe(ymParcelDef_Create()));
+		return bindScoped(Safe(ymParcelDef_Create()));
 	}
 }
 

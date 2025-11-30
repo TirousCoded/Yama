@@ -26,7 +26,7 @@ public:
     }
 
 
-    std::optional<YmLID> fnItem(const std::string& name);
+    std::optional<YmItemIndex> fnItem(const std::string& name);
 
 
 private:

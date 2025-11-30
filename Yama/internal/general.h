@@ -34,6 +34,17 @@ namespace _ym {
         void* user = nullptr;
     };
 
+    // Struct used to tell Global::raiseErr about a constant table constant the error exists in relation to.
+    struct ConstDbgInfo final {
+        std::string_view fullname; // The fullname of the item of the constant table in question.
+        YmConst index; // Index of the constant.
+
+
+        static inline ConstDbgInfo mk(std::string_view fullname, YmConst index) noexcept {
+            return ConstDbgInfo{ .fullname = fullname, .index = index };
+        }
+    };
+
     // Static class encapsulating Yama API process-wide and thread-local data/functionality.
     class Global final {
     public:
@@ -45,12 +56,19 @@ namespace _ym {
         static bool fullnameIsLegal(std::string_view fullname);
 
         template<typename... Args>
-        static inline void raiseErr(YmErrCode code, std::format_string<Args...> fmt, Args&&... args) {
+        static inline void raiseErr(std::optional<ConstDbgInfo> constDbgInfo, YmErrCode code, std::format_string<Args...> fmt, Args&&... args) {
             if (!_errCallbackInfo.fn) {
                 return;
             }
-            std::string errmsg(std::format("[Yama] [{}] {}", ymFmtYmErrCode(code), std::format(fmt, std::forward<Args>(args)...)));
+            std::string errmsg =
+                constDbgInfo
+                ? std::format("[Yama] [{}] For {} const. #{}: {}", ymFmtYmErrCode(code), constDbgInfo->fullname, constDbgInfo->index + 1, std::format(fmt, std::forward<Args>(args)...))
+                : std::format("[Yama] [{}] {}", ymFmtYmErrCode(code), std::format(fmt, std::forward<Args>(args)...));
             _errCallbackInfo.fn(code, errmsg.c_str(), _errCallbackInfo.user);
+        }
+        template<typename... Args>
+        static inline void raiseErr(YmErrCode code, std::format_string<Args...> fmt, Args&&... args) {
+            raiseErr(std::nullopt, code, fmt, std::forward<Args>(args)...);
         }
 
 

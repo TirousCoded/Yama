@@ -15,16 +15,8 @@ std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
     return loader->import(path);
 }
 
-std::shared_ptr<YmParcel> YmCtx::import(YmPID pid) {
-    return loader->import(pid);
-}
-
 std::shared_ptr<YmItem> YmCtx::load(const std::string& fullname) {
     return loader->load(fullname);
-}
-
-std::shared_ptr<YmItem> YmCtx::load(YmGID gid) {
-    return loader->load(gid);
 }
 
 void YmCtx::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
@@ -33,7 +25,7 @@ void YmCtx::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
 }
 
 void YmCtx::pIterStartFrom(ym::Safe<YmCtx> ctx, ym::Safe<YmParcel> parcel) noexcept {
-    _pIt = ctx->loader->parcels().find(parcel->pid);
+    _pIt = ctx->loader->parcels().find(parcel->getName());
     _pEnd = ctx->loader->parcels().end();
 }
 

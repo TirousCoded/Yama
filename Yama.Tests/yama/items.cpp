@@ -6,19 +6,19 @@
 #include "../utils/utils.h"
 
 
-TEST(Items, GID) {
+TEST(Items, Parcel) {
     SETUP_ERRCOUNTER;
     SETUP_DM;
     SETUP_CTX(ctx);
     SETUP_PARCELDEF(p_def);
-    YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
-    ASSERT_NE(f_lid, YM_NO_LID);
+    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
+    ASSERT_NE(f_index, YM_NO_ITEM_INDEX);
     ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
     auto item = ymCtx_Load(ctx, "p:f");
     ASSERT_TRUE(item);
     YmParcel* p = ymCtx_Import(ctx, "p");
     ASSERT_NE(p, nullptr);
-    EXPECT_EQ(ymItem_GID(item), ymGID(ymParcel_PID(p), f_lid));
+    EXPECT_EQ(ymItem_Parcel(item), p);
 }
 
 TEST(Items, Fullname) {
@@ -26,7 +26,7 @@ TEST(Items, Fullname) {
     SETUP_DM;
     SETUP_CTX(ctx);
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_LID);
+    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_ITEM_INDEX);
     ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
     auto item = ymCtx_Load(ctx, "p:f");
     ASSERT_TRUE(item);
@@ -38,7 +38,7 @@ TEST(Items, Kind) {
     SETUP_DM;
     SETUP_CTX(ctx);
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_LID);
+    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_ITEM_INDEX);
     ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
     auto item = ymCtx_Load(ctx, "p:f");
     ASSERT_TRUE(item);
@@ -60,10 +60,10 @@ TEST(Items, Consts) {
     }
     {
         SETUP_PARCELDEF(nonempty_def);
-        YmLID f_lid = ymParcelDef_FnItem(nonempty_def, "f");
-        ymParcelDef_IntConst(nonempty_def, f_lid, 10);
-        ymParcelDef_IntConst(nonempty_def, f_lid, 11);
-        ymParcelDef_IntConst(nonempty_def, f_lid, 12);
+        YmItemIndex f_index = ymParcelDef_FnItem(nonempty_def, "f");
+        ymParcelDef_IntConst(nonempty_def, f_index, 10);
+        ymParcelDef_IntConst(nonempty_def, f_index, 11);
+        ymParcelDef_IntConst(nonempty_def, f_index, 12);
         ymDm_BindParcelDef(dm, "nonempty", nonempty_def);
         YmItem* f = ymCtx_Load(ctx, "nonempty:f");
         ASSERT_TRUE(f);
@@ -78,16 +78,16 @@ TEST(Items, ConstType) {
     SETUP_CTX(ctx);
 
     SETUP_PARCELDEF(p_def);
-    YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
-    YmLID g_lid = ymParcelDef_FnItem(p_def, "g");
+    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
+    YmItemIndex g_index = ymParcelDef_FnItem(p_def, "g");
     
     static_assert(YmConstType_Num == 6);
-    YmConst int_c = ymParcelDef_IntConst(p_def, f_lid, 10);
-    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_lid, 10);
-    YmConst float_c = ymParcelDef_FloatConst(p_def, f_lid, 3.14159);
-    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_lid, true);
-    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_lid, U'💩');
-    YmConst ref_c = ymParcelDef_RefConst(p_def, f_lid, "p:g");
+    YmConst int_c = ymParcelDef_IntConst(p_def, f_index, 10);
+    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_index, 10);
+    YmConst float_c = ymParcelDef_FloatConst(p_def, f_index, 3.14159);
+    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_index, true);
+    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_index, U'💩');
+    YmConst ref_c = ymParcelDef_RefConst(p_def, f_index, "p:g");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* f = ymCtx_Load(ctx, "p:f");
@@ -109,16 +109,16 @@ TEST(Items, ConstValueAccess) {
     SETUP_CTX(ctx);
 
     SETUP_PARCELDEF(p_def);
-    YmLID f_lid = ymParcelDef_FnItem(p_def, "f");
-    YmLID g_lid = ymParcelDef_FnItem(p_def, "g");
+    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
+    YmItemIndex g_index = ymParcelDef_FnItem(p_def, "g");
 
     static_assert(YmConstType_Num == 6);
-    YmConst int_c = ymParcelDef_IntConst(p_def, f_lid, 10);
-    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_lid, 10);
-    YmConst float_c = ymParcelDef_FloatConst(p_def, f_lid, 3.14159);
-    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_lid, true);
-    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_lid, U'💩');
-    YmConst ref_c = ymParcelDef_RefConst(p_def, f_lid, "p:g");
+    YmConst int_c = ymParcelDef_IntConst(p_def, f_index, 10);
+    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_index, 10);
+    YmConst float_c = ymParcelDef_FloatConst(p_def, f_index, 3.14159);
+    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_index, true);
+    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_index, U'💩');
+    YmConst ref_c = ymParcelDef_RefConst(p_def, f_index, "p:g");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* f = ymCtx_Load(ctx, "p:f");

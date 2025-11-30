@@ -186,28 +186,6 @@ extern "C" {
     */
 
 
-    /* TODO: Need to later include 16-bit value for specifying an ID for the item argument tuple
-    *        parameterizing it in case of instantiated generic types.
-    * 
-    *        This'll mean bumping up sizeof(YmGID) to 8.
-    */
-
-    typedef YmUInt16 YmPID; /* Domain-wide stable ID of an imported parcel. */
-    typedef YmUInt16 YmLID; /* Local ID of an item within its parcel. */
-    typedef YmUInt32 YmGID; /* Domain-wide stable global ID of a loaded item, combining its LID and its parcel's PID. */
-
-#define YM_NO_LID (YmLID(-1))
-
-    /* Returns a GID created from pid and lid. */
-#define ymGID(pid, lid) (YmGID(pid) << 16 | YmGID(lid))
-
-    /* Extracts PID component of gid. */
-#define ymGID_PID(gid) (YmPID(gid >> 16))
-
-    /* Extracts LID component of gid. */
-#define ymGID_LID(gid) (YmLID(gid))
-
-
     /* NOTE: Resources are thread-unsafe unless otherwise specified.
     */
 
@@ -279,7 +257,12 @@ extern "C" {
     /* Behaviour is undefined if dm is invalid. */
     void ymDm_Destroy(struct YmDm* dm);
 
+    /* TODO: ymDm_BindParcelDef overwriting existing bindings hasn't been unit tested.
+    */
+
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
+    /* Fails if path specified is illegal. */
+    /* Fails if parceldef fails verification. */
     /* Behaviour is undefined if dm is invalid. */
     /* Behaviour is undefined if path (as a pointer) is invalid. */
     /* Behaviour is undefined if parceldef is invalid. */
@@ -306,26 +289,31 @@ extern "C" {
     /* Behaviour is undefined if path (as a pointer) is invalid. */
     struct YmParcel* ymCtx_Import(struct YmCtx* ctx, const YmChar* path);
 
-    /* Imports the parcel under pid, returning a pointer to it, or YM_NIL on failure. */
-    /* The parcel must first have already been imported by this context, or another under the same domain. */
-    /* Behaviour is undefined if ctx is invalid. */
-    struct YmParcel* ymCtx_ImportByPID(struct YmCtx* ctx, YmPID pid);
-
     /* Loads the item with fullname, returning a pointer to it, or YM_NIL on failure. */
-    /* Loading may involve the importing of parcels or the loading of other items. */
     /* Fails if fullname does not describe a loadable item. */
+    /* Loading may involve the importing of parcels or the loading of other items. */
     /* Behaviour is undefined if ctx is invalid. */
     /* Behaviour is undefined if fullname (as a pointer) is invalid. */
     struct YmItem* ymCtx_Load(struct YmCtx* ctx, const YmChar* fullname);
 
-    /* TODO: Unit test LoadByGID_AutoImportsDeps is incomplete.
+    /* TODO: Better explain the specifics of why naturalization is needed.
+    * 
+    *        Explain that it's needed to legally use parcel/item ptrs across
+    *        context boundaries.
     */
 
-    /* Loads the item under gid, returning a pointer to it, or YM_NIL on failure. */
-    /* Loading may involve the importing of parcels or the loading of other items. */
-    /* Fails if gid does not describe a loadable item. */
+    /* TODO: These 'naturalization' fns have not been unit tested yet.
+    */
+
+    /* Makes it legal to use parcel with ctx, if it wasn't already. */
     /* Behaviour is undefined if ctx is invalid. */
-    struct YmItem* ymCtx_LoadByGID(struct YmCtx* ctx, YmGID gid);
+    /* Behaviour is undefined if parcel is invalid. */
+    void ymCtx_NaturalizeParcel(struct YmCtx* ctx, struct YmParcel* parcel);
+
+    /* Makes it legal to use parcel with ctx, if it wasn't already. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if item is invalid. */
+    void ymCtx_NaturalizeItem(struct YmCtx* ctx, struct YmItem* item);
 
 
     /* Parcel Def. API */
@@ -337,60 +325,62 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     void ymParcelDef_Destroy(struct YmParcelDef* parceldef);
 
-    /* Adds a new function to parceldef, returning its LID, or YM_NO_LID on failure. */
+    /* Index of an item in a parcel. */
+    typedef YmUInt16 YmItemIndex;
+
+#define YM_NO_ITEM_INDEX (YmItemIndex(-1))
+
+    /* Adds a new function to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if function's fullname conflicts with an existing declaration. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
-    YmLID ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name);
+    YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name);
 
     /* Given parceldef and an item therein, returns the index of the int constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_IntConst(struct YmParcelDef* parceldef, YmLID item, YmInt value);
+    YmConst ymParcelDef_IntConst(struct YmParcelDef* parceldef, YmItemIndex item, YmInt value);
 
     /* Given parceldef and an item therein, returns the index of the uint constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_UIntConst(struct YmParcelDef* parceldef, YmLID item, YmUInt value);
+    YmConst ymParcelDef_UIntConst(struct YmParcelDef* parceldef, YmItemIndex item, YmUInt value);
 
     /* Given parceldef and an item therein, returns the index of the float constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_FloatConst(struct YmParcelDef* parceldef, YmLID item, YmFloat value);
+    YmConst ymParcelDef_FloatConst(struct YmParcelDef* parceldef, YmItemIndex item, YmFloat value);
 
     /* Given parceldef and an item therein, returns the index of the bool constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_BoolConst(struct YmParcelDef* parceldef, YmLID item, YmBool value);
+    YmConst ymParcelDef_BoolConst(struct YmParcelDef* parceldef, YmItemIndex item, YmBool value);
 
     /* Given parceldef and an item therein, returns the index of the runic constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_RuneConst(struct YmParcelDef* parceldef, YmLID item, YmRune value);
+    YmConst ymParcelDef_RuneConst(struct YmParcelDef* parceldef, YmItemIndex item, YmRune value);
 
     /* Given parceldef and an item therein, returns the index of the item reference constant with value, or YM_NO_CONST on failure. */
     /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the LID of an item in parceldef. */
-    /* Fails if adding a new item would require an LID exceeding YM_MAX_CONST. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
+    /* Fails if symbol is not a legal item fullname. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_RefConst(struct YmParcelDef* parceldef, YmLID item, const YmChar* symbol);
+    YmConst ymParcelDef_RefConst(struct YmParcelDef* parceldef, YmItemIndex item, const YmChar* symbol);
 
 
     /* Parcel API */
-
-    /* Returns the PID of parcel. */
-    /* Behaviour is undefined if parcel is invalid. */
-    YmPID ymParcel_PID(struct YmParcel* parcel);
 
     /* Returns the path parcel was imported under. */
     /* This string's memory is managed internally. */
@@ -400,9 +390,9 @@ extern "C" {
 
     /* Item API */
 
-    /* Returns the GID of item. */
+    /* Returns the parcel the item belongs to. */
     /* Behaviour is undefined if item is invalid. */
-    YmGID ymItem_GID(struct YmItem* item);
+    YmParcel* ymItem_Parcel(struct YmItem* item);
 
     /* Returns the fullname of item. */
     /* This string's memory is managed internally. */
@@ -468,6 +458,18 @@ extern "C" {
 
 
     /* Parcel Iterator API */
+
+    /* TODO: Maybe replace this API w/ a ymCtx_ForEachParcel fn which takes in a fn ptr and
+    *        a void* and calls said fn ptr w/ it for each imported parcel, letting the end-user
+    *        use the fn to observe each one.
+    * 
+    *        Then, in yama++, we can have the ym::Context abstraction be able to provide the
+    *        end user w/ a std::vector<ym::Parcel> upon query, constructed in the backend w/
+    *        ymCtx_ForEachParcel.
+    * 
+    *        This would make thread-safety easier to deal w/, as ymCtx_ForEachParcel impl can
+    *        lock domain state for the duration of ymCtx_ForEachParcel.
+    */
 
     /* NOTE: Parcel iterator state is invalidated EVEN IF all that changes is an adding
     *        of a new imported parcel.

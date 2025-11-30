@@ -67,16 +67,20 @@ YmParcel* ymCtx_Import(YmCtx* ctx, const YmChar* path) {
     return Safe(ctx)->import(std::string(Safe(path))).get();
 }
 
-YmParcel* ymCtx_ImportByPID(YmCtx* ctx, YmPID pid) {
-    return Safe(ctx)->import(pid).get();
-}
-
 YmItem* ymCtx_Load(YmCtx* ctx, const YmChar* fullname) {
     return Safe(ctx)->load(std::string(Safe(fullname))).get();
 }
 
-YmItem* ymCtx_LoadByGID(YmCtx* ctx, YmGID gid) {
-    return Safe(ctx)->load(gid).get();
+void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
+    assertSafe(ctx);
+    assertSafe(parcel);
+    // TODO
+}
+
+void ymCtx_NaturalizeItem(YmCtx* ctx, YmItem* item) {
+    assertSafe(ctx);
+    assertSafe(item);
+    // TODO
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
@@ -87,44 +91,40 @@ void ymParcelDef_Destroy(YmParcelDef* parceldef) {
     delete Safe(parceldef).get();
 }
 
-YmLID ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name) {
-    return Safe(parceldef)->fnItem(std::string(Safe(name))).value_or(YM_NO_LID);
+YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name) {
+    return Safe(parceldef)->fnItem(std::string(Safe(name))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmConst ymParcelDef_IntConst(YmParcelDef* parceldef, YmLID item, YmInt value) {
+YmConst ymParcelDef_IntConst(YmParcelDef* parceldef, YmItemIndex item, YmInt value) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
-YmConst ymParcelDef_UIntConst(YmParcelDef* parceldef, YmLID item, YmUInt value) {
+YmConst ymParcelDef_UIntConst(YmParcelDef* parceldef, YmItemIndex item, YmUInt value) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
-YmConst ymParcelDef_FloatConst(YmParcelDef* parceldef, YmLID item, YmFloat value) {
+YmConst ymParcelDef_FloatConst(YmParcelDef* parceldef, YmItemIndex item, YmFloat value) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
-YmConst ymParcelDef_BoolConst(YmParcelDef* parceldef, YmLID item, YmBool value) {
+YmConst ymParcelDef_BoolConst(YmParcelDef* parceldef, YmItemIndex item, YmBool value) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
-YmConst ymParcelDef_RuneConst(YmParcelDef* parceldef, YmLID item, YmRune value) {
+YmConst ymParcelDef_RuneConst(YmParcelDef* parceldef, YmItemIndex item, YmRune value) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
 }
 
-YmConst ymParcelDef_RefConst(YmParcelDef* parceldef, YmLID item, const YmChar* symbol) {
+YmConst ymParcelDef_RefConst(YmParcelDef* parceldef, YmItemIndex item, const YmChar* symbol) {
     return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(RefConstInfo{ .sym = symbol }));
-}
-
-YmPID ymParcel_PID(YmParcel* parcel) {
-    return Safe(parcel)->pid;
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
     return Safe(parcel)->path.c_str();
 }
 
-YmGID ymItem_GID(YmItem* item) {
-    return Safe(item)->gid;
+YmParcel* ymItem_Parcel(YmItem* item) {
+    return Safe(item)->parcel;
 }
 
 const YmChar* ymItem_Fullname(YmItem* item) {

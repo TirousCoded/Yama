@@ -17,12 +17,18 @@ YmWord ErrCounter::operator[](YmErrCode code) const noexcept {
 void ErrCounter::report(YmErrCode code, const YmChar* msg) {
     ymAssert(code < YmErrCode_Num);
     ymAssert(msg != nullptr);
-    ym::println("{}", msg);
+    if (!_suppressLog) {
+        ym::println("{}", msg);
+    }
     _counts[code]++;
 }
 
 void ErrCounter::reset() noexcept {
     _counts.fill(0);
+}
+
+void ErrCounter::setSuppressLog(bool suppress) noexcept {
+    _suppressLog = suppress;
 }
 
 void ErrCounter::setupCallbackForThisThread() {

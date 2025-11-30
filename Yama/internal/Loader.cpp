@@ -22,8 +22,7 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
         return false;
     }
     std::scoped_lock lk(_sessionLock);
-    auto success = _bindings.push(std::make_shared<YmParcel>(path, parceldef->info));
-    ymAssert(success);
+    _setBinding(path, std::make_shared<YmParcel>(path, parceldef->info));
     return true;
 }
 
@@ -38,19 +37,9 @@ std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(const std::string& path) co
     return _pubParcels.fetch(path);
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(YmPID pid) const noexcept {
-    std::shared_lock lk(_accessLock);
-    return _pubParcels.fetch(pid);
-}
-
 std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& fullname) const noexcept {
     std::shared_lock lk(_accessLock);
     return _pubItems.fetch(fullname);
-}
-
-std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(YmGID gid) const noexcept {
-    std::shared_lock lk(_accessLock);
-    return _pubItems.fetch(gid);
 }
 
 std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& path) {
@@ -61,19 +50,10 @@ std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& path) {
     std::scoped_lock lk(_sessionLock);
     _beginSession();
     auto result = _import(path);
-    _endSession();
-    return result;
-}
-
-std::shared_ptr<YmParcel> _ym::DmLoader::import(YmPID pid) {
-    if (const auto result = fetchParcel(pid)) {
-        return result;
-    }
-    std::scoped_lock lk(_sessionLock);
-    _beginSession();
-    auto result = _import(pid);
-    _endSession();
-    return result;
+    return
+        _endSession()
+        ? result
+        : nullptr;
 }
 
 std::shared_ptr<YmItem> _ym::DmLoader::load(const std::string& fullname) {
@@ -84,33 +64,37 @@ std::shared_ptr<YmItem> _ym::DmLoader::load(const std::string& fullname) {
     std::scoped_lock lk(_sessionLock);
     _beginSession();
     auto result = _load(fullname);
-    _endSession();
-    return result;
+    return
+        _endSession()
+        ? result
+        : nullptr;
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::load(YmGID gid) {
-    if (const auto result = fetchItem(gid)) {
-        return result;
+void _ym::DmLoader::_setBinding(const std::string& path, std::shared_ptr<YmParcel> x) {
+    ymAssert(x != nullptr);
+    _bindings[path] = std::move(x); // Overwrite existing, if any.
+}
+
+std::shared_ptr<YmParcel> _ym::DmLoader::_queryBinding(const std::string& path) {
+    if (const auto it = _bindings.find(path); it != _bindings.end()) {
+        return it->second;
     }
-    std::scoped_lock lk(_sessionLock);
-    _beginSession();
-    auto result = _load(gid);
-    _endSession();
-    return result;
+    return nullptr;
 }
 
 void _ym::DmLoader::_beginSession() {
     _success = true;
 }
 
-void _ym::DmLoader::_endSession() {
+bool _ym::DmLoader::_endSession() {
     // It's presumed that _sessionLock is held by method calling this one.
     std::scoped_lock lk(_accessLock);
     _privParcels.commitOrDiscard(_success);
     _privItems.commitOrDiscard(_success);
+    return _success;
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path) {
+std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path, std::optional<ConstDbgInfo> constDbgInfo) {
     if (auto existing = _privParcels.fetch(path)) {
         ymAssert(_ym::Global::pathIsLegal(path));
         return existing;
@@ -118,14 +102,16 @@ std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path) {
     if (!_ym::Global::pathIsLegal(path)) {
         _success = false;
         _ym::Global::raiseErr(
+            constDbgInfo,
             YmErrCode_IllegalPath,
             "Import failed; path \"{}\" is illegal!",
             path);
         return nullptr;
     }
-    if (!_privParcels.push(_bindings.fetch(path))) {
+    if (!_privParcels.push(_queryBinding(path))) {
         _success = false;
         _ym::Global::raiseErr(
+            constDbgInfo,
             YmErrCode_ParcelNotFound,
             "Import failed; no parcel found at path \"{}\"!",
             path);
@@ -133,21 +119,7 @@ std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path) {
     return _privParcels.fetch(path);
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::_import(YmPID pid) {
-    if (auto existing = _privParcels.fetch(pid)) {
-        return existing;
-    }
-    if (!_privParcels.push(_bindings.fetch(pid))) {
-        _success = false;
-        _ym::Global::raiseErr(
-            YmErrCode_ParcelNotFound,
-            "Import failed; no parcel found with PID {}!",
-            pid);
-    }
-    return _privParcels.fetch(pid);
-}
-
-std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname) {
+std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname, std::optional<ConstDbgInfo> constDbgInfo) {
     if (auto existing = _privItems.fetch(fullname)) {
         ymAssert(_ym::Global::fullnameIsLegal(fullname));
         return existing;
@@ -155,6 +127,7 @@ std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname) {
     if (!_ym::Global::fullnameIsLegal(fullname)) {
         _success = false;
         _ym::Global::raiseErr(
+            constDbgInfo,
             YmErrCode_IllegalFullname,
             "Load failed; fullname \"{}\" is illegal!",
             fullname);
@@ -167,13 +140,14 @@ std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname) {
             auto res = std::make_shared<YmItem>(ym::Safe(*parcel), ym::Safe(item));
             // Push before resolving consts to ensure that the loading resource is available
             // for lookup for resolving the consts of other items.
-            const bool success = _pubItems.push(res);
+            const bool success = _privItems.push(res);
             ymAssert(success);
             _resolveConsts(*res);
         }
         else {
             _success = false;
             _ym::Global::raiseErr(
+                constDbgInfo,
                 YmErrCode_ItemNotFound,
                 "Load failed; {} contains no item \"{}\"!",
                 (std::string)path,
@@ -181,33 +155,6 @@ std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname) {
         }
     }
     return _privItems.fetch(fullname);
-}
-
-std::shared_ptr<YmItem> _ym::DmLoader::_load(YmGID gid) {
-    if (auto existing = _privItems.fetch(gid)) {
-        return existing;
-    }
-    YmPID pid = ymGID_PID(gid);
-    YmLID lid = ymGID_LID(gid);
-    if (const auto parcel = _import(pid)) {
-        if (const auto item = parcel->item(lid)) {
-            auto res = std::make_shared<YmItem>(ym::Safe(*parcel), ym::Safe(item));
-            // Push before resolving consts to ensure that the loading resource is available
-            // for lookup for resolving the consts of other items.
-            const bool success = _pubItems.push(res);
-            ymAssert(success);
-            _resolveConsts(*res);
-        }
-        else {
-            _success = false;
-            _ym::Global::raiseErr(
-                YmErrCode_ItemNotFound,
-                "Load failed; {} contains no item with LID {}!",
-                parcel->path,
-                lid);
-        }
-    }
-    return _privItems.fetch(gid);
 }
 
 void _ym::DmLoader::_resolveConsts(YmItem& x) {
@@ -218,7 +165,7 @@ void _ym::DmLoader::_resolveConsts(YmItem& x) {
             x.putValConst(i);
         }
         else if (_ym::isRefConstType(type)) {
-            x.putRefConst(i, _load(info.as<_ym::RefConstInfo>().sym).get());
+            x.putRefConst(i, _load(info.as<_ym::RefConstInfo>().sym, ConstDbgInfo::mk(x.fullname, i)).get());
         }
         else YM_DEADEND;
     }
@@ -244,16 +191,8 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(const std::string& path) c
     return _parcels.fetch(path);
 }
 
-std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(YmPID pid) const noexcept {
-    return _parcels.fetch(pid);
-}
-
 std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const std::string& fullname) const noexcept {
     return _items.fetch(fullname);
-}
-
-std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(YmGID gid) const noexcept {
-    return _items.fetch(gid);
 }
 
 std::shared_ptr<YmParcel> _ym::CtxLoader::import(const std::string& path) {
@@ -266,16 +205,6 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::import(const std::string& path) {
         : nullptr;
 }
 
-std::shared_ptr<YmParcel> _ym::CtxLoader::import(YmPID pid) {
-    if (auto result = fetchParcel(pid)) {
-        return result;
-    }
-    return
-        _parcels.push(upstream()->import(pid))
-        ? fetchParcel(pid)
-        : nullptr;
-}
-
 std::shared_ptr<YmItem> _ym::CtxLoader::load(const std::string& fullname) {
     if (auto result = fetchItem(fullname)) {
         return result;
@@ -283,16 +212,6 @@ std::shared_ptr<YmItem> _ym::CtxLoader::load(const std::string& fullname) {
     return
         _items.push(upstream()->load(fullname))
         ? fetchItem(fullname)
-        : nullptr;
-}
-
-std::shared_ptr<YmItem> _ym::CtxLoader::load(YmGID gid) {
-    if (auto result = fetchItem(gid)) {
-        return result;
-    }
-    return
-        _items.push(upstream()->load(gid))
-        ? fetchItem(gid)
         : nullptr;
 }
 

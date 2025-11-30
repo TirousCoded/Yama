@@ -56,20 +56,26 @@ namespace {
     };
 }
 
+
+#define SETUP_ALL(ctx) \
+SETUP_ERRCOUNTER; \
+SETUP_DM; \
+SETUP_CTX(ctx)
+
 #define SETUP_DM \
 YmDm* dm = ymDm_Create(); \
 ASSERT_TRUE(dm); \
-auto dm_ = ym::bindDm(ym::Safe(dm))
+auto dm_ = ym::bindScoped(ym::Safe(dm))
 
 #define SETUP_CTX(name) \
 YmCtx* name = ymCtx_Create(dm); \
 ASSERT_TRUE(name); \
-auto name ## _ = ym::bindCtx(ym::Safe(name))
+auto name ## _ = ym::bindScoped(ym::Safe(name))
 
 #define SETUP_PARCELDEF(name) \
 YmParcelDef* name = ymParcelDef_Create(); \
 ASSERT_TRUE(name); \
-auto name ## _ = ym::bindParcelDef(ym::Safe(name))
+auto name ## _ = ym::bindScoped(ym::Safe(name))
 
 #define BIND_AND_IMPORT(ctx, name, def, path_cstr) \
 EXPECT_EQ(ymDm_BindParcelDef(dm, path_cstr, def), YM_TRUE); \

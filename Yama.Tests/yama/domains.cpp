@@ -30,7 +30,7 @@ TEST(Domains, BindParcelDef_IllegalPath) {
         SETUP_PARCELDEF(p);
         EXPECT_EQ(ymDm_BindParcelDef(dm, path.c_str(), p), YM_FALSE)
             << "path == \"" << path << "\"";
-        EXPECT_GE(err[YmErrCode_IllegalPath], 1);
+        EXPECT_EQ(err[YmErrCode_IllegalPath], 1);
     }
 }
 

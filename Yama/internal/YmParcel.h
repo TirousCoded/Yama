@@ -15,11 +15,9 @@
 
 struct YmParcel final {
 public:
-    using ID = YmPID;
     using Name = std::string;
 
 
-    const ID pid;
     const Name path;
     const std::shared_ptr<_ym::ParcelInfo> info;
 
@@ -29,19 +27,7 @@ public:
 
     YmWord items() const noexcept;
     const _ym::ItemInfo* item(const std::string& localName) const noexcept;
-    const _ym::ItemInfo* item(YmLID lid) const noexcept;
 
-    inline const ID& getID() const noexcept { return pid; }
     inline const Name& getName() const noexcept { return path; }
-
-
-private:
-    //
-
-
-    static std::atomic<YmPID> _nextPID;
-
-
-    static YmPID _acquirePID() noexcept;
 };
 

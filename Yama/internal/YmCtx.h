@@ -26,9 +26,7 @@ public:
 
 
     std::shared_ptr<YmParcel> import(const std::string& path);
-    std::shared_ptr<YmParcel> import(YmPID pid);
     std::shared_ptr<YmItem> load(const std::string& fullname);
-    std::shared_ptr<YmItem> load(YmGID gid);
 
 
     static void pIterStart(ym::Safe<YmCtx> ctx) noexcept;

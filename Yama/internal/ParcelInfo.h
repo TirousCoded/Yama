@@ -47,7 +47,7 @@ namespace _ym {
     }
 
     struct ItemInfo final {
-        const YmLID lid;
+        const YmItemIndex index;
         const std::string localName;
         const YmKind kind;
         std::vector<ConstInfo> consts; // Constant table symbols.
@@ -73,21 +73,21 @@ namespace _ym {
         YmWord items() const noexcept;
         ItemInfo* item(const std::string& localName) noexcept;
         const ItemInfo* item(const std::string& localName) const noexcept;
-        ItemInfo* item(YmLID lid) noexcept;
-        const ItemInfo* item(YmLID lid) const noexcept;
+        ItemInfo* item(YmItemIndex index) noexcept;
+        const ItemInfo* item(YmItemIndex index) const noexcept;
 
 
         // Fails if name conflict arises.
         // Invalidates item pointers.
-        std::optional<YmLID> addItem(std::string localName, YmKind kind);
+        std::optional<YmItemIndex> addItem(std::string localName, YmKind kind);
 
         // Performs adding/querying of constant table symbols.
-        YmConst pullConst(YmLID item, ConstInfo sym);
+        YmConst pullConst(YmItemIndex item, ConstInfo sym);
 
 
     private:
         std::vector<ItemInfo> _items;
-        std::unordered_map<std::string, YmLID> _lookup;
+        std::unordered_map<std::string, YmItemIndex> _lookup;
     };
 }
 

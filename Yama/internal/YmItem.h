@@ -40,20 +40,16 @@ namespace _ym {
 
 struct YmItem final {
 public:
-    using ID = YmGID;
     using Name = std::string;
 
 
-    // TODO: Right now YmItem is generated anew for each context, unlike YmParcel which has
-    //       context-independent ParcelData objects they wrap.
-
-    const YmGID gid;
+    const ym::Safe<YmParcel> parcel;
     const std::string fullname;
     const ym::Safe<const _ym::ItemInfo> info;
 
 
     inline YmItem(ym::Safe<YmParcel> parcel, ym::Safe<const _ym::ItemInfo> info) :
-        gid(ymGID(parcel->pid, info->lid)),
+        parcel(parcel),
         fullname(std::format("{}:{}", parcel->path, info->localName)),
         info(info) {
         _initConstsArrayToDummyIntConsts();
@@ -64,7 +60,6 @@ public:
     std::string_view path() const noexcept;
     std::string_view localName() const noexcept;
 
-    inline const ID& getID() const noexcept { return gid; }
     inline const Name& getName() const noexcept { return fullname; }
 
     std::span<const _ym::Const> consts() const noexcept;

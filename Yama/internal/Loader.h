@@ -10,6 +10,7 @@
 
 #include "../yama/yama.h"
 #include "Area.h"
+#include "general.h"
 #include "YmItem.h"
 #include "YmParcel.h"
 
@@ -32,30 +33,18 @@ namespace _ym {
         // Acquires parcel w/out attempting to import.
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmParcel> fetchParcel(const std::string& path) const noexcept = 0;
-        // Acquires parcel w/out attempting to import.
-        // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmParcel> fetchParcel(YmPID pid) const noexcept = 0;
 
         // Acquires item w/out attempting to load.
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmItem> fetchItem(const std::string& fullname) const noexcept = 0;
-        // Acquires item w/out attempting to load.
-        // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> fetchItem(YmGID gid) const noexcept = 0;
 
         // Acquires parcel, attempting import if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmParcel> import(const std::string& path) = 0;
-        // Acquires parcel, attempting import if necessary.
-        // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmParcel> import(YmPID pid) = 0;
 
         // Acquires item, attempting load if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmItem> load(const std::string& fullname) = 0;
-        // Acquires item, attempting load if necessary.
-        // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> load(YmGID gid) = 0;
     };
 
     // Base class of all unsynchronized loader.
@@ -85,15 +74,11 @@ namespace _ym {
 
         bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef);
 
-        void reset() noexcept override;
+        void reset() noexcept override; // TODO: Should also reset bindings?
         std::shared_ptr<YmParcel> fetchParcel(const std::string& path) const noexcept override;
-        std::shared_ptr<YmParcel> fetchParcel(YmPID pid) const noexcept override;
         std::shared_ptr<YmItem> fetchItem(const std::string& fullname) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(YmGID gid) const noexcept override;
         std::shared_ptr<YmParcel> import(const std::string& path) override;
-        std::shared_ptr<YmParcel> import(YmPID pid) override;
         std::shared_ptr<YmItem> load(const std::string& fullname) override;
-        std::shared_ptr<YmItem> load(YmGID gid) override;
 
 
     private:
@@ -121,7 +106,8 @@ namespace _ym {
         //        w/ bindings protected by _sessionLock.
 
 
-        _ym::Area<YmParcel> _pubParcels, _privParcels, _bindings;
+        std::unordered_map<std::string, std::shared_ptr<YmParcel>> _bindings;
+        _ym::Area<YmParcel> _pubParcels, _privParcels;
         _ym::Area<YmItem> _pubItems, _privItems;
         bool _success = false;
         mutable std::shared_mutex _accessLock; // Protects access to _pub*** area state.
@@ -130,12 +116,13 @@ namespace _ym {
 
         // These methods are unsynchronized.
 
+        void _setBinding(const std::string& path, std::shared_ptr<YmParcel> x);
+        std::shared_ptr<YmParcel> _queryBinding(const std::string& path);
+
         void _beginSession();
-        void _endSession();
-        std::shared_ptr<YmParcel> _import(const std::string& path);
-        std::shared_ptr<YmParcel> _import(YmPID pid);
-        std::shared_ptr<YmItem> _load(const std::string& fullname);
-        std::shared_ptr<YmItem> _load(YmGID gid);
+        bool _endSession(); // Returns if session overall was successful or not.
+        std::shared_ptr<YmParcel> _import(const std::string& path, std::optional<ConstDbgInfo> constDbgInfo = std::nullopt);
+        std::shared_ptr<YmItem> _load(const std::string& fullname, std::optional<ConstDbgInfo> constDbgInfo = std::nullopt);
         void _resolveConsts(YmItem& x);
     };
 
@@ -149,13 +136,9 @@ namespace _ym {
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const std::string& path) const noexcept override;
-        std::shared_ptr<YmParcel> fetchParcel(YmPID pid) const noexcept override;
         std::shared_ptr<YmItem> fetchItem(const std::string& fullname) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(YmGID gid) const noexcept override;
         std::shared_ptr<YmParcel> import(const std::string& path) override;
-        std::shared_ptr<YmParcel> import(YmPID pid) override;
         std::shared_ptr<YmItem> load(const std::string& fullname) override;
-        std::shared_ptr<YmItem> load(YmGID gid) override;
         const Area<YmParcel>& parcels() const override;
         const Area<YmItem>& items() const override;
 
