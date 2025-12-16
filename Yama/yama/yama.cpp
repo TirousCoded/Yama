@@ -15,7 +15,9 @@ using namespace _ym;
 
 const YmChar* ymFmtKind(YmKind x) {
     static constexpr std::array<const YmChar*, YmKind_Num> names{
-        "Fn.",
+        "Struct",
+        "Fn",
+        "Method",
     };
     return
         x < YmKind_Num
@@ -23,20 +25,34 @@ const YmChar* ymFmtKind(YmKind x) {
         : "???";
 }
 
-const YmChar* ymFmtConstType(YmConstType x) {
-    static constexpr std::array<const YmChar*, YmConstType_Num> names{
-        "Int Const.",
-        "UInt Const.",
-        "Float Const.",
-        "Bool Const.",
-        "Rune Const.",
-
-        "Ref. Const.",
+YmBool ymKind_IsCallable(YmKind x) {
+    ymAssert(x < YmKind_Num);
+    static constexpr std::array<bool, YmKind_Num> values{
+        false,
+        true,
+        true,
     };
-    return
-        x < YmConstType_Num
-        ? names[size_t(x)]
-        : "???";
+    return values[size_t(x)];
+}
+
+YmBool ymKind_IsMember(YmKind x) {
+    ymAssert(x < YmKind_Num);
+    static constexpr std::array<bool, YmKind_Num> values{
+        false,
+        false,
+        true,
+    };
+    return values[size_t(x)];
+}
+
+YmBool ymKind_HasMembers(YmKind x) {
+    ymAssert(x < YmKind_Num);
+    static constexpr std::array<bool, YmKind_Num> values{
+        true,
+        false,
+        false,
+    };
+    return values[size_t(x)];
 }
 
 YmDm* ymDm_Create(void) {
@@ -91,32 +107,24 @@ void ymParcelDef_Destroy(YmParcelDef* parceldef) {
     delete Safe(parceldef).get();
 }
 
-YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name) {
-    return Safe(parceldef)->fnItem(std::string(Safe(name))).value_or(YM_NO_ITEM_INDEX);
+YmItemIndex ymParcelDef_StructItem(YmParcelDef* parceldef, const YmChar* name) {
+    return Safe(parceldef)->structItem(std::string(Safe(name))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmConst ymParcelDef_IntConst(YmParcelDef* parceldef, YmItemIndex item, YmInt value) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
+YmItemIndex ymParcelDef_FnItem(YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType) {
+    return Safe(parceldef)->fnItem(std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmConst ymParcelDef_UIntConst(YmParcelDef* parceldef, YmItemIndex item, YmUInt value) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
+YmItemIndex ymParcelDef_MethodItem(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
+    return Safe(parceldef)->methodItem(owner, std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmConst ymParcelDef_FloatConst(YmParcelDef* parceldef, YmItemIndex item, YmFloat value) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
+YmParamIndex ymParcelDef_AddParam(YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym paramType) {
+    return Safe(parceldef)->addParam(item, std::string(Safe(name)), std::string(Safe(paramType))).value_or(YM_NO_PARAM_INDEX);
 }
 
-YmConst ymParcelDef_BoolConst(YmParcelDef* parceldef, YmItemIndex item, YmBool value) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
-}
-
-YmConst ymParcelDef_RuneConst(YmParcelDef* parceldef, YmItemIndex item, YmRune value) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(value));
-}
-
-YmConst ymParcelDef_RefConst(YmParcelDef* parceldef, YmItemIndex item, const YmChar* symbol) {
-    return deref(Safe(parceldef)->info).pullConst(item, ConstInfo(RefConstInfo{ .sym = symbol }));
+YmRef ymParcelDef_AddRef(YmParcelDef* parceldef, YmItemIndex item, YmRefSym symbol) {
+    return Safe(parceldef)->addRef(item, std::string(Safe(symbol))).value_or(YM_NO_REF);
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
@@ -135,56 +143,69 @@ YmKind ymItem_Kind(YmItem* item) {
     return Safe(item)->kind();
 }
 
-YmWord ymItem_Consts(YmItem* item) {
-    return Safe(item)->consts().size();
+YmItem* ymItem_Owner(YmItem* item) {
+    return Safe(item)->owner();
 }
 
-YmConstType ymItem_ConstType(YmItem* item, YmConst index) {
-    ymAssert(index < Safe(item)->consts().size());
-    return constTypeOf(Safe(item)->consts()[index]);
+YmMembers ymItem_Members(YmItem* item) {
+    return Safe(item)->members();
 }
 
-YmInt ymItem_IntConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_Int>(index);
+YmItem* ymItem_MemberByIndex(YmItem* item, YmMemberIndex member) {
+    return Safe(item)->member(member);
 }
 
-YmUInt ymItem_UIntConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_UInt>(index);
+YmItem* ymItem_MemberByName(YmItem* item, const YmChar* name) {
+    return Safe(item)->member(std::string(Safe(name)));
 }
 
-YmFloat ymItem_FloatConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_Float>(index);
+YmItem* ymItem_ReturnType(YmItem* item) {
+    return Safe(item)->returnType();
 }
 
-YmBool ymItem_BoolConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_Bool>(index);
+YmParams ymItem_Params(YmItem* item) {
+    return Safe(item)->params();
 }
 
-YmRune ymItem_RuneConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_Rune>(index);
+const YmChar* ymItem_ParamName(YmItem* item, YmParamIndex param) {
+    return Safe(item)->paramName(param);
 }
 
-YmItem* ymItem_RefConst(YmItem* item, YmConst index) {
-    return Safe(item)->constAs<YmConstType_Ref>(index);
+YmItem* ymItem_ParamType(YmItem* item, YmParamIndex param) {
+    return Safe(item)->paramType(param);
+}
+
+YmItem* ymItem_Ref(YmItem* item, YmRef reference) {
+    return Safe(item)->ref(reference);
+}
+
+YmRef ymItem_FindRef(YmItem* item, YmItem* referenced) {
+    return Safe(item)->findRef(Safe(referenced)).value_or(YM_NO_REF);
+}
+
+YmBool ymItem_Converts(YmItem* from, YmItem* to, YmBool coercion) {
+    assertSafe(from);
+    assertSafe(to);
+    return YM_FALSE;
 }
 
 void ymParcelIter_Start(YmCtx* ctx) {
     Global::pIterStart(Safe(ctx));
 }
 
-void ymParcelIter_StartFrom(struct YmCtx* ctx, YmParcel* startFrom) {
+void ymParcelIter_StartFrom(YmCtx* ctx, YmParcel* startFrom) {
     Global::pIterStartFrom(Safe(ctx), Safe(startFrom));
 }
 
-void ymParcelIter_Advance(YmWord n) {
+void ymParcelIter_Advance(size_t n) {
     Global::pIterAdvance(n);
 }
 
-YmParcel* ymParcelIter_Get() {
+YmParcel* ymParcelIter_Get(void) {
     return Global::pIterGet();
 }
 
-YmBool ymParcelIter_Done() {
+YmBool ymParcelIter_Done(void) {
     return Global::pIterDone();
 }
 

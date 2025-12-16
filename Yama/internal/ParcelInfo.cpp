@@ -3,7 +3,37 @@
 #include "ParcelInfo.h"
 
 #include "general.h"
+#include "../yama++/general.h"
 
+
+bool _ym::checkRefSymbol(const std::string& symbol, std::string_view msg) {
+    if (_ym::Global::fullnameIsLegal(symbol)) {
+        return true;
+    }
+    _ym::Global::raiseErr(
+        YmErrCode_IllegalFullname,
+        "{}; fullname \"{}\" is illegal!",
+        (std::string)msg,
+        symbol);
+    return false;
+}
+
+bool _ym::checkCallable(const ItemInfo& item, std::string_view msg) {
+    bool result = ymKind_IsCallable(item.kind);
+    if (!result) {
+        Global::raiseErr(
+            YmErrCode_NonCallableItem,
+            "{}; item {} (index {}) is non-callable!",
+            (std::string)msg,
+            item.localName,
+            item.index);
+    }
+    return result;
+}
+
+bool _ym::ItemInfo::isOwner() const noexcept {
+    return !memberName();
+}
 
 std::optional<std::string_view> _ym::ItemInfo::ownerName() const noexcept {
     const auto [owner, member] = split_s<YmChar>(localName, "::");
@@ -21,33 +51,96 @@ std::optional<std::string_view> _ym::ItemInfo::memberName() const noexcept {
         : std::nullopt;
 }
 
-YmConst _ym::ItemInfo::queryConst(const ConstInfo& sym) const noexcept {
-    for (YmWord i = 0; i < consts.size(); i++) {
-        if (consts[i] == sym) {
-            return YmConst(i);
-        }
-    }
-    return YM_NO_CONST;
+const _ym::ParamInfo* _ym::ItemInfo::queryParam(YmParamIndex index) const noexcept {
+    return
+        size_t(index) < params.size()
+        ? &params[size_t(index)]
+        : nullptr;
 }
 
-YmConst _ym::ItemInfo::pullConst(ConstInfo sym) {
-    if (YmConst index = queryConst(sym); index != YM_NO_CONST) {
-        return index;
+const _ym::ParamInfo* _ym::ItemInfo::queryParam(const std::string& localName) const noexcept {
+    // NOTE: Due to strict cap of YM_MAX_PARAMS it should be fine to do an O(n) search.
+    for (const auto& param : params) {
+        if (param.name == localName) return &param;
     }
-    if (consts.size() > YmWord(YM_MAX_CONST)) {
-        _ym::Global::raiseErr(
-            YmErrCode_MaxConstsLimit,
-            "Cannot add constant symbol to {} (index {}); would exceed {} limit!",
-            localName,
-            index,
-            YM_MAX_CONST);
-        return YM_NO_CONST;
-    }
-    consts.push_back(std::move(sym));
-    return YmConst(consts.size() - 1);
+    return nullptr;
 }
 
-YmWord _ym::ParcelInfo::items() const noexcept {
+YmMembers _ym::ItemInfo::memberCount() const noexcept {
+    return (YmUInt16)membersByIndex.size();
+}
+
+std::optional<YmParamIndex> _ym::ItemInfo::addParam(std::string name, std::string paramTypeSymbol) {
+    if (!checkRefSymbol(paramTypeSymbol, "Cannot add parameter")) {
+        return std::nullopt;
+    }
+    if (!checkCallable(*this, "Cannot add parameter")) {
+        return std::nullopt;
+    }
+    if (queryParam(name)) {
+        Global::raiseErr(
+            YmErrCode_ParamNameConflict,
+            "Cannot add parameter; name \"{}\" already taken!",
+            name);
+        return std::nullopt;
+    }
+    if (params.size() >= size_t(YM_MAX_PARAMS)) {
+        Global::raiseErr(
+            YmErrCode_MaxParamsLimit,
+            "Cannot add parameter; would exceed {} limit!",
+            YM_MAX_PARAMS);
+        return std::nullopt;
+    }
+    params.push_back(ParamInfo{
+        .index = YmParamIndex(params.size()),
+        .name = std::move(name),
+        .type = consts.pullRef(std::move(paramTypeSymbol)).value(),
+        });
+    return params.back().index;
+}
+
+std::optional<YmRef> _ym::ItemInfo::addRef(std::string symbol) {
+    if (!checkRefSymbol(symbol, "Cannot add reference")) {
+        return std::nullopt;
+    }
+    if (auto result = consts.pullRef(std::move(symbol), size_t(YmRef(-1)))) {
+        return (YmRef)result.value();
+    }
+    _ym::Global::raiseErr(
+        YmErrCode_InternalError,
+        "Cannot add reference; internal failure!");
+    return std::nullopt;
+}
+
+void _ym::ItemInfo::attemptSetupAsMember(ParcelInfo& parcel) {
+    if (isOwner()) {
+        return;
+    }
+    if (auto owner = parcel.item((std::string)ownerName().value())) {
+        // Bind this->owner to a ref to our new owner.
+        this->owner = consts.pullRef(owner->fullnameForRef()).value();
+        // Pull ref constant of *this for our owner to be setup w/.
+        auto ref = owner->consts.pullRef(fullnameForRef()).value();
+        // Bind ref to by-index/name lookup in *owner.
+        owner->membersByIndex.push_back(ref);
+        owner->membersByName.try_emplace((std::string)memberName().value(), std::move(ref)); // Move ref.
+    }
+}
+
+std::string _ym::ItemInfo::fullnameForRef() const {
+    return std::format("@here:{}", (std::string)localName);
+}
+
+bool _ym::ParcelInfo::verify() const {
+    bool success = true;
+    for (const auto& item : _items) {
+        continue; // TODO: Add verif. checks when needed.
+        success = false;
+    }
+    return success;
+}
+
+size_t _ym::ParcelInfo::items() const noexcept {
     return _items.size();
 }
 
@@ -81,40 +174,83 @@ const _ym::ItemInfo* _ym::ParcelInfo::item(YmItemIndex index) const noexcept {
         : nullptr;
 }
 
-std::optional<YmItemIndex> _ym::ParcelInfo::addItem(std::string localName, YmKind kind) {
+std::optional<YmItemIndex> _ym::ParcelInfo::addItem(std::string localName, YmKind kind, std::optional<std::string> returnTypeSymbol) {
     if (item(localName)) {
-        _ym::Global::raiseErr(
+        Global::raiseErr(
             YmErrCode_ItemNameConflict,
-            "Cannot add item \"{}\"; name conflict!",
+            "Cannot add item; name \"{}\" already taken!",
             localName);
         return std::nullopt;
     }
-    const YmItemIndex index((YmItemIndex)items());
-    _items.push_back(ItemInfo{
-        .index = index,
+    ItemInfo newItem{
+        .index = (YmItemIndex)items(),
         .localName = localName,
         .kind = kind,
-        });
+    };
+    if (returnTypeSymbol) {
+        ymAssert(ymKind_IsCallable(newItem.kind));
+        // TODO: This error msg is *clunky*, improve it.
+        if (!checkRefSymbol(*returnTypeSymbol, "Cannot add item; invalid return type symbol")) {
+            return std::nullopt;
+        }
+        newItem.returnType = newItem.consts.pullRef(std::move(*returnTypeSymbol));
+    }
+    // NOTE: Make sure error checks stay ABOVE mutations of *this.
+    _items.push_back(std::move(newItem));
+    auto& result = _items.back();
     // NOTE: Move localName into _lookup to avoid heap alloc.
-    _lookup.try_emplace(std::move(localName), index);
-    return index;
+    _lookup.try_emplace(std::move(localName), result.index);
+    result.attemptSetupAsMember(*this);
+    return result.index;
 }
 
-YmConst _ym::ParcelInfo::pullConst(YmItemIndex item, ConstInfo sym) {
-    if (sym.is<RefConstInfo>() && !Global::fullnameIsLegal(sym.as<RefConstInfo>().sym)) {
+std::optional<YmItemIndex> _ym::ParcelInfo::addItem(YmItemIndex owner, std::string memberName, YmKind kind, std::optional<std::string> returnTypeSymbol) {
+    auto ownerItemPtr = item(owner);
+    if (!ownerItemPtr) {
+        // TODO: Maybe look into adding more context to this error msg.
         Global::raiseErr(
-            YmErrCode_IllegalFullname,
-            "Cannot add constant symbol; fullname \"{}\" is illegal!",
-            sym.as<RefConstInfo>().sym);
-        return YM_NO_CONST;
+            YmErrCode_ItemNotFound,
+            "Cannot add item; no owner item found at index {}!",
+            owner);
+        return std::nullopt;
     }
-    if (auto found = this->item(item)) {
-        return found->pullConst(std::move(sym));
+    auto& ownerItem = ym::deref(ownerItemPtr);
+    if (!ymKind_HasMembers(ownerItem.kind)) {
+        Global::raiseErr(
+            YmErrCode_ItemCannotHaveMembers,
+            "Cannot add item; owner {} is a {} which cannot have members!",
+            ownerItem.localName,
+            ymFmtKind(ownerItem.kind));
+        return std::nullopt;
     }
-    Global::raiseErr(
+    return addItem(std::format("{}::{}", ownerItem.localName, memberName), kind, std::move(returnTypeSymbol));
+}
+
+std::optional<YmParamIndex> _ym::ParcelInfo::addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol) {
+    auto info = _expectItem(item, "Cannot add parameter");
+    return
+        info
+        ? info->addParam(std::move(name), std::move(paramTypeSymbol))
+        : std::nullopt;
+}
+
+std::optional<YmRef> _ym::ParcelInfo::addRef(YmItemIndex item, std::string symbol) {
+    auto info = _expectItem(item, "Cannot add reference");
+    return
+        info
+        ? info->addRef(std::move(symbol))
+        : std::nullopt;
+}
+
+_ym::ItemInfo* _ym::ParcelInfo::_expectItem(YmItemIndex index, std::string_view msg) {
+    if (_ym::ItemInfo* result = item(index)) {
+        return result;
+    }
+    _ym::Global::raiseErr(
         YmErrCode_ItemNotFound,
-        "Cannot add constant symbol; item at index {} not found!",
-        item);
-    return YM_NO_CONST;
+        "{}; no item found at index {}!",
+        (std::string)msg,
+        index);
+    return nullptr;
 }
 

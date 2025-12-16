@@ -5,7 +5,7 @@
 
 #include <string>
 #include <vector>
-#include <yama++/smartptrs.h>
+#include <yama++/resources.h>
 
 #include "ErrCounter.h"
 
@@ -69,6 +69,11 @@ auto dm_ = ym::bindScoped(ym::Safe(dm))
 
 #define SETUP_CTX(name) \
 YmCtx* name = ymCtx_Create(dm); \
+ASSERT_TRUE(name); \
+auto name ## _ = ym::bindScoped(ym::Safe(name))
+
+#define SETUP_CALLSIGDEF(name) \
+YmCallSigDef* name = ymCallSigDef_Create(); \
 ASSERT_TRUE(name); \
 auto name ## _ = ym::bindScoped(ym::Safe(name))
 

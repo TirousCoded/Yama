@@ -25,7 +25,7 @@ public:
     YmParcel(std::string path, std::shared_ptr<_ym::ParcelInfo> info);
 
 
-    YmWord items() const noexcept;
+    size_t items() const noexcept;
     const _ym::ItemInfo* item(const std::string& localName) const noexcept;
 
     inline const Name& getName() const noexcept { return path; }

@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include <concepts>
+
 #include "../yama/yama.h"
 
 #include "hash.h"
@@ -52,6 +54,7 @@ namespace ym {
 
         constexpr T* operator->() const noexcept { return get(); }
         constexpr T& operator*() const noexcept { return value(); }
+        constexpr T& operator[](size_t x) const noexcept { return get()[x]; }
 
         constexpr operator T* () const noexcept { return get(); } // Implicit
         template<typename U>
@@ -70,6 +73,21 @@ namespace ym {
         }
 
         inline size_t hash() const noexcept { return ym::hash(get()); }
+
+        template<std::integral U>
+        constexpr Safe operator+(const U& x) const noexcept { return Safe(get() + x); }
+        template<std::integral U>
+        constexpr Safe operator-(const U& x) const noexcept { return Safe(get() - x); }
+
+        template<std::integral U>
+        constexpr Safe& operator+=(const U& x) noexcept { return *this = *this + x; }
+        template<std::integral U>
+        constexpr Safe& operator-=(const U& x) noexcept { return *this = *this - x; }
+
+        constexpr Safe& operator++() noexcept { return *this += 1; }
+        constexpr Safe& operator--() noexcept { return *this -= 1; }
+        constexpr Safe operator++(int) noexcept { auto old = *this; ++*this; return old; }
+        constexpr Safe operator--(int) noexcept { auto old = *this; --*this; return old; }
 
 
     private:

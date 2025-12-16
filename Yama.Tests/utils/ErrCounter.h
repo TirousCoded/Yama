@@ -13,8 +13,8 @@ public:
 	ErrCounter() = default;
 
 
-	YmWord count(YmErrCode code) const noexcept;
-	YmWord operator[](YmErrCode code) const noexcept;
+	size_t count(YmErrCode code) const noexcept;
+	size_t operator[](YmErrCode code) const noexcept;
 
 	void report(YmErrCode code, const YmChar* msg);
 	void reset() noexcept;
@@ -25,7 +25,7 @@ public:
 
 
 private:
-	std::array<YmWord, YmErrCode_Num> _counts;
+	std::array<size_t, YmErrCode_Num> _counts;
 	bool _suppressLog = false;
 };
 

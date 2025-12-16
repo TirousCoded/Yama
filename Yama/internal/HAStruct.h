@@ -7,7 +7,7 @@
 #include <span>
 #include <concepts>
 
-#include "../yama/basics.h"
+#include "../yama/scalars.h"
 
 
 namespace _ym {
@@ -25,7 +25,7 @@ namespace _ym {
         requires (T v)
     {
         // Queries array size.
-        { v.size() } noexcept -> std::convertible_to<YmWord>;
+        { v.size() } noexcept -> std::convertible_to<size_t>;
     };
 
     template<typename T>

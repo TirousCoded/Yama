@@ -5,19 +5,24 @@
 #define _ERRORS_DOT_H 1
 
 
-#include "basics.h"
+#include "scalars.h"
 
 
 extern "C" {
 
 
     typedef enum : YmUInt16 {
-        YmErrCode_IllegalPath = 0, /* Illegal import path. */
-        YmErrCode_IllegalFullname, /* Illegal fullname. */
-        YmErrCode_ParcelNotFound, /* Couldn't find a specific parcel. */
-        YmErrCode_ItemNotFound, /* Couldn't find a specific item. */
-        YmErrCode_ItemNameConflict, /* Parcel def. already contains item under name. */
-        YmErrCode_MaxConstsLimit, /* Adding a new constant table entry would require a constant index exceeding YM_MAX_CONST. */
+        YmErrCode_IllegalPath = 0,          /* Illegal import path. */
+        YmErrCode_IllegalFullname,          /* Illegal fullname. */
+        YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
+        YmErrCode_ItemNotFound,             /* Couldn't find a specific item. */
+        YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
+        YmErrCode_ItemNameConflict,         /* Parcel def. already contains item under name. */
+        YmErrCode_ParamNameConflict,        /* Item already contains parameter under name. */
+        YmErrCode_MaxParamsLimit,           /* Param count would exceed YM_MAX_PARAMS. */
+        YmErrCode_NonCallableItem,          /* Item is non-callable. */
+        YmErrCode_ItemCannotHaveMembers,    /* Item cannot have members. */
+        YmErrCode_InternalError,            /* Internal Error */
 
         YmErrCode_Num, /* Enum size. Not a valid error code. */
     } YmErrCode;

@@ -7,7 +7,7 @@
 
 #include "config.h"
 #include "macros.h"
-#include "basics.h"
+#include "scalars.h"
 
 
 extern "C" {
@@ -33,8 +33,8 @@ extern "C" {
 
 
     /* -- Internals -- */
-    void _ymAssert(YmBool cond, const YmChar* cond_txt, const YmChar* file, YmWord line);
-    void _ymVerify(YmBool cond, const YmChar* cond_txt, const YmChar* file, YmWord line);
+    void _ymAssert(YmBool cond, const YmChar* cond_txt, const YmChar* file, size_t line);
+    void _ymVerify(YmBool cond, const YmChar* cond_txt, const YmChar* file, size_t line);
 }
 
 

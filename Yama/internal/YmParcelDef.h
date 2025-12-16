@@ -26,10 +26,13 @@ public:
     }
 
 
-    std::optional<YmItemIndex> fnItem(const std::string& name);
+    bool verify() const;
 
+    std::optional<YmItemIndex> structItem(const std::string& name);
+    std::optional<YmItemIndex> fnItem(const std::string& name, std::string returnTypeSymbol);
+    std::optional<YmItemIndex> methodItem(YmItemIndex owner, const std::string& name, std::string returnTypeSymbol);
 
-private:
-    //
+    std::optional<YmParamIndex> addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol);
+    std::optional<YmRef> addRef(YmItemIndex item, std::string symbol);
 };
 

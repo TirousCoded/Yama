@@ -121,8 +121,9 @@ namespace _ym {
 
         void _beginSession();
         bool _endSession(); // Returns if session overall was successful or not.
-        std::shared_ptr<YmParcel> _import(const std::string& path, std::optional<ConstDbgInfo> constDbgInfo = std::nullopt);
-        std::shared_ptr<YmItem> _load(const std::string& fullname, std::optional<ConstDbgInfo> constDbgInfo = std::nullopt);
+        std::shared_ptr<YmParcel> _import(const std::string& path, std::optional<std::string> indirectForLoadOf = std::nullopt);
+        std::shared_ptr<YmItem> _load(const std::string& fullname, std::optional<std::string> indirectForLoadOf = std::nullopt);
+        std::string _resolveHere(const std::string& pathOrFullname, const std::optional<std::string>& indirectForLoadOf) const;
         void _resolveConsts(YmItem& x);
     };
 

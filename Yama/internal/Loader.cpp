@@ -21,6 +21,9 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
             path);
         return false;
     }
+    if (!parceldef->verify()) {
+        return false;
+    }
     std::scoped_lock lk(_sessionLock);
     _setBinding(path, std::make_shared<YmParcel>(path, parceldef->info));
     return true;
@@ -94,48 +97,74 @@ bool _ym::DmLoader::_endSession() {
     return _success;
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path, std::optional<ConstDbgInfo> constDbgInfo) {
-    if (auto existing = _privParcels.fetch(path)) {
+std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path, std::optional<std::string> indirectForLoadOf) {
+    auto resolved = _resolveHere(path, indirectForLoadOf);
+    if (auto existing = _privParcels.fetch(resolved)) {
         ymAssert(_ym::Global::pathIsLegal(path));
         return existing;
     }
     if (!_ym::Global::pathIsLegal(path)) {
         _success = false;
-        _ym::Global::raiseErr(
-            constDbgInfo,
-            YmErrCode_IllegalPath,
-            "Import failed; path \"{}\" is illegal!",
-            path);
+        if (indirectForLoadOf) {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalPath,
+                "For {}; dependency import failed; path \"{}\" is illegal!",
+                indirectForLoadOf.value(),
+                path);
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalPath,
+                "Import failed; path \"{}\" is illegal!",
+                path);
+        }
         return nullptr;
     }
-    if (!_privParcels.push(_queryBinding(path))) {
+    if (!_privParcels.push(_queryBinding(resolved))) {
         _success = false;
-        _ym::Global::raiseErr(
-            constDbgInfo,
-            YmErrCode_ParcelNotFound,
-            "Import failed; no parcel found at path \"{}\"!",
-            path);
+        if (indirectForLoadOf) {
+            _ym::Global::raiseErr(
+                YmErrCode_ParcelNotFound,
+                "For {}; dependency import failed; no parcel found at path \"{}\"!",
+                indirectForLoadOf.value(),
+                path);
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_ParcelNotFound,
+                "Import failed; no parcel found at path \"{}\"!",
+                path);
+        }
     }
-    return _privParcels.fetch(path);
+    return _privParcels.fetch(resolved);
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname, std::optional<ConstDbgInfo> constDbgInfo) {
-    if (auto existing = _privItems.fetch(fullname)) {
+std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname, std::optional<std::string> indirectForLoadOf) {
+    auto resolved = _resolveHere(fullname, indirectForLoadOf);
+    if (auto existing = _privItems.fetch(resolved)) {
         ymAssert(_ym::Global::fullnameIsLegal(fullname));
         return existing;
     }
     if (!_ym::Global::fullnameIsLegal(fullname)) {
         _success = false;
-        _ym::Global::raiseErr(
-            constDbgInfo,
-            YmErrCode_IllegalFullname,
-            "Load failed; fullname \"{}\" is illegal!",
-            fullname);
+        if (indirectForLoadOf) {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalFullname,
+                "For {}; dependency load failed; fullname \"{}\" is illegal!",
+                indirectForLoadOf.value(),
+                fullname);
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalFullname,
+                "Load failed; fullname \"{}\" is illegal!",
+                fullname);
+        }
         return nullptr;
     }
-    const auto [path, localName] = _ym::split_s<YmChar>(fullname, ":");
+    const auto [path, localName] = _ym::split_s<YmChar>(resolved, ":");
     ymAssert(!localName.empty());
-    if (const auto parcel = _import((std::string)path)) {
+    if (const auto parcel = _import((std::string)path, indirectForLoadOf)) {
         if (const auto item = parcel->item((std::string)localName)) {
             auto res = std::make_shared<YmItem>(ym::Safe(*parcel), ym::Safe(item));
             // Push before resolving consts to ensure that the loading resource is available
@@ -146,28 +175,44 @@ std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname, std::o
         }
         else {
             _success = false;
-            _ym::Global::raiseErr(
-                constDbgInfo,
-                YmErrCode_ItemNotFound,
-                "Load failed; {} contains no item \"{}\"!",
-                (std::string)path,
-                (std::string)localName);
+            if (indirectForLoadOf) {
+                _ym::Global::raiseErr(
+                    YmErrCode_ItemNotFound,
+                    "For {}; dependency load failed; {} contains no item \"{}\"!",
+                    indirectForLoadOf.value(),
+                    (std::string)path,
+                    (std::string)localName);
+            }
+            else {
+                _ym::Global::raiseErr(
+                    YmErrCode_ItemNotFound,
+                    "Load failed; {} contains no item \"{}\"!",
+                    (std::string)path,
+                    (std::string)localName);
+            }
         }
     }
-    return _privItems.fetch(fullname);
+    return _privItems.fetch(resolved);
+}
+
+std::string _ym::DmLoader::_resolveHere(const std::string& pathOrFullname, const std::optional<std::string>& indirectForLoadOf) const {
+    if (!indirectForLoadOf) {
+        return pathOrFullname;
+    }
+    if (std::string_view(pathOrFullname).substr(0, 5) != "@here") {
+        return pathOrFullname;
+    }
+    auto result = pathOrFullname;
+    result.replace(0, 5, split_s<YmChar>(*indirectForLoadOf, ":").first);
+    return result;
 }
 
 void _ym::DmLoader::_resolveConsts(YmItem& x) {
-    for (YmConst i = 0; i < YmConst(x.info->consts.size()); i++) {
-        auto& info = x.info->consts[i];
-        auto type = _ym::constTypeOf(info);
-        if (_ym::isValConstType(type)) {
-            x.putValConst(i);
-        }
-        else if (_ym::isRefConstType(type)) {
-            x.putRefConst(i, _load(info.as<_ym::RefConstInfo>().sym, ConstDbgInfo::mk(x.fullname, i)).get());
-        }
-        else YM_DEADEND;
+    for (size_t i = 0; i < x.info->consts.size(); i++) {
+        auto& sym = x.info->consts[i];
+        if (isVal(sym))         x.putValConst(i);
+        else if (isRef(sym))    x.putRefConst(i, _load(sym.as<_ym::RefInfo>().sym, x.fullname).get());
+        else                    YM_DEADEND;
     }
 }
 

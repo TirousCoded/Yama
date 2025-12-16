@@ -7,7 +7,7 @@ YmParcel::YmParcel(std::string path, std::shared_ptr<_ym::ParcelInfo> info) :
     path(std::move(path)),
     info(std::move(info)) {}
 
-YmWord YmParcel::items() const noexcept {
+size_t YmParcel::items() const noexcept {
     return info->items();
 }
 

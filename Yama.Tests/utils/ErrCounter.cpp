@@ -5,12 +5,12 @@
 #include <yama++/print.h>
 
 
-YmWord ErrCounter::count(YmErrCode code) const noexcept {
+size_t ErrCounter::count(YmErrCode code) const noexcept {
     ymAssert(code < YmErrCode_Num);
     return _counts[code];
 }
 
-YmWord ErrCounter::operator[](YmErrCode code) const noexcept {
+size_t ErrCounter::operator[](YmErrCode code) const noexcept {
     return count(code);
 }
 

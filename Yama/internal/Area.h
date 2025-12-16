@@ -17,14 +17,15 @@ namespace _ym {
 
 
     template<typename T>
-    concept AreaResource =
+    concept Resource =
         requires (const std::remove_cvref_t<T> v)
     {
         typename T::Name;
         { v.getName() } noexcept -> std::convertible_to<const typename T::Name&>;
     };
 
-    template<AreaResource T>
+
+    template<Resource T>
     class Area final {
     public:
         using Name = T::Name;
@@ -154,6 +155,26 @@ namespace _ym {
                 _upstream->discard(true);
             }
         }
+
+        // TODO: A cool feature to add would be to given commit/commitOrDiscard an optional
+        //       'root' parameter, then having it be that ONLY resources which are referenced
+        //       directly/indirectly by root are committed, and EVERYTHING ELSE IS DISCARDED!
+        //
+        //       This would let us be *sloppy*, adding items to an area during loading which
+        //       are needed to check things DURING the load, but which aren't depended upon by
+        //       the thing being loaded itself, and so could be discarded.
+        //
+        //       For this we could use a visitor pattern setup akin to what we'd use for a GC.
+        //
+        //       This impl would need to be able to detect, and avoid traversing, items which
+        //       are already upstream, and so 100% don't ref downstream stuff, and so it'd be
+        //       wasteful to scan those.
+        //
+        //       Also, this impl would need to be able to avoid rescanning already traversed
+        //       items. For example, method types and their owner types will need to have a
+        //       dep graph cycle between them so that traversing from either one GUARANTEED
+        //       will visit BOTH, and this graph cycle would need to be handled correctly.
+
         // Transfers the resources from the area to the upstream area.
         // Fails quietly if there is no upstream area.
         // Behaviour is undefined if a name collision occurs between this area and upstream.
@@ -170,6 +191,7 @@ namespace _ym {
                 ymAssert(_byName.empty());
             }
         }
+
         inline void commitOrDiscard(bool commit) {
             if (commit) this->commit();
             else        discard();

@@ -29,7 +29,7 @@ void _ym::crash() noexcept {
 thread_local _ym::ErrCallbackInfo _ym::Global::_errCallbackInfo = {};
 
 const std::regex _ym::Global::_legalPathPattern = std::regex("[^/:]+(/[^/:]+)*");
-const std::regex _ym::Global::_legalFullnamePattern = std::regex("[^/:]+(/[^/:]+)*:[^/:]+");
+const std::regex _ym::Global::_legalFullnamePattern = std::regex("[^/:]+(/[^/:]+)*:[^/:]+(::[^/:]+)?");
 
 void _ym::Global::setErrCallback(YmErrCallbackFn fn, void* user) noexcept {
     _errCallbackInfo = ErrCallbackInfo{

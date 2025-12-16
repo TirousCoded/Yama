@@ -14,6 +14,7 @@
 
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
+#include "ConstTableInfo.h"
 #include "ParcelInfo.h"
 #include "YmParcel.h"
 
@@ -30,10 +31,10 @@ namespace _ym {
 
         ym::Safe<YmItem>
     >;
-    static_assert(Const::size == YmConstType_Num);
+    static_assert(Const::size == ConstTypes);
 
-    inline YmConstType constTypeOf(const Const& x) noexcept {
-        return YmConstType(x.index());
+    inline ConstType constTypeOf(const Const& x) noexcept {
+        return ConstType(x.index());
     }
 }
 
@@ -60,19 +61,32 @@ public:
     std::string_view path() const noexcept;
     std::string_view localName() const noexcept;
 
+    YmItem* owner() const noexcept;
+    YmMembers members() const noexcept;
+    YmItem* member(YmMemberIndex member) const noexcept;
+    YmItem* member(const std::string& name) const noexcept;
+
+    YmItem* returnType() const noexcept;
+    inline YmParams params() const noexcept { return YmParams(info->params.size()); }
+    const YmChar* paramName(YmParamIndex param) const;
+    YmItem* paramType(YmParamIndex param) const;
+
+    YmItem* ref(YmRef reference) const noexcept;
+    std::optional<YmRef> findRef(ym::Safe<YmItem> referenced) const noexcept;
+
     inline const Name& getName() const noexcept { return fullname; }
 
     std::span<const _ym::Const> consts() const noexcept;
-    template<YmConstType ConstType>
-    inline const _ym::Const::Alt<ConstType>& constAs(YmConst index) const noexcept {
+    template<_ym::ConstType I>
+    inline const _ym::Const::Alt<size_t(I)>& constAs(size_t index) const noexcept {
         ymAssert(index < consts().size());
-        ymAssert(consts()[index].index() == ConstType);
-        return consts()[index].as<ConstType>();
+        ymAssert(_ym::constTypeOf(consts()[index]) == I);
+        return consts()[index].as<size_t(I)>();
     }
 
-    void putValConst(YmConst index);
+    void putValConst(size_t index);
     // Fails quietly if ref == nullptr.
-    void putRefConst(YmConst index, YmItem* ref);
+    void putRefConst(size_t index, YmItem* ref);
 
 
 private:
@@ -84,9 +98,9 @@ private:
     void _initConstsArrayToDummyIntConsts();
 
     template<typename T>
-    inline void _putValConstAs(YmConst index) {
-        ymAssert(index < info->consts.size());
-        ymAssert(_ym::isValConstType(YmConstType(info->consts[index].index())));
+    inline void _putValConstAs(size_t index) {
+        ymAssert(size_t(index) < info->consts.size());
+        ymAssert(info->consts.isVal(index));
         _consts[index] = _ym::Const::byType<T>(info->consts[index].as<T>());
     }
 };

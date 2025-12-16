@@ -10,7 +10,7 @@
 #include "platform.h"
 #include "config.h"
 #include "macros.h"
-#include "basics.h"
+#include "scalars.h"
 #include "asserts.h"
 #include "errors.h"
 
@@ -174,15 +174,23 @@ extern "C" {
     */
 
 
-    /* TODO: Below description doesn't really work w/, for example, ymCtx_Dm.
+    /* TODO: The below policy, w/ regards to its impl is somewhat inconsistent w/ regards to API descriptions.
     */
 
     /* NOTE: When Yama API functions accept pointers to resources (ie. domains, contexts, parcel defs., etc.)
     *        the function DOES NOT TAKE OWNERSHIP of the resource, unless otherwise specified.
     * 
+    *        When Yama API functions accept pointers but DOES take ownership of the resource, it is said
+    *        to 'steal' the reference (and this should be stated in its description.) This reference stealing
+    *        occurs even when the Yama API function call OTHERWISE FAILS (meaning that the resource will be
+    *        released by the internals of the failed function call.)
+    * 
     *        When Yama API functions return pointers to resources, the function TRANSFERS OWNERSHIP of
     *        the resource to the end-user, unless otherwise specified, or unless the resource is one that
     *        the end-user cannot release (ie. parcels, items, etc.)
+    * 
+    *        When Yama API functions return pointers but DOES NOT transfer ownership of the resource, it
+    *        is said to return a 'borrowed' reference (and this should be stated in its description.)
     */
 
 
@@ -207,45 +215,92 @@ extern "C" {
 
 
     typedef enum : YmUInt8 {
-        YmKind_Fn = 0,
+        YmKind_Struct = 0,
+        YmKind_Fn,
+        YmKind_Method,
 
         YmKind_Num, /* Enum size. Not a valid type kind. */
     } YmKind;
 
-    /* TODO: ymFmtKind hasn't been unit tested. */
+    /* TODO: ymFmtKind hasn't been unit tested.
+    */
 
     /* Returns the string name of type kind x, or "???" if x is invalid. */
     /* The memory of the returned string is static and is valid for the lifetime of the process. */
     const YmChar* ymFmtKind(YmKind x);
 
+    /* TODO: ymKind_IsCallable hasn't been unit tested.
+    */
 
-    /* Constant table entry types. */
-    typedef enum : YmUInt8 {
-        YmConstType_Int = 0,
-        YmConstType_UInt,
-        YmConstType_Float,
-        YmConstType_Bool,
-        YmConstType_Rune,
+    /* Returns if kind x is for callable types. */
+    /* Behaviour is undefined if x is invalid. */
+    YmBool ymKind_IsCallable(YmKind x);
 
-        YmConstType_Ref,
+    /* TODO: ymKind_IsMember hasn't been unit tested.
+    */
 
-        YmConstType_Num, /* Enum size. Not a valid constant table entry type. */
-    } YmConstType;
+    /* Returns if kind x is for member types. */
+    /* Behaviour is undefined if x is invalid. */
+    YmBool ymKind_IsMember(YmKind x);
 
-    /* TODO: ymFmtConstType hasn't been unit tested. */
+    /* TODO: ymKind_HasMembers hasn't been unit tested.
+    */
 
-    /* Returns the string name of constant type x, or "???" if x is invalid. */
-    /* The memory of the returned string is static and is valid for the lifetime of the process. */
-    const YmChar* ymFmtConstType(YmConstType x);
+    /* Returns if kind x is types which can have members. */
+    /* Behaviour is undefined if x is invalid. */
+    YmBool ymKind_HasMembers(YmKind x);
 
-    /* Index of a constant table entry. */
-    typedef YmUInt8 YmConst;
 
-    /* Max legal constant index. */
-#define YM_MAX_CONST (YmConst(-2))
+    /* TODO: Maybe do this aliasing for ALL (more or less) of our C-strings.
+    */
 
-    /* Sentinel index for no constant. */
-#define YM_NO_CONST (YmConst(-1))
+    /* TODO: YmRefSym C-strings are specifically for reference strings in the
+    *        constant tables of items.
+    * 
+    *        Be sure to better explain what these are (remember, constant
+    *        tables are in backend) and what their syntax is, and how they
+    *        differ from regular fullname strings.
+    */
+
+    /* Item Reference Symbol */
+    typedef const YmChar* YmRefSym;
+
+
+    /* Integer ID of an item's reference to another item. */
+    typedef YmUInt16 YmRef;
+
+    /* Sentinel ID for no reference. */
+#define YM_NO_REF (YmRef(-1))
+
+
+    /* Index of an item in a parcel. */
+    typedef YmUInt16 YmItemIndex;
+
+    /* Sentinel index for no item. */
+#define YM_NO_ITEM_INDEX (YmItemIndex(-1))
+
+
+    /* Index of an item member (ie. in its owner's member list.) */
+    typedef YmUInt16 YmMemberIndex;
+
+    /* Number of members. */
+    typedef YmMemberIndex YmMembers;
+
+    /* Sentinel index for no member. */
+#define YM_NO_MEMBER_INDEX (YmMemberIndex(-1))
+
+
+    /* Index of a callable item parameter. */
+    typedef YmUInt8 YmParamIndex;
+
+    /* Number of parameters. */
+    typedef YmParamIndex YmParams;
+
+    /* Sentinel index for no parameter. */
+#define YM_NO_PARAM_INDEX (YmParamIndex(-1))
+
+    /* Max number of parameters of callable item may have. */
+#define YM_MAX_PARAMS (YmParams(24))
 
 
     /* Domain API */
@@ -280,7 +335,7 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     void ymCtx_Destroy(struct YmCtx* ctx);
 
-    /* Returns the Yama domain associated with ctx. */
+    /* Returns (a borrowed reference to) the Yama domain associated with ctx. */
     /* Behaviour is undefined if ctx is invalid. */
     struct YmDm* ymCtx_Dm(struct YmCtx* ctx);
 
@@ -325,59 +380,53 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     void ymParcelDef_Destroy(struct YmParcelDef* parceldef);
 
-    /* Index of an item in a parcel. */
-    typedef YmUInt16 YmItemIndex;
+#if __cplusplus
+    static_assert(YmKind_Num == 3);
+#endif
 
-#define YM_NO_ITEM_INDEX (YmItemIndex(-1))
-
-    /* Adds a new function to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
-    /* Fails if function's fullname conflicts with an existing declaration. */
+    /* Adds a new struct to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
+    /* Fails if new item's fullname conflicts with an existing declaration. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name);
+    YmItemIndex ymParcelDef_StructItem(struct YmParcelDef* parceldef, const YmChar* name);
 
-    /* Given parceldef and an item therein, returns the index of the int constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
+    /* Adds a new function to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
+    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Fails if returnType is illegal. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_IntConst(struct YmParcelDef* parceldef, YmItemIndex item, YmInt value);
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
+    YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType);
 
-    /* Given parceldef and an item therein, returns the index of the uint constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
+    /* Adds a new method to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
+    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Fails if owner is not a valid item index. */
+    /* Fails if owner is not allowed to have members. */
+    /* Fails if returnType is illegal. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_UIntConst(struct YmParcelDef* parceldef, YmItemIndex item, YmUInt value);
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
+    YmItemIndex ymParcelDef_MethodItem(struct YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType);
 
-    /* Given parceldef and an item therein, returns the index of the float constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Adds a new parameter to the specified item, returning its index, or YM_NO_PARAM_INDEX on failure. */
     /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
+    /* Fails if item is not callable. */
+    /* Fails if name conflicts with an existing parameter. */
+    /* Fails if paramType is illegal. */
+    /* Fails if adding new param would exceed YM_MAX_PARAMS. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_FloatConst(struct YmParcelDef* parceldef, YmItemIndex item, YmFloat value);
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Behaviour is undefined if paramType (as a pointer) is invalid. */
+    YmParamIndex ymParcelDef_AddParam(struct YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym paramType);
 
-    /* Given parceldef and an item therein, returns the index of the bool constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
+    /* Explicitly adds to item in parceldef a reference to the item specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
+    /* These IDs are not guaranteed to be unique, nor sequential. */
     /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
+    /* Fails if symbol is illegal. */
+    /* Fails if Yama API internals are unable to allocate a reference ID. */
     /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_BoolConst(struct YmParcelDef* parceldef, YmItemIndex item, YmBool value);
-
-    /* Given parceldef and an item therein, returns the index of the runic constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_RuneConst(struct YmParcelDef* parceldef, YmItemIndex item, YmRune value);
-
-    /* Given parceldef and an item therein, returns the index of the item reference constant with value, or YM_NO_CONST on failure. */
-    /* If no existing constant could be found, a new constant will attempt to be added. */
-    /* Fails if item is not the index of an item in parceldef. */
-    /* Fails if adding a new constant would require an index exceeding YM_MAX_CONST. */
-    /* Fails if symbol is not a legal item fullname. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    YmConst ymParcelDef_RefConst(struct YmParcelDef* parceldef, YmItemIndex item, const YmChar* symbol);
+    /* Behaviour is undefined if symbol (as a pointer) is invalid. */
+    YmRef ymParcelDef_AddRef(struct YmParcelDef* parceldef, YmItemIndex item, YmRefSym symbol);
 
 
     /* Parcel API */
@@ -403,58 +452,54 @@ extern "C" {
     /* Behaviour is undefined if item is invalid. */
     YmKind ymItem_Kind(struct YmItem* item);
 
-    /* Returns the size of the constant table of item. */
+    /* Returns the owner of item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */
-    YmWord ymItem_Consts(struct YmItem* item);
+    YmItem* ymItem_Owner(struct YmItem* item);
 
-    /* Returns the type of the constant at index in item. */
+    /* Returns the number of members item has, if any. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    YmConstType ymItem_ConstType(struct YmItem* item, YmConst index);
+    YmMembers ymItem_Members(struct YmItem* item);
 
-    /* TODO: MAYBE revise below ymItem_***Const fns to return an indeterminate value
-    *        upon failure (due to invalid index or const type mismatch), rather than
-    *        having them be UB.
-    * 
-    *        These would be more testable, and less able to crash end-user's code, but
-    *        MIGHT cause subtle bugs in end-user code due to them failing quietly.
-    */
-
-    /* Returns the value of int constant at index in item. */
+    /* Returns the member at member in item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not an int constant. */
-    YmInt ymItem_IntConst(struct YmItem* item, YmConst index);
+    YmItem* ymItem_MemberByIndex(struct YmItem* item, YmMemberIndex member);
 
-    /* Returns the value of uint constant at index in item. */
+    /* Returns the member under name in item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not an uint constant. */
-    YmUInt ymItem_UIntConst(struct YmItem* item, YmConst index);
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    YmItem* ymItem_MemberByName(struct YmItem* item, const YmChar* name);
 
-    /* Returns the value of float constant at index in item. */
+    /* Returns the return type of the item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not a float constant. */
-    YmFloat ymItem_FloatConst(struct YmItem* item, YmConst index);
+    YmItem* ymItem_ReturnType(struct YmItem* item);
 
-    /* Returns the value of bool constant at index in item. */
+    /* Returns the number of parameters the item has, if any. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not a bool constant. */
-    YmBool ymItem_BoolConst(struct YmItem* item, YmConst index);
+    YmParams ymItem_Params(struct YmItem* item);
 
-    /* Returns the value of runic constant at index in item. */
+    /* Returns the name of param in item, or YM_NIL on failure. */
+    /* This string's memory is managed internally. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not a runic constant. */
-    YmRune ymItem_RuneConst(struct YmItem* item, YmConst index);
+    const YmChar* ymItem_ParamName(struct YmItem* item, YmParamIndex param);
 
-    /* Returns the value of item reference constant at index in item. */
+    /* Returns the type of param in item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */
-    /* Behaviour is undefined if no constant at index. */
-    /* Behaviour is undefined if constant at index is not an item reference constant. */
-    YmItem* ymItem_RefConst(struct YmItem* item, YmConst index);
+    YmItem* ymItem_ParamType(struct YmItem* item, YmParamIndex param);
+
+    /* Returns the item referenced under reference, or YM_NIL on failure. */
+    /* Behaviour is undefined if item is invalid. */
+    YmItem* ymItem_Ref(struct YmItem* item, YmRef reference);
+
+    /* Returns if the reference ID item has for its reference to referenced, or YM_NO_REF if item doesn't reference referenced. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if referenced is invalid. */
+    YmRef ymItem_FindRef(struct YmItem* item, struct YmItem* referenced);
+
+    /* Returns if the conversion 'from -> to' is legal. */
+    /* coercion specifies if 'from -> to' is a legal coercion (aka. implicit conversion.) */
+    /* Behaviour is undefined if from is invalid. */
+    /* Behaviour is undefined if to is invalid. */
+    YmBool ymItem_Converts(struct YmItem* from, struct YmItem* to, YmBool coercion);
 
 
     /* Parcel Iterator API */
@@ -496,7 +541,7 @@ extern "C" {
     /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
     /* Parcel iterator state is invalidated if traversed context is deinitialized. */
     /* Behaviour is undefined if parcel iterator state is invalid. */
-    void ymParcelIter_Advance(YmWord n);
+    void ymParcelIter_Advance(size_t n);
 
     /* Queries the parcel iterator, returning a pointer to the current parcel, or YM_NIL on failure. */
     /* Fail indicates that the parcel iterator is past-the-end, or iteration hasn't started. */
@@ -504,14 +549,14 @@ extern "C" {
     /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
     /* Parcel iterator state is invalidated if traversed context is deinitialized. */
     /* Behaviour is undefined if parcel iterator state is invalid. */
-    struct YmParcel* ymParcelIter_Get();
+    struct YmParcel* ymParcelIter_Get(void);
 
     /* Returns if parcel iterator is past-the-end. */
     /* Parcel iterator state is thread-local. */
     /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
     /* Parcel iterator state is invalidated if traversed context is deinitialized. */
     /* Behaviour is undefined if parcel iterator state is invalid. */
-    YmBool ymParcelIter_Done();
+    YmBool ymParcelIter_Done(void);
 
 
     /* Item Iterator API */

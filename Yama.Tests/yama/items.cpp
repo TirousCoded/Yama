@@ -7,129 +7,340 @@
 
 
 TEST(Items, Parcel) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
-    ASSERT_NE(f_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
-    auto item = ymCtx_Load(ctx, "p:f");
-    ASSERT_TRUE(item);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
     YmParcel* p = ymCtx_Import(ctx, "p");
     ASSERT_NE(p, nullptr);
-    EXPECT_EQ(ymItem_Parcel(item), p);
+    EXPECT_EQ(ymItem_Parcel(A), p);
 }
 
 TEST(Items, Fullname) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
-    auto item = ymCtx_Load(ctx, "p:f");
-    ASSERT_TRUE(item);
-    EXPECT_STREQ(ymItem_Fullname(item), "p:f");
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_STREQ(ymItem_Fullname(A), "p:A");
 }
 
 TEST(Items, Kind) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_FnItem(p_def, "f"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
-    auto item = ymCtx_Load(ctx, "p:f");
-    ASSERT_TRUE(item);
-    EXPECT_EQ(ymItem_Kind(item), YmKind_Fn);
-}
-
-TEST(Items, Consts) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
-    {
-        SETUP_PARCELDEF(empty_def);
-        ymParcelDef_FnItem(empty_def, "f");
-        ymDm_BindParcelDef(dm, "empty", empty_def);
-        YmItem* f = ymCtx_Load(ctx, "empty:f");
-        ASSERT_TRUE(f);
-
-        EXPECT_EQ(ymItem_Consts(f), 0);
-    }
-    {
-        SETUP_PARCELDEF(nonempty_def);
-        YmItemIndex f_index = ymParcelDef_FnItem(nonempty_def, "f");
-        ymParcelDef_IntConst(nonempty_def, f_index, 10);
-        ymParcelDef_IntConst(nonempty_def, f_index, 11);
-        ymParcelDef_IntConst(nonempty_def, f_index, 12);
-        ymDm_BindParcelDef(dm, "nonempty", nonempty_def);
-        YmItem* f = ymCtx_Load(ctx, "nonempty:f");
-        ASSERT_TRUE(f);
-
-        EXPECT_EQ(ymItem_Consts(f), 3);
-    }
-}
-
-TEST(Items, ConstType) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
-
-    SETUP_PARCELDEF(p_def);
-    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
-    YmItemIndex g_index = ymParcelDef_FnItem(p_def, "g");
-    
-    static_assert(YmConstType_Num == 6);
-    YmConst int_c = ymParcelDef_IntConst(p_def, f_index, 10);
-    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_index, 10);
-    YmConst float_c = ymParcelDef_FloatConst(p_def, f_index, 3.14159);
-    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_index, true);
-    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_index, U'💩');
-    YmConst ref_c = ymParcelDef_RefConst(p_def, f_index, "p:g");
-
+    ymParcelDef_StructItem(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
-    YmItem* f = ymCtx_Load(ctx, "p:f");
-    ASSERT_TRUE(f);
-    ASSERT_EQ(ymItem_Consts(f), YmConstType_Num);
-
-    static_assert(YmConstType_Num == 6);
-    EXPECT_EQ(ymItem_ConstType(f, int_c), YmConstType_Int);
-    EXPECT_EQ(ymItem_ConstType(f, uint_c), YmConstType_UInt);
-    EXPECT_EQ(ymItem_ConstType(f, float_c), YmConstType_Float);
-    EXPECT_EQ(ymItem_ConstType(f, bool_c), YmConstType_Bool);
-    EXPECT_EQ(ymItem_ConstType(f, rune_c), YmConstType_Rune);
-    EXPECT_EQ(ymItem_ConstType(f, ref_c), YmConstType_Ref);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_Kind(A), YmKind_Struct);
 }
 
-TEST(Items, ConstValueAccess) {
-    SETUP_ERRCOUNTER;
-    SETUP_DM;
-    SETUP_CTX(ctx);
-
+TEST(Items, Owner_MemberType) {
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    YmItemIndex f_index = ymParcelDef_FnItem(p_def, "f");
-    YmItemIndex g_index = ymParcelDef_FnItem(p_def, "g");
-
-    static_assert(YmConstType_Num == 6);
-    YmConst int_c = ymParcelDef_IntConst(p_def, f_index, 10);
-    YmConst uint_c = ymParcelDef_UIntConst(p_def, f_index, 10);
-    YmConst float_c = ymParcelDef_FloatConst(p_def, f_index, 3.14159);
-    YmConst bool_c = ymParcelDef_BoolConst(p_def, f_index, true);
-    YmConst rune_c = ymParcelDef_RuneConst(p_def, f_index, U'💩');
-    YmConst ref_c = ymParcelDef_RefConst(p_def, f_index, "p:g");
-
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
-    YmItem* f = ymCtx_Load(ctx, "p:f");
-    ASSERT_TRUE(f);
-    ASSERT_EQ(ymItem_Consts(f), YmConstType_Num);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m = ymCtx_Load(ctx, "p:A::m");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m);
+    EXPECT_EQ(ymItem_Owner(A_m), A);
+}
 
-    static_assert(YmConstType_Num == 6);
-    EXPECT_EQ(ymItem_IntConst(f, int_c), 10);
-    EXPECT_EQ(ymItem_UIntConst(f, uint_c), 10);
-    EXPECT_DOUBLE_EQ(ymItem_FloatConst(f, float_c), 3.14159);
-    EXPECT_EQ(ymItem_BoolConst(f, bool_c), true);
-    EXPECT_EQ(ymItem_RuneConst(f, rune_c), U'💩');
+TEST(Items, Owner_NonMemberType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_Owner(A), nullptr); // p:A is not a member type.
+}
+
+TEST(Items, Members_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
+    auto A_m2 = ymCtx_Load(ctx, "p:A::m2");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m1);
+    ASSERT_TRUE(A_m2);
+    EXPECT_EQ(ymItem_Members(A), 2);
+}
+
+TEST(Items, Members_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m = ymCtx_Load(ctx, "p:A::m");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m);
+    EXPECT_EQ(ymItem_Members(A_m), 0); // p:A::m is not an owner type.
+}
+
+TEST(Items, MemberByIndex_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
+    auto A_m2 = ymCtx_Load(ctx, "p:A::m2");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m1);
+    ASSERT_TRUE(A_m2);
+    EXPECT_EQ(ymItem_MemberByIndex(A, 0), A_m1);
+    EXPECT_EQ(ymItem_MemberByIndex(A, 1), A_m2);
+    EXPECT_EQ(ymItem_MemberByIndex(A, 2), nullptr); // Out-Of-Bounds
+}
+
+TEST(Items, MemberByIndex_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m = ymCtx_Load(ctx, "p:A::m");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m);
+    EXPECT_EQ(ymItem_MemberByIndex(A_m, 0), nullptr); // p:A::m is not an owner type.
+}
+
+TEST(Items, MemberByName_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
+    auto A_m2 = ymCtx_Load(ctx, "p:A::m2");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m1);
+    ASSERT_TRUE(A_m2);
+    EXPECT_EQ(ymItem_MemberByName(A, "m1"), A_m1);
+    EXPECT_EQ(ymItem_MemberByName(A, "m2"), A_m2);
+    EXPECT_EQ(ymItem_MemberByName(A, "missing"), nullptr); // Missing
+}
+
+TEST(Items, MemberByName_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m = ymCtx_Load(ctx, "p:A::m");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m);
+    EXPECT_EQ(ymItem_MemberByName(A_m, "m"), nullptr); // p:A::m is not an owner type.
+}
+
+static void setup_fn_item_with_three_params(YmDm* dm, YmParcelDef* p_def) {
+    ymAssert(dm != nullptr);
+    ymAssert(p_def != nullptr);
+    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
+    ymParcelDef_StructItem(p_def, "B");
+    ymParcelDef_StructItem(p_def, "C");
+    ymParcelDef_StructItem(p_def, "D");
+    ymParcelDef_AddParam(p_def, A_index, "x", "p:B");
+    ymParcelDef_AddParam(p_def, A_index, "y", "p:C");
+    ymParcelDef_AddParam(p_def, A_index, "z", "p:D");
+    ymDm_BindParcelDef(dm, "p", p_def);
+}
+
+TEST(Items, ReturnType_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    EXPECT_EQ(ymItem_ReturnType(A), B);
+}
+
+TEST(Items, ReturnType_NonCallable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_ReturnType(A), nullptr);
+}
+
+TEST(Items, Params_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+    EXPECT_EQ(ymItem_Params(A), 3);
+}
+
+TEST(Items, Params_NonCallable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_Params(A), 0);
+}
+
+TEST(Items, ParamName_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+    EXPECT_STREQ(ymItem_ParamName(A, 0), "x");
+    EXPECT_STREQ(ymItem_ParamName(A, 1), "y");
+    EXPECT_STREQ(ymItem_ParamName(A, 2), "z");
+}
+
+TEST(Items, ParamName_ParamNotFound_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+    EXPECT_EQ(ymItem_ParamName(A, 3), nullptr);
+    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
+}
+
+TEST(Items, ParamName_ParamNotFound_NonCallable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_ParamName(A, 0), nullptr);
+    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
+}
+
+TEST(Items, ParamType_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+    EXPECT_EQ(ymItem_ParamType(A, 0), B);
+    EXPECT_EQ(ymItem_ParamType(A, 1), C);
+    EXPECT_EQ(ymItem_ParamType(A, 2), D);
+}
+
+TEST(Items, ParamType_ParamNotFound_Callable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_fn_item_with_three_params(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+    EXPECT_EQ(ymItem_ParamType(A, 3), nullptr);
+    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
+}
+
+TEST(Items, ParamType_ParamNotFound_NonCallable) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_ParamType(A, 0), nullptr);
+    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
+}
+
+TEST(Items, Ref) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    YmItemIndex A_index = ymParcelDef_StructItem(p_def, "A");
+    YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
+    ymParcelDef_StructItem(p_def, "B");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    YmItem* B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    EXPECT_EQ(ymItem_Ref(A, A_ref_B), B);
+}
+
+TEST(Items, Ref_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_StructItem(p_def, "A");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(A);
+
+    EXPECT_EQ(ymItem_Ref(A, 100), nullptr);
+}
+
+TEST(Items, FindRef) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    YmItemIndex A_index = ymParcelDef_StructItem(p_def, "A");
+    YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
+    ymParcelDef_StructItem(p_def, "B");
+    ymParcelDef_StructItem(p_def, "C");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    YmItem* B = ymCtx_Load(ctx, "p:B");
+    YmItem* C = ymCtx_Load(ctx, "p:C");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+
+    EXPECT_EQ(ymItem_FindRef(A, B), A_ref_B);
+    EXPECT_EQ(ymItem_FindRef(A, C), YM_NO_REF);
 }
 

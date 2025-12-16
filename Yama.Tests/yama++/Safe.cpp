@@ -4,21 +4,24 @@
 #include <yama++/Safe.h>
 
 
+using namespace ym;
+
+
 TEST(Safe, InitViaLValue) {
     int a = 10;
-    ym::Safe<int> b(a);
+    Safe<int> b(a);
     ASSERT_EQ(b.get(), &a);
 }
 
 TEST(Safe, InitViaRawPointer) {
     int a = 10;
-    ym::Safe<int> b(&a);
+    Safe<int> b(&a);
     ASSERT_EQ(b.get(), &a);
 }
 
 TEST(Safe, InitViaRawPointer_Fail) {
     ASSERT_DEATH({
-        ym::Safe<int>((int*)nullptr);
+        Safe<int>((int*)nullptr);
         },
         ".*");
 }
@@ -37,43 +40,43 @@ namespace {
 
 TEST(Safe, InitViaRawPointer_WithExplicitConvert) {
     Derived a{};
-    ym::Safe<Derived> b((Base*)&a); // Convert Base* -> Derived*.
+    Safe<Derived> b((Base*)&a); // Convert Base* -> Derived*.
     ASSERT_EQ(b.get(), &a);
 }
 
 TEST(Safe, InitViaRawPointer_WithExplicitConvert_Fail) {
     ASSERT_DEATH({
-        ym::Safe<Derived>((Base*)nullptr); // Convert Base* -> Derived*.
+        Safe<Derived>((Base*)nullptr); // Convert Base* -> Derived*.
         },
         ".*");
 }
 
 TEST(Safe, InitViaExplicitConvertBetweenSafeTypes) {
     Derived a{};
-    ym::Safe<Derived> b(ym::Safe<Base>((Base*)&a)); // Convert ym::Safe<Base> -> ym::Safe<Derived>.
+    Safe<Derived> b(Safe<Base>((Base*)&a)); // Convert Safe<Base> -> Safe<Derived>.
     ASSERT_EQ(b.get(), &a);
 }
 
 TEST(Safe, CopyCtor) {
     int a = 10;
-    ym::Safe<int> b(a);
-    ym::Safe<int> c(b); // Copy ctor.
+    Safe<int> b(a);
+    Safe<int> c(b); // Copy ctor.
     ASSERT_EQ(c.get(), &a);
     ASSERT_EQ(b.get(), &a); // Still good.
 }
 
 TEST(Safe, MoveCtor) {
     int a = 10;
-    ym::Safe<int> b(a);
-    ym::Safe<int> c(std::move(b)); // Move ctor.
+    Safe<int> b(a);
+    Safe<int> c(std::move(b)); // Move ctor.
     ASSERT_EQ(c.get(), &a);
 }
 
 TEST(Safe, CopyAssign) {
     int a1 = 10;
     int a2 = 20;
-    ym::Safe<int> other(a2);
-    ym::Safe<int> b(a1);
+    Safe<int> other(a2);
+    Safe<int> b(a1);
     b = other; // Copy assign.
     ASSERT_EQ(b.get(), &a2);
     ASSERT_EQ(other.get(), &a2); // Still good.
@@ -82,8 +85,8 @@ TEST(Safe, CopyAssign) {
 TEST(Safe, MoveAssign) {
     int a1 = 10;
     int a2 = 20;
-    ym::Safe<int> other(a2);
-    ym::Safe<int> b(a1);
+    Safe<int> other(a2);
+    Safe<int> b(a1);
     b = std::move(other); // Move assign.
     ASSERT_EQ(b.get(), &a2);
 }
@@ -93,9 +96,9 @@ TEST(Safe, MoveAssign) {
 TEST(Safe, Equality) {
     int v1 = 10;
     int v2 = 10;
-    ym::Safe<int> a1(v1);
-    ym::Safe<int> a2(v1);
-    ym::Safe<int> b(v2);
+    Safe<int> a1(v1);
+    Safe<int> a2(v1);
+    Safe<int> b(v2);
     ASSERT_EQ(a1, a1);
     ASSERT_EQ(a1, a2);
     ASSERT_NE(a1, b);
@@ -104,9 +107,9 @@ TEST(Safe, Equality) {
 TEST(Safe, Get) {
     int v1 = 10;
     int v2 = 10;
-    ym::Safe<int> a1(v1);
-    ym::Safe<int> a2(v1);
-    ym::Safe<int> b(v2);
+    Safe<int> a1(v1);
+    Safe<int> a2(v1);
+    Safe<int> b(v2);
     ASSERT_EQ(a1.get(), &v1);
     ASSERT_EQ(a2.get(), &v1);
     ASSERT_EQ(b.get(), &v2);
@@ -115,9 +118,9 @@ TEST(Safe, Get) {
 TEST(Safe, Value) {
     int v1 = 10;
     int v2 = 20;
-    ym::Safe<int> a1(v1);
-    ym::Safe<int> a2(v1);
-    ym::Safe<int> b(v2);
+    Safe<int> a1(v1);
+    Safe<int> a2(v1);
+    Safe<int> b(v2);
     // Assert that returned lvalue uses correct pointer.
     ASSERT_EQ(&(a1.value()), &v1);
     ASSERT_EQ(&(a2.value()), &v1);
@@ -136,7 +139,7 @@ namespace {
 
 TEST(Safe, DerefViaArrow) {
     A v{ 10 };
-    ym::Safe<A> a(v);
+    Safe<A> a(v);
     // Assert that returned lvalue uses correct pointer.
     ASSERT_EQ(&(a->a), &(v.a));
     // Just for good measure, we'll also test deref.
@@ -146,9 +149,9 @@ TEST(Safe, DerefViaArrow) {
 TEST(Safe, DerefViaStar) {
     int v1 = 10;
     int v2 = 20;
-    ym::Safe<int> a1(v1);
-    ym::Safe<int> a2(v1);
-    ym::Safe<int> b(v2);
+    Safe<int> a1(v1);
+    Safe<int> a2(v1);
+    Safe<int> b(v2);
     // Assert that returned lvalue uses correct pointer.
     ASSERT_EQ(&(*a1), &v1);
     ASSERT_EQ(&(*a2), &v1);
@@ -159,50 +162,119 @@ TEST(Safe, DerefViaStar) {
     ASSERT_EQ(*b, v2);
 }
 
+TEST(Safe, ArrayAccess) {
+    int arr[10]{};
+    for (size_t i = 0; i < 10; i++) {
+        EXPECT_EQ(&Safe(arr[0])[i], &arr[i]) << "i == " << i;
+    }
+}
+
 TEST(Safe, ImplicitConvertToRawPointerOfSameElemType) {
     Derived v{};
-    ym::Safe<Derived> a(v);
+    Safe<Derived> a(v);
     Derived* b = a;
     ASSERT_EQ(b, &v);
 }
 
 TEST(Safe, ExplicitConvertToRawPointerOfDiffElemType) {
     Derived v{};
-    ym::Safe<Base> a(v);
-    Derived* b = (Derived*)a; // Convert ym::Safe<Base> -> Derived*.
+    Safe<Base> a(v);
+    Derived* b = (Derived*)a; // Convert Safe<Base> -> Derived*.
     ASSERT_EQ(b, &v);
 }
 
 TEST(Safe, Into) {
     Derived v{};
-    ym::Safe<Base> a(v);
-    Derived* b = a.into<Derived>(); // Convert ym::Safe<Base> -> Derived*.
+    Safe<Base> a(v);
+    Derived* b = a.into<Derived>(); // Convert Safe<Base> -> Derived*.
     ASSERT_EQ(b, &v);
 }
 
 TEST(Safe, DowncastInto) {
     Derived v{};
-    ym::Safe<Base> a = v;
+    Safe<Base> a = v;
     // Downcasting from base type to derived type, which is a circumstance in which
     // the compiler might not know the runtime type.
-    ym::Safe<Derived> b = a.downcastInto<Derived>();
-    ASSERT_EQ(b, ym::Safe(v));
+    Safe<Derived> b = a.downcastInto<Derived>();
+    ASSERT_EQ(b, Safe(v));
 }
 
 TEST(Safe, Hash) {
     int v = 10;
     // Hashing Safe(v) should yield equiv to hashing &v.
-    EXPECT_EQ(ym::Safe(v).hash(), ym::hash(&v));
-    EXPECT_EQ(std::hash<ym::Safe<int>>{}(ym::Safe(v)), ym::hash(&v));
+    EXPECT_EQ(Safe(v).hash(), hash(&v));
+    EXPECT_EQ(std::hash<Safe<int>>{}(Safe(v)), hash(&v));
 }
 
-// NOTE: Alongside ym::Safe, we'll also test ym::assertSafe.
+TEST(Safe, Addition) {
+    int arr[10]{};
+    EXPECT_EQ(Safe(arr[0]) + 0, Safe(arr[0]));
+    EXPECT_EQ(Safe(arr[0]) + 3, Safe(arr[3]));
+    EXPECT_EQ(Safe(arr[0]) + 3 + 3 + 3, Safe(arr[9]));
+}
+
+TEST(Safe, Subtraction) {
+    int arr[10]{};
+    EXPECT_EQ(Safe(arr[9]) - 0, Safe(arr[9]));
+    EXPECT_EQ(Safe(arr[9]) - 3, Safe(arr[6]));
+    EXPECT_EQ(Safe(arr[9]) - 3 - 3 - 3, Safe(arr[0]));
+}
+
+TEST(Safe, AddAssign) {
+    int arr[10]{};
+    auto a = Safe(arr[0]);
+    auto& b = a += 5;
+    EXPECT_EQ(a, Safe(arr[5]));
+    EXPECT_EQ(&a, &b);
+}
+
+TEST(Safe, SubtractAssign) {
+    int arr[10]{};
+    auto a = Safe(arr[9]);
+    auto& b = a -= 5;
+    EXPECT_EQ(a, Safe(arr[4]));
+    EXPECT_EQ(&a, &b);
+}
+
+TEST(Safe, PreIncr) {
+    int arr[10]{};
+    auto a = Safe(arr[0]);
+    auto& b = ++a;
+    EXPECT_EQ(a, Safe(arr[1]));
+    EXPECT_EQ(&a, &b);
+}
+
+TEST(Safe, PreDecr) {
+    int arr[10]{};
+    auto a = Safe(arr[9]);
+    auto& b = --a;
+    EXPECT_EQ(a, Safe(arr[8]));
+    EXPECT_EQ(&a, &b);
+}
+
+TEST(Safe, PostIncr) {
+    int arr[10]{};
+    auto a = Safe(arr[0]);
+    auto b = a++;
+    EXPECT_EQ(a, Safe(arr[1]));
+    EXPECT_EQ(b, Safe(arr[0]));
+}
+
+TEST(Safe, PostDecr) {
+    int arr[10]{};
+    auto a = Safe(arr[9]);
+    auto b = a--;
+    EXPECT_EQ(a, Safe(arr[8]));
+    EXPECT_EQ(b, Safe(arr[9]));
+}
+
+// NOTE: Alongside Safe, we'll also test assertSafe.
 
 TEST(Safe, AssertSafe) {
     int v = 10;
-    ym::assertSafe(&v); // Succeeds
+    assertSafe(&v); // Succeeds
     ASSERT_DEATH({
-        ym::assertSafe((int*)nullptr); // Fails
+        assertSafe((int*)nullptr); // Fails
         },
         ".*");
 }

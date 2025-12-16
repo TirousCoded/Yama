@@ -10,16 +10,14 @@
 
 
 TEST(ParcelIters, PriorToFirstStart) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     EXPECT_EQ(ymParcelIter_Get(), nullptr);
     ymParcelIter_Advance(1);
     EXPECT_EQ(ymParcelIter_Get(), nullptr);
 }
 
 TEST(ParcelIters, Traversal) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(a_def);
     SETUP_PARCELDEF(b_def);
     SETUP_PARCELDEF(c_def);
@@ -44,8 +42,7 @@ TEST(ParcelIters, Traversal) {
 }
 
 TEST(ParcelIters, TraversalFrom) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(a_def);
     SETUP_PARCELDEF(b_def);
     SETUP_PARCELDEF(c_def);
@@ -72,8 +69,7 @@ TEST(ParcelIters, TraversalFrom) {
 }
 
 TEST(ParcelIters, Advance_IncrEquiv) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(a_def);
     SETUP_PARCELDEF(b_def);
     SETUP_PARCELDEF(c_def);
@@ -99,8 +95,7 @@ TEST(ParcelIters, Advance_IncrEquiv) {
 }
 
 TEST(ParcelIters, Advance_PastTheEnd) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(a_def);
     SETUP_PARCELDEF(b_def);
     SETUP_PARCELDEF(c_def);
@@ -117,8 +112,7 @@ TEST(ParcelIters, Advance_PastTheEnd) {
 }
 
 TEST(ParcelIters, Advance_Zero) {
-    SETUP_DM;
-    SETUP_CTX(ctx);
+    SETUP_ALL(ctx);
     SETUP_PARCELDEF(a_def);
     SETUP_PARCELDEF(b_def);
     SETUP_PARCELDEF(c_def);
