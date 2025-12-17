@@ -107,15 +107,15 @@ void ymParcelDef_Destroy(YmParcelDef* parceldef) {
     delete Safe(parceldef).get();
 }
 
-YmItemIndex ymParcelDef_StructItem(YmParcelDef* parceldef, const YmChar* name) {
+YmItemIndex ymParcelDef_AddStruct(YmParcelDef* parceldef, const YmChar* name) {
     return Safe(parceldef)->structItem(std::string(Safe(name))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmItemIndex ymParcelDef_FnItem(YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType) {
+YmItemIndex ymParcelDef_AddFn(YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType) {
     return Safe(parceldef)->fnItem(std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmItemIndex ymParcelDef_MethodItem(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
+YmItemIndex ymParcelDef_AddMethod(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
     return Safe(parceldef)->methodItem(owner, std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
 }
 

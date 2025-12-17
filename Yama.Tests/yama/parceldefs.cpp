@@ -13,14 +13,14 @@ TEST(ParcelDefs, CreateAndDestroy) {
     SETUP_PARCELDEF(p_def); // Macro will do the create/destroy.
 }
 
-TEST(ParcelDefs, StructItem) {
+TEST(ParcelDefs, AddStruct) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     std::string otherName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string otherFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
-    YmItemIndex foo_index = ymParcelDef_StructItem(p_def, "foo");
-    YmItemIndex bar_index = ymParcelDef_StructItem(p_def, "bar");
-    YmItemIndex other_index = ymParcelDef_StructItem(p_def, otherName.c_str());
+    YmItemIndex foo_index = ymParcelDef_AddStruct(p_def, "foo");
+    YmItemIndex bar_index = ymParcelDef_AddStruct(p_def, "bar");
+    YmItemIndex other_index = ymParcelDef_AddStruct(p_def, otherName.c_str());
     ASSERT_NE(foo_index, YM_NO_ITEM_INDEX);
     ASSERT_NE(bar_index, YM_NO_ITEM_INDEX);
     ASSERT_NE(other_index, YM_NO_ITEM_INDEX);
@@ -49,31 +49,31 @@ TEST(ParcelDefs, StructItem) {
     EXPECT_EQ(ymItem_Params(other), 0);
 }
 
-TEST(ParcelDefs, StructItem_ItemNameConflict) {
+TEST(ParcelDefs, AddStruct_ItemNameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_StructItem(p_def, "foo"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_StructItem(p_def, "foo"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_ItemNameConflict], 1);
 }
 
-TEST(ParcelDefs, FnItem) {
+TEST(ParcelDefs, AddFn) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     std::string otherName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string otherFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
-    ymParcelDef_StructItem(p_def, "A");
-    ymParcelDef_StructItem(p_def, "B");
-    ymParcelDef_StructItem(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
 
-    YmItemIndex foo_index = ymParcelDef_FnItem(p_def, "foo", "p:A"); // w/out params
+    YmItemIndex foo_index = ymParcelDef_AddFn(p_def, "foo", "p:A"); // w/out params
 
-    YmItemIndex bar_index = ymParcelDef_FnItem(p_def, "bar", "p:A"); // w/ params
+    YmItemIndex bar_index = ymParcelDef_AddFn(p_def, "bar", "p:A"); // w/ params
     ymParcelDef_AddParam(p_def, bar_index, "x", "p:A");
     ymParcelDef_AddParam(p_def, bar_index, "y", "p:B");
     ymParcelDef_AddParam(p_def, bar_index, "z", "p:C");
 
-    YmItemIndex other_index = ymParcelDef_FnItem(p_def, otherName.c_str(), "p:A"); // w/out params
+    YmItemIndex other_index = ymParcelDef_AddFn(p_def, otherName.c_str(), "p:A"); // w/out params
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto A = ymCtx_Load(ctx, "p:A");
@@ -111,38 +111,38 @@ TEST(ParcelDefs, FnItem) {
     EXPECT_EQ(ymItem_ParamType(bar, 2), C);
 }
 
-TEST(ParcelDefs, FnItem_ItemNameConflict) {
+TEST(ParcelDefs, AddFn_ItemNameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_StructItem(p_def, "A"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_FnItem(p_def, "A", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "p:B"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_ItemNameConflict], 1);
 }
 
-TEST(ParcelDefs, FnItem_IllegalFullname_InvalidReturnTypeSymbol) {
+TEST(ParcelDefs, AddFn_IllegalFullname_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_EQ(ymParcelDef_FnItem(p_def, "A", "/"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "/"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalFullname], 1);
 }
 
-TEST(ParcelDefs, MethodItem) {
+TEST(ParcelDefs, AddMethod) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     std::string otherName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string otherFullname = taul::utf8_s(u8"p:A::ab魂💩cd"); // Ensure can handle UTF-8.
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    ymParcelDef_StructItem(p_def, "B");
-    ymParcelDef_StructItem(p_def, "C");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
 
-    YmItemIndex foo_index = ymParcelDef_MethodItem(p_def, A_index, "foo", "p:C"); // w/out params
+    YmItemIndex foo_index = ymParcelDef_AddMethod(p_def, A_index, "foo", "p:C"); // w/out params
 
-    YmItemIndex bar_index = ymParcelDef_MethodItem(p_def, A_index, "bar", "p:C"); // w/ params
+    YmItemIndex bar_index = ymParcelDef_AddMethod(p_def, A_index, "bar", "p:C"); // w/ params
     ymParcelDef_AddParam(p_def, bar_index, "x", "p:C");
     ymParcelDef_AddParam(p_def, bar_index, "y", "p:B");
     ymParcelDef_AddParam(p_def, bar_index, "z", "p:C");
 
-    YmItemIndex other_index = ymParcelDef_MethodItem(p_def, A_index, otherName.c_str(), "p:C"); // w/out params
+    YmItemIndex other_index = ymParcelDef_AddMethod(p_def, A_index, otherName.c_str(), "p:C"); // w/out params
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto A = ymCtx_Load(ctx, "p:A");
@@ -183,48 +183,48 @@ TEST(ParcelDefs, MethodItem) {
     EXPECT_EQ(ymItem_ParamType(A_bar, 2), C);
 }
 
-TEST(ParcelDefs, MethodItem_ItemNameConflict) {
+TEST(ParcelDefs, AddMethod_ItemNameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
     ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(ymParcelDef_MethodItem(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_MethodItem(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_ItemNameConflict], 1);
 }
 
-TEST(ParcelDefs, MethodItem_ItemNotFound_InvalidOwner) {
+TEST(ParcelDefs, AddMethod_ItemNotFound_InvalidOwner) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_EQ(ymParcelDef_MethodItem(p_def, 5'000, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, 5'000, "m", "p:B"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
 }
 
-TEST(ParcelDefs, MethodItem_ItemCannotHaveMembers) {
+TEST(ParcelDefs, AddMethod_ItemCannotHaveMembers) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
     ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_MethodItem(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_ItemCannotHaveMembers], 1);
 }
 
-TEST(ParcelDefs, MethodItem_IllegalFullname_InvalidReturnTypeSymbol) {
+TEST(ParcelDefs, AddMethod_IllegalFullname_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
     ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_MethodItem(p_def, A_index, "m", "/"), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "/"), YM_NO_ITEM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalFullname], 1);
 }
 
 TEST(ParcelDefs, AddParam) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
-    ymParcelDef_StructItem(p_def, "B");
-    ymParcelDef_StructItem(p_def, "C");
-    ymParcelDef_StructItem(p_def, "D");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "D");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "p:B"), 0);
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "y", "p:C"), 1);
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "z", "p:D"), 2);
@@ -256,7 +256,7 @@ TEST(ParcelDefs, AddParam_ItemNotFound) {
 TEST(ParcelDefs, AddParam_NonCallableItem) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "p:B"), YM_NO_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NonCallableItem], 1);
 }
@@ -264,7 +264,7 @@ TEST(ParcelDefs, AddParam_NonCallableItem) {
 TEST(ParcelDefs, AddParam_ParamNameConflict) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "p:B"), 0);
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "p:C"), YM_NO_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_ParamNameConflict], 1);
@@ -273,7 +273,7 @@ TEST(ParcelDefs, AddParam_ParamNameConflict) {
 TEST(ParcelDefs, AddParam_IllegalFullname) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "/"), YM_NO_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalFullname], 1);
 }
@@ -281,7 +281,7 @@ TEST(ParcelDefs, AddParam_IllegalFullname) {
 TEST(ParcelDefs, AddParam_MaxParamsLimit) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
     for (YmParamIndex i = 0; i < YM_MAX_PARAMS; i++) {
         std::string paramName = std::format("a{}", i);
         ASSERT_EQ(ymParcelDef_AddParam(p_def, A_index, paramName.c_str(), "p:B"), i) << "i == " << i;
@@ -293,8 +293,8 @@ TEST(ParcelDefs, AddParam_MaxParamsLimit) {
 TEST(ParcelDefs, AddRef) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    ymParcelDef_StructItem(p_def, "B");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
     YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
     ASSERT_NE(A_ref_B, YM_NO_REF);
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -316,7 +316,7 @@ TEST(ParcelDefs, AddRef_IllegalFullname) {
     for (const auto& fullname : illegalFullnames) {
         SETUP_ERRCOUNTER;
         SETUP_PARCELDEF(p_def);
-        YmItemIndex p_A_index = ymParcelDef_StructItem(p_def, "A");
+        YmItemIndex p_A_index = ymParcelDef_AddStruct(p_def, "A");
         ASSERT_NE(p_A_index, YM_NO_ITEM_INDEX);
         EXPECT_EQ(ymParcelDef_AddRef(p_def, p_A_index, fullname.c_str()), YM_NO_REF);
         EXPECT_EQ(err[YmErrCode_IllegalFullname], 1);

@@ -9,7 +9,7 @@
 TEST(Items, Parcel) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -21,7 +21,7 @@ TEST(Items, Parcel) {
 TEST(Items, Fullname) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -31,7 +31,7 @@ TEST(Items, Fullname) {
 TEST(Items, Kind) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -41,8 +41,8 @@ TEST(Items, Kind) {
 TEST(Items, Owner_MemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -54,7 +54,7 @@ TEST(Items, Owner_MemberType) {
 TEST(Items, Owner_NonMemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -64,9 +64,9 @@ TEST(Items, Owner_NonMemberType) {
 TEST(Items, Members_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -80,8 +80,8 @@ TEST(Items, Members_OwnerType) {
 TEST(Items, Members_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -93,9 +93,9 @@ TEST(Items, Members_NonOwnerType) {
 TEST(Items, MemberByIndex_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -111,8 +111,8 @@ TEST(Items, MemberByIndex_OwnerType) {
 TEST(Items, MemberByIndex_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -124,9 +124,9 @@ TEST(Items, MemberByIndex_NonOwnerType) {
 TEST(Items, MemberByName_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m1_index = ymParcelDef_MethodItem(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_MethodItem(p_def, A_index, "m2", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -142,8 +142,8 @@ TEST(Items, MemberByName_OwnerType) {
 TEST(Items, MemberByName_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_StructItem(p_def, "A");
-    auto A_m_index = ymParcelDef_MethodItem(p_def, A_index, "m", "p:A");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -155,10 +155,10 @@ TEST(Items, MemberByName_NonOwnerType) {
 static void setup_fn_item_with_three_params(YmDm* dm, YmParcelDef* p_def) {
     ymAssert(dm != nullptr);
     ymAssert(p_def != nullptr);
-    auto A_index = ymParcelDef_FnItem(p_def, "A", "p:B");
-    ymParcelDef_StructItem(p_def, "B");
-    ymParcelDef_StructItem(p_def, "C");
-    ymParcelDef_StructItem(p_def, "D");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "D");
     ymParcelDef_AddParam(p_def, A_index, "x", "p:B");
     ymParcelDef_AddParam(p_def, A_index, "y", "p:C");
     ymParcelDef_AddParam(p_def, A_index, "z", "p:D");
@@ -179,7 +179,7 @@ TEST(Items, ReturnType_Callable) {
 TEST(Items, ReturnType_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -204,7 +204,7 @@ TEST(Items, Params_Callable) {
 TEST(Items, Params_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -247,7 +247,7 @@ TEST(Items, ParamName_ParamNotFound_Callable) {
 TEST(Items, ParamName_ParamNotFound_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -291,7 +291,7 @@ TEST(Items, ParamType_ParamNotFound_Callable) {
 TEST(Items, ParamType_ParamNotFound_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -302,9 +302,9 @@ TEST(Items, ParamType_ParamNotFound_NonCallable) {
 TEST(Items, Ref) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    YmItemIndex A_index = ymParcelDef_StructItem(p_def, "A");
+    YmItemIndex A_index = ymParcelDef_AddStruct(p_def, "A");
     YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
-    ymParcelDef_StructItem(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "B");
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* A = ymCtx_Load(ctx, "p:A");
     YmItem* B = ymCtx_Load(ctx, "p:B");
@@ -317,7 +317,7 @@ TEST(Items, Ref) {
 TEST(Items, Ref_Failure) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
@@ -328,10 +328,10 @@ TEST(Items, Ref_Failure) {
 TEST(Items, FindRef) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    YmItemIndex A_index = ymParcelDef_StructItem(p_def, "A");
+    YmItemIndex A_index = ymParcelDef_AddStruct(p_def, "A");
     YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
-    ymParcelDef_StructItem(p_def, "B");
-    ymParcelDef_StructItem(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
     ymDm_BindParcelDef(dm, "p", p_def);
     YmItem* A = ymCtx_Load(ctx, "p:A");
     YmItem* B = ymCtx_Load(ctx, "p:B");

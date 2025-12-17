@@ -20,7 +20,7 @@ inline YmItemIndex setup_struct(
         ADD_FAILURE();
         return YM_NO_ITEM_INDEX;
     }
-    YmItemIndex result = ymParcelDef_StructItem(def, localName.c_str());
+    YmItemIndex result = ymParcelDef_AddStruct(def, localName.c_str());
     for (const auto& refconst : refconsts) {
         ymParcelDef_AddRef(def, result, refconst.c_str());
     }
@@ -38,7 +38,7 @@ inline YmItemIndex setup_fn(
         ADD_FAILURE();
         return YM_NO_ITEM_INDEX;
     }
-    YmItemIndex result = ymParcelDef_FnItem(def, localName.c_str(), returnTypeSymbol.c_str());
+    YmItemIndex result = ymParcelDef_AddFn(def, localName.c_str(), returnTypeSymbol.c_str());
     for (const auto& refconst : refconsts) {
         ymParcelDef_AddRef(def, result, refconst.c_str());
     }
@@ -57,7 +57,7 @@ inline YmItemIndex setup_method(
         ADD_FAILURE();
         return YM_NO_ITEM_INDEX;
     }
-    YmItemIndex result = ymParcelDef_MethodItem(def, owner, localName.c_str(), returnTypeSymbol.c_str());
+    YmItemIndex result = ymParcelDef_AddMethod(def, owner, localName.c_str(), returnTypeSymbol.c_str());
     for (const auto& refconst : refconsts) {
         ymParcelDef_AddRef(def, result, refconst.c_str());
     }

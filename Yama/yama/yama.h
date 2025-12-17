@@ -388,7 +388,7 @@ extern "C" {
     /* Fails if new item's fullname conflicts with an existing declaration. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_StructItem(struct YmParcelDef* parceldef, const YmChar* name);
+    YmItemIndex ymParcelDef_AddStruct(struct YmParcelDef* parceldef, const YmChar* name);
 
     /* Adds a new function to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
@@ -396,7 +396,7 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_FnItem(struct YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType);
+    YmItemIndex ymParcelDef_AddFn(struct YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType);
 
     /* Adds a new method to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
@@ -406,7 +406,7 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_MethodItem(struct YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType);
+    YmItemIndex ymParcelDef_AddMethod(struct YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType);
 
     /* Adds a new parameter to the specified item, returning its index, or YM_NO_PARAM_INDEX on failure. */
     /* Fails if item is not the index of an item in parceldef. */

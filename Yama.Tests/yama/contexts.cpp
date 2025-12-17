@@ -49,7 +49,7 @@ TEST(Contexts, Load) {
     SETUP_PARCELDEF(p_def);
     std::string name = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string fullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
-    ymParcelDef_StructItem(p_def, name.c_str());
+    ymParcelDef_AddStruct(p_def, name.c_str());
     BIND_AND_IMPORT(ctx, p, p_def, "p");
     YmItem* item = ymCtx_Load(ctx, fullname.c_str());
     ASSERT_NE(item, nullptr);
@@ -62,7 +62,7 @@ TEST(Contexts, Load_AcrossCtxBoundaries) {
     SETUP_ERRCOUNTER;
     SETUP_DM;
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_StructItem(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymDm_BindParcelDef(dm, "p", p_def);
     SETUP_CTX(ctx1);
     SETUP_CTX(ctx2);
