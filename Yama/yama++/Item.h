@@ -15,6 +15,44 @@ namespace ym {
     // A handle wrapping a YmItem.
     class Item final : public Handle<YmItem> {
     public:
+        class Param final {
+        public:
+            Param() = delete;
+            Param(const Param&) = default;
+            Param(Param&&) noexcept = default;
+            ~Param() noexcept = default;
+            Param& operator=(const Param&) = default;
+            Param& operator=(Param&&) noexcept = default;
+
+
+            bool operator==(const Param&) const noexcept = default;
+
+            constexpr const YmParamIndex& index() const noexcept {
+                return _index;
+            }
+            inline std::string_view name() const noexcept {
+                return ymItem_ParamName(_item, index());
+            }
+            inline Item type() const noexcept {
+                return Item(Safe(ymItem_ParamType(_item, index())));
+            }
+
+
+        private:
+            friend class Item;
+
+
+            Safe<YmItem> _item;
+            YmParamIndex _index = 0;
+
+
+            inline Param(Safe<YmItem> item, YmParamIndex index) noexcept :
+                _item(item),
+                _index(index) {
+            }
+        };
+
+
         inline explicit Item(Safe<YmItem> x) noexcept :
             Handle(x) {
         }
@@ -59,17 +97,11 @@ namespace ym {
         inline YmParams params() const noexcept {
             return ymItem_Params(*this);
         }
-        inline std::optional<std::string_view> paramName(YmParamIndex param) const noexcept {
-            if (auto result = ymItem_ParamName(*this, param)) {
-                return result;
-            }
-            return std::nullopt;
-        }
-        inline std::optional<Item> paramType(YmParamIndex param) const noexcept {
-            if (auto result = ymItem_ParamType(*this, param)) {
-                return Item(Safe(result));
-            }
-            return std::nullopt;
+        inline std::optional<Param> param(YmParamIndex index) const noexcept {
+            return
+                index < params()
+                ? std::make_optional(Param(*this, index))
+                : std::nullopt;
         }
         inline std::optional<Item> ref(YmRef reference) const noexcept {
             if (auto result = ymItem_Ref(*this, reference)) {

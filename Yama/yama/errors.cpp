@@ -6,10 +6,11 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 11);
+    static_assert(YmErrCode_Num == 14);
     switch (code) {
     case YmErrCode_IllegalPath:             return "IllegalPath";
     case YmErrCode_IllegalFullname:         return "IllegalFullname";
+    case YmErrCode_IllegalRefSym:           return "IllegalRefSym";
     case YmErrCode_ParcelNotFound:          return "ParcelNotFound";
     case YmErrCode_ItemNotFound:            return "ItemNotFound";
     case YmErrCode_ParamNotFound:           return "ParamNotFound";
@@ -18,6 +19,8 @@ const YmChar* ymFmtYmErrCode(YmErrCode code) {
     case YmErrCode_MaxParamsLimit:          return "MaxParamsLimit";
     case YmErrCode_NonCallableItem:         return "NonCallableItem";
     case YmErrCode_ItemCannotHaveMembers:   return "ItemCannotHaveMembers";
+    case YmErrCode_ProtocolItem:            return "ProtocolItem";
+    case YmErrCode_NonProtocolItem:         return "NonProtocolItem";
     case YmErrCode_InternalError:           return "InternalError";
     default:                                return "???";
     }

@@ -216,6 +216,7 @@ extern "C" {
 
     typedef enum : YmUInt8 {
         YmKind_Struct = 0,
+        YmKind_Protocol,
         YmKind_Fn,
         YmKind_Method,
 
@@ -260,6 +261,15 @@ extern "C" {
     *        Be sure to better explain what these are (remember, constant
     *        tables are in backend) and what their syntax is, and how they
     *        differ from regular fullname strings.
+    * 
+    *        This includes explaining '%here%' when we bring it to the frontend.
+    */
+
+    /* TODO: Explain how the special 'Self' keyword works. Included in this,
+    *        explain things like the quark about how a 'Self' ref for a function
+    *        will resolve to the function type itself (as it has no owner, and
+    *        so 'Self' behaves the same as it does for other owner-less kinds
+    *        like struct/protocol.)
     */
 
     /* Item Reference Symbol */
@@ -301,6 +311,17 @@ extern "C" {
 
     /* Max number of parameters of callable item may have. */
 #define YM_MAX_PARAMS (YmParams(24))
+
+
+    /* A callback function used to perform call behaviour (ie. of a fn/method/etc.) */
+    /* ctx is the context the call behaviour is to be executed with, and is guaranteed to not be YM_NIL. */
+    /* user is a pointer used to expose callback function to external data. */
+    typedef void (*YmCallBhvrCallbackFn)(
+        struct YmCtx* ctx,
+        void* user);
+
+    /* A No-op YmCallBhvrCallbackFn callback fn. */
+    void ymInertCallBhvrFn(struct YmCtx*, void*);
 
 
     /* Domain API */
@@ -381,14 +402,39 @@ extern "C" {
     void ymParcelDef_Destroy(struct YmParcelDef* parceldef);
 
 #if __cplusplus
-    static_assert(YmKind_Num == 3);
+    static_assert(YmKind_Num == 4);
 #endif
+
+    /* NOTE: Try to keep yama/special/loading.cpp 'Self' unit test updated w/ every new place we
+    *        add to the below ymParcelDef_*** API which the end-user can inject a reference symbol.
+    */
 
     /* Adds a new struct to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_AddStruct(struct YmParcelDef* parceldef, const YmChar* name);
+    YmItemIndex ymParcelDef_AddStruct(
+        struct YmParcelDef* parceldef,
+        const YmChar* name);
+
+    /* Adds a new protocol to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
+    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    YmItemIndex ymParcelDef_AddProtocol(
+        struct YmParcelDef* parceldef,
+        const YmChar* name);
+
+    /* TODO: Our unit tests don't cover whether callBehaviour uploads correctly, as that's currently
+    *        unobservable.
+    * 
+    *        My plan is to make this observable behaviourally later on when we impl our object system,
+    *        (ie. we observe via actually invoking the call behaviour,) so I'm making this TODO here
+    *        as a reminder for us to write these tests.
+    */
+
+    /* TODO: Maybe make callBehaviour being YM_NIL not UB, but instead a proper non-fatal error.
+    */
 
     /* Adds a new function to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
@@ -396,17 +442,56 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_AddFn(struct YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType);
+    /* Behaviour is undefined if callBehaviour is invalid. */
+    YmItemIndex ymParcelDef_AddFn(
+        struct YmParcelDef* parceldef,
+        const YmChar* name,
+        YmRefSym returnType,
+        YmCallBhvrCallbackFn callBehaviour,
+        void* callBehaviourData);
+
+    /* TODO: For now, we'll forbid protocols from having regular methods, but we may change this in the future,
+    *        in which case the description for below will need to be updated.
+    */
 
     /* Adds a new method to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
     /* Fails if owner is not a valid item index. */
     /* Fails if owner is not allowed to have members. */
+    /* Fails if owner is a protocol. */
     /* Fails if returnType is illegal. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    YmItemIndex ymParcelDef_AddMethod(struct YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType);
+    /* Behaviour is undefined if callBehaviour is invalid. */
+    YmItemIndex ymParcelDef_AddMethod(
+        struct YmParcelDef* parceldef,
+        YmItemIndex owner,
+        const YmChar* name,
+        YmRefSym returnType,
+        YmCallBhvrCallbackFn callBehaviour,
+        void* callBehaviourData);
+
+    /* NOTE: Herein, a 'method requirement' or 'method req.' is the name given to special methods defined for
+    *        protocols which define one of the methods defining the interface of the protocol.
+    * 
+    *        These behave otherwise like regular methods, but have this special additional role.
+    */
+
+    /* Adds a new method req. to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
+    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Fails if owner is not a valid item index. */
+    /* Fails if owner is not a protocol. */
+    /* Fails if returnType is illegal. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
+    /* Behaviour is undefined if callBehaviour is invalid. */
+    YmItemIndex ymParcelDef_AddMethodReq(
+        struct YmParcelDef* parceldef,
+        YmItemIndex owner,
+        const YmChar* name,
+        YmRefSym returnType);
 
     /* Adds a new parameter to the specified item, returning its index, or YM_NO_PARAM_INDEX on failure. */
     /* Fails if item is not the index of an item in parceldef. */
@@ -417,7 +502,11 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if paramType (as a pointer) is invalid. */
-    YmParamIndex ymParcelDef_AddParam(struct YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym paramType);
+    YmParamIndex ymParcelDef_AddParam(
+        struct YmParcelDef* parceldef,
+        YmItemIndex item,
+        const YmChar* name,
+        YmRefSym paramType);
 
     /* Explicitly adds to item in parceldef a reference to the item specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
     /* These IDs are not guaranteed to be unique, nor sequential. */
@@ -426,7 +515,10 @@ extern "C" {
     /* Fails if Yama API internals are unable to allocate a reference ID. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if symbol (as a pointer) is invalid. */
-    YmRef ymParcelDef_AddRef(struct YmParcelDef* parceldef, YmItemIndex item, YmRefSym symbol);
+    YmRef ymParcelDef_AddRef(
+        struct YmParcelDef* parceldef,
+        YmItemIndex item,
+        YmRefSym symbol);
 
 
     /* Parcel API */
@@ -438,6 +530,10 @@ extern "C" {
 
 
     /* Item API */
+
+    /* TODO: Add in diagnostic fmt fns for getting nicely formatted string reprs of
+     *       internal constant tables, and item dependency graphs.
+    */
 
     /* Returns the parcel the item belongs to. */
     /* Behaviour is undefined if item is invalid. */

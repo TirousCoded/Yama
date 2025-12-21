@@ -6,6 +6,7 @@
 #include <signal.h>
 #endif
 
+#include "../yama++/Safe.h"
 #include "general.h"
 #include "frontend-resources.h"
 
@@ -46,6 +47,12 @@ bool _ym::Global::fullnameIsLegal(std::string_view fullname) {
     return std::regex_match(fullname.begin(), fullname.end(), _legalFullnamePattern);
 }
 
+bool _ym::Global::refSymIsLegal(std::string_view refSym) {
+    return
+        refSym == "Self" ||
+        fullnameIsLegal(refSym);
+}
+
 void _ym::Global::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
     YmCtx::pIterStart(ctx);
 }
@@ -66,3 +73,7 @@ bool _ym::Global::pIterDone() noexcept {
     return YmCtx::pIterDone();
 }
 
+_ym::CallBhvrCallbackInfo _ym::CallBhvrCallbackInfo::mk(YmCallBhvrCallbackFn fn, void* user) noexcept {
+    ym::assertSafe(fn);
+    return CallBhvrCallbackInfo{ .fn = fn, .user = user };
+}

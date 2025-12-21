@@ -16,6 +16,7 @@ using namespace _ym;
 const YmChar* ymFmtKind(YmKind x) {
     static constexpr std::array<const YmChar*, YmKind_Num> names{
         "Struct",
+        "Protocol",
         "Fn",
         "Method",
     };
@@ -29,6 +30,7 @@ YmBool ymKind_IsCallable(YmKind x) {
     ymAssert(x < YmKind_Num);
     static constexpr std::array<bool, YmKind_Num> values{
         false,
+        false,
         true,
         true,
     };
@@ -40,6 +42,7 @@ YmBool ymKind_IsMember(YmKind x) {
     static constexpr std::array<bool, YmKind_Num> values{
         false,
         false,
+        false,
         true,
     };
     return values[size_t(x)];
@@ -49,10 +52,15 @@ YmBool ymKind_HasMembers(YmKind x) {
     ymAssert(x < YmKind_Num);
     static constexpr std::array<bool, YmKind_Num> values{
         true,
+        true,
         false,
         false,
     };
     return values[size_t(x)];
+}
+
+void ymInertCallBhvrFn(YmCtx*, void*) {
+    // Do nothing.
 }
 
 YmDm* ymDm_Create(void) {
@@ -107,24 +115,76 @@ void ymParcelDef_Destroy(YmParcelDef* parceldef) {
     delete Safe(parceldef).get();
 }
 
-YmItemIndex ymParcelDef_AddStruct(YmParcelDef* parceldef, const YmChar* name) {
-    return Safe(parceldef)->structItem(std::string(Safe(name))).value_or(YM_NO_ITEM_INDEX);
+YmItemIndex ymParcelDef_AddStruct(
+    YmParcelDef* parceldef,
+    const YmChar* name) {
+    return Safe(parceldef)->addStruct(
+        std::string(Safe(name))
+    ).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddFn(YmParcelDef* parceldef, const YmChar* name, YmRefSym returnType) {
-    return Safe(parceldef)->fnItem(std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
+YmItemIndex ymParcelDef_AddProtocol(YmParcelDef* parceldef, const YmChar* name) {
+    return Safe(parceldef)->addProtocol(
+        std::string(Safe(name))
+    ).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddMethod(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
-    return Safe(parceldef)->methodItem(owner, std::string(Safe(name)), std::string(Safe(returnType))).value_or(YM_NO_ITEM_INDEX);
+YmItemIndex ymParcelDef_AddFn(
+    YmParcelDef* parceldef,
+    const YmChar* name,
+    YmRefSym returnType,
+    YmCallBhvrCallbackFn callBehaviour,
+    void* callBehaviourData) {
+    return Safe(parceldef)->addFn(
+        std::string(Safe(name)),
+        std::string(Safe(returnType)),
+        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData)
+    ).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmParamIndex ymParcelDef_AddParam(YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym paramType) {
-    return Safe(parceldef)->addParam(item, std::string(Safe(name)), std::string(Safe(paramType))).value_or(YM_NO_PARAM_INDEX);
+YmItemIndex ymParcelDef_AddMethod(
+    YmParcelDef* parceldef,
+    YmItemIndex owner,
+    const YmChar* name,
+    YmRefSym returnType,
+    YmCallBhvrCallbackFn callBehaviour,
+    void* callBehaviourData) {
+    return Safe(parceldef)->addMethod(
+        owner,
+        std::string(Safe(name)),
+        std::string(Safe(returnType)),
+        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData)
+    ).value_or(YM_NO_ITEM_INDEX);
 }
 
-YmRef ymParcelDef_AddRef(YmParcelDef* parceldef, YmItemIndex item, YmRefSym symbol) {
-    return Safe(parceldef)->addRef(item, std::string(Safe(symbol))).value_or(YM_NO_REF);
+YmItemIndex ymParcelDef_AddMethodReq(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
+    return Safe(parceldef)->addMethodReq(
+        owner,
+        std::string(Safe(name)),
+        std::string(Safe(returnType))
+    ).value_or(YM_NO_ITEM_INDEX);
+}
+
+YmParamIndex ymParcelDef_AddParam(
+    YmParcelDef* parceldef,
+    YmItemIndex item,
+    const YmChar* name,
+    YmRefSym paramType) {
+    return Safe(parceldef)->addParam(
+        item,
+        std::string(Safe(name)),
+        std::string(Safe(paramType))
+    ).value_or(YM_NO_PARAM_INDEX);
+}
+
+YmRef ymParcelDef_AddRef(
+    YmParcelDef* parceldef,
+    YmItemIndex item,
+    YmRefSym symbol) {
+    return Safe(parceldef)->addRef(
+        item,
+        std::string(Safe(symbol))
+    ).value_or(YM_NO_REF);
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
@@ -184,8 +244,23 @@ YmRef ymItem_FindRef(YmItem* item, YmItem* referenced) {
 }
 
 YmBool ymItem_Converts(YmItem* from, YmItem* to, YmBool coercion) {
-    assertSafe(from);
-    assertSafe(to);
+    Safe _from(from), _to(to);
+    if (_from == _to) {
+        return YM_TRUE;
+    }
+    auto fromK = _from->kind();
+    auto toK = _to->kind();
+    bool fromIsP = fromK == YmKind_Protocol;
+    bool toIsP = toK == YmKind_Protocol;
+    if (fromIsP && toIsP) {
+        return YM_TRUE;
+    }
+    if (!fromIsP && toIsP && _from->conforms(_to)) {
+        return YM_TRUE;
+    }
+    if (fromIsP && !toIsP && _to->conforms(_from)) {
+        return (YmBool)!coercion;
+    }
     return YM_FALSE;
 }
 

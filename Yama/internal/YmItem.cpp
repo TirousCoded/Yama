@@ -91,6 +91,38 @@ std::optional<YmRef> YmItem::findRef(ym::Safe<YmItem> referenced) const noexcept
     return std::nullopt;
 }
 
+bool YmItem::conforms(ym::Safe<YmItem> protocol) const noexcept {
+    ymAssert(protocol->kind() == YmKind_Protocol);
+    for (YmMemberIndex i = 0; i < protocol->members(); i++) {
+        const auto expects = ym::Safe(protocol->member(i));
+        if (const auto found = member((std::string)expects->info->memberName().value())) {
+            if (expects->info->returnTypeIsSelf()) {
+                if (found->returnType() != found->owner()) {
+                    return false;
+                }
+            }
+            else if (found->returnType() != expects->returnType()) {
+                return false;
+            }
+            if (found->params() != expects->params()) {
+                return false;
+            }
+            for (YmParamIndex j = 0; j < found->params(); j++) {
+                if (expects->info->paramTypeIsSelf(j)) {
+                    if (found->paramType(j) != found->owner()) {
+                        return false;
+                    }
+                }
+                else if (found->paramType(j) != expects->paramType(j)) {
+                    return false;
+                }
+            }
+        }
+        else return false;
+    }
+    return true;
+}
+
 std::span<const _ym::Const> YmItem::consts() const noexcept {
     return std::span(_consts);
 }

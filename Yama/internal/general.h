@@ -29,6 +29,18 @@ namespace _ym {
     constexpr size_t enumSize = size_t(T::Num);
 
 
+    constexpr std::string_view refSymHere = "%here%";
+
+
+    struct CallBhvrCallbackInfo final {
+        YmCallBhvrCallbackFn fn = ymInertCallBhvrFn;
+        void* user = nullptr;
+
+
+        static CallBhvrCallbackInfo mk(YmCallBhvrCallbackFn fn, void* user = nullptr) noexcept;
+    };
+
+
     struct ErrCallbackInfo final {
         YmErrCallbackFn fn = nullptr;
         void* user = nullptr;
@@ -43,6 +55,7 @@ namespace _ym {
         static void setErrCallback(YmErrCallbackFn fn, void* user) noexcept;
         static bool pathIsLegal(std::string_view path);
         static bool fullnameIsLegal(std::string_view fullname);
+        static bool refSymIsLegal(std::string_view refSym);
 
         template<typename... Args>
         static inline void raiseErr(YmErrCode code, std::format_string<Args...> fmt, Args&&... args) {

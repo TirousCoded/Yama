@@ -13,6 +13,7 @@
 #include <string>
 
 #include "../yama/yama.h"
+#include "general.h"
 #include "ParcelInfo.h"
 
 
@@ -28,11 +29,30 @@ public:
 
     bool verify() const;
 
-    std::optional<YmItemIndex> structItem(const std::string& name);
-    std::optional<YmItemIndex> fnItem(const std::string& name, std::string returnTypeSymbol);
-    std::optional<YmItemIndex> methodItem(YmItemIndex owner, const std::string& name, std::string returnTypeSymbol);
+    std::optional<YmItemIndex> addStruct(
+        const std::string& name);
+    std::optional<YmItemIndex> addProtocol(
+        const std::string& name);
+    std::optional<YmItemIndex> addFn(
+        const std::string& name,
+        std::string returnTypeSymbol,
+        _ym::CallBhvrCallbackInfo callBehaviour);
+    std::optional<YmItemIndex> addMethod(
+        YmItemIndex owner,
+        const std::string& name,
+        std::string returnTypeSymbol,
+        _ym::CallBhvrCallbackInfo callBehaviour);
+    std::optional<YmItemIndex> addMethodReq(
+        YmItemIndex owner,
+        const std::string& name,
+        std::string returnTypeSymbol);
 
-    std::optional<YmParamIndex> addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol);
-    std::optional<YmRef> addRef(YmItemIndex item, std::string symbol);
+    std::optional<YmParamIndex> addParam(
+        YmItemIndex item,
+        std::string name,
+        std::string paramTypeSymbol);
+    std::optional<YmRef> addRef(
+        YmItemIndex item,
+        std::string symbol);
 };
 

@@ -27,6 +27,8 @@ namespace _ym {
     bool checkRefSymbol(const std::string& symbol, std::string_view msg);
     bool checkCallable(const ItemInfo& item, std::string_view msg);
 
+    inline void methodReqCallBhvr(YmCtx* ctx, void* user) {}
+
 
     struct ParamInfo final {
         YmParamIndex index;
@@ -43,6 +45,7 @@ namespace _ym {
         //       don't even need to define themselves. To this end, look into a 'descriptor' setup,
         //       like in our old impl, to reduce per-item memory consumption.
 
+        std::optional<CallBhvrCallbackInfo> callBehaviour;
         std::optional<ConstIndex> owner;
         std::vector<ConstIndex> membersByIndex;
         std::unordered_map<std::string, ConstIndex> membersByName;
@@ -50,6 +53,9 @@ namespace _ym {
         std::vector<ParamInfo> params;
         ConstTableInfo consts;
 
+
+        bool returnTypeIsSelf() const noexcept;
+        bool paramTypeIsSelf(YmParamIndex index) const noexcept;
 
         bool isOwner() const noexcept; // Detects if owner based on name syntax.
         std::optional<std::string_view> ownerName() const noexcept;
@@ -82,13 +88,27 @@ namespace _ym {
 
         // Fails if name conflict arises.
         // Invalidates item pointers.
-        std::optional<YmItemIndex> addItem(std::string localName, YmKind kind, std::optional<std::string> returnTypeSymbol = std::nullopt);
+        std::optional<YmItemIndex> addItem(
+            std::string localName,
+            YmKind kind,
+            std::optional<std::string> returnTypeSymbol = std::nullopt,
+            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt);
         // Fails if name conflict arises.
         // Invalidates item pointers.
-        std::optional<YmItemIndex> addItem(YmItemIndex owner, std::string memberName, YmKind kind, std::optional<std::string> returnTypeSymbol = std::nullopt);
+        std::optional<YmItemIndex> addItem(
+            YmItemIndex owner,
+            std::string memberName,
+            YmKind kind,
+            std::optional<std::string> returnTypeSymbol = std::nullopt,
+            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt);
 
-        std::optional<YmParamIndex> addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol);
-        std::optional<YmRef> addRef(YmItemIndex item, std::string symbol);
+        std::optional<YmParamIndex> addParam(
+            YmItemIndex item,
+            std::string name,
+            std::string paramTypeSymbol);
+        std::optional<YmRef> addRef(
+            YmItemIndex item,
+            std::string symbol);
 
 
     private:

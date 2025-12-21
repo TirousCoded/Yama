@@ -14,6 +14,7 @@ extern "C" {
     typedef enum : YmUInt16 {
         YmErrCode_IllegalPath = 0,          /* Illegal import path. */
         YmErrCode_IllegalFullname,          /* Illegal fullname. */
+        YmErrCode_IllegalRefSym,            /* Illegal reference symbol. */
         YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
         YmErrCode_ItemNotFound,             /* Couldn't find a specific item. */
         YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
@@ -22,9 +23,11 @@ extern "C" {
         YmErrCode_MaxParamsLimit,           /* Param count would exceed YM_MAX_PARAMS. */
         YmErrCode_NonCallableItem,          /* Item is non-callable. */
         YmErrCode_ItemCannotHaveMembers,    /* Item cannot have members. */
+        YmErrCode_ProtocolItem,             /* Item is a protocol. */
+        YmErrCode_NonProtocolItem,          /* Item is a non-protocol. */
         YmErrCode_InternalError,            /* Internal Error */
 
-        YmErrCode_Num, /* Enum size. Not a valid error code. */
+        YmErrCode_Num,                      /* Enum size. Not a valid error code. */
     } YmErrCode;
 
     /* TODO: ymFmtYmErrCode hasn't been unit tested. */

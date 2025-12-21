@@ -34,12 +34,12 @@ namespace ym {
         Handle& operator=(Handle&&) noexcept = default;
 
 
+        inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
+        inline bool operator!=(std::convertible_to<Safe<T>> auto const& x) const noexcept { return !(*this == x); }
+
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
         inline operator T* () const noexcept { return get(); } // Implicit
-
-        inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
-        inline bool operator!=(std::convertible_to<Safe<T>> auto const& x) const noexcept { return !(*this == x); }
 
 
     private:
@@ -68,12 +68,12 @@ namespace ym {
         Handle& operator=(Handle&&) noexcept = default;
 
 
+        inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
+        inline bool operator!=(std::convertible_to<Safe<T>> auto const& x) const noexcept { return !(*this == x); }
+
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
         inline operator T* () const noexcept { return get(); } // Implicit
-
-        inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
-        inline bool operator!=(std::convertible_to<Safe<T>> auto const& x) const noexcept { return !(*this == x); }
 
 
         // Disowns the ownership this handle's resource, invalidating the handle.
@@ -84,7 +84,7 @@ namespace ym {
         // Destroys the resource owned by this handle, invalidating the handle.
         inline void drop() noexcept {
             destroy(_res);
-            // Stop dtor from attempting destroy.
+            // NOTE: This stops dtor from attempting destroy.
             disown();
         }
 

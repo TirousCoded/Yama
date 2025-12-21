@@ -74,6 +74,10 @@ public:
     YmItem* ref(YmRef reference) const noexcept;
     std::optional<YmRef> findRef(ym::Safe<YmItem> referenced) const noexcept;
 
+    // TODO: Improve conforms by giving it a way to cache in domain/context.
+
+    bool conforms(ym::Safe<YmItem> protocol) const noexcept;
+
     inline const Name& getName() const noexcept { return fullname; }
 
     std::span<const _ym::Const> consts() const noexcept;

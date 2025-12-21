@@ -29,6 +29,23 @@ inline YmItemIndex setup_struct(
     }
     return result;
 }
+inline YmItemIndex setup_protocol(
+    YmParcelDef* def,
+    const std::string& localName,
+    std::initializer_list<std::string> refconsts) {
+    if (!def) {
+        ADD_FAILURE();
+        return YM_NO_ITEM_INDEX;
+    }
+    YmItemIndex result = ymParcelDef_AddProtocol(def, localName.c_str());
+    for (const auto& refconst : refconsts) {
+        ymParcelDef_AddRef(def, result, refconst.c_str());
+    }
+    if (result == YM_NO_ITEM_INDEX) {
+        ADD_FAILURE();
+    }
+    return result;
+}
 inline YmItemIndex setup_fn(
     YmParcelDef* def,
     const std::string& localName,
@@ -38,7 +55,7 @@ inline YmItemIndex setup_fn(
         ADD_FAILURE();
         return YM_NO_ITEM_INDEX;
     }
-    YmItemIndex result = ymParcelDef_AddFn(def, localName.c_str(), returnTypeSymbol.c_str());
+    YmItemIndex result = ymParcelDef_AddFn(def, localName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
     for (const auto& refconst : refconsts) {
         ymParcelDef_AddRef(def, result, refconst.c_str());
     }
@@ -57,7 +74,7 @@ inline YmItemIndex setup_method(
         ADD_FAILURE();
         return YM_NO_ITEM_INDEX;
     }
-    YmItemIndex result = ymParcelDef_AddMethod(def, owner, localName.c_str(), returnTypeSymbol.c_str());
+    YmItemIndex result = ymParcelDef_AddMethod(def, owner, localName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
     for (const auto& refconst : refconsts) {
         ymParcelDef_AddRef(def, result, refconst.c_str());
     }
@@ -86,6 +103,14 @@ inline void test_struct(
     ym::println("-- testing {}", fullname);
     ASSERT_NE(item, nullptr);
     test_item_basics(item, fullname, YmKind_Struct, refconsts);
+}
+inline void test_protocol(
+    YmItem* item,
+    const std::string& fullname,
+    std::initializer_list<YmItem*> refconsts) {
+    ym::println("-- testing {}", fullname);
+    ASSERT_NE(item, nullptr);
+    test_item_basics(item, fullname, YmKind_Protocol, refconsts);
 }
 inline void test_fn(
     YmItem* item,

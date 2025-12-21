@@ -7,12 +7,12 @@
 
 
 bool _ym::checkRefSymbol(const std::string& symbol, std::string_view msg) {
-    if (_ym::Global::fullnameIsLegal(symbol)) {
+    if (_ym::Global::refSymIsLegal(symbol)) {
         return true;
     }
     _ym::Global::raiseErr(
-        YmErrCode_IllegalFullname,
-        "{}; fullname \"{}\" is illegal!",
+        YmErrCode_IllegalRefSym,
+        "{}; reference symbol \"{}\" is illegal!",
         (std::string)msg,
         symbol);
     return false;
@@ -29,6 +29,20 @@ bool _ym::checkCallable(const ItemInfo& item, std::string_view msg) {
             item.index);
     }
     return result;
+}
+
+bool _ym::ItemInfo::returnTypeIsSelf() const noexcept {
+    return
+        returnType
+        ? consts[*returnType].as<RefInfo>().sym == "Self"
+        : false;
+}
+
+bool _ym::ItemInfo::paramTypeIsSelf(YmParamIndex index) const noexcept {
+    return
+        size_t(index) < params.size()
+        ? consts[params[index].type].as<RefInfo>().sym == "Self"
+        : false;
 }
 
 bool _ym::ItemInfo::isOwner() const noexcept {
@@ -128,7 +142,7 @@ void _ym::ItemInfo::attemptSetupAsMember(ParcelInfo& parcel) {
 }
 
 std::string _ym::ItemInfo::fullnameForRef() const {
-    return std::format("@here:{}", (std::string)localName);
+    return std::format("{}:{}", (std::string)refSymHere, (std::string)localName);
 }
 
 bool _ym::ParcelInfo::verify() const {
@@ -174,7 +188,11 @@ const _ym::ItemInfo* _ym::ParcelInfo::item(YmItemIndex index) const noexcept {
         : nullptr;
 }
 
-std::optional<YmItemIndex> _ym::ParcelInfo::addItem(std::string localName, YmKind kind, std::optional<std::string> returnTypeSymbol) {
+std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
+    std::string localName,
+    YmKind kind,
+    std::optional<std::string> returnTypeSymbol,
+    std::optional<CallBhvrCallbackInfo> callBehaviour) {
     if (item(localName)) {
         Global::raiseErr(
             YmErrCode_ItemNameConflict,
@@ -195,6 +213,7 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(std::string localName, YmKin
         }
         newItem.returnType = newItem.consts.pullRef(std::move(*returnTypeSymbol));
     }
+    newItem.callBehaviour = callBehaviour;
     // NOTE: Make sure error checks stay ABOVE mutations of *this.
     _items.push_back(std::move(newItem));
     auto& result = _items.back();
@@ -204,7 +223,12 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(std::string localName, YmKin
     return result.index;
 }
 
-std::optional<YmItemIndex> _ym::ParcelInfo::addItem(YmItemIndex owner, std::string memberName, YmKind kind, std::optional<std::string> returnTypeSymbol) {
+std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
+    YmItemIndex owner,
+    std::string memberName,
+    YmKind kind,
+    std::optional<std::string> returnTypeSymbol,
+    std::optional<CallBhvrCallbackInfo> callBehaviour) {
     auto ownerItemPtr = item(owner);
     if (!ownerItemPtr) {
         // TODO: Maybe look into adding more context to this error msg.
@@ -223,7 +247,32 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(YmItemIndex owner, std::stri
             ymFmtKind(ownerItem.kind));
         return std::nullopt;
     }
-    return addItem(std::format("{}::{}", ownerItem.localName, memberName), kind, std::move(returnTypeSymbol));
+    if (kind == YmKind_Method) {
+        ymAssert(callBehaviour.has_value());
+        bool isMethodReq = callBehaviour.value().fn == methodReqCallBhvr;
+        bool ownerIsProtocol = ownerItem.kind == YmKind_Protocol;
+        if (!isMethodReq && ownerIsProtocol) {
+            Global::raiseErr(
+                YmErrCode_ProtocolItem,
+                "Cannot add regular method to {} item {}!",
+                ymFmtKind(ownerItem.kind),
+                ownerItem.localName);
+            return std::nullopt;
+        }
+        else if (isMethodReq && !ownerIsProtocol) {
+            Global::raiseErr(
+                YmErrCode_NonProtocolItem,
+                "Cannot add method req. to {} item {}!",
+                ymFmtKind(ownerItem.kind),
+                ownerItem.localName);
+            return std::nullopt;
+        }
+    }
+    return addItem(
+        std::format("{}::{}", ownerItem.localName, memberName),
+        kind,
+        std::move(returnTypeSymbol),
+        callBehaviour);
 }
 
 std::optional<YmParamIndex> _ym::ParcelInfo::addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol) {

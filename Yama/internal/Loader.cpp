@@ -139,28 +139,31 @@ std::shared_ptr<YmParcel> _ym::DmLoader::_import(const std::string& path, std::o
     return _privParcels.fetch(resolved);
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& fullname, std::optional<std::string> indirectForLoadOf) {
-    auto resolved = _resolveHere(fullname, indirectForLoadOf);
+std::shared_ptr<YmItem> _ym::DmLoader::_load(const std::string& refSymOrFullname, std::optional<std::string> indirectForLoadOf) {
+    auto resolved = _resolveRefSym(refSymOrFullname, indirectForLoadOf);
     if (auto existing = _privItems.fetch(resolved)) {
-        ymAssert(_ym::Global::fullnameIsLegal(fullname));
         return existing;
     }
-    if (!_ym::Global::fullnameIsLegal(fullname)) {
-        _success = false;
-        if (indirectForLoadOf) {
+    if (indirectForLoadOf) {
+        if (!_ym::Global::refSymIsLegal(refSymOrFullname)) {
+            _success = false;
             _ym::Global::raiseErr(
-                YmErrCode_IllegalFullname,
-                "For {}; dependency load failed; fullname \"{}\" is illegal!",
+                YmErrCode_IllegalRefSym,
+                "For {}; dependency load failed; reference symbol \"{}\" is illegal!",
                 indirectForLoadOf.value(),
-                fullname);
+                refSymOrFullname);
+            return nullptr;
         }
-        else {
+    }
+    else {
+        if (!_ym::Global::fullnameIsLegal(refSymOrFullname)) {
+            _success = false;
             _ym::Global::raiseErr(
                 YmErrCode_IllegalFullname,
                 "Load failed; fullname \"{}\" is illegal!",
-                fullname);
+                refSymOrFullname);
+            return nullptr;
         }
-        return nullptr;
     }
     const auto [path, localName] = _ym::split_s<YmChar>(resolved, ":");
     ymAssert(!localName.empty());
@@ -199,12 +202,19 @@ std::string _ym::DmLoader::_resolveHere(const std::string& pathOrFullname, const
     if (!indirectForLoadOf) {
         return pathOrFullname;
     }
-    if (std::string_view(pathOrFullname).substr(0, 5) != "@here") {
+    if (std::string_view(pathOrFullname).substr(0, refSymHere.length()) != refSymHere) {
         return pathOrFullname;
     }
     auto result = pathOrFullname;
-    result.replace(0, 5, split_s<YmChar>(*indirectForLoadOf, ":").first);
+    result.replace(0, refSymHere.length(), split_s<YmChar>(*indirectForLoadOf, ":").first);
     return result;
+}
+
+std::string _ym::DmLoader::_resolveRefSym(const std::string& refSymOrFullname, const std::optional<std::string>& indirectForLoadOf) const {
+    return
+        refSymOrFullname == "Self" && indirectForLoadOf
+        ? (std::string)split_s<YmChar>(*indirectForLoadOf, "::").first
+        : _resolveHere(refSymOrFullname, indirectForLoadOf);
 }
 
 void _ym::DmLoader::_resolveConsts(YmItem& x) {

@@ -3,36 +3,32 @@
 #include "loading-helpers.h"
 
 
-// TODO: Add in diagnostic fmt fns for getting nicely formatted string reprs of
-//       internal constant tables, and item dependency graphs.
-
-// TODO: Due to how items will have things like references to their member items, and
-//       members to their owners, we'll have to either update below tests to reflect
-//       this, or make a 'NOTE' stating we don't care.
-
-
 TEST(Loading, WorksWithAllItemKinds) {
-    static_assert(YmKind_Num == 3);
+    static_assert(YmKind_Num == 4);
     // Dep Graph:
     //      p:A                     (Struct)
-    //      p:B -> p:A              (Function) (Need back ref to set return type.)
+    //      p:B                     (Protocol)
+    //      p:C -> p:A              (Function) (Need back ref to set return type.)
     //      p:A::m -> p:A           (Method) (Need back ref to set return type.)
 
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     YmItemIndex p_A_index = setup_struct(p_def, "A", {});
-    YmItemIndex p_B_index = setup_fn(p_def, "B", "p:A", {});
+    YmItemIndex p_B_index = setup_protocol(p_def, "B", {});
+    YmItemIndex p_C_index = setup_fn(p_def, "C", "p:A", {});
     YmItemIndex p_A_m_index = setup_method(p_def, p_A_index, "m", "p:A", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
     YmItem* p_A = ymCtx_Load(ctx, "p:A");
     YmItem* p_B = ymCtx_Load(ctx, "p:B");
+    YmItem* p_C = ymCtx_Load(ctx, "p:C");
     YmItem* p_A_m = ymCtx_Load(ctx, "p:A::m");
 
     test_struct(p_A, "p:A", {});
-    test_fn(p_B, "p:B", { p_A });
+    test_protocol(p_B, "p:B", {});
+    test_fn(p_C, "p:C", { p_A });
     test_method(p_A_m, "p:A::m", { p_A });
 }
 
@@ -333,6 +329,64 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     EXPECT_EQ(ymItem_MemberByName(p_A, "m2"), p_A_m2);
 }
 
+TEST(Loading, Self) {
+    static_assert(YmKind_Num == 4);
+    // NOTE: This test covers (ideally) ALL places in ymParcelDef_*** API where a reference
+    //       symbol can be injected, and tests that they can interpret the direct loading
+    //       of 'Self' correctly. Also, this tests that 'Self' is interpreted correctly
+    //       in protocols and non-protocols alike.
+    // NOTE: yama/special/protocol-conformance.cpp is responsible for testing that 'Self'
+    //       operates as expected w/ regards to protocol conformance checking.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto STRUCT_index = setup_struct(p_def, "STRUCT", {});
+    auto STRUCT_ref = ymParcelDef_AddRef(p_def, STRUCT_index, "Self"); // Covers ref for this kind.
+    auto STRUCT_m_index = setup_method(p_def, STRUCT_index, "m", "Self", {}); // Covers method kind.
+    ymParcelDef_AddParam(p_def, STRUCT_m_index, "a", "Self");
+    auto STRUCT_m_ref = ymParcelDef_AddRef(p_def, STRUCT_m_index, "Self"); // Covers ref for this kind.
+    
+    auto PROTOCOL_index = setup_protocol(p_def, "PROTOCOL", {});
+    auto PROTOCOL_ref = ymParcelDef_AddRef(p_def, PROTOCOL_index, "Self"); // Covers ref for this kind.
+    auto PROTOCOL_m_index = ymParcelDef_AddMethodReq(p_def, PROTOCOL_index, "m", "Self");
+    ymParcelDef_AddParam(p_def, PROTOCOL_m_index, "a", "Self");
+    auto PROTOCOL_m_ref = ymParcelDef_AddRef(p_def, PROTOCOL_m_index, "Self"); // Covers ref for this kind.
+    
+    auto FN_index = setup_fn(p_def, "FN", "Self", {});
+    ymParcelDef_AddParam(p_def, FN_index, "a", "Self");
+    auto FN_ref = ymParcelDef_AddRef(p_def, FN_index, "Self"); // Covers ref for this kind.
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
+    auto STRUCT_m = ymCtx_Load(ctx, "p:STRUCT::m");
+    auto PROTOCOL = ymCtx_Load(ctx, "p:PROTOCOL");
+    auto PROTOCOL_m = ymCtx_Load(ctx, "p:PROTOCOL::m");
+    auto FN = ymCtx_Load(ctx, "p:FN");
+    ASSERT_TRUE(STRUCT);
+    ASSERT_TRUE(STRUCT_m);
+    ASSERT_TRUE(PROTOCOL);
+    ASSERT_TRUE(PROTOCOL_m);
+    ASSERT_TRUE(FN);
+
+    EXPECT_EQ(ymItem_ReturnType(STRUCT_m), STRUCT);
+    EXPECT_EQ(ymItem_ReturnType(PROTOCOL_m), PROTOCOL);
+    EXPECT_EQ(ymItem_ReturnType(FN), FN);
+
+    ASSERT_EQ(ymItem_Params(STRUCT_m), 1);
+    ASSERT_EQ(ymItem_Params(PROTOCOL_m), 1);
+    ASSERT_EQ(ymItem_Params(FN), 1);
+
+    EXPECT_EQ(ymItem_ParamType(STRUCT_m, 0), STRUCT);
+    EXPECT_EQ(ymItem_ParamType(PROTOCOL_m, 0), PROTOCOL);
+    EXPECT_EQ(ymItem_ParamType(FN, 0), FN);
+
+    EXPECT_EQ(ymItem_Ref(STRUCT, STRUCT_ref), STRUCT);
+    EXPECT_EQ(ymItem_Ref(STRUCT_m, STRUCT_m_ref), STRUCT);
+    EXPECT_EQ(ymItem_Ref(PROTOCOL, PROTOCOL_ref), PROTOCOL);
+    EXPECT_EQ(ymItem_Ref(PROTOCOL_m, PROTOCOL_m_ref), PROTOCOL);
+    EXPECT_EQ(ymItem_Ref(FN, FN_ref), FN);
+}
+
 TEST(Loading, Fail_IllegalFullname_DirectLoad) {
     for (const auto& fullname : illegalFullnames) {
         SETUP_ALL(ctx);
@@ -342,8 +396,8 @@ TEST(Loading, Fail_IllegalFullname_DirectLoad) {
     }
 }
 
-TEST(Loading, Fail_IllegalFullname_IndirectLoad) {
-    // NOTE: ymParcelDef_RefConst will cover checking fullname syntax for indirect loading.
+TEST(Loading, Fail_IllegalRefSym_IndirectLoad) {
+    // NOTE: ymParcelDef_AddRef will cover checking fullname syntax for indirect loading.
 }
 
 TEST(Loading, Fail_ParcelNotFound_DirectLoad) {

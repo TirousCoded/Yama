@@ -42,7 +42,7 @@ TEST(Items, Owner_MemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -65,8 +65,8 @@ TEST(Items, Members_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -81,7 +81,7 @@ TEST(Items, Members_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -94,8 +94,8 @@ TEST(Items, MemberByIndex_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -112,7 +112,7 @@ TEST(Items, MemberByIndex_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -125,8 +125,8 @@ TEST(Items, MemberByName_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A");
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A");
+    auto A_m1_index = ymParcelDef_AddMethod(p_def, A_index, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    auto A_m2_index = ymParcelDef_AddMethod(p_def, A_index, "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -143,7 +143,7 @@ TEST(Items, MemberByName_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -155,7 +155,7 @@ TEST(Items, MemberByName_NonOwnerType) {
 static void setup_fn_item_with_three_params(YmDm* dm, YmParcelDef* p_def) {
     ymAssert(dm != nullptr);
     ymAssert(p_def != nullptr);
-    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B");
+    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddStruct(p_def, "B");
     ymParcelDef_AddStruct(p_def, "C");
     ymParcelDef_AddStruct(p_def, "D");
