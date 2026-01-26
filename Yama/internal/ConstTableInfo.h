@@ -32,13 +32,13 @@ namespace _ym {
 
     inline const YmChar* fmt(ConstType x) {
         static constexpr std::array<const YmChar*, ConstTypes> names{
-            "Int Const.",
-            "UInt Const.",
-            "Float Const.",
-            "Bool Const.",
-            "Rune Const.",
+            "Int",
+            "UInt",
+            "Float",
+            "Bool",
+            "Rune",
 
-            "Ref. Const.",
+            "Ref",
         };
         return
             size_t(x) < ConstTypes
@@ -78,20 +78,14 @@ namespace _ym {
         static_assert(ConstInfo::size == ConstTypes);
         auto t = constTypeOf(x);
         switch (t) {
-        case ConstType::Int:    return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmInt>()));
-        case ConstType::UInt:   return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmUInt>()));
-        case ConstType::Float:  return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmFloat>()));
-        case ConstType::Bool:   return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmBool>()));
-        case ConstType::Rune:   return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmRune>()));
-        case ConstType::Ref:    return std::format("{} ({})", fmt(t), x.as<RefInfo>().sym);
-        default:                return std::format("{} (n/a)", fmt(t));
+        case ConstType::Int:        return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmInt>()));
+        case ConstType::UInt:       return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmUInt>()));
+        case ConstType::Float:      return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmFloat>()));
+        case ConstType::Bool:       return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmBool>()));
+        case ConstType::Rune:       return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmRune>()));
+        case ConstType::Ref:        return std::format("{} ({})", fmt(t), x.as<RefInfo>().sym);
+        default:                    return std::format("{} (n/a)", fmt(t));
         }
-    }
-
-    inline bool validRefConst(const ConstInfo& x) noexcept {
-        return
-            isRef(x) &&
-            Global::fullnameIsLegal(x.as<RefInfo>().sym);
     }
 
 

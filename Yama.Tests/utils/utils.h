@@ -22,6 +22,16 @@ namespace {
         "ab:c",
         "abc/d:ef",
         "abc/def:",
+
+        "abc:xyz",
+        "abc:xyz::m",
+        "abc:xyz::m::m",
+        "abc:xyz[abc:xyz, abc:xyz]",
+        "abc:xyz[abc:xyz, abc:xyz]::m",
+        "abc:xyz[abc:xyz, abc:xyz]::m::m",
+        "abc:xyz::m[abc:xyz, abc:xyz]",
+        "abc:xyz::m[abc:xyz, abc:xyz]::m",
+        "abc:xyz::m[abc:xyz, abc:xyz]::m::m",
     };
     inline const std::vector<std::string> illegalFullnames{
         // Illegal Path Components
@@ -34,12 +44,24 @@ namespace {
         "abc/def", // Legal path, illegal fullname.
 
         ":",
+        ":ghi",
+        ":ghi::m",
         "/:",
         "//:",
         "/def:",
         "abc/:",
         "abc//def:",
         "abc/def:",
+
+        "::",
+        "::m",
+        "/::",
+        "//::",
+        "/def::",
+        "abc/::",
+        "abc//def::",
+        "abc/def::",
+        "abc/def:ghi::",
 
         ":xyz",
         "/:xyz",
@@ -53,6 +75,17 @@ namespace {
         "abc:xy:z",
         "abc:xyz/",
         "abc:xy/z",
+        "abc:xyz[abc:xyz:]",
+        "abc:xyz[abc:xy:z]",
+        "abc:xyz[abc:xyz/]",
+        "abc:xyz[abc:xy/z]",
+        "abc:xyz[abc:xyz:, abc:xyz]",
+        "abc:xyz[abc:xy:z, abc:xyz]",
+        "abc:xyz[abc:xyz/, abc:xyz]",
+        "abc:xyz[abc:xy/z, abc:xyz]",
+        "abc:xyz,",
+        "abc:xyz[abc:xyz,]",
+        "abc:xyz[abc:xyz, abc:xyz]/m",
     };
 }
 

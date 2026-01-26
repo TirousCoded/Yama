@@ -152,6 +152,101 @@ TEST(Items, MemberByName_NonOwnerType) {
     EXPECT_EQ(ymItem_MemberByName(A_m, "m"), nullptr); // p:A::m is not an owner type.
 }
 
+static void setup_for_item_params_tests(YmDm* dm, YmParcelDef* p_def) {
+    ymAssert(dm != nullptr);
+    ymAssert(p_def != nullptr);
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ymParcelDef_AddStruct(p_def, "Int");
+    ymParcelDef_AddStruct(p_def, "Float");
+    auto A_index = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any");
+    ymParcelDef_AddItemParam(p_def, A_index, "U", "p:Any");
+    ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymDm_BindParcelDef(dm, "p", p_def);
+}
+
+TEST(Items, ItemParams_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A[p:Int, p:Float]");
+    ASSERT_TRUE(A);
+    EXPECT_EQ(ymItem_ItemParams(A), 2);
+}
+
+TEST(Items, ItemParams_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A_m = ymCtx_Load(ctx, "p:A[p:Int, p:Float]::m");
+    ASSERT_TRUE(A_m);
+    EXPECT_EQ(ymItem_ItemParams(A_m), 2);
+}
+
+TEST(Items, ItemParamByIndex_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A[p:Int, p:Float]");
+    auto Int = ymCtx_Load(ctx, "p:Int");
+    auto Float = ymCtx_Load(ctx, "p:Float");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(Int);
+    ASSERT_TRUE(Float);
+    ASSERT_EQ(ymItem_ItemParams(A), 2);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A, 0), Int);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A, 1), Float);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A, 2), nullptr);
+}
+
+TEST(Items, ItemParamByIndex_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A_m = ymCtx_Load(ctx, "p:A[p:Int, p:Float]::m");
+    auto Int = ymCtx_Load(ctx, "p:Int");
+    auto Float = ymCtx_Load(ctx, "p:Float");
+    ASSERT_TRUE(A_m);
+    ASSERT_TRUE(Int);
+    ASSERT_TRUE(Float);
+    ASSERT_EQ(ymItem_ItemParams(A_m), 2);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A_m, 0), Int);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A_m, 1), Float);
+    EXPECT_EQ(ymItem_ItemParamByIndex(A_m, 2), nullptr);
+}
+
+TEST(Items, ItemParamByName_OwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A = ymCtx_Load(ctx, "p:A[p:Int, p:Float]");
+    auto Int = ymCtx_Load(ctx, "p:Int");
+    auto Float = ymCtx_Load(ctx, "p:Float");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(Int);
+    ASSERT_TRUE(Float);
+    ASSERT_EQ(ymItem_ItemParams(A), 2);
+    EXPECT_EQ(ymItem_ItemParamByName(A, "T"), Int);
+    EXPECT_EQ(ymItem_ItemParamByName(A, "U"), Float);
+    EXPECT_EQ(ymItem_ItemParamByName(A, "V"), nullptr);
+}
+
+TEST(Items, ItemParamByName_NonOwnerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    setup_for_item_params_tests(dm, p_def);
+    auto A_m = ymCtx_Load(ctx, "p:A[p:Int, p:Float]::m");
+    auto Int = ymCtx_Load(ctx, "p:Int");
+    auto Float = ymCtx_Load(ctx, "p:Float");
+    ASSERT_TRUE(A_m);
+    ASSERT_TRUE(Int);
+    ASSERT_TRUE(Float);
+    ASSERT_EQ(ymItem_ItemParams(A_m), 2);
+    EXPECT_EQ(ymItem_ItemParamByName(A_m, "T"), Int);
+    EXPECT_EQ(ymItem_ItemParamByName(A_m, "U"), Float);
+    EXPECT_EQ(ymItem_ItemParamByName(A_m, "V"), nullptr);
+}
+
 static void setup_fn_item_with_three_params(YmDm* dm, YmParcelDef* p_def) {
     ymAssert(dm != nullptr);
     ymAssert(p_def != nullptr);

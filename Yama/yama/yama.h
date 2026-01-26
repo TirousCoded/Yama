@@ -92,6 +92,13 @@ extern "C" {
     *                 'kinds' (ie. RC, non-RC, subres) for the above to be added.
     */
 
+    /* TODO: Make it so that we call each file/directory name-like part of the path
+    *        a 'module' (or 'submodule'.)
+    * 
+    *        This naming convention is meant to abstract the import system away from
+    *        the filesystem.
+    */
+
     /* NOTE: When importing a Yama parcel, a 'path' is used to identify it in the
     *        'import environment' of the domain.
     * 
@@ -262,7 +269,7 @@ extern "C" {
     *        tables are in backend) and what their syntax is, and how they
     *        differ from regular fullname strings.
     * 
-    *        This includes explaining '%here%' when we bring it to the frontend.
+    *        This includes explaining '%here' when we bring it to the frontend.
     */
 
     /* TODO: Explain how the special 'Self' keyword works. Included in this,
@@ -300,7 +307,20 @@ extern "C" {
 #define YM_NO_MEMBER_INDEX (YmMemberIndex(-1))
 
 
-    /* Index of a callable item parameter. */
+    /* Index of an item parameter. */
+    typedef YmUInt8 YmItemParamIndex;
+
+    /* Number of item parameters. */
+    typedef YmItemParamIndex YmItemParams;
+
+    /* Sentinel index for no item parameter. */
+#define YM_NO_ITEM_PARAM_INDEX (YmItemParamIndex(-1))
+
+    /* Max number of item parameters an item may have. */
+#define YM_MAX_ITEM_PARAMS (YmItemParams(25))
+
+
+    /* Index of a callable item's parameter. */
     typedef YmUInt8 YmParamIndex;
 
     /* Number of parameters. */
@@ -309,7 +329,7 @@ extern "C" {
     /* Sentinel index for no parameter. */
 #define YM_NO_PARAM_INDEX (YmParamIndex(-1))
 
-    /* Max number of parameters of callable item may have. */
+    /* Max number of parameters a callable item may have. */
 #define YM_MAX_PARAMS (YmParams(24))
 
 
@@ -334,6 +354,8 @@ extern "C" {
     void ymDm_Destroy(struct YmDm* dm);
 
     /* TODO: ymDm_BindParcelDef overwriting existing bindings hasn't been unit tested.
+    */
+    /* TODO: Do we properly test if ymDm_BindParcelDef normalizes path?
     */
 
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
@@ -394,6 +416,10 @@ extern "C" {
 
     /* Parcel Def. API */
 
+    /* TODO: Disallow identifier names input into fns below from containing '%', '$', ' ', '\n', etc.
+    *        Also be sure to test for things like 'abc/%here' and 'abc::$m' illegality.
+    */
+
     /* Creates a new Yama parcel def., returning a pointer to it. */
     struct YmParcelDef* ymParcelDef_Create(void);
 
@@ -404,10 +430,6 @@ extern "C" {
 #if __cplusplus
     static_assert(YmKind_Num == 4);
 #endif
-
-    /* NOTE: Try to keep yama/special/loading.cpp 'Self' unit test updated w/ every new place we
-    *        add to the below ymParcelDef_*** API which the end-user can inject a reference symbol.
-    */
 
     /* Adds a new struct to parceldef, returning its index, or YM_NO_ITEM_INDEX on failure. */
     /* Fails if new item's fullname conflicts with an existing declaration. */
@@ -455,7 +477,7 @@ extern "C" {
     */
 
     /* Adds a new method to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
-    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Fails if new item has a name conflict with an existing item, item parameter, or 'Self'. */
     /* Fails if owner is not a valid item index. */
     /* Fails if owner is not allowed to have members. */
     /* Fails if owner is a protocol. */
@@ -479,7 +501,7 @@ extern "C" {
     */
 
     /* Adds a new method req. to parceldef, owned by owner, returning its index, or YM_NO_ITEM_INDEX on failure. */
-    /* Fails if new item's fullname conflicts with an existing declaration. */
+    /* Fails if new item has a name conflict with an existing item, item parameter, or 'Self'. */
     /* Fails if owner is not a valid item index. */
     /* Fails if owner is not a protocol. */
     /* Fails if returnType is illegal. */
@@ -493,12 +515,38 @@ extern "C" {
         const YmChar* name,
         YmRefSym returnType);
 
+    /* NOTE: Right now item params are treated as pseudo-items, w/ them having certain characteristics
+    *        of items (ie. they can have name conflicts w/ them,) while not having others (ie. they're
+    *        literally not items.)
+    * 
+    *        This may change in the future.
+    * 
+    *        The name 'Self' is reserved as another pseudo-item, for letting items refer to the owner
+    *        type of a owner/members group.
+    */
+
+    /* Adds a new item parameter to the specified item, returning its index, or YM_NO_ITEM_PARAM_INDEX on failure. */
+    /* item will not be able to load if constraintType doesn't specify a protocol. */
+    /* Fails if new item has a name conflict with an existing item, item parameter, or 'Self'. */
+    /* Fails if item is not the index of an item in parceldef. */
+    /* Fails if item is a member. */
+    /* Fails if constraintType is illegal. */
+    /* Fails if adding new item parameter would exceed YM_MAX_ITEM_PARAMS. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Behaviour is undefined if constraintType (as a pointer) is invalid. */
+    YmItemParamIndex ymParcelDef_AddItemParam(
+        struct YmParcelDef* parceldef,
+        YmItemIndex item,
+        const YmChar* name,
+        YmRefSym constraintType);
+
     /* Adds a new parameter to the specified item, returning its index, or YM_NO_PARAM_INDEX on failure. */
     /* Fails if item is not the index of an item in parceldef. */
     /* Fails if item is not callable. */
     /* Fails if name conflicts with an existing parameter. */
     /* Fails if paramType is illegal. */
-    /* Fails if adding new param would exceed YM_MAX_PARAMS. */
+    /* Fails if adding new parameter would exceed YM_MAX_PARAMS. */
     /* Behaviour is undefined if parceldef is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if paramType (as a pointer) is invalid. */
@@ -564,6 +612,19 @@ extern "C" {
     /* Behaviour is undefined if item is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     YmItem* ymItem_MemberByName(struct YmItem* item, const YmChar* name);
+
+    /* Returns the number of item parameters the item has, if any. */
+    /* Behaviour is undefined if item is invalid. */
+    YmItemParams ymItem_ItemParams(struct YmItem* item);
+
+    /* Returns the item parameter at itemParam in item, or YM_NIL on failure. */
+    /* Behaviour is undefined if item is invalid. */
+    YmItem* ymItem_ItemParamByIndex(struct YmItem* item, YmItemParamIndex itemParam);
+
+    /* Returns the item parameter under name in item, or YM_NIL on failure. */
+    /* Behaviour is undefined if item is invalid. */
+    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    YmItem* ymItem_ItemParamByName(struct YmItem* item, const YmChar* name);
 
     /* Returns the return type of the item, or YM_NIL on failure. */
     /* Behaviour is undefined if item is invalid. */

@@ -6,17 +6,19 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 14);
+    static_assert(YmErrCode_Num == 16);
     switch (code) {
-    case YmErrCode_IllegalPath:             return "IllegalPath";
-    case YmErrCode_IllegalFullname:         return "IllegalFullname";
-    case YmErrCode_IllegalRefSym:           return "IllegalRefSym";
+    case YmErrCode_IllegalSpecifier:        return "IllegalSpecifier";
+    case YmErrCode_IllegalConstraint:       return "IllegalConstraint";
+    case YmErrCode_ItemArgsError:           return "ItemArgsError";
     case YmErrCode_ParcelNotFound:          return "ParcelNotFound";
     case YmErrCode_ItemNotFound:            return "ItemNotFound";
     case YmErrCode_ParamNotFound:           return "ParamNotFound";
-    case YmErrCode_ItemNameConflict:        return "ItemNameConflict";
-    case YmErrCode_ParamNameConflict:       return "ParamNameConflict";
-    case YmErrCode_MaxParamsLimit:          return "MaxParamsLimit";
+    case YmErrCode_NameConflict:            return "NameConflict";
+    case YmErrCode_LimitReached:            return "LimitReached";
+    case YmErrCode_ConcreteItem:            return "ConcreteItem";
+    case YmErrCode_GenericItem:             return "GenericItem";
+    case YmErrCode_MemberItem:              return "MemberItem";
     case YmErrCode_NonCallableItem:         return "NonCallableItem";
     case YmErrCode_ItemCannotHaveMembers:   return "ItemCannotHaveMembers";
     case YmErrCode_ProtocolItem:            return "ProtocolItem";

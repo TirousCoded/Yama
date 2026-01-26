@@ -3,19 +3,20 @@
 #include "ParcelInfo.h"
 
 #include "general.h"
+#include "SpecSolver.h"
 #include "../yama++/general.h"
 
 
-bool _ym::checkRefSymbol(const std::string& symbol, std::string_view msg) {
-    if (_ym::Global::refSymIsLegal(symbol)) {
-        return true;
+std::optional<std::string> _ym::normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver) {
+    if (auto result = solver(symbol, SpecSolver::MustBe::Item)) {
+        return result;
     }
     _ym::Global::raiseErr(
-        YmErrCode_IllegalRefSym,
+        YmErrCode_IllegalSpecifier,
         "{}; reference symbol \"{}\" is illegal!",
         (std::string)msg,
         symbol);
-    return false;
+    return std::nullopt;
 }
 
 bool _ym::checkCallable(const ItemInfo& item, std::string_view msg) {
@@ -24,6 +25,19 @@ bool _ym::checkCallable(const ItemInfo& item, std::string_view msg) {
         Global::raiseErr(
             YmErrCode_NonCallableItem,
             "{}; item {} (index {}) is non-callable!",
+            (std::string)msg,
+            item.localName,
+            item.index);
+    }
+    return result;
+}
+
+bool _ym::checkNonMember(const ItemInfo& item, std::string_view msg) {
+    bool result = !ymKind_IsMember(item.kind);
+    if (!result) {
+        Global::raiseErr(
+            YmErrCode_MemberItem,
+            "{}; item {} (index {}) is a member type!",
             (std::string)msg,
             item.localName,
             item.index);
@@ -65,6 +79,20 @@ std::optional<std::string_view> _ym::ItemInfo::memberName() const noexcept {
         : std::nullopt;
 }
 
+const _ym::ItemParamInfo* _ym::ItemInfo::queryItemParam(YmItemParamIndex index) const noexcept {
+    return
+        size_t(index) < itemParams.size()
+        ? itemParams[size_t(index)].get()
+        : nullptr;
+}
+
+const _ym::ItemParamInfo* _ym::ItemInfo::queryItemParam(const std::string& name) const noexcept {
+    if (auto it = itemParamNameMap.find(name); it != itemParamNameMap.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 const _ym::ParamInfo* _ym::ItemInfo::queryParam(YmParamIndex index) const noexcept {
     return
         size_t(index) < params.size()
@@ -81,11 +109,67 @@ const _ym::ParamInfo* _ym::ItemInfo::queryParam(const std::string& localName) co
 }
 
 YmMembers _ym::ItemInfo::memberCount() const noexcept {
-    return (YmUInt16)membersByIndex.size();
+    return (YmMembers)membersByIndex.size();
+}
+
+YmItemParams _ym::ItemInfo::itemParamCount() const noexcept {
+    return (YmItemParams)itemParams.size();
+}
+
+bool _ym::ItemInfo::isParameterized() const noexcept {
+    return itemParamCount() >= 1;
+}
+
+std::optional<YmItemParamIndex> _ym::ItemInfo::addItemParam(std::string name, std::string constraintTypeSymbol) {
+    bool badItemParamRef = false;
+    SpecSolver solver{};
+    // TODO: Does this lambda fn object heap alloc w/ each addItemParam call?
+    solver.itemParamCallback = [this, &name, &badItemParamRef](taul::str id, bool rootOfEntireTree) {
+        const auto itemParamName = (std::string)id.substr(1);
+        if (rootOfEntireTree) {
+            Global::raiseErr(
+                YmErrCode_IllegalConstraint,
+                "Cannot add item parameter; cannot use item parameter {} as a constraint type!",
+                itemParamName);
+            badItemParamRef = true;
+        }
+        if (!queryItemParam(itemParamName) && itemParamName != name) {
+            Global::raiseErr(
+                YmErrCode_IllegalSpecifier,
+                "Cannot add item parameter; item parameter {} not found!",
+                itemParamName);
+            badItemParamRef = true;
+        }
+        };
+    auto normalizedConstraintTypeSym = normalizeRefSym(constraintTypeSymbol, "Cannot add item parameter", solver);
+    if (!normalizedConstraintTypeSym) {
+        return std::nullopt;
+    }
+    if (badItemParamRef) {
+        return std::nullopt;
+    }
+    if (!checkNonMember(*this, "Cannot add item parameter")) {
+        return std::nullopt;
+    }
+    if (itemParams.size() >= size_t(YM_MAX_ITEM_PARAMS)) {
+        Global::raiseErr(
+            YmErrCode_LimitReached,
+            "Cannot add item parameter; would exceed {} limit!",
+            YM_MAX_ITEM_PARAMS);
+        return std::nullopt;
+    }
+    itemParams.emplace_back(std::make_shared<ItemParamInfo>(ItemParamInfo{
+        .index = YmItemParamIndex(itemParams.size()),
+        .name = name,
+        .constraint = consts.pullRef(std::move(normalizedConstraintTypeSym.value())).value(),
+        }));
+    itemParamNameMap.try_emplace(std::move(name), ym::Safe(itemParams.back().get()));
+    return itemParams.back()->index;
 }
 
 std::optional<YmParamIndex> _ym::ItemInfo::addParam(std::string name, std::string paramTypeSymbol) {
-    if (!checkRefSymbol(paramTypeSymbol, "Cannot add parameter")) {
+    auto normalizedParamTypeSym = normalizeRefSym(paramTypeSymbol, "Cannot add parameter");
+    if (!normalizedParamTypeSym) {
         return std::nullopt;
     }
     if (!checkCallable(*this, "Cannot add parameter")) {
@@ -93,14 +177,14 @@ std::optional<YmParamIndex> _ym::ItemInfo::addParam(std::string name, std::strin
     }
     if (queryParam(name)) {
         Global::raiseErr(
-            YmErrCode_ParamNameConflict,
+            YmErrCode_NameConflict,
             "Cannot add parameter; name \"{}\" already taken!",
             name);
         return std::nullopt;
     }
     if (params.size() >= size_t(YM_MAX_PARAMS)) {
         Global::raiseErr(
-            YmErrCode_MaxParamsLimit,
+            YmErrCode_LimitReached,
             "Cannot add parameter; would exceed {} limit!",
             YM_MAX_PARAMS);
         return std::nullopt;
@@ -108,16 +192,17 @@ std::optional<YmParamIndex> _ym::ItemInfo::addParam(std::string name, std::strin
     params.push_back(ParamInfo{
         .index = YmParamIndex(params.size()),
         .name = std::move(name),
-        .type = consts.pullRef(std::move(paramTypeSymbol)).value(),
+        .type = consts.pullRef(std::move(normalizedParamTypeSym.value())).value(),
         });
     return params.back().index;
 }
 
 std::optional<YmRef> _ym::ItemInfo::addRef(std::string symbol) {
-    if (!checkRefSymbol(symbol, "Cannot add reference")) {
+    auto normalizedSymbol = normalizeRefSym(symbol, "Cannot add reference");
+    if (!normalizedSymbol) {
         return std::nullopt;
     }
-    if (auto result = consts.pullRef(std::move(symbol), size_t(YmRef(-1)))) {
+    if (auto result = consts.pullRef(std::move(normalizedSymbol.value()), size_t(YmRef(-1)))) {
         return (YmRef)result.value();
     }
     _ym::Global::raiseErr(
@@ -131,18 +216,21 @@ void _ym::ItemInfo::attemptSetupAsMember(ParcelInfo& parcel) {
         return;
     }
     if (auto owner = parcel.item((std::string)ownerName().value())) {
+        auto membName = (std::string)memberName().value();
         // Bind this->owner to a ref to our new owner.
-        this->owner = consts.pullRef(owner->fullnameForRef()).value();
+        // Using $Self here nicely accounts for things like generics.
+        this->owner = consts.pullRef("$Self").value();
         // Pull ref constant of *this for our owner to be setup w/.
-        auto ref = owner->consts.pullRef(fullnameForRef()).value();
+        // Using $Self::[MEMBER] here nicely accounts for things like generics.
+        auto ref = owner->consts.pullRef(std::format("$Self::{}", membName)).value();
         // Bind ref to by-index/name lookup in *owner.
         owner->membersByIndex.push_back(ref);
-        owner->membersByName.try_emplace((std::string)memberName().value(), std::move(ref)); // Move ref.
+        owner->membersByName.try_emplace(membName, std::move(ref)); // Move ref.
     }
 }
 
 std::string _ym::ItemInfo::fullnameForRef() const {
-    return std::format("{}:{}", (std::string)refSymHere, (std::string)localName);
+    return std::format("%here:{}", (std::string)localName);
 }
 
 bool _ym::ParcelInfo::verify() const {
@@ -195,7 +283,7 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
     std::optional<CallBhvrCallbackInfo> callBehaviour) {
     if (item(localName)) {
         Global::raiseErr(
-            YmErrCode_ItemNameConflict,
+            YmErrCode_NameConflict,
             "Cannot add item; name \"{}\" already taken!",
             localName);
         return std::nullopt;
@@ -208,10 +296,10 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
     if (returnTypeSymbol) {
         ymAssert(ymKind_IsCallable(newItem.kind));
         // TODO: This error msg is *clunky*, improve it.
-        if (!checkRefSymbol(*returnTypeSymbol, "Cannot add item; invalid return type symbol")) {
-            return std::nullopt;
+        if (auto normalizedReturnTypeSym = normalizeRefSym(*returnTypeSymbol, "Cannot add item; invalid return type symbol")) {
+            newItem.returnType = newItem.consts.pullRef(std::move(*normalizedReturnTypeSym));
         }
-        newItem.returnType = newItem.consts.pullRef(std::move(*returnTypeSymbol));
+        else return std::nullopt;
     }
     newItem.callBehaviour = callBehaviour;
     // NOTE: Make sure error checks stay ABOVE mutations of *this.
@@ -239,6 +327,9 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
         return std::nullopt;
     }
     auto& ownerItem = ym::deref(ownerItemPtr);
+    if (!_checkNoMemberLevelNameConflict(ownerItem, memberName, "Cannot add item")) {
+        return std::nullopt;
+    }
     if (!ymKind_HasMembers(ownerItem.kind)) {
         Global::raiseErr(
             YmErrCode_ItemCannotHaveMembers,
@@ -275,6 +366,16 @@ std::optional<YmItemIndex> _ym::ParcelInfo::addItem(
         callBehaviour);
 }
 
+std::optional<YmItemParamIndex> _ym::ParcelInfo::addItemParam(YmItemIndex item, std::string name, std::string constraintTypeSymbol) {
+    if (auto info = _expectItem(item, "Cannot add item parameter")) {
+        if (!_checkNoMemberLevelNameConflict(*info, name, "Cannot add item parameter")) {
+            return std::nullopt;
+        }
+        return info->addItemParam(std::move(name), std::move(constraintTypeSymbol));
+    }
+    else return std::nullopt;
+}
+
 std::optional<YmParamIndex> _ym::ParcelInfo::addParam(YmItemIndex item, std::string name, std::string paramTypeSymbol) {
     auto info = _expectItem(item, "Cannot add parameter");
     return
@@ -301,5 +402,32 @@ _ym::ItemInfo* _ym::ParcelInfo::_expectItem(YmItemIndex index, std::string_view 
         (std::string)msg,
         index);
     return nullptr;
+}
+
+bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(const ItemInfo& owner, const std::string& name, std::string_view msg) {
+    if (name == "Self") {
+        Global::raiseErr(
+            YmErrCode_NameConflict,
+            "{}; name \"Self\" is illegal!",
+            (std::string)msg);
+        return false;
+    }
+    else if (owner.queryItemParam(name)) {
+        Global::raiseErr(
+            YmErrCode_NameConflict,
+            "{}; name \"{}\" already taken!",
+            (std::string)msg,
+            name);
+        return false;
+    }
+    else if (owner.membersByName.contains(name)) {
+        Global::raiseErr(
+            YmErrCode_NameConflict,
+            "{}; name \"{}\" already taken!",
+            (std::string)msg,
+            name);
+        return false;
+    }
+    else return true;
 }
 

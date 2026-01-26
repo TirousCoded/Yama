@@ -39,32 +39,57 @@ namespace _ym {
 }
 
 
-struct YmItem final {
+struct YmItem final : public std::enable_shared_from_this<YmItem> {
 public:
     using Name = std::string;
 
 
     const ym::Safe<YmParcel> parcel;
-    const std::string fullname;
     const ym::Safe<const _ym::ItemInfo> info;
+    const std::vector<ym::Safe<YmItem>> itemArgs;
 
 
-    inline YmItem(ym::Safe<YmParcel> parcel, ym::Safe<const _ym::ItemInfo> info) :
+    inline YmItem(
+        ym::Safe<YmParcel> parcel,
+        ym::Safe<const _ym::ItemInfo> info,
+        std::vector<ym::Safe<YmItem>> itemArgs = {}) :
         parcel(parcel),
-        fullname(std::format("{}:{}", parcel->path, info->localName)),
-        info(info) {
+        info(info),
+        itemArgs(std::move(itemArgs)) {
+        ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
         _initConstsArrayToDummyIntConsts();
+        _initFullname();
+    }
+    inline YmItem(
+        ym::Safe<YmParcel> parcel,
+        ym::Safe<const _ym::ItemInfo> info,
+        YmItem& owner) :
+        parcel(parcel),
+        info(info),
+        itemArgs(std::move(itemArgs)) {
+        ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
+        _initConstsArrayToDummyIntConsts();
+        _initFullname(owner);
     }
 
 
     inline YmKind kind() const noexcept { return info->kind; }
-    std::string_view path() const noexcept;
-    std::string_view localName() const noexcept;
+    const std::string& path() const noexcept;
+    const std::string& fullname() const noexcept;
+    const std::string& localName() const noexcept;
 
-    YmItem* owner() const noexcept;
+    YmItem* owner() noexcept;
+    const YmItem* owner() const noexcept;
+    ym::Safe<YmItem> self() noexcept;
+    ym::Safe<const YmItem> self() const noexcept;
     YmMembers members() const noexcept;
     YmItem* member(YmMemberIndex member) const noexcept;
     YmItem* member(const std::string& name) const noexcept;
+    YmItemParams itemParams() const noexcept;
+    YmItem* itemParam(YmItemParamIndex index) const noexcept;
+    YmItem* itemParam(const std::string& name) const noexcept;
+    YmItem* itemParamConstraint(YmItemParamIndex index) const noexcept;
+    YmItem* itemParamConstraint(const std::string& name) const noexcept;
 
     YmItem* returnType() const noexcept;
     inline YmParams params() const noexcept { return YmParams(info->params.size()); }
@@ -74,11 +99,9 @@ public:
     YmItem* ref(YmRef reference) const noexcept;
     std::optional<YmRef> findRef(ym::Safe<YmItem> referenced) const noexcept;
 
-    // TODO: Improve conforms by giving it a way to cache in domain/context.
-
     bool conforms(ym::Safe<YmItem> protocol) const noexcept;
 
-    inline const Name& getName() const noexcept { return fullname; }
+    inline const Name& getName() const noexcept { return fullname(); }
 
     std::span<const _ym::Const> consts() const noexcept;
     template<_ym::ConstType I>
@@ -87,6 +110,9 @@ public:
         ymAssert(_ym::constTypeOf(consts()[index]) == I);
         return consts()[index].as<size_t(I)>();
     }
+    inline ym::Safe<YmItem> constAsRef(size_t index) const noexcept {
+        return constAs<_ym::ConstType::Ref>(index);
+    }
 
     void putValConst(size_t index);
     // Fails quietly if ref == nullptr.
@@ -94,12 +120,16 @@ public:
 
 
 private:
+    std::string _fullname;
+
     // TODO: Later revise to make our _consts inline w/ the memory block of YmItem itself via HAStruct.
 
     std::vector<_ym::Const> _consts;
 
 
     void _initConstsArrayToDummyIntConsts();
+    void _initFullname();
+    void _initFullname(YmItem& owner);
 
     template<typename T>
     inline void _putValConstAs(size_t index) {

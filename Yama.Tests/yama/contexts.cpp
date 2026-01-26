@@ -32,6 +32,18 @@ TEST(Contexts, Import) {
     ASSERT_EQ(a, b);
 }
 
+TEST(Contexts, Import_Normalizes) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymDm_BindParcelDef(dm, "p/q/r", p_def);
+    auto a = ymCtx_Import(ctx, "p/q/r");
+    auto b = ymCtx_Import(ctx, "p  /  q /      \r r");
+    auto c = ymCtx_Import(ctx, "    p/  q  \n\n\n /r   ");
+    ASSERT_TRUE(a);
+    EXPECT_EQ(a, b);
+    EXPECT_EQ(a, c);
+}
+
 TEST(Contexts, Import_AcrossCtxBoundaries) {
     SETUP_ERRCOUNTER;
     SETUP_DM;
@@ -56,6 +68,19 @@ TEST(Contexts, Load) {
     EXPECT_EQ(ymItem_Parcel(item), ymCtx_Import(ctx, "p"));
     EXPECT_STREQ(ymItem_Fullname(item), fullname.c_str());
     EXPECT_EQ(ymItem_Kind(item), YmKind_Struct);
+}
+
+TEST(Contexts, Load_Normalizes) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymDm_BindParcelDef(dm, "p/q/r", p_def);
+    auto a = ymCtx_Load(ctx, "p/q/r:A");
+    auto b = ymCtx_Load(ctx, "p  /  q /      \r r  :A");
+    auto c = ymCtx_Load(ctx, "    p/  q  \n\n\n /r  :   A ");
+    ASSERT_TRUE(a);
+    EXPECT_EQ(a, b);
+    EXPECT_EQ(a, c);
 }
 
 TEST(Contexts, Load_AcrossCtxBoundaries) {

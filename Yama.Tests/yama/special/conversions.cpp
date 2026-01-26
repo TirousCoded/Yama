@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 #include <taul/strings.h>
 #include <yama/yama.h>
+#include <yama++/general.h>
 
 #include "../../utils/utils.h"
 
@@ -12,7 +13,7 @@
 // NOTE: Yama defines explicit and implicit conversions, the ladder called 'coercions'.
 
 
-void conv(YmItem* from, YmItem* to, bool succeedIfExplicit, bool succeedIfImplicit, int line) {
+static void conv(YmItem* from, YmItem* to, bool succeedIfExplicit, bool succeedIfImplicit, int line) {
     EXPECT_EQ(ymItem_Converts(from, to, false) == YM_TRUE, succeedIfExplicit)
         << "line: " << line << ", " << ymItem_Fullname(from) << " -> " << ymItem_Fullname(to);
 
@@ -24,93 +25,124 @@ void conv(YmItem* from, YmItem* to, bool succeedIfExplicit, bool succeedIfImplic
 conv((from), (to), (succeedIfExplicit), (succeedIfImplicit), __LINE__)
 
 
-TEST(Conversions, Identity) {
+static ym::Safe<YmItem> load(YmCtx* ctx, const std::string& fullname) {
+    auto result = ymCtx_Load(ctx, fullname.c_str());
+    EXPECT_TRUE(result);
+    if (!result) throw std::runtime_error(""); // Abort test.
+    return ym::Safe(result);
+}
+static std::optional<std::vector<YmItem*>> mkItemsVec(YmCtx* ctx, std::vector<std::string> fullnames) {
+    std::vector<YmItem*> result{};
+    result.reserve(fullnames.size());
+    for (const auto& fullname : fullnames) {
+        result.push_back(ymCtx_Load(ctx, fullname.c_str()));
+        EXPECT_TRUE(result.back()) << "fullname==" << fullname;
+        if (!result.back()) {
+            return std::nullopt;
+        }
+    }
+    return ym::retopt(result);
+}
+
+
+TEST(Conversions, Identity_IncludeGenerics) {
     static_assert(YmKind_Num == 4);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto STRUCT_index = ymParcelDef_AddStruct(p_def, "STRUCT");
-    auto PROTOCOL_index = ymParcelDef_AddProtocol(p_def, "PROTOCOL");
-    auto FN_index = ymParcelDef_AddFn(p_def, "FN", "p:STRUCT", ymInertCallBhvrFn, nullptr);
-    auto METHOD_index = ymParcelDef_AddMethod(p_def, STRUCT_index, "METHOD", "p:STRUCT", ymInertCallBhvrFn, nullptr);
-    ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
-    auto PROTOCOL = ymCtx_Load(ctx, "p:PROTOCOL");
-    auto FN = ymCtx_Load(ctx, "p:FN");
-    auto METHOD = ymCtx_Load(ctx, "p:STRUCT::METHOD");
-    ASSERT_TRUE(STRUCT);
-    ASSERT_TRUE(PROTOCOL);
-    ASSERT_TRUE(FN);
-    ASSERT_TRUE(METHOD);
 
-    for (const auto& t : { STRUCT, PROTOCOL, FN, METHOD }) {
+    ymParcelDef_AddProtocol(p_def, "Any");
+
+    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    auto B_ind = ymParcelDef_AddStruct(p_def, "B");
+    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddItemParam(p_def, C_ind, "T", "p:Any");
+    
+    auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
+    auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
+    ymParcelDef_AddItemParam(p_def, Q_ind, "T", "p:Any");
+    
+    auto f_ind = ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
+    auto g_ind = ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddItemParam(p_def, g_ind, "T", "p:Any");
+    
+    auto A_m_ind = ymParcelDef_AddMethod(p_def, A_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
+    auto C_m_ind = ymParcelDef_AddMethod(p_def, C_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
+    
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto items = mkItemsVec(ctx, {
+        "p:A",
+        "p:B",
+        "p:C[p:A]",
+        "p:C[p:B]",
+        "p:P",
+        "p:Q[p:A]",
+        "p:Q[p:B]",
+        "p:f",
+        "p:g[p:A]",
+        "p:g[p:B]",
+        "p:A::m",
+        "p:C[p:A]::m",
+        "p:C[p:B]::m",
+        })
+        .value();
+
+    for (const auto& t : items) {
         CONV(t, t, true, true);
     }
 }
 
 // NOTE: We exclude protocols from below as their conversion rules are more nuanced.
 
-// NOTE: The two NonIdentity_***_ExcludingProtocols tests below cover the fact that for
-//		 conversions T -> U, where T and U differ, and are non-protocols, the default
-//		 is for the conversion to be illegal, w/ being legal being a special case.
+// NOTE: Test below cover the fact that for conversions T -> U, where T and U differ, and
+//       are non-protocols, the default is for the conversion to be illegal, w/ being legal
+//       being a special case.
 
-TEST(Conversions, NonIdentity_BetweenSameKinds_ExcludingProtocols) {
+// TODO: Maybe we exclude protocols, but what about their methods?
+
+TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
     static_assert(YmKind_Num == 4);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto STRUCT1_index = ymParcelDef_AddStruct(p_def, "STRUCT1");
-    auto STRUCT2_index = ymParcelDef_AddStruct(p_def, "STRUCT2");
-    auto FN1_index = ymParcelDef_AddFn(p_def, "FN1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
-    auto FN2_index = ymParcelDef_AddFn(p_def, "FN2", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
-    auto METHOD1_index = ymParcelDef_AddMethod(p_def, STRUCT1_index, "METHOD1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
-    auto METHOD2_index = ymParcelDef_AddMethod(p_def, STRUCT1_index, "METHOD2", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
+
+    ymParcelDef_AddProtocol(p_def, "Any");
+
+    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    auto B_ind = ymParcelDef_AddStruct(p_def, "B");
+    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddItemParam(p_def, C_ind, "T", "p:Any");
+
+    ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
+    auto h_ind = ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddItemParam(p_def, h_ind, "T", "p:Any");
+
+    ymParcelDef_AddMethod(p_def, A_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, A_ind, "m2", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, B_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, C_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT1 = ymCtx_Load(ctx, "p:STRUCT1");
-    auto STRUCT2 = ymCtx_Load(ctx, "p:STRUCT2");
-    auto FN1 = ymCtx_Load(ctx, "p:FN1");
-    auto FN2 = ymCtx_Load(ctx, "p:FN2");
-    auto METHOD1 = ymCtx_Load(ctx, "p:STRUCT1::METHOD1");
-    auto METHOD2 = ymCtx_Load(ctx, "p:STRUCT1::METHOD2");
-    ASSERT_TRUE(STRUCT1);
-    ASSERT_TRUE(STRUCT2);
-    ASSERT_TRUE(FN1);
-    ASSERT_TRUE(FN2);
-    ASSERT_TRUE(METHOD1);
-    ASSERT_TRUE(METHOD2);
 
-    std::vector<std::pair<YmItem*, YmItem*>> pairs{
-        { STRUCT1,	STRUCT2 },
-        { FN1,		FN2 },
-        { METHOD1,	METHOD2 },
-    };
+    auto items = mkItemsVec(ctx, {
+        "p:A",
+        "p:B",
+        "p:C[p:A]",
+        "p:C[p:B]",
+        "p:f",
+        "p:g",
+        "p:h[p:A]",
+        "p:h[p:B]",
+        "p:A::m1",
+        "p:A::m2",
+        "p:B::m1",
+        "p:C[p:A]::m1",
+        "p:C[p:B]::m1",
+        })
+        .value();
 
-    for (const auto& [from, to] : pairs) {
-        CONV(from, to, false, false);
-    }
-}
-
-TEST(Conversions, NonIdentity_BetweenDiffKinds_ExcludingProtocols) {
-    static_assert(YmKind_Num == 4);
-    SETUP_ALL(ctx);
-    SETUP_PARCELDEF(p_def);
-    auto STRUCT_index = ymParcelDef_AddStruct(p_def, "STRUCT");
-    auto FN_index = ymParcelDef_AddFn(p_def, "FN", "p:STRUCT", ymInertCallBhvrFn, nullptr);
-    auto METHOD_index = ymParcelDef_AddMethod(p_def, STRUCT_index, "METHOD", "p:STRUCT", ymInertCallBhvrFn, nullptr);
-    ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
-    auto FN = ymCtx_Load(ctx, "p:FN");
-    auto METHOD = ymCtx_Load(ctx, "p:STRUCT::METHOD");
-    ASSERT_TRUE(STRUCT);
-    ASSERT_TRUE(FN);
-    ASSERT_TRUE(METHOD);
-
-    std::vector<YmItem*> types{
-        STRUCT,
-        FN,
-        METHOD,
-    };
-
-    for (const auto& from : types) {
-        for (const auto& to : types) {
+    for (const auto& from : items) {
+        for (const auto& to : items) {
             if (&from == &to) continue; // Skip identity convs.
             CONV(from, to, false, false);
         }
@@ -123,62 +155,90 @@ TEST(Conversions, NonProtocolToProtocol) {
     static_assert(YmKind_Num == 4);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto T_index = ymParcelDef_AddStruct(p_def, "T");
-    ymParcelDef_AddMethod(p_def, T_index, "mA", "p:T", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, T_index, "mB", "p:T", ymInertCallBhvrFn, nullptr);
-    auto P1_index = ymParcelDef_AddProtocol(p_def, "P1");
-    ymParcelDef_AddMethodReq(p_def, P1_index, "mA", "p:T");
-    auto P2_index = ymParcelDef_AddProtocol(p_def, "P2");
-    ymParcelDef_AddMethodReq(p_def, P2_index, "mB", "p:T");
-    auto P3_index = ymParcelDef_AddProtocol(p_def, "P3");
-    ymParcelDef_AddMethodReq(p_def, P3_index, "mC", "p:T");
-    ymDm_BindParcelDef(dm, "p", p_def);
-    auto T = ymCtx_Load(ctx, "p:T");
-    auto P1 = ymCtx_Load(ctx, "p:P1");
-    auto P2 = ymCtx_Load(ctx, "p:P2");
-    auto P3 = ymCtx_Load(ctx, "p:P3");
-    ASSERT_TRUE(T);
-    ASSERT_TRUE(P1);
-    ASSERT_TRUE(P2);
-    ASSERT_TRUE(P3);
+    
+    ymParcelDef_AddProtocol(p_def, "Any");
 
-    CONV(T, P1, true, true);
-    CONV(T, P2, true, true);
-    CONV(T, P3, false, false); // T is not P3.
+    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, A_ind, "mA", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, A_ind, "mB", "p:A", ymInertCallBhvrFn, nullptr);
+
+    ymParcelDef_AddStruct(p_def, "B");
+    
+    auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
+    ymParcelDef_AddMethodReq(p_def, P1_ind, "mA", "p:A");
+    
+    auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
+    ymParcelDef_AddMethodReq(p_def, P2_ind, "mB", "p:A");
+
+    auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
+    ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
+
+    auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
+    ymParcelDef_AddItemParam(p_def, P4_ind, "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
+    
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto A = load(ctx, "p:A");
+    auto P1 = load(ctx, "p:P1");
+    auto P2 = load(ctx, "p:P2");
+    auto P3 = load(ctx, "p:P3");
+    auto P4_A = load(ctx, "p:P4[p:A]");
+    auto P4_B = load(ctx, "p:P4[p:B]");
+
+    CONV(A, P1, true, true);
+    CONV(A, P2, true, true);
+    CONV(A, P3, false, false); // A is not P3.
+    CONV(A, P4_A, true, true);
+    CONV(A, P4_B, false, false); // A is not P4[B].
 }
 
-// Given P -> T, where P is a protocol, and T is not, and T conforms to P, the
+// Given P -> A, where P is a protocol, and A is not, and A conforms to P, the
 // conversion is statically allowed, and checked for full legality at runtime.
 
-// Given P -> T, where P is a protocol, and T is not, and T does NOT conform
-// to P, the conversion is illegal (as no value of P could be a legal T.)
+// Given P -> A, where P is a protocol, and A is not, and A does NOT conform
+// to P, the conversion is illegal (as no value of P could be a legal A.)
 
 TEST(Conversions, ProtocolToNonProtocol) {
     static_assert(YmKind_Num == 4);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto T_index = ymParcelDef_AddStruct(p_def, "T");
-    ymParcelDef_AddMethod(p_def, T_index, "mA", "p:T", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, T_index, "mB", "p:T", ymInertCallBhvrFn, nullptr);
-    auto P1_index = ymParcelDef_AddProtocol(p_def, "P1");
-    ymParcelDef_AddMethodReq(p_def, P1_index, "mA", "p:T");
-    auto P2_index = ymParcelDef_AddProtocol(p_def, "P2");
-    ymParcelDef_AddMethodReq(p_def, P2_index, "mB", "p:T");
-    auto P3_index = ymParcelDef_AddProtocol(p_def, "P3");
-    ymParcelDef_AddMethodReq(p_def, P3_index, "mC", "p:T");
-    ymDm_BindParcelDef(dm, "p", p_def);
-    auto T = ymCtx_Load(ctx, "p:T");
-    auto P1 = ymCtx_Load(ctx, "p:P1");
-    auto P2 = ymCtx_Load(ctx, "p:P2");
-    auto P3 = ymCtx_Load(ctx, "p:P3");
-    ASSERT_TRUE(T);
-    ASSERT_TRUE(P1);
-    ASSERT_TRUE(P2);
-    ASSERT_TRUE(P3);
 
-    CONV(P1, T, true, false);
-    CONV(P2, T, true, false);
-    CONV(P3, T, false, false); // T is not P3
+    ymParcelDef_AddProtocol(p_def, "Any");
+
+    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, A_ind, "mA", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, A_ind, "mB", "p:A", ymInertCallBhvrFn, nullptr);
+
+    ymParcelDef_AddStruct(p_def, "B");
+
+    auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
+    ymParcelDef_AddMethodReq(p_def, P1_ind, "mA", "p:A");
+    
+    auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
+    ymParcelDef_AddMethodReq(p_def, P2_ind, "mB", "p:A");
+    
+    auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
+    ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
+
+    auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
+    ymParcelDef_AddItemParam(p_def, P4_ind, "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
+    
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto A = load(ctx, "p:A");
+    auto P1 = load(ctx, "p:P1");
+    auto P2 = load(ctx, "p:P2");
+    auto P3 = load(ctx, "p:P3");
+    auto P4_A = load(ctx, "p:P4[p:A]");
+    auto P4_B = load(ctx, "p:P4[p:B]");
+
+    CONV(P1, A, true, false);
+    CONV(P2, A, true, false);
+    CONV(P3, A, false, false); // A is not P3
+    CONV(P4_A, A, true, false);
+    CONV(P4_B, A, false, false); // A is not P4[B]
 }
 
 // TODO: If we ever have situations be possible where protocols P and Q can be found
@@ -193,18 +253,38 @@ TEST(Conversions, ProtocolToProtocol) {
     static_assert(YmKind_Num == 4);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    ymParcelDef_AddStruct(p_def, "T");
-    auto P_index = ymParcelDef_AddProtocol(p_def, "P");
-    ymParcelDef_AddMethodReq(p_def, P_index, "mA", "p:T");
-    auto Q_index = ymParcelDef_AddProtocol(p_def, "Q");
-    ymParcelDef_AddMethodReq(p_def, Q_index, "mB", "p:T");
-    ymDm_BindParcelDef(dm, "p", p_def);
-    auto P = ymCtx_Load(ctx, "p:P");
-    auto Q = ymCtx_Load(ctx, "p:Q");
-    ASSERT_TRUE(P);
-    ASSERT_TRUE(Q);
 
-    CONV(P, Q, true, true);
-    CONV(Q, P, true, true); // Should also be true.
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+
+    auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
+    ymParcelDef_AddMethodReq(p_def, P_ind, "mA", "p:A");
+    
+    auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
+    ymParcelDef_AddMethodReq(p_def, Q_ind, "mB", "p:A");
+    
+    auto R_ind = ymParcelDef_AddProtocol(p_def, "R");
+    ymParcelDef_AddItemParam(p_def, R_ind, "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, R_ind, "mA", "$T");
+    
+    ymDm_BindParcelDef(dm, "p", p_def);
+    
+    auto items = mkItemsVec(ctx, {
+        "p:P",
+        "p:Q",
+        "p:R[p:A]",
+        "p:R[p:B]",
+        })
+        .value();
+
+    // NOTE: For P -> Q, then Q -> P should also be true.
+
+    for (const auto& from : items) {
+        for (const auto& to : items) {
+            if (&from == &to) continue; // Skip identity convs.
+            CONV(from, to, true, true);
+        }
+    }
 }
 

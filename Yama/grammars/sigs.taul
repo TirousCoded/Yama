@@ -1,0 +1,66 @@
+
+
+lexer section:
+
+
+    # NOTE: IDENTIFIER(s) can be prefixed w/ '%' or '$' for special keywords.
+
+    # NOTE: '\x80-\ud7ff\ue000-\U0010ffff' below means we allow ANY non-ASCII Unicode codepoint,
+    #       excluding the surrogate pair range U+d800-U+dfff.
+    # NOTE: Including LITERALLY ALL legal Unicode codepoint may not be 100% correct to do.
+
+    IDENTIFIER                      : [%$]? [a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff] [0-9a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff]* ;
+
+    L_SQUARE                        : '[' ;
+    R_SQUARE                        : ']' ;
+
+    COMMA                           : ',' ;
+    DBL_COLON                       : '::' ;
+    COLON                           : ':' ;
+    SLASH                           : '/' ;
+    #DOLLAR                          : '$' ;
+    #PERCENT                         : '%' ;
+
+    # NOTE: Here 'whitespace' refers also to newlines.
+
+    skip WHITESPACE                 : [ \t\r\n]+ ;
+
+
+parser section:
+
+
+    # TODO: We can later add '?' suffix to below to summarize yama:Option[T] as T?.
+
+    # Examples:
+    #   p
+    #   p/a
+    #   p/a:A
+    #   p/a:A[p/a:A, p/a:B]
+    #   p/a:A::m
+    #   p/a:A[p/a:A, p/a:B]::m
+
+    # The root Id of an expr tree always specifies a file/directory identifier.
+
+    # Exception to this is the 'Self' keyword in context of reference symbols.
+
+    # Composite Exprs:
+    #   x/y         - Access file/directory y in directory x.
+    #   x:y         - Access item y in parcel x.
+    #   x::y        - Access member item y in owner item x.
+    #   x[args]     - Instantiate constructed item of x parameterized by args.
+
+
+    TopLevel                        : Expr end ;
+
+    precedence Expr                 : Expr SLASH Id
+                                    | Expr COLON Id
+                                    | Expr DBL_COLON Id
+                                    | Expr Args
+                                    | Id
+                                    ;
+
+    Args                            : L_SQUARE ( Arg ( COMMA Arg )* )? R_SQUARE ;
+    Arg                             : Expr ;
+
+    Id                              : IDENTIFIER ;
+

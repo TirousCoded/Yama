@@ -12,15 +12,17 @@ extern "C" {
 
 
     typedef enum : YmUInt16 {
-        YmErrCode_IllegalPath = 0,          /* Illegal import path. */
-        YmErrCode_IllegalFullname,          /* Illegal fullname. */
-        YmErrCode_IllegalRefSym,            /* Illegal reference symbol. */
+        YmErrCode_IllegalSpecifier = 0,     /* Illegal specifier (in some import/load context.) */
+        YmErrCode_IllegalConstraint,        /* Illegal type parameter constraint. */
+        YmErrCode_ItemArgsError,            /* Item arguments error. */
         YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
         YmErrCode_ItemNotFound,             /* Couldn't find a specific item. */
         YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
-        YmErrCode_ItemNameConflict,         /* Parcel def. already contains item under name. */
-        YmErrCode_ParamNameConflict,        /* Item already contains parameter under name. */
-        YmErrCode_MaxParamsLimit,           /* Param count would exceed YM_MAX_PARAMS. */
+        YmErrCode_NameConflict,             /* Name conflict detected. */
+        YmErrCode_LimitReached,             /* Known limit reached. */
+        YmErrCode_ConcreteItem,             /* Item is concrete (ie. not generic.) */
+        YmErrCode_GenericItem,              /* Item is generic (ie. not concrete.) */
+        YmErrCode_MemberItem,               /* Item is a member. */
         YmErrCode_NonCallableItem,          /* Item is non-callable. */
         YmErrCode_ItemCannotHaveMembers,    /* Item cannot have members. */
         YmErrCode_ProtocolItem,             /* Item is a protocol. */

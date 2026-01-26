@@ -5,6 +5,7 @@
 #include "general.h"
 #include "YmParcel.h"
 #include "YmItem.h"
+#include "SpecSolver.h"
 
 
 YmCtx::YmCtx(ym::Safe<YmDm> domain) :
@@ -12,21 +13,39 @@ YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     loader(std::make_shared<_ym::CtxLoader>(domain->loader)) {}
 
 std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
-    return loader->import(path);
+    if (auto normalizedPath = _ym::SpecSolver()(path, _ym::SpecSolver::MustBe::Path)) {
+        return loader->import(*normalizedPath);
+    }
+    else {
+        _ym::Global::raiseErr(
+            YmErrCode_IllegalSpecifier,
+            "Import failed; \"{}\" syntax error!",
+            path);
+        return nullptr;
+    }
 }
 
 std::shared_ptr<YmItem> YmCtx::load(const std::string& fullname) {
-    return loader->load(fullname);
+    if (auto normalizedFullname = _ym::SpecSolver()(fullname, _ym::SpecSolver::MustBe::Item)) {
+        return loader->load(*normalizedFullname);
+    }
+    else {
+        _ym::Global::raiseErr(
+            YmErrCode_IllegalSpecifier,
+            "Load failed; \"{}\" syntax error!",
+            fullname);
+        return nullptr;
+    }
 }
 
 void YmCtx::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
-    _pIt = ctx->loader->parcels().begin();
-    _pEnd = ctx->loader->parcels().end();
+    _pIt = ctx->loader->commits().parcels.begin();
+    _pEnd = ctx->loader->commits().parcels.end();
 }
 
 void YmCtx::pIterStartFrom(ym::Safe<YmCtx> ctx, ym::Safe<YmParcel> parcel) noexcept {
-    _pIt = ctx->loader->parcels().find(parcel->getName());
-    _pEnd = ctx->loader->parcels().end();
+    _pIt = ctx->loader->commits().parcels.find(parcel->getName());
+    _pEnd = ctx->loader->commits().parcels.end();
 }
 
 void YmCtx::pIterAdvance(size_t n) noexcept {
@@ -47,6 +66,6 @@ bool YmCtx::pIterDone() noexcept {
     return _pIt == _pEnd;
 }
 
-thread_local _ym::Area<YmParcel>::Iterator YmCtx::_pIt = {};
-thread_local _ym::Area<YmParcel>::Iterator YmCtx::_pEnd = {};
+thread_local _ym::Section<YmParcel>::Iterator YmCtx::_pIt = {};
+thread_local _ym::Section<YmParcel>::Iterator YmCtx::_pEnd = {};
 

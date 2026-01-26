@@ -47,6 +47,10 @@ public:
         const std::string& name,
         std::string returnTypeSymbol);
 
+    std::optional<YmItemParamIndex> addItemParam(
+        YmItemIndex item,
+        std::string name,
+        std::string constraintTypeSymbol);
     std::optional<YmParamIndex> addParam(
         YmItemIndex item,
         std::string name,

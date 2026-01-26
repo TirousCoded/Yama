@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include <vector>
+
 #include "Handle.h"
 
 
@@ -36,13 +38,30 @@ namespace ym {
             }
             return std::nullopt;
         }
+        inline std::optional<YmItemIndex> addProtocol(
+            std::convertible_to<std::string_view> auto const& name) noexcept {
+            if (auto result = ymParcelDef_AddProtocol(
+                *this,
+                std::string_view(name).data())) {
+                return result;
+            }
+            return std::nullopt;
+        }
         inline std::optional<YmItemIndex> addFn(
             std::convertible_to<std::string_view> auto const& name,
-            std::convertible_to<std::string_view> auto const& returnTypeSymbol) noexcept {
+            std::convertible_to<std::string_view> auto const& returnTypeSymbol,
+            const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
+            YmCallBhvrCallbackFn callBehaviour,
+            void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddFn(
                 *this,
                 std::string_view(name).data(),
-                std::string_view(returnTypeSymbol).data())) {
+                std::string_view(returnTypeSymbol).data(),
+                callBehaviour,
+                callBehaviourData)) {
+                for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
+                    addParam(result, name, typeSymbol);
+                }
                 return result;
             }
             return std::nullopt;
@@ -50,12 +69,20 @@ namespace ym {
         inline std::optional<YmItemIndex> addMethod(
             YmItemIndex owner,
             std::convertible_to<std::string_view> auto const& name,
-            std::convertible_to<std::string_view> auto const& returnTypeSymbol) noexcept {
+            std::convertible_to<std::string_view> auto const& returnTypeSymbol,
+            const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
+            YmCallBhvrCallbackFn callBehaviour,
+            void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddMethod(
                 *this,
                 owner,
                 std::string_view(name).data(),
-                std::string_view(returnTypeSymbol).data())) {
+                std::string_view(returnTypeSymbol).data(),
+                callBehaviour,
+                callBehaviourData)) {
+                for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
+                    addParam(result, name, typeSymbol);
+                }
                 return result;
             }
             return std::nullopt;
@@ -85,11 +112,5 @@ namespace ym {
             return std::nullopt;
         }
     };
-
-    void foo() {
-        ParcelDef aa{};
-        auto panic_index = aa.addFn("panic", "yama:Never").value();
-        aa.addParam(panic_index, "msg", "yama:Str");
-    }
 }
 

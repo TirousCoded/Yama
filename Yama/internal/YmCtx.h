@@ -40,6 +40,6 @@ private:
     //
 
 
-    static thread_local _ym::Area<YmParcel>::Iterator _pIt, _pEnd;
+    static thread_local _ym::Section<YmParcel>::Iterator _pIt, _pEnd;
 };
 

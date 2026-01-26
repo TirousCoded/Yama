@@ -119,14 +119,14 @@ YmItemIndex ymParcelDef_AddStruct(
     YmParcelDef* parceldef,
     const YmChar* name) {
     return Safe(parceldef)->addStruct(
-        std::string(Safe(name))
-    ).value_or(YM_NO_ITEM_INDEX);
+        std::string(Safe(name)))
+        .value_or(YM_NO_ITEM_INDEX);
 }
 
 YmItemIndex ymParcelDef_AddProtocol(YmParcelDef* parceldef, const YmChar* name) {
     return Safe(parceldef)->addProtocol(
-        std::string(Safe(name))
-    ).value_or(YM_NO_ITEM_INDEX);
+        std::string(Safe(name)))
+        .value_or(YM_NO_ITEM_INDEX);
 }
 
 YmItemIndex ymParcelDef_AddFn(
@@ -138,8 +138,8 @@ YmItemIndex ymParcelDef_AddFn(
     return Safe(parceldef)->addFn(
         std::string(Safe(name)),
         std::string(Safe(returnType)),
-        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData)
-    ).value_or(YM_NO_ITEM_INDEX);
+        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData))
+        .value_or(YM_NO_ITEM_INDEX);
 }
 
 YmItemIndex ymParcelDef_AddMethod(
@@ -153,16 +153,24 @@ YmItemIndex ymParcelDef_AddMethod(
         owner,
         std::string(Safe(name)),
         std::string(Safe(returnType)),
-        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData)
-    ).value_or(YM_NO_ITEM_INDEX);
+        _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData))
+        .value_or(YM_NO_ITEM_INDEX);
 }
 
 YmItemIndex ymParcelDef_AddMethodReq(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
     return Safe(parceldef)->addMethodReq(
         owner,
         std::string(Safe(name)),
-        std::string(Safe(returnType))
-    ).value_or(YM_NO_ITEM_INDEX);
+        std::string(Safe(returnType)))
+        .value_or(YM_NO_ITEM_INDEX);
+}
+
+YmItemParamIndex ymParcelDef_AddItemParam(YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym constraintType) {
+    return Safe(parceldef)->addItemParam(
+        item,
+        std::string(Safe(name)),
+        std::string(Safe(constraintType)))
+        .value_or(YM_NO_ITEM_PARAM_INDEX);
 }
 
 YmParamIndex ymParcelDef_AddParam(
@@ -173,8 +181,8 @@ YmParamIndex ymParcelDef_AddParam(
     return Safe(parceldef)->addParam(
         item,
         std::string(Safe(name)),
-        std::string(Safe(paramType))
-    ).value_or(YM_NO_PARAM_INDEX);
+        std::string(Safe(paramType)))
+        .value_or(YM_NO_PARAM_INDEX);
 }
 
 YmRef ymParcelDef_AddRef(
@@ -183,8 +191,8 @@ YmRef ymParcelDef_AddRef(
     YmRefSym symbol) {
     return Safe(parceldef)->addRef(
         item,
-        std::string(Safe(symbol))
-    ).value_or(YM_NO_REF);
+        std::string(Safe(symbol)))
+        .value_or(YM_NO_REF);
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
@@ -196,7 +204,7 @@ YmParcel* ymItem_Parcel(YmItem* item) {
 }
 
 const YmChar* ymItem_Fullname(YmItem* item) {
-    return Safe(item)->fullname.c_str();
+    return Safe(item)->fullname().c_str();
 }
 
 YmKind ymItem_Kind(YmItem* item) {
@@ -217,6 +225,18 @@ YmItem* ymItem_MemberByIndex(YmItem* item, YmMemberIndex member) {
 
 YmItem* ymItem_MemberByName(YmItem* item, const YmChar* name) {
     return Safe(item)->member(std::string(Safe(name)));
+}
+
+YmItemParams ymItem_ItemParams(YmItem* item) {
+    return Safe(item)->itemParams();
+}
+
+YmItem* ymItem_ItemParamByIndex(YmItem* item, YmItemParamIndex itemParam) {
+    return Safe(item)->itemParam(itemParam);
+}
+
+YmItem* ymItem_ItemParamByName(YmItem* item, const YmChar* name) {
+    return Safe(item)->itemParam(std::string(Safe(name)));
 }
 
 YmItem* ymItem_ReturnType(YmItem* item) {
@@ -252,16 +272,10 @@ YmBool ymItem_Converts(YmItem* from, YmItem* to, YmBool coercion) {
     auto toK = _to->kind();
     bool fromIsP = fromK == YmKind_Protocol;
     bool toIsP = toK == YmKind_Protocol;
-    if (fromIsP && toIsP) {
-        return YM_TRUE;
-    }
-    if (!fromIsP && toIsP && _from->conforms(_to)) {
-        return YM_TRUE;
-    }
-    if (fromIsP && !toIsP && _to->conforms(_from)) {
-        return (YmBool)!coercion;
-    }
-    return YM_FALSE;
+    if (fromIsP && toIsP)                               return YM_TRUE;
+    else if (!fromIsP && toIsP && _from->conforms(_to)) return YM_TRUE;
+    else if (fromIsP && !toIsP && _to->conforms(_from)) return (YmBool)!coercion;
+    else                                                return YM_FALSE;
 }
 
 void ymParcelIter_Start(YmCtx* ctx) {

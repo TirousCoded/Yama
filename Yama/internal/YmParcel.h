@@ -13,7 +13,7 @@
 #include "ParcelInfo.h"
 
 
-struct YmParcel final {
+struct YmParcel final : public std::enable_shared_from_this<YmParcel> {
 public:
     using Name = std::string;
 

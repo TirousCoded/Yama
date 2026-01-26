@@ -58,6 +58,16 @@ std::optional<YmItemIndex> YmParcelDef::addMethodReq(
         _ym::CallBhvrCallbackInfo::mk(_ym::methodReqCallBhvr, (void*)std::uintptr_t(-1)));
 }
 
+std::optional<YmItemParamIndex> YmParcelDef::addItemParam(
+    YmItemIndex item,
+    std::string name,
+    std::string constraintTypeSymbol) {
+    return info->addItemParam(
+        item,
+        std::move(name),
+        std::move(constraintTypeSymbol));
+}
+
 std::optional<YmParamIndex> YmParcelDef::addParam(
     YmItemIndex item,
     std::string name,

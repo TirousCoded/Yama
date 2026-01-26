@@ -29,9 +29,6 @@ namespace _ym {
     constexpr size_t enumSize = size_t(T::Num);
 
 
-    constexpr std::string_view refSymHere = "%here%";
-
-
     struct CallBhvrCallbackInfo final {
         YmCallBhvrCallbackFn fn = ymInertCallBhvrFn;
         void* user = nullptr;

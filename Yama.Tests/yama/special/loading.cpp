@@ -3,36 +3,105 @@
 #include "loading-helpers.h"
 
 
+// TODO: Below, our little semi-formal language of 'Generics:' and 'Dep Graph:' is alright,
+//       but as generics were added it has become increasingly *loose* in terms of how comprehensive
+//       it is.
+//
+//       At some point we'd be best to figure out what our priorities regarding it are, and try
+//       to revise it to be more uniform and consistent in terms of comprehensiveness.
+
+
 TEST(Loading, WorksWithAllItemKinds) {
     static_assert(YmKind_Num == 4);
     // Dep Graph:
     //      p:A                     (Struct)
     //      p:B                     (Protocol)
-    //      p:C -> p:A              (Function) (Need back ref to set return type.)
-    //      p:A::m -> p:A           (Method) (Need back ref to set return type.)
-
+    //      p:C     -> p:Int        (Function)
+    //      p:A::m  -> p:A          (Method)
+    //              -> p:Int
+    //      p:B::m  -> p:B          (Method Req.)
+    //              -> p:Int
+    //
+    //      p:Int
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    YmItemIndex p_A_index = setup_struct(p_def, "A", {});
-    YmItemIndex p_B_index = setup_protocol(p_def, "B", {});
-    YmItemIndex p_C_index = setup_fn(p_def, "C", "p:A", {});
-    YmItemIndex p_A_m_index = setup_method(p_def, p_A_index, "m", "p:A", {});
+    YmItemIndex Int_index = setup_struct(p_def, "Int", {});
+
+    YmItemIndex A_index = setup_struct(p_def, "A", {});
+    YmItemIndex B_index = setup_protocol(p_def, "B", {});
+    YmItemIndex C_index = setup_fn(p_def, "C", "p:Int", {});
+    YmItemIndex A_m_index = setup_method(p_def, A_index, "m", "p:Int", {});
+    YmItemIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    YmItem* B = ymCtx_Load(ctx, "p:B");
+    YmItem* C = ymCtx_Load(ctx, "p:C");
+    YmItem* A_m = ymCtx_Load(ctx, "p:A::m");
+    YmItem* B_m = ymCtx_Load(ctx, "p:B::m");
+    YmItem* Int = ymCtx_Load(ctx, "p:Int");
 
-    YmItem* p_A = ymCtx_Load(ctx, "p:A");
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-    YmItem* p_C = ymCtx_Load(ctx, "p:C");
-    YmItem* p_A_m = ymCtx_Load(ctx, "p:A::m");
-
-    test_struct(p_A, "p:A", {});
-    test_protocol(p_B, "p:B", {});
-    test_fn(p_C, "p:C", { p_A });
-    test_method(p_A_m, "p:A::m", { p_A });
+    test_struct(A, "p:A", { A_m });
+    test_protocol(B, "p:B", { B_m });
+    test_fn(C, "p:C", { Int });
+    test_method(A_m, "p:A::m", { A, Int });
+    test_method(B_m, "p:B::m", { B, Int });
 }
 
-TEST(Loading, NoRefConsts) {
+TEST(Loading, WorksWithAllItemKinds_Generics) {
+    static_assert(YmKind_Num == 4);
+    // Generics:
+    //      A[X: Any]
+    //      B[X: Any]
+    //      C[X: Any]() -> X
+    //      A[X: Any]::m() -> X
+    //      B[X: Any]::m() -> X
+    // 
+    // Dep Graph:
+    //      p:A[X]          -> X            (Struct)
+    //      p:B[X]          -> X            (Protocol)
+    //      p:C[X]          -> X            (Function)
+    //      p:A[X]::m       -> p:A[X]       (Method)
+    //                      -> X
+    //      p:B[X]::m       -> p:B[X]       (Method Req.)
+    //                      -> X
+    //
+    //      p:A[p:Int]      -> p:Int
+    //      p:B[p:Int]      -> p:Int
+    //      p:C[p:Int]      -> p:Int
+    //      p:A[p:Int]::m   -> p:A[p:Int]
+    //                      -> p:Int
+    //      p:B[p:Int]::m   -> p:B[p:Int]
+    //                      -> p:Int
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    YmItemIndex Any_index = setup_protocol(p_def, "Any", {});
+    YmItemIndex Int_index = setup_struct(p_def, "Int", {});
+
+    YmItemIndex A_index = setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+    YmItemIndex B_index = setup_protocol(p_def, "B", {}, { { "X", "p:Any" } });
+    YmItemIndex C_index = setup_fn(p_def, "C", "p:Int", {}, { { "X", "p:Any" } });
+    YmItemIndex A_m_index = setup_method(p_def, A_index, "m", "p:Int", {});
+    YmItemIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    YmItem* A_Int = ymCtx_Load(ctx, "p:A[p:Int]");
+    YmItem* B_Int = ymCtx_Load(ctx, "p:B[p:Int]");
+    YmItem* C_Int = ymCtx_Load(ctx, "p:C[p:Int]");
+    YmItem* A_Int_m = ymCtx_Load(ctx, "p:A[p:Int]::m");
+    YmItem* B_Int_m = ymCtx_Load(ctx, "p:B[p:Int]::m");
+    YmItem* Int = ymCtx_Load(ctx, "p:Int");
+
+    test_struct(A_Int, "p:A[p:Int]", {}, { Int });
+    test_protocol(B_Int, "p:B[p:Int]", {}, { Int });
+    test_fn(C_Int, "p:C[p:Int]", {}, { Int });
+    test_method(A_Int_m, "p:A[p:Int]::m", { A_Int }, { Int });
+    test_method(B_Int_m, "p:B[p:Int]::m", { B_Int }, { Int });
+}
+
+TEST(Loading, NoRefs) {
     // Dep Graph:
     //      p:A
 
@@ -50,7 +119,7 @@ TEST(Loading, NoRefConsts) {
     test_struct(p_A, "p:A", {});
 }
 
-TEST(Loading, RefConsts) {
+TEST(Loading, Refs) {
     // Dep Graph:
     //      p:A -> p:B
     //          -> p:C
@@ -75,7 +144,7 @@ TEST(Loading, RefConsts) {
     test_struct(p_C, "p:C", {});
 }
 
-TEST(Loading, MultipleLayersOfIndirectRefConstReferences) {
+TEST(Loading, MultipleLayersOfIndirectRefs) {
     // Dep Graph:
     //      p:A -> p:B -> p:D
     //                 -> p:E
@@ -159,6 +228,38 @@ TEST(Loading, DepGraphCycle) {
 
     test_struct(p_A, "p:A", { p_B, p_A });
     test_struct(p_B, "p:B", { p_A });
+}
+
+TEST(Loading, DepGraphCycle_ArisingDueToSpecificTypeArgUsed) {
+    // Generics:
+    //      T[X: Any]
+    //
+    // Dep Graph:
+    //      p:T[X]      -> X
+    //
+    //      p:A         -> p:T[p:A] -> p:A      (back ref)
+    // 
+    //      p:T[p:A]    -> p:A      -> p:T[p:A] (back ref)
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] load, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Any_index = setup_protocol(p_def, "Any", {});
+
+    auto A_index = setup_struct(p_def, "A", { "p:T[p:A]" });
+
+    auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto T_A = ymCtx_Load(ctx, "p:T[p:A]");
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(T_A);
+    ASSERT_TRUE(A);
+
+    test_struct(T_A, "p:T[p:A]", {}, { A });
+    test_struct(A, "p:A", { T_A });
 }
 
 TEST(Loading, ItemsReferencedFromDifferentParcels) {
@@ -329,32 +430,93 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     EXPECT_EQ(ymItem_MemberByName(p_A, "m2"), p_A_m2);
 }
 
-TEST(Loading, Self) {
-    static_assert(YmKind_Num == 4);
-    // NOTE: This test covers (ideally) ALL places in ymParcelDef_*** API where a reference
-    //       symbol can be injected, and tests that they can interpret the direct loading
-    //       of 'Self' correctly. Also, this tests that 'Self' is interpreted correctly
-    //       in protocols and non-protocols alike.
-    // NOTE: yama/special/protocol-conformance.cpp is responsible for testing that 'Self'
+TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
+    // Generics:
+    //      T[X: Any]
+    //      T[X: Any]::m1() -> X
+    //      T[X: Any]::m2(X) -> Int
+    // 
+    // Dep Graph:
+    //      p:T[X]      -> X
+    //                  -> p:T[X]::m1   -> p:T[X]
+    //                                  -> X
+    //                  -> p:T[X]::m2   -> p:T[X]
+    //                                  -> X
+    //                                  -> p:Int
+    // 
+    //      p:T[p:A]    -> p:A
+    //                  -> p:T[p:A]::m1 -> p:T[p:A]
+    //                                  -> p:A
+    //                  -> p:T[p:A]::m2 -> p:T[p:A]
+    //                                  -> p:A
+    //                                  -> p:Int
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] load, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+    auto Any_index = setup_protocol(p_def, "Any", {});
+
+    auto T_index = setup_struct(p_def, "T", { "p:T[$X]::m1", "p:T[$X]::m2" }, { { "X", "p:Any" } });
+    auto T_m1_index = setup_method(p_def, T_index, "m1", "$X", { "$X" });
+    auto T_m2_index = setup_method(p_def, T_index, "m2", "p:Int", { "$X", "p:Int" });
+
+    auto A_index = setup_struct(p_def, "A", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    // NOTE: This test covers principle load being of the owner.
+    YmItem* T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
+    YmItem* T_A_m1 = ymCtx_Load(ctx, "p:T[p:A]::m1");
+    YmItem* T_A_m2 = ymCtx_Load(ctx, "p:T[p:A]::m2");
+    YmItem* A = ymCtx_Load(ctx, "p:A");
+    YmItem* Int = ymCtx_Load(ctx, "p:Int");
+    ASSERT_TRUE(T_A);
+    ASSERT_TRUE(T_A_m1);
+    ASSERT_TRUE(T_A_m2);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(Int);
+
+    test_struct(T_A, "p:T[p:A]", { T_A_m1, T_A_m2 }, { A });
+    test_method(T_A_m1, "p:T[p:A]::m1", {}, { A });
+    test_method(T_A_m2, "p:T[p:A]::m2", { Int }, { A });
+
+    EXPECT_EQ(ymItem_Owner(T_A), nullptr);
+    EXPECT_EQ(ymItem_Owner(T_A_m1), T_A);
+    EXPECT_EQ(ymItem_Owner(T_A_m2), T_A);
+    EXPECT_EQ(ymItem_Members(T_A), 2);
+    EXPECT_EQ(ymItem_Members(T_A_m1), 0);
+    EXPECT_EQ(ymItem_Members(T_A_m2), 0);
+    EXPECT_EQ(ymItem_MemberByIndex(T_A, 0), T_A_m1);
+    EXPECT_EQ(ymItem_MemberByIndex(T_A, 1), T_A_m2);
+    EXPECT_EQ(ymItem_MemberByName(T_A, "m1"), T_A_m1);
+    EXPECT_EQ(ymItem_MemberByName(T_A, "m2"), T_A_m2);
+}
+
+TEST(Loading, SelfRef_IncludingRefsWithinMembers) {
+    // NOTE: yama/special/protocol-conformance.cpp is responsible for testing that '$Self'
     //       operates as expected w/ regards to protocol conformance checking.
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
+    // NOTE: Here, struct is for testing non-protocol types generally.
+
     auto STRUCT_index = setup_struct(p_def, "STRUCT", {});
-    auto STRUCT_ref = ymParcelDef_AddRef(p_def, STRUCT_index, "Self"); // Covers ref for this kind.
-    auto STRUCT_m_index = setup_method(p_def, STRUCT_index, "m", "Self", {}); // Covers method kind.
-    ymParcelDef_AddParam(p_def, STRUCT_m_index, "a", "Self");
-    auto STRUCT_m_ref = ymParcelDef_AddRef(p_def, STRUCT_m_index, "Self"); // Covers ref for this kind.
-    
+    auto STRUCT_ref = ymParcelDef_AddRef(p_def, STRUCT_index, "$Self");
+    auto STRUCT_m_index = setup_method(p_def, STRUCT_index, "m", "$Self", {}); // Covers method kind.
+    ymParcelDef_AddParam(p_def, STRUCT_m_index, "a", "$Self");
+    auto STRUCT_m_ref = ymParcelDef_AddRef(p_def, STRUCT_m_index, "$Self");
+
     auto PROTOCOL_index = setup_protocol(p_def, "PROTOCOL", {});
-    auto PROTOCOL_ref = ymParcelDef_AddRef(p_def, PROTOCOL_index, "Self"); // Covers ref for this kind.
-    auto PROTOCOL_m_index = ymParcelDef_AddMethodReq(p_def, PROTOCOL_index, "m", "Self");
-    ymParcelDef_AddParam(p_def, PROTOCOL_m_index, "a", "Self");
-    auto PROTOCOL_m_ref = ymParcelDef_AddRef(p_def, PROTOCOL_m_index, "Self"); // Covers ref for this kind.
-    
-    auto FN_index = setup_fn(p_def, "FN", "Self", {});
-    ymParcelDef_AddParam(p_def, FN_index, "a", "Self");
-    auto FN_ref = ymParcelDef_AddRef(p_def, FN_index, "Self"); // Covers ref for this kind.
+    auto PROTOCOL_ref = ymParcelDef_AddRef(p_def, PROTOCOL_index, "$Self");
+    auto PROTOCOL_m_index = ymParcelDef_AddMethodReq(p_def, PROTOCOL_index, "m", "$Self");
+    ymParcelDef_AddParam(p_def, PROTOCOL_m_index, "a", "$Self");
+    auto PROTOCOL_m_ref = ymParcelDef_AddRef(p_def, PROTOCOL_m_index, "$Self");
+
+    auto FN_index = setup_fn(p_def, "FN", "$Self", {});
+    ymParcelDef_AddParam(p_def, FN_index, "a", "$Self");
+    auto FN_ref = ymParcelDef_AddRef(p_def, FN_index, "$Self");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
@@ -387,12 +549,480 @@ TEST(Loading, Self) {
     EXPECT_EQ(ymItem_Ref(FN, FN_ref), FN);
 }
 
-TEST(Loading, Fail_IllegalFullname_DirectLoad) {
+TEST(Loading, ItemArgRef_IncludingRefsWithinMembers) {
+    // Generics:
+    //      T[X: Any]
+    //      T[X: Any]::m() -> X
+    //      U[X: Any]
+    //
+    // Dep Graph:
+    //      p:T[X]      -> X
+    //                  -> p:T[X]::m        -> X
+    //                                      -> p:U[X]
+    //                  -> p:U[p:U[X]]
+    //
+    //      p:U[X]      -> X
+    //
+    //      p:T[p:A]    -> p:A
+    //                  -> p:T[p:A]::m      -> p:A
+    //                                      -> p:U[p:A]
+    //                  -> p:U[p:U[p:A]]
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Any_index = setup_protocol(p_def, "Any", {});
+
+    auto A_index = setup_struct(p_def, "A", {});
+
+    // NOTE: All the '$X' below are the item arg refs under test.
+
+    auto T_index = setup_struct(p_def, "T", { "p:U[p:U[$X]]" }, { { "X", "p:Any" } });
+    auto T_m_index = setup_method(p_def, T_index, "m", "$X", { "p:U[$X]" });
+
+    auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
+    auto T_A_m = ymCtx_Load(ctx, "p:T[p:A]::m"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto U_A = ymCtx_Load(ctx, "p:U[p:A]");
+    auto U_U_A = ymCtx_Load(ctx, "p:U[p:U[p:A]]");
+    ASSERT_TRUE(T_A);
+    ASSERT_TRUE(T_A_m);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(U_A);
+    ASSERT_TRUE(U_U_A);
+
+    test_struct(T_A, "p:T[p:A]", { T_A_m, U_U_A }, { A });
+    test_method(T_A_m, "p:T[p:A]::m", { A, U_A }, { A });
+    test_struct(A, "p:A", {});
+    test_struct(U_A, "p:U[p:A]", {}, { A });
+    test_struct(U_U_A, "p:U[p:U[p:A]]", {}, { U_A });
+
+    EXPECT_EQ(ymItem_ReturnType(T_A_m), A);
+}
+
+TEST(Loading, Here) {
+    // Dep Graph:
+    //      p:A
+    //
+    //      p:B -> p:A  (p:B exists to indirectly load p:A via %here.)
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:B load, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto A_index = setup_struct(p_def, "A", {});
+    auto B_index = setup_struct(p_def, "B", {});
+    auto B_ref = ymParcelDef_AddRef(p_def, B_index, "%here:A"); // Reference symbol under test.
+    ASSERT_NE(B_ref, YM_NO_REF);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto B = ymCtx_Load(ctx, "p:B"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(A);
+
+    test_struct(B, "p:B", { A });
+    test_struct(A, "p:A", {});
+    
+    EXPECT_EQ(ymItem_Ref(B, B_ref), A); // Ensure %here:A and p:A are the same.
+}
+
+TEST(Loading, ItemParams_IncludingForMemberTypes) {
+    // Generics:
+    //      T[X: P, Y: Q]
+    //      T[X: P, Y: Q]::m() -> Int
+    // 
+    // Dep Graph:
+    //      p:T[X, Y]               -> p:T[X, Y]::m     -> p:T[X, Y]
+    //                                                  -> X
+    //                                                  -> Y
+    //                              -> X
+    //                              -> Y
+    // 
+    //      p:T[p:A, p:B]           -> p:T[p:A, p:B]::m -> p:T[p:A, p:B]
+    //                                                  -> p:A              (X == p:A)
+    //                                                  -> p:B              (Y == p:B)
+    //                              -> p:A                                  (X == p:A)
+    //                              -> p:B                                  (Y == p:B)
+    // 
+    //      p:T[p:C, p:D]           -> p:T[p:C, p:D]::m -> p:T[p:C, p:D]
+    //                                                  -> p:C              (X == p:C)
+    //                                                  -> p:D              (Y == p:D)
+    //                              -> p:C                                  (X == p:C)
+    //                              -> p:D                                  (Y == p:D)
+    // 
+    //      p:T[p:C, p:T[p:A, p:B]] -> p:T[~, ~]::m     -> p:T[~, ~]
+    //                                                  -> p:C              (X == p:C)
+    //                                                  -> p:T[p:A, p:B]    (Y == p:T[p:A, p:B])
+    //                              -> p:C                                  (X == p:C)
+    //                              -> p:T[p:A, p:B]                        (Y == p:T[p:A, p:B])
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+
+    auto P_index = setup_protocol(p_def, "P", {});
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
+    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+
+    auto Q_index = setup_protocol(p_def, "Q", {});
+    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:Int");
+
+    auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P" }, { "Y", "p:Q" } });
+    ymParcelDef_AddMethod(p_def, T_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    auto A_index = setup_struct(p_def, "A", {});
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+
+    auto B_index = setup_struct(p_def, "B", {});
+    auto B_m_index = ymParcelDef_AddMethod(p_def, B_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    auto C_index = setup_struct(p_def, "C", {});
+    auto C_m_index = ymParcelDef_AddMethod(p_def, C_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, C_m_index, "x", "p:Int");
+
+    auto D_index = setup_struct(p_def, "D", {});
+    auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto T_C_T_A_B = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]"); // The recursive load under test.
+    auto T_C_T_A_B_m = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]::m"); // The recursive load under test.
+    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
+    auto T_A_B_m = ymCtx_Load(ctx, "p:T[p:A, p:B]::m"); // The recursive load under test.
+    auto T_C_D = ymCtx_Load(ctx, "p:T[p:C, p:D]"); // The recursive load under test.
+    auto T_C_D_m = ymCtx_Load(ctx, "p:T[p:C, p:D]::m"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(T_C_T_A_B);
+    ASSERT_TRUE(T_C_T_A_B_m);
+    ASSERT_TRUE(T_A_B);
+    ASSERT_TRUE(T_A_B_m);
+    ASSERT_TRUE(T_C_D);
+    ASSERT_TRUE(T_C_D_m);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+
+    test_struct(T_A_B, "p:T[p:A, p:B]", { T_A_B_m }, { A, B });
+    test_method(T_A_B_m, "p:T[p:A, p:B]::m", {}, { A, B });
+    test_struct(T_C_D, "p:T[p:C, p:D]", { T_C_D_m }, { C, D });
+    test_method(T_C_D_m, "p:T[p:C, p:D]::m", {}, { C, D });
+    test_struct(T_C_T_A_B, "p:T[p:C, p:T[p:A, p:B]]", { T_C_T_A_B_m }, { C, T_A_B });
+    test_method(T_C_T_A_B_m, "p:T[p:C, p:T[p:A, p:B]]::m", {}, { C, T_A_B });
+}
+
+TEST(Loading, ItemParams_ParamsInterReferenceOneAnother) {
+    // Generics:
+    //      T[X: Any, Y: P[U[X]]]
+    // 
+    // Any is a top type.
+    // 
+    // P expects a method 'm() -> X', where P's X will above be 'U[X]'.
+    // 
+    // U[X] is used instead of just X to test w/ nesting.
+    //
+    // Dep Graph:
+    //      p:T[X, Y]       -> X
+    //                      -> Y
+    //
+    //      p:T[p:A, p:B]   -> p:A  (X == p:A)
+    //                      -> p:B  (Y == p:B)
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Any_index = setup_protocol(p_def, "Any", {});
+
+    auto P_index = setup_protocol(p_def, "P", {}, { { "X", "p:Any" } });
+    ymParcelDef_AddMethodReq(p_def, P_index, "m", "$X");
+
+    auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
+
+    auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:Any" }, { "Y", "p:P[p:U[$X]]" } });
+
+    auto A_index = setup_struct(p_def, "A", {});
+
+    auto B_index = setup_struct(p_def, "B", {});
+    ymParcelDef_AddMethod(p_def, B_index, "m", "p:U[p:A]", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(T_A_B);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    test_struct(T_A_B, "p:T[p:A, p:B]", {}, { A, B });
+}
+
+TEST(Loading, ItemParams_ParamsReferenceSelf) {
+    // Generics:
+    //      T[X: P[U[Self]]]
+    // 
+    // P expects a method 'm() -> X', where P's X will above be 'U[Self]'.
+    // 
+    // U[Self] is used instead of just Self to test w/ nesting.
+    //
+    // Dep Graph:
+    //      p:T[X]      -> X
+    //
+    //      p:T[p:A]    -> p:A  (X == p:A)
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Any_index = setup_protocol(p_def, "Any", {});
+
+    auto P_index = setup_protocol(p_def, "P", {}, { { "X", "p:Any" } });
+    ymParcelDef_AddMethodReq(p_def, P_index, "m", "$X");
+
+    auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
+
+    auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P[p:U[$Self]]" } });
+
+    auto A_index = setup_struct(p_def, "A", {});
+    ymParcelDef_AddMethod(p_def, A_index, "m", "p:U[p:T[p:A]]", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    ASSERT_TRUE(T_A);
+    ASSERT_TRUE(A);
+
+    test_struct(T_A, "p:T[p:A]", {}, { A });
+}
+
+TEST(Loading, ItemParams_IndirectLoad) {
+    // Generics:
+    //      T[X: P, Y: Q]
+    // 
+    // Dep Graph:
+    //      p:T[X, Y]               -> X
+    //                              -> Y
+    // 
+    //      p:H                     -> p:T[p:A, p:B]
+    //                              -> p:T[p:C, p:D]
+    //                              -> p:T[p:C, p:T[p:A, p:B]]
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+
+    auto P_index = setup_protocol(p_def, "P", {});
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
+    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+
+    auto Q_index = setup_protocol(p_def, "Q", {});
+    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:Int");
+
+    auto H_index = setup_struct(p_def, "H", { "p:T[p:A, p:B]", "p:T[p:C, p:D]", "p:T[p:C, p:T[p:A, p:B]]" });
+
+    auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P" }, { "Y", "p:Q" } });
+    auto T_m_index = ymParcelDef_AddMethod(p_def, T_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    auto A_index = setup_struct(p_def, "A", {});
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+
+    auto B_index = setup_struct(p_def, "B", {});
+    auto B_m_index = ymParcelDef_AddMethod(p_def, B_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    auto C_index = setup_struct(p_def, "C", {});
+    auto C_m_index = ymParcelDef_AddMethod(p_def, C_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, C_m_index, "x", "p:Int");
+
+    auto D_index = setup_struct(p_def, "D", {});
+    auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto H = ymCtx_Load(ctx, "p:H"); // The recursive load under test.
+    auto T_C_T_A_B = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]");
+    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]");
+    auto T_C_D = ymCtx_Load(ctx, "p:T[p:C, p:D]");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto D = ymCtx_Load(ctx, "p:D");
+    ASSERT_TRUE(H);
+    ASSERT_TRUE(T_C_T_A_B);
+    ASSERT_TRUE(T_A_B);
+    ASSERT_TRUE(T_C_D);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(D);
+
+    test_struct(H, "p:H", { T_A_B, T_C_D, T_C_T_A_B });
+    test_struct(T_A_B, "p:T[p:A, p:B]", {}, { A, B });
+    test_struct(T_C_D, "p:T[p:C, p:D]", {}, { C, D });
+    test_struct(T_C_T_A_B, "p:T[p:C, p:T[p:A, p:B]]", {}, { C, T_A_B });
+}
+
+TEST(Loading, ItemParams_RecursiveConstraint_ForGenericProtocol) {
+    // Generics:
+    //      P[T: Self]                              (Test via $Self.)
+    //      Q[T: Q[T]]                              (Test via explicit.)
+    // 
+    // Dep Graph:
+    //      p:P[T]                  -> T
+    //      p:Q[T]                  -> T
+    // 
+    //      p:P[p:A]                -> p:P[p:A]     (back ref)
+    //                              -> p:A
+    //      p:Q[p:A]                -> p:Q[p:A]     (back ref)
+    //                              -> p:A
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:P[p:A] loads, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto None_index = setup_struct(p_def, "None", {});
+
+    // A conforms to P and Q.
+    auto A_index = setup_struct(p_def, "A", {});
+    ymParcelDef_AddMethod(p_def, A_index, "m", "p:None", ymInertCallBhvrFn, nullptr);
+
+    // B doesn't conform to P and Q.
+    auto B_index = setup_struct(p_def, "B", {});
+
+    auto P_index = setup_protocol(p_def, "P", {}, { { "T", "$Self" } });
+    ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:None");
+
+    auto Q_index = setup_protocol(p_def, "Q", {}, { { "T", "p:Q[$T]" } });
+    ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:None");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto P_A = ymCtx_Load(ctx, "p:P[p:A]"); // The recursive load under test.
+    auto Q_A = ymCtx_Load(ctx, "p:Q[p:A]"); // The recursive load under test.
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(P_A);
+    ASSERT_TRUE(Q_A);
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    test_protocol(P_A, "p:P[p:A]", {}, { A });
+    test_protocol(Q_A, "p:Q[p:A]", {}, { A });
+
+    EXPECT_EQ(ymItem_Converts(B, P_A, true), YM_FALSE);
+    EXPECT_EQ(ymItem_Converts(B, Q_A, true), YM_FALSE);
+}
+
+TEST(Loading, ItemParams_RecursiveConstraint_ForGenericNonProtocol_Illegal) {
+    // Generics:
+    //      A[T: Self]                              (Test via $Self.)
+    //      B[T: B[T]]                              (Test via explicit.)
+    // 
+    // Dep Graph:
+    //      p:A[T]                  -> T
+    //      p:B[T]                  -> T
+    // 
+    //      p:A[p:C]                -> p:A[p:C]     (back ref)
+    //                              -> p:C
+    //      p:B[p:C]                -> p:B[p:C]     (back ref)
+    //                              -> p:C
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto A_index = setup_struct(p_def, "A", {}, { { "T", "$Self" } });
+    auto B_index = setup_struct(p_def, "B", {}, { { "T", "p:B[$T]" } });
+    auto C_index = setup_struct(p_def, "C", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[p:C]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_NonProtocolItem], 1);
+    
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:C]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_NonProtocolItem], 1);
+}
+
+TEST(Loading, MemberAccess) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+
+    auto A_index = setup_struct(p_def, "A", {}, {});
+    setup_method(p_def, A_index, "m", "p:A", {});
+    auto A_m_ref = ymParcelDef_AddRef(p_def, A_index, "p:A::m");
+    auto B_A_m_ref = ymParcelDef_AddRef(p_def, A_index, "p:B[p:A]::m");
+
+    auto B_index = setup_struct(p_def, "B", {}, { { "T", "p:Any" } });
+    setup_method(p_def, B_index, "m", "p:A", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_m = ymCtx_Load(ctx, "p:A::m");
+    auto B_A_m = ymCtx_Load(ctx, "p:B[p:A]::m");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_m);
+    ASSERT_TRUE(B_A_m);
+
+    EXPECT_EQ(ymItem_Ref(A, A_m_ref), A_m);
+    EXPECT_EQ(ymItem_Ref(A, B_A_m_ref), B_A_m);
+}
+
+TEST(Loading, MemberAccess_SelfAndItemParamRefs) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+
+    auto A_index = setup_struct(p_def, "A", {}, { { "T", "p:Any" } });
+    setup_method(p_def, A_index, "m1", "p:B", {});
+    auto A_m1_ref = ymParcelDef_AddRef(p_def, A_index, "$Self::m1");
+    auto B_m2_ref = ymParcelDef_AddRef(p_def, A_index, "$T::m2");
+
+    auto B_index = setup_struct(p_def, "B", {});
+    setup_method(p_def, B_index, "m2", "p:B", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto A_B = ymCtx_Load(ctx, "p:A[p:B]");
+    auto A_B_m1 = ymCtx_Load(ctx, "p:A[p:B]::m1");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto B_m2 = ymCtx_Load(ctx, "p:B::m2");
+    ASSERT_TRUE(A_B);
+    ASSERT_TRUE(A_B_m1);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(B_m2);
+
+    EXPECT_EQ(ymItem_Ref(A_B, A_m1_ref), A_B_m1);
+    EXPECT_EQ(ymItem_Ref(A_B, B_m2_ref), B_m2);
+}
+
+TEST(Loading, Fail_IllegalSpecifier_DirectLoad) {
     for (const auto& fullname : illegalFullnames) {
         SETUP_ALL(ctx);
         EXPECT_EQ(ymCtx_Load(ctx, fullname.c_str()), nullptr)
             << "fullname == \"" << fullname << "\"";
-        EXPECT_EQ(err[YmErrCode_IllegalFullname], 1);
+        EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
     }
 }
 
@@ -453,12 +1083,180 @@ TEST(Loading, Fail_ItemNotFound_IndirectLoad) {
     SETUP_PARCELDEF(p_def);
     SETUP_PARCELDEF(q_def);
 
-    YmItemIndex p_A_index = setup_struct(p_def, "A", { "q:A" });
+    setup_struct(p_def, "A", { "q:A" });
     
     ymDm_BindParcelDef(dm, "p", p_def);
     ymDm_BindParcelDef(dm, "q", q_def);
 
     EXPECT_EQ(ymCtx_Load(ctx, "p:A"), nullptr);
     EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+}
+
+TEST(Loading, Fail_ConcreteItem_ArgPackOnConcreteType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_struct(p_def, "Int", {});
+    setup_protocol(p_def, "Any", {});
+
+    setup_struct(p_def, "A", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[p:Int]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ConcreteItem], 1);
+}
+
+TEST(Loading, Fail_GenericItem_ArgPackMissing) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+
+    setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A"), nullptr);
+    EXPECT_EQ(err[YmErrCode_GenericItem], 1);
+}
+
+TEST(Loading, Fail_GenericItem_ArgPackMissing_AndAttemptedMemberAccess) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_struct(p_def, "Int", {});
+    setup_protocol(p_def, "Any", {});
+
+    auto A_index = setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+    setup_method(p_def, A_index, "m", "p:Int", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A::m"), nullptr);
+    EXPECT_EQ(err[YmErrCode_GenericItem], 1);
+}
+
+TEST(Loading, Fail_ItemArgsError_ArgDoesntConformToConstraint) {
+    // Generics:
+    //      T[X: P]
+    // 
+    // Dep Graph:
+    //      p:T[X]      -> X
+    // 
+    //      p:T[p:A]    -> p:A      (X == p:A; but p:A doesn't conform to p:P.)
+
+    // NOTE: Don't call ymCtx_Load for any item before the initial p:T[~] load, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+
+    auto P_index = setup_protocol(p_def, "P", {});
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
+    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+
+    setup_struct(p_def, "T", {}, { { "X", "p:P" } });
+
+    auto A_index = setup_struct(p_def, "A", {});
+    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    //ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:T[p:A]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemArgsError], 1);
+}
+
+TEST(Loading, Fail_ItemArgsError_TooManyArgs) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "Int", {});
+
+    setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[p:Int, p:Int]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemArgsError], 1);
+}
+
+TEST(Loading, Fail_ItemArgsError_TooFewArgs) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "Int", {});
+
+    setup_struct(p_def, "A", {}, { { "X", "p:Any" }, { "Y", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[p:Int]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemArgsError], 1);
+}
+
+TEST(Loading, Fail_ItemArgsError_EmptyArgPack) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "Int", {});
+
+    setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemArgsError], 1);
+}
+
+TEST(Loading, Fail_ItemNotFound_SelfRefUnavailableForDirectLoads) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "$Self"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+}
+
+TEST(Loading, Fail_ItemNotFound_ItemArgRefsUnavailableForDirectLoads) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "$X"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+}
+
+TEST(Loading, Fail_ParcelNotFound_HereUnavailableForDirectLoads) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "%here:Int"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ParcelNotFound], 1);
+}
+
+TEST(Loading, Fail_NonProtocolItem_GenericTypeConstraintTypeIsNotAProtocol) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    auto Int_index = setup_struct(p_def, "Int", {});
+
+    auto A_index = setup_struct(p_def, "A", {}, { { "T", "p:Int" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A[p:Int]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_NonProtocolItem], 1);
 }
 

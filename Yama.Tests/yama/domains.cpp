@@ -23,14 +23,14 @@ TEST(Domains, BindParcelDef) {
     ASSERT_TRUE(ymCtx_Import(ctx, path.c_str())); // Available
 }
 
-TEST(Domains, BindParcelDef_IllegalPath) {
+TEST(Domains, BindParcelDef_IllegalSpecifier) {
     for (const auto& path : illegalPaths) {
         SETUP_ERRCOUNTER;
         SETUP_DM;
         SETUP_PARCELDEF(p);
         EXPECT_EQ(ymDm_BindParcelDef(dm, path.c_str(), p), YM_FALSE)
             << "path == \"" << path << "\"";
-        EXPECT_EQ(err[YmErrCode_IllegalPath], 1);
+        EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
     }
 }
 
