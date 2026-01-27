@@ -201,6 +201,70 @@ extern "C" {
     */
 
 
+    /* TODO: Maybe impl 'Alias' and 'MemberAlias' kinds. These items would encapsulate refs to
+    *        other items, and upon load instead of returning these items, the loader will instead
+    *        FORWARD to the ref'd item, and return that instead.
+    * 
+    *        As part of this we'd be best to have a way to load w/out forwarding aliases like this,
+    *        instead having load return the actual alias item itself.
+    */
+    /* TODO: If we impl MemberAlias kind, then we can make '$Self' a special member alias that gets
+    *        added up-front to ALL non-member items, and likewise we can make '$T' item params be
+    *        impl'd as special MemberAlias(es) as well.
+    * 
+    *        In both these cases we'd likely need special semantics for these cases, as '$Self' and
+    *        '$T' have special semantics that don't necessarily apply elsewhere.
+    * 
+    *        Also, this would mean revising '$' prefix syntax to be a more general way for accessing
+    *        member items within the item who's ref syms are being evaluated.
+    */
+    /* TODO: In the future we should try to add covariance/contravariance w/ regards to protocols,
+    *        allowing conforming types to have param/return types of methods to not necessarily be
+    *        the exact same type as in the protocol, but instead just have the types used have
+    *        compatible value sets.
+    *        
+    *        This is a feature that'll require complexity to be added to our system, and we need this
+    *        stuff to be kept in mind as we impl other parts of our API.
+    */
+    /* TODO: Currently, item params are presumed during loading to NOT be protocols, even if args
+    *        to said items are protocols.
+    * 
+    *        This is a detail that'll need to be considered if we impl covariance/contravariance
+    *        w/ protocol conformance checking.
+    */
+    /* TODO: If we impl MemberAlias kind, then this can help us more easily impl $Self nuance w/
+    *        regards to generic type constraint checking, where $Self's meaning CHANGES from its
+    *        usual meaning.
+    * 
+    *        MemberAlias kind can help as if we can query the alias item itself W/OUT forwarding to
+    *        the item ref'd by it, then it can let us identify $Self during eval of the expr tree
+    *        of a ref sym.
+    * 
+    *        What we can do is perform a parallel depth-first traversal of the expr trees of the two
+    *        sides of a constraint check of an arg, in which we traverse the constraint's expr tree,
+    *        and at each step we discern the corresponding in the arg type's fullname's expr tree,
+    *        and then we can perform appropriate checks therein.
+    * 
+    *        Still not 100% how this would exactly work, but MemberAlias would enable us such that
+    *        I think we'd be able to figure something out, and be left w/ a system that enables us
+    *        to do this and more advanced static analysis w/ greater flexibility.
+    */
+
+
+    /* TODO: Currently, our loading system error messages SUCK, and are formatting-wise vary
+    *        inconsistent, so improve them!
+    * 
+    *        Also, improve protocol conformance error messages, as right now they don't explain at
+    *        all WHY a given type failed to conform to a protocol!
+    */
+    /* TODO: Refactor our loading system code, as it's a BIG MESS at the moment!
+    * 
+    *        One of the big things is the need to make the impl more consistently stable, as right
+    *        now I worry it might have a bunch of edge cases in which it crashes or behaves in some
+    *        unwanted fashion (such as raising *internal errors*.)
+    */
+
+
     /* NOTE: Resources are thread-unsafe unless otherwise specified.
     */
 
@@ -261,7 +325,6 @@ extern "C" {
 
     /* TODO: Maybe do this aliasing for ALL (more or less) of our C-strings.
     */
-
     /* TODO: YmRefSym C-strings are specifically for reference strings in the
     *        constant tables of items.
     * 
@@ -271,7 +334,6 @@ extern "C" {
     * 
     *        This includes explaining '%here' when we bring it to the frontend.
     */
-
     /* TODO: Explain how the special 'Self' keyword works. Included in this,
     *        explain things like the quark about how a 'Self' ref for a function
     *        will resolve to the function type itself (as it has no owner, and

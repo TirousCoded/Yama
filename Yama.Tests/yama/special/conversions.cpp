@@ -25,12 +25,6 @@ static void conv(YmItem* from, YmItem* to, bool succeedIfExplicit, bool succeedI
 conv((from), (to), (succeedIfExplicit), (succeedIfImplicit), __LINE__)
 
 
-static ym::Safe<YmItem> load(YmCtx* ctx, const std::string& fullname) {
-    auto result = ymCtx_Load(ctx, fullname.c_str());
-    EXPECT_TRUE(result);
-    if (!result) throw std::runtime_error(""); // Abort test.
-    return ym::Safe(result);
-}
 static std::optional<std::vector<YmItem*>> mkItemsVec(YmCtx* ctx, std::vector<std::string> fullnames) {
     std::vector<YmItem*> result{};
     result.reserve(fullnames.size());

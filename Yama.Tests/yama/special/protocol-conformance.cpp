@@ -10,8 +10,8 @@
 // NOTE: These unit tests cover when a non-protocol types conforms to protocol types.
 
 
-#define succeed(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_TRUE)
-#define fail(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_FALSE)
+#define success(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_TRUE)
+#define failure(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_FALSE)
 
 
 TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
@@ -33,27 +33,20 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     ymParcelDef_AddProtocol(p_def, "Any"); // Our empty protocol top type.
     
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT1 = ymCtx_Load(ctx, "p:STRUCT1");
-    auto STRUCT2 = ymCtx_Load(ctx, "p:STRUCT2");
-    auto FN1 = ymCtx_Load(ctx, "p:FN1");
-    auto FN2 = ymCtx_Load(ctx, "p:FN2");
-    auto METHOD1 = ymCtx_Load(ctx, "p:STRUCT1::METHOD1");
-    auto METHOD2 = ymCtx_Load(ctx, "p:STRUCT1::METHOD2");
-    auto Any = ymCtx_Load(ctx, "p:Any");
-    ASSERT_TRUE(STRUCT1);
-    ASSERT_TRUE(STRUCT2);
-    ASSERT_TRUE(FN1);
-    ASSERT_TRUE(FN2);
-    ASSERT_TRUE(METHOD1);
-    ASSERT_TRUE(METHOD2);
-    ASSERT_TRUE(Any);
+    auto STRUCT1 = load(ctx, "p:STRUCT1");
+    auto STRUCT2 = load(ctx, "p:STRUCT2");
+    auto FN1 = load(ctx, "p:FN1");
+    auto FN2 = load(ctx, "p:FN2");
+    auto METHOD1 = load(ctx, "p:STRUCT1::METHOD1");
+    auto METHOD2 = load(ctx, "p:STRUCT1::METHOD2");
+    auto Any = load(ctx, "p:Any");
 
-    succeed(STRUCT1, Any);
-    succeed(STRUCT2, Any);
-    succeed(FN1, Any);
-    succeed(FN2, Any);
-    succeed(METHOD1, Any);
-    succeed(METHOD2, Any);
+    success(STRUCT1, Any);
+    success(STRUCT2, Any);
+    success(FN1, Any);
+    success(FN2, Any);
+    success(METHOD1, Any);
+    success(METHOD2, Any);
 }
 
 TEST(ProtocolConformance, NonEmptyProtocol) {
@@ -84,24 +77,19 @@ TEST(ProtocolConformance, NonEmptyProtocol) {
     ymParcelDef_AddParam(p_def, CanDrink_buyDrinks_index, "drinks", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto Bob = ymCtx_Load(ctx, "p:Bob");
-    auto Sally = ymCtx_Load(ctx, "p:Sally");
-    auto George = ymCtx_Load(ctx, "p:George");
-    auto Person = ymCtx_Load(ctx, "p:Person");
-    auto CanDrink = ymCtx_Load(ctx, "p:CanDrink");
-    ASSERT_TRUE(Bob);
-    ASSERT_TRUE(Sally);
-    ASSERT_TRUE(George);
-    ASSERT_TRUE(Person);
-    ASSERT_TRUE(CanDrink);
+    auto Bob = load(ctx, "p:Bob");
+    auto Sally = load(ctx, "p:Sally");
+    auto George = load(ctx, "p:George");
+    auto Person = load(ctx, "p:Person");
+    auto CanDrink = load(ctx, "p:CanDrink");
 
-    succeed(Bob, Person);
-    succeed(Sally, Person);
-    succeed(George, Person);
+    success(Bob, Person);
+    success(Sally, Person);
+    success(George, Person);
 
-    succeed(Bob, CanDrink);
-    fail(Sally, CanDrink);
-    succeed(George, CanDrink);
+    success(Bob, CanDrink);
+    failure(Sally, CanDrink);
+    success(George, CanDrink);
 }
 
 // NOTE: This test is here just to sanity check that failure is *generally* detected
@@ -122,18 +110,14 @@ TEST(ProtocolConformance, AllKindsGenerallyFailAsExpected) {
     ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
-    auto FN = ymCtx_Load(ctx, "p:FN");
-    auto METHOD = ymCtx_Load(ctx, "p:STRUCT::METHOD");
-    auto P = ymCtx_Load(ctx, "p:P");
-    ASSERT_TRUE(STRUCT);
-    ASSERT_TRUE(FN);
-    ASSERT_TRUE(METHOD);
-    ASSERT_TRUE(P);
+    auto STRUCT = load(ctx, "p:STRUCT");
+    auto FN = load(ctx, "p:FN");
+    auto METHOD = load(ctx, "p:STRUCT::METHOD");
+    auto P = load(ctx, "p:P");
 
-    fail(STRUCT, P);
-    fail(FN, P);
-    fail(METHOD, P);
+    failure(STRUCT, P);
+    failure(FN, P);
+    failure(METHOD, P);
 }
 
 TEST(ProtocolConformance, MustHaveAllMethodsNamed) {
@@ -168,18 +152,14 @@ TEST(ProtocolConformance, MustHaveAllMethodsNamed) {
     ymParcelDef_AddMethodReq(p_def, P_index, "baz", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto P = ymCtx_Load(ctx, "p:P");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(P);
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto P = load(ctx, "p:P");
 
-    succeed(A, P);
-    succeed(B, P);
-    fail(C, P);
+    success(A, P);
+    success(B, P);
+    failure(C, P);
 }
 
 TEST(ProtocolConformance, MethodsMustHaveCorrectReturnTypes) {
@@ -200,15 +180,12 @@ TEST(ProtocolConformance, MethodsMustHaveCorrectReturnTypes) {
     ymParcelDef_AddMethodReq(p_def, P_index, "foo", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto P = ymCtx_Load(ctx, "p:P");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(P);
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto P = load(ctx, "p:P");
 
-    succeed(A, P);
-    fail(B, P);
+    success(A, P);
+    failure(B, P);
 }
 
 TEST(ProtocolConformance, MethodsMustHaveCorrectParams) {
@@ -260,24 +237,18 @@ TEST(ProtocolConformance, MethodsMustHaveCorrectParams) {
     ymParcelDef_AddParam(p_def, P_foo_index, "c", "p:Float");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    auto E = ymCtx_Load(ctx, "p:E");
-    auto P = ymCtx_Load(ctx, "p:P");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
-    ASSERT_TRUE(E);
-    ASSERT_TRUE(P);
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto D = load(ctx, "p:D");
+    auto E = load(ctx, "p:E");
+    auto P = load(ctx, "p:P");
 
-    succeed(A, P);
-    succeed(B, P);
-    fail(C, P);
-    fail(D, P);
-    fail(E, P);
+    success(A, P);
+    success(B, P);
+    failure(C, P);
+    failure(D, P);
+    failure(E, P);
 }
 
 TEST(ProtocolConformance, Self) {
@@ -305,18 +276,14 @@ TEST(ProtocolConformance, Self) {
     ymParcelDef_AddParam(p_def, P_foo_index, "a", "$Self");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto P = ymCtx_Load(ctx, "p:P");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(P);
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto P = load(ctx, "p:P");
 
-    succeed(A, P);
-    succeed(B, P);
-    fail(C, P);
+    success(A, P);
+    success(B, P);
+    failure(C, P);
 }
 
 TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting) {
@@ -362,24 +329,18 @@ TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting) {
     ymParcelDef_AddParam(p_def, E_m_index, "a", "p:G[p:G[p:X]]");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto P = ymCtx_Load(ctx, "p:P");
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    auto E = ymCtx_Load(ctx, "p:E");
-    ASSERT_TRUE(P);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
-    ASSERT_TRUE(E);
+    auto P = load(ctx, "p:P");
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto D = load(ctx, "p:D");
+    auto E = load(ctx, "p:E");
 
-    succeed(A, P);
-    fail(B, P);
-    fail(C, P);
-    fail(D, P);
-    fail(E, P);
+    success(A, P);
+    failure(B, P);
+    failure(C, P);
+    failure(D, P);
+    failure(E, P);
 }
 
 TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting_SelfAndTypeArgs) {
@@ -413,20 +374,16 @@ TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting_SelfAndTypeArgs) {
     ymParcelDef_AddParam(p_def, B_m_index, "b", "p:H[p:G[p:B]]"); // <- This one needs to be p:B though.
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto P_A = ymCtx_Load(ctx, "p:P[p:A]");
-    auto P_B = ymCtx_Load(ctx, "p:P[p:B]");
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    ASSERT_TRUE(P_A);
-    ASSERT_TRUE(P_B);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
+    auto P_A = load(ctx, "p:P[p:A]");
+    auto P_B = load(ctx, "p:P[p:B]");
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
 
-    succeed(A, P_A);
-    succeed(B, P_A);
+    success(A, P_A);
+    success(B, P_A);
 
-    fail(A, P_B);
-    fail(B, P_B);
+    failure(A, P_B);
+    failure(B, P_B);
 }
 
 TEST(ProtocolConformance, Generics_BothOfTheProtocolTypeAndOfTheTypesCheckedForConformanceAgainstIt) {
@@ -465,65 +422,53 @@ TEST(ProtocolConformance, Generics_BothOfTheProtocolTypeAndOfTheTypesCheckedForC
     ymParcelDef_AddParam(p_def, C_m_index, "b", "p:X");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto Any = ymCtx_Load(ctx, "p:Any");
-    auto P_X = ymCtx_Load(ctx, "p:P[p:X]");
-    auto P_Y = ymCtx_Load(ctx, "p:P[p:Y]");
-    auto P_A_X_X = ymCtx_Load(ctx, "p:P[p:A[p:X, p:X]]");
-    auto A_X_X = ymCtx_Load(ctx, "p:A[p:X, p:X]");
-    auto A_Y_Y = ymCtx_Load(ctx, "p:A[p:Y, p:Y]");
-    auto A_X_Y = ymCtx_Load(ctx, "p:A[p:X, p:Y]");
-    auto A_A_X_X_A_X_X = ymCtx_Load(ctx, "p:A[p:A[p:X, p:X], p:A[p:X, p:X]]");
-    auto B_X_X = ymCtx_Load(ctx, "p:B[p:X, p:X]");
-    auto B_Y_Y = ymCtx_Load(ctx, "p:B[p:Y, p:Y]");
-    auto B_X_Y = ymCtx_Load(ctx, "p:B[p:X, p:Y]");
-    auto C = ymCtx_Load(ctx, "p:C");
-    ASSERT_TRUE(Any);
-    ASSERT_TRUE(P_X);
-    ASSERT_TRUE(P_Y);
-    ASSERT_TRUE(P_A_X_X);
-    ASSERT_TRUE(A_X_X);
-    ASSERT_TRUE(A_Y_Y);
-    ASSERT_TRUE(A_X_Y);
-    ASSERT_TRUE(A_A_X_X_A_X_X);
-    ASSERT_TRUE(B_X_X);
-    ASSERT_TRUE(B_Y_Y);
-    ASSERT_TRUE(B_X_Y);
-    ASSERT_TRUE(C);
+    auto Any = load(ctx, "p:Any");
+    auto P_X = load(ctx, "p:P[p:X]");
+    auto P_Y = load(ctx, "p:P[p:Y]");
+    auto P_A_X_X = load(ctx, "p:P[p:A[p:X, p:X]]");
+    auto A_X_X = load(ctx, "p:A[p:X, p:X]");
+    auto A_Y_Y = load(ctx, "p:A[p:Y, p:Y]");
+    auto A_X_Y = load(ctx, "p:A[p:X, p:Y]");
+    auto A_A_X_X_A_X_X = load(ctx, "p:A[p:A[p:X, p:X], p:A[p:X, p:X]]");
+    auto B_X_X = load(ctx, "p:B[p:X, p:X]");
+    auto B_Y_Y = load(ctx, "p:B[p:Y, p:Y]");
+    auto B_X_Y = load(ctx, "p:B[p:X, p:Y]");
+    auto C = load(ctx, "p:C");
 
-    succeed(A_X_X, Any);
-    succeed(A_Y_Y, Any);
-    succeed(A_X_Y, Any);
-    succeed(A_A_X_X_A_X_X, Any);
-    succeed(B_X_X, Any);
-    succeed(B_Y_Y, Any);
-    succeed(B_X_Y, Any);
-    succeed(C, Any);
+    success(A_X_X, Any);
+    success(A_Y_Y, Any);
+    success(A_X_Y, Any);
+    success(A_A_X_X_A_X_X, Any);
+    success(B_X_X, Any);
+    success(B_Y_Y, Any);
+    success(B_X_Y, Any);
+    success(C, Any);
 
-    succeed(A_X_X, P_X);
-    fail(A_Y_Y, P_X);
-    fail(A_X_Y, P_X);
-    fail(A_A_X_X_A_X_X, P_X);
-    fail(B_X_X, P_X);
-    fail(B_Y_Y, P_X);
-    fail(B_X_Y, P_X);
-    succeed(C, P_X);
+    success(A_X_X, P_X);
+    failure(A_Y_Y, P_X);
+    failure(A_X_Y, P_X);
+    failure(A_A_X_X_A_X_X, P_X);
+    failure(B_X_X, P_X);
+    failure(B_Y_Y, P_X);
+    failure(B_X_Y, P_X);
+    success(C, P_X);
 
-    fail(A_X_X, P_Y);
-    succeed(A_Y_Y, P_Y);
-    fail(A_X_Y, P_Y);
-    fail(A_A_X_X_A_X_X, P_Y);
-    fail(B_X_X, P_Y);
-    fail(B_Y_Y, P_Y);
-    fail(B_X_Y, P_Y);
-    fail(C, P_Y);
+    failure(A_X_X, P_Y);
+    success(A_Y_Y, P_Y);
+    failure(A_X_Y, P_Y);
+    failure(A_A_X_X_A_X_X, P_Y);
+    failure(B_X_X, P_Y);
+    failure(B_Y_Y, P_Y);
+    failure(B_X_Y, P_Y);
+    failure(C, P_Y);
 
-    fail(A_X_X, P_A_X_X);
-    fail(A_Y_Y, P_A_X_X);
-    fail(A_X_Y, P_A_X_X);
-    succeed(A_A_X_X_A_X_X, P_A_X_X);
-    fail(B_X_X, P_A_X_X);
-    fail(B_Y_Y, P_A_X_X);
-    fail(B_X_Y, P_A_X_X);
-    fail(C, P_A_X_X);
+    failure(A_X_X, P_A_X_X);
+    failure(A_Y_Y, P_A_X_X);
+    failure(A_X_Y, P_A_X_X);
+    success(A_A_X_X_A_X_X, P_A_X_X);
+    failure(B_X_X, P_A_X_X);
+    failure(B_Y_Y, P_A_X_X);
+    failure(B_X_Y, P_A_X_X);
+    failure(C, P_A_X_X);
 }
 

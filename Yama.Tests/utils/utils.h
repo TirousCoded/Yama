@@ -87,6 +87,15 @@ namespace {
         "abc:xyz[abc:xyz,]",
         "abc:xyz[abc:xyz, abc:xyz]/m",
     };
+
+
+    // Throws std::runtime_error on load error in order to force unit test to crash.
+    inline ym::Safe<YmItem> load(YmCtx* ctx, const std::string& fullname) {
+        auto result = ymCtx_Load(ctx, fullname.c_str());
+        EXPECT_TRUE(result);
+        if (!result) throw std::runtime_error(""); // Abort test.
+        return ym::Safe(result);
+    }
 }
 
 

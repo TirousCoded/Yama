@@ -35,12 +35,13 @@ TEST(Loading, WorksWithAllItemKinds) {
     YmItemIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    YmItem* A = ymCtx_Load(ctx, "p:A");
-    YmItem* B = ymCtx_Load(ctx, "p:B");
-    YmItem* C = ymCtx_Load(ctx, "p:C");
-    YmItem* A_m = ymCtx_Load(ctx, "p:A::m");
-    YmItem* B_m = ymCtx_Load(ctx, "p:B::m");
-    YmItem* Int = ymCtx_Load(ctx, "p:Int");
+
+    YmItem* A = load(ctx, "p:A");
+    YmItem* B = load(ctx, "p:B");
+    YmItem* C = load(ctx, "p:C");
+    YmItem* A_m = load(ctx, "p:A::m");
+    YmItem* B_m = load(ctx, "p:B::m");
+    YmItem* Int = load(ctx, "p:Int");
 
     test_struct(A, "p:A", { A_m });
     test_protocol(B, "p:B", { B_m });
@@ -87,12 +88,13 @@ TEST(Loading, WorksWithAllItemKinds_Generics) {
     YmItemIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    YmItem* A_Int = ymCtx_Load(ctx, "p:A[p:Int]");
-    YmItem* B_Int = ymCtx_Load(ctx, "p:B[p:Int]");
-    YmItem* C_Int = ymCtx_Load(ctx, "p:C[p:Int]");
-    YmItem* A_Int_m = ymCtx_Load(ctx, "p:A[p:Int]::m");
-    YmItem* B_Int_m = ymCtx_Load(ctx, "p:B[p:Int]::m");
-    YmItem* Int = ymCtx_Load(ctx, "p:Int");
+
+    YmItem* A_Int = load(ctx, "p:A[p:Int]");
+    YmItem* B_Int = load(ctx, "p:B[p:Int]");
+    YmItem* C_Int = load(ctx, "p:C[p:Int]");
+    YmItem* A_Int_m = load(ctx, "p:A[p:Int]::m");
+    YmItem* B_Int_m = load(ctx, "p:B[p:Int]::m");
+    YmItem* Int = load(ctx, "p:Int");
 
     test_struct(A_Int, "p:A[p:Int]", {}, { Int });
     test_protocol(B_Int, "p:B[p:Int]", {}, { Int });
@@ -114,7 +116,7 @@ TEST(Loading, NoRefs) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
 
     test_struct(p_A, "p:A", {});
 }
@@ -135,9 +137,9 @@ TEST(Loading, Refs) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-    YmItem* p_C = ymCtx_Load(ctx, "p:C");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_B = load(ctx, "p:B");
+    YmItem* p_C = load(ctx, "p:C");
 
     test_struct(p_A, "p:A", { p_B, p_C });
     test_struct(p_B, "p:B", {});
@@ -164,12 +166,12 @@ TEST(Loading, MultipleLayersOfIndirectRefs) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-    YmItem* p_C = ymCtx_Load(ctx, "p:C");
-    YmItem* p_D = ymCtx_Load(ctx, "p:D");
-    YmItem* p_E = ymCtx_Load(ctx, "p:E");
-    YmItem* p_F = ymCtx_Load(ctx, "p:F");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_B = load(ctx, "p:B");
+    YmItem* p_C = load(ctx, "p:C");
+    YmItem* p_D = load(ctx, "p:D");
+    YmItem* p_E = load(ctx, "p:E");
+    YmItem* p_F = load(ctx, "p:F");
 
     test_struct(p_A, "p:A", { p_B, p_C });
     test_struct(p_B, "p:B", { p_D, p_E });
@@ -197,10 +199,10 @@ TEST(Loading, ItemReferencedMultipleTimesInAcyclicDepGraph) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-    YmItem* p_C = ymCtx_Load(ctx, "p:C");
-    YmItem* p_D = ymCtx_Load(ctx, "p:D");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_B = load(ctx, "p:B");
+    YmItem* p_C = load(ctx, "p:C");
+    YmItem* p_D = load(ctx, "p:D");
 
     test_struct(p_A, "p:A", { p_B, p_C, p_D });
     test_struct(p_B, "p:B", { p_D });
@@ -223,8 +225,8 @@ TEST(Loading, DepGraphCycle) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_B = load(ctx, "p:B");
 
     test_struct(p_A, "p:A", { p_B, p_A });
     test_struct(p_B, "p:B", { p_A });
@@ -253,10 +255,9 @@ TEST(Loading, DepGraphCycle_ArisingDueToSpecificTypeArgUsed) {
     auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:Any" } });
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto T_A = ymCtx_Load(ctx, "p:T[p:A]");
-    auto A = ymCtx_Load(ctx, "p:A");
-    ASSERT_TRUE(T_A);
-    ASSERT_TRUE(A);
+
+    auto T_A = load(ctx, "p:T[p:A]");
+    auto A = load(ctx, "p:A");
 
     test_struct(T_A, "p:T[p:A]", {}, { A });
     test_struct(A, "p:A", { T_A });
@@ -279,9 +280,9 @@ TEST(Loading, ItemsReferencedFromDifferentParcels) {
     ymDm_BindParcelDef(dm, "p", p_def);
     ymDm_BindParcelDef(dm, "q", q_def);
     
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-    YmItem* q_A = ymCtx_Load(ctx, "q:A");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_B = load(ctx, "p:B");
+    YmItem* q_A = load(ctx, "q:A");
 
     test_struct(p_A, "p:A", { q_A });
     test_struct(p_B, "p:B", {});
@@ -302,9 +303,8 @@ TEST(Loading, DirectLoadsAutoImportParcels) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
 
-    ASSERT_NE(p_A, nullptr);
     EXPECT_EQ(ymItem_Parcel(p_A), ymCtx_Import(ctx, "p"));
 }
 
@@ -325,10 +325,9 @@ TEST(Loading, IndirectLoadsAutoImportParcels) {
     ymDm_BindParcelDef(dm, "p", p_def);
     ymDm_BindParcelDef(dm, "q", q_def);
 
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* q_A = ymCtx_Load(ctx, "q:A");
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* q_A = load(ctx, "q:A");
 
-    ASSERT_NE(q_A, nullptr);
     EXPECT_EQ(ymItem_Parcel(q_A), ymCtx_Import(ctx, "q"));
 }
 
@@ -355,14 +354,10 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
     ymDm_BindParcelDef(dm, "p", p_def);
 
     // NOTE: This test covers principle load being of the owner.
-    YmItem* p_A = ymCtx_Load(ctx, "p:A"); // The recursive load under test.
-    YmItem* p_A_m1 = ymCtx_Load(ctx, "p:A::m1");
-    YmItem* p_A_m2 = ymCtx_Load(ctx, "p:A::m2");
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-
-    ASSERT_NE(p_A, nullptr);
-    ASSERT_NE(p_A_m1, nullptr);
-    ASSERT_NE(p_A_m2, nullptr);
+    YmItem* p_A = load(ctx, "p:A"); // The recursive load under test.
+    YmItem* p_A_m1 = load(ctx, "p:A::m1");
+    YmItem* p_A_m2 = load(ctx, "p:A::m2");
+    YmItem* p_B = load(ctx, "p:B");
 
     test_struct(p_A, "p:A", { p_A_m1, p_A_m2 });
     test_method(p_A_m1, "p:A::m1", { p_A, p_B });
@@ -404,14 +399,10 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     ymDm_BindParcelDef(dm, "p", p_def);
 
     // NOTE: This test covers principle load being of a member.
-    YmItem* p_A_m1 = ymCtx_Load(ctx, "p:A::m1"); // The recursive load under test.
-    YmItem* p_A = ymCtx_Load(ctx, "p:A");
-    YmItem* p_A_m2 = ymCtx_Load(ctx, "p:A::m2");
-    YmItem* p_B = ymCtx_Load(ctx, "p:B");
-
-    ASSERT_NE(p_A, nullptr);
-    ASSERT_NE(p_A_m1, nullptr);
-    ASSERT_NE(p_A_m2, nullptr);
+    YmItem* p_A_m1 = load(ctx, "p:A::m1"); // The recursive load under test.
+    YmItem* p_A = load(ctx, "p:A");
+    YmItem* p_A_m2 = load(ctx, "p:A::m2");
+    YmItem* p_B = load(ctx, "p:B");
 
     test_struct(p_A, "p:A", { p_A_m1, p_A_m2 });
     test_method(p_A_m1, "p:A::m1", { p_A, p_B });
@@ -466,17 +457,13 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
     auto A_index = setup_struct(p_def, "A", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
+
     // NOTE: This test covers principle load being of the owner.
-    YmItem* T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
-    YmItem* T_A_m1 = ymCtx_Load(ctx, "p:T[p:A]::m1");
-    YmItem* T_A_m2 = ymCtx_Load(ctx, "p:T[p:A]::m2");
-    YmItem* A = ymCtx_Load(ctx, "p:A");
-    YmItem* Int = ymCtx_Load(ctx, "p:Int");
-    ASSERT_TRUE(T_A);
-    ASSERT_TRUE(T_A_m1);
-    ASSERT_TRUE(T_A_m2);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(Int);
+    YmItem* T_A = load(ctx, "p:T[p:A]"); // The recursive load under test.
+    YmItem* T_A_m1 = load(ctx, "p:T[p:A]::m1");
+    YmItem* T_A_m2 = load(ctx, "p:T[p:A]::m2");
+    YmItem* A = load(ctx, "p:A");
+    YmItem* Int = load(ctx, "p:Int");
 
     test_struct(T_A, "p:T[p:A]", { T_A_m1, T_A_m2 }, { A });
     test_method(T_A_m1, "p:T[p:A]::m1", {}, { A });
@@ -519,16 +506,12 @@ TEST(Loading, SelfRef_IncludingRefsWithinMembers) {
     auto FN_ref = ymParcelDef_AddRef(p_def, FN_index, "$Self");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto STRUCT = ymCtx_Load(ctx, "p:STRUCT");
-    auto STRUCT_m = ymCtx_Load(ctx, "p:STRUCT::m");
-    auto PROTOCOL = ymCtx_Load(ctx, "p:PROTOCOL");
-    auto PROTOCOL_m = ymCtx_Load(ctx, "p:PROTOCOL::m");
-    auto FN = ymCtx_Load(ctx, "p:FN");
-    ASSERT_TRUE(STRUCT);
-    ASSERT_TRUE(STRUCT_m);
-    ASSERT_TRUE(PROTOCOL);
-    ASSERT_TRUE(PROTOCOL_m);
-    ASSERT_TRUE(FN);
+
+    auto STRUCT = load(ctx, "p:STRUCT");
+    auto STRUCT_m = load(ctx, "p:STRUCT::m");
+    auto PROTOCOL = load(ctx, "p:PROTOCOL");
+    auto PROTOCOL_m = load(ctx, "p:PROTOCOL::m");
+    auto FN = load(ctx, "p:FN");
 
     EXPECT_EQ(ymItem_ReturnType(STRUCT_m), STRUCT);
     EXPECT_EQ(ymItem_ReturnType(PROTOCOL_m), PROTOCOL);
@@ -585,16 +568,12 @@ TEST(Loading, ItemArgRef_IncludingRefsWithinMembers) {
     auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
-    auto T_A_m = ymCtx_Load(ctx, "p:T[p:A]::m"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto U_A = ymCtx_Load(ctx, "p:U[p:A]");
-    auto U_U_A = ymCtx_Load(ctx, "p:U[p:U[p:A]]");
-    ASSERT_TRUE(T_A);
-    ASSERT_TRUE(T_A_m);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(U_A);
-    ASSERT_TRUE(U_U_A);
+
+    auto T_A = load(ctx, "p:T[p:A]"); // The recursive load under test.
+    auto T_A_m = load(ctx, "p:T[p:A]::m"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
+    auto U_A = load(ctx, "p:U[p:A]");
+    auto U_U_A = load(ctx, "p:U[p:U[p:A]]");
 
     test_struct(T_A, "p:T[p:A]", { T_A_m, U_U_A }, { A });
     test_method(T_A_m, "p:T[p:A]::m", { A, U_A }, { A });
@@ -622,10 +601,9 @@ TEST(Loading, Here) {
     ASSERT_NE(B_ref, YM_NO_REF);
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto B = ymCtx_Load(ctx, "p:B"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(A);
+
+    auto B = load(ctx, "p:B"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
 
     test_struct(B, "p:B", { A });
     test_struct(A, "p:A", {});
@@ -695,26 +673,17 @@ TEST(Loading, ItemParams_IncludingForMemberTypes) {
     auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto T_C_T_A_B = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]"); // The recursive load under test.
-    auto T_C_T_A_B_m = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]::m"); // The recursive load under test.
-    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
-    auto T_A_B_m = ymCtx_Load(ctx, "p:T[p:A, p:B]::m"); // The recursive load under test.
-    auto T_C_D = ymCtx_Load(ctx, "p:T[p:C, p:D]"); // The recursive load under test.
-    auto T_C_D_m = ymCtx_Load(ctx, "p:T[p:C, p:D]::m"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    ASSERT_TRUE(T_C_T_A_B);
-    ASSERT_TRUE(T_C_T_A_B_m);
-    ASSERT_TRUE(T_A_B);
-    ASSERT_TRUE(T_A_B_m);
-    ASSERT_TRUE(T_C_D);
-    ASSERT_TRUE(T_C_D_m);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
+
+    auto T_C_T_A_B = load(ctx, "p:T[p:C, p:T[p:A, p:B]]"); // The recursive load under test.
+    auto T_C_T_A_B_m = load(ctx, "p:T[p:C, p:T[p:A, p:B]]::m"); // The recursive load under test.
+    auto T_A_B = load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
+    auto T_A_B_m = load(ctx, "p:T[p:A, p:B]::m"); // The recursive load under test.
+    auto T_C_D = load(ctx, "p:T[p:C, p:D]"); // The recursive load under test.
+    auto T_C_D_m = load(ctx, "p:T[p:C, p:D]::m"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto D = load(ctx, "p:D");
 
     test_struct(T_A_B, "p:T[p:A, p:B]", { T_A_B_m }, { A, B });
     test_method(T_A_B_m, "p:T[p:A, p:B]::m", {}, { A, B });
@@ -761,12 +730,10 @@ TEST(Loading, ItemParams_ParamsInterReferenceOneAnother) {
     ymParcelDef_AddMethod(p_def, B_index, "m", "p:U[p:A]", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    ASSERT_TRUE(T_A_B);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
+
+    auto T_A_B = load(ctx, "p:T[p:A, p:B]"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
 
     test_struct(T_A_B, "p:T[p:A, p:B]", {}, { A, B });
 }
@@ -802,10 +769,9 @@ TEST(Loading, ItemParams_ParamsReferenceSelf) {
     ymParcelDef_AddMethod(p_def, A_index, "m", "p:U[p:T[p:A]]", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto T_A = ymCtx_Load(ctx, "p:T[p:A]"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    ASSERT_TRUE(T_A);
-    ASSERT_TRUE(A);
+
+    auto T_A = load(ctx, "p:T[p:A]"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
 
     test_struct(T_A, "p:T[p:A]", {}, { A });
 }
@@ -856,22 +822,15 @@ TEST(Loading, ItemParams_IndirectLoad) {
     auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto H = ymCtx_Load(ctx, "p:H"); // The recursive load under test.
-    auto T_C_T_A_B = ymCtx_Load(ctx, "p:T[p:C, p:T[p:A, p:B]]");
-    auto T_A_B = ymCtx_Load(ctx, "p:T[p:A, p:B]");
-    auto T_C_D = ymCtx_Load(ctx, "p:T[p:C, p:D]");
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    ASSERT_TRUE(H);
-    ASSERT_TRUE(T_C_T_A_B);
-    ASSERT_TRUE(T_A_B);
-    ASSERT_TRUE(T_C_D);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
+
+    auto H = load(ctx, "p:H"); // The recursive load under test.
+    auto T_C_T_A_B = load(ctx, "p:T[p:C, p:T[p:A, p:B]]");
+    auto T_A_B = load(ctx, "p:T[p:A, p:B]");
+    auto T_C_D = load(ctx, "p:T[p:C, p:D]");
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
+    auto C = load(ctx, "p:C");
+    auto D = load(ctx, "p:D");
 
     test_struct(H, "p:H", { T_A_B, T_C_D, T_C_T_A_B });
     test_struct(T_A_B, "p:T[p:A, p:B]", {}, { A, B });
@@ -914,14 +873,11 @@ TEST(Loading, ItemParams_RecursiveConstraint_ForGenericProtocol) {
     ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
-    auto P_A = ymCtx_Load(ctx, "p:P[p:A]"); // The recursive load under test.
-    auto Q_A = ymCtx_Load(ctx, "p:Q[p:A]"); // The recursive load under test.
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    ASSERT_TRUE(P_A);
-    ASSERT_TRUE(Q_A);
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
+
+    auto P_A = load(ctx, "p:P[p:A]"); // The recursive load under test.
+    auto Q_A = load(ctx, "p:Q[p:A]"); // The recursive load under test.
+    auto A = load(ctx, "p:A");
+    auto B = load(ctx, "p:B");
 
     test_protocol(P_A, "p:P[p:A]", {}, { A });
     test_protocol(Q_A, "p:Q[p:A]", {}, { A });
@@ -977,12 +933,9 @@ TEST(Loading, MemberAccess) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto A_m = ymCtx_Load(ctx, "p:A::m");
-    auto B_A_m = ymCtx_Load(ctx, "p:B[p:A]::m");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(A_m);
-    ASSERT_TRUE(B_A_m);
+    auto A = load(ctx, "p:A");
+    auto A_m = load(ctx, "p:A::m");
+    auto B_A_m = load(ctx, "p:B[p:A]::m");
 
     EXPECT_EQ(ymItem_Ref(A, A_m_ref), A_m);
     EXPECT_EQ(ymItem_Ref(A, B_A_m_ref), B_A_m);
@@ -1004,14 +957,10 @@ TEST(Loading, MemberAccess_SelfAndItemParamRefs) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
-    auto A_B = ymCtx_Load(ctx, "p:A[p:B]");
-    auto A_B_m1 = ymCtx_Load(ctx, "p:A[p:B]::m1");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto B_m2 = ymCtx_Load(ctx, "p:B::m2");
-    ASSERT_TRUE(A_B);
-    ASSERT_TRUE(A_B_m1);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(B_m2);
+    auto A_B = load(ctx, "p:A[p:B]");
+    auto A_B_m1 = load(ctx, "p:A[p:B]::m1");
+    auto B = load(ctx, "p:B");
+    auto B_m2 = load(ctx, "p:B::m2");
 
     EXPECT_EQ(ymItem_Ref(A_B, A_m1_ref), A_B_m1);
     EXPECT_EQ(ymItem_Ref(A_B, B_m2_ref), B_m2);
