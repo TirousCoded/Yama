@@ -7,32 +7,43 @@
 #include "YmParcelDef.h"
 #include "SpecSolver.h"
 
+#include "../yama++/resources.h"
+
 
 _ym::DmLoader::DmLoader() :
     SynchronizedLoader(),
     _ldrState(_staging, _binds) {
     _staging.setUpstream(&_commits);
+    _bindYamaParcel();
 }
 
-bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef) {
-    if (!_ym::Global::pathIsLegal(path)) {
+bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel) {
+    if (auto normalizedPath = SpecSolver{}(path, SpecSolver::MustBe::Path)) {
+        if (!bindIsForYamaParcel && *normalizedPath == "yama") {
+            _ym::Global::raiseErr(
+                YmErrCode_PathBindError,
+                "Cannot bind parcel def.; would overwrite \"yama\" parcel!");
+            return false;
+        }
+        if (!parceldef->verify()) {
+            return false;
+        }
+        std::scoped_lock lk(_updateLock);
+        _binds.set(*normalizedPath, std::make_shared<YmParcel>(*normalizedPath, parceldef->info));
+        return true;
+    }
+    else {
         _ym::Global::raiseErr(
             YmErrCode_IllegalSpecifier,
             "Cannot bind parcel def.; path \"{}\" is illegal!",
             path);
         return false;
     }
-    if (!parceldef->verify()) {
-        return false;
-    }
-    std::scoped_lock lk(_updateLock);
-    _binds.set(path, std::make_shared<YmParcel>(path, parceldef->info));
-    return true;
 }
 
 void _ym::DmLoader::reset() noexcept {
     std::scoped_lock lk(_accessLock, _updateLock);
-    // TODO: Should also reset _commits/_binds?
+    // TODO: Should also reset _commits/_binds? (If so, call _bindYamaParcel.)
     _staging.discard(true);
 }
 
@@ -74,6 +85,18 @@ std::shared_ptr<YmItem> _ym::DmLoader::load(const std::string& normalizedFullnam
         result
         ? result->shared_from_this()
         : nullptr;
+}
+
+void _ym::DmLoader::_bindYamaParcel() {
+    auto p = ym::makeScoped<YmParcelDef>();
+    p->addStruct("None");
+    p->addStruct("Int");
+    p->addStruct("UInt");
+    p->addStruct("Float");
+    p->addStruct("Bool");
+    p->addStruct("Rune");
+    p->addProtocol("Any");
+    if (!bindParcelDef("yama", *p, true)) YM_DEADEND;
 }
 
 _ym::CtxLoader::CtxLoader(const std::shared_ptr<Loader>& upstream) :

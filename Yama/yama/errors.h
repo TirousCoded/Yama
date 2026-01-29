@@ -14,6 +14,7 @@ extern "C" {
     typedef enum : YmUInt16 {
         YmErrCode_IllegalSpecifier = 0,     /* Illegal specifier (in some import/load context.) */
         YmErrCode_IllegalConstraint,        /* Illegal type parameter constraint. */
+        YmErrCode_PathBindError,            /* Path binding error. */
         YmErrCode_ItemArgsError,            /* Item arguments error. */
         YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
         YmErrCode_ItemNotFound,             /* Couldn't find a specific item. */

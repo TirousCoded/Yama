@@ -265,6 +265,8 @@ extern "C" {
     */
 
 
+    /* TODO: Revise our policy on thread-safety to be per-function.
+    */
     /* NOTE: Resources are thread-unsafe unless otherwise specified.
     */
 
@@ -414,11 +416,6 @@ extern "C" {
     /* Destroys domain dm. */
     /* Behaviour is undefined if dm is invalid. */
     void ymDm_Destroy(struct YmDm* dm);
-
-    /* TODO: ymDm_BindParcelDef overwriting existing bindings hasn't been unit tested.
-    */
-    /* TODO: Do we properly test if ymDm_BindParcelDef normalizes path?
-    */
 
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
     /* Fails if path specified is illegal. */

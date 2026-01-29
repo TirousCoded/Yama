@@ -52,7 +52,7 @@ namespace ym {
 
     template<UserManagedRes T, typename... Args>
     inline Safe<T> create(Args&&... args) {
-        return Safe(ResTraits<T>::create(std::forward<Args>(args)));
+        return Safe(ResTraits<T>::create(std::forward<Args>(args)...));
     }
     // Fails quietly if x == nullptr.
     template<UserManagedRes T>
@@ -75,7 +75,7 @@ namespace ym {
     }
     template<UserManagedRes T, typename... Args>
     inline Scoped<T> makeScoped(Args&&... args) {
-        return bindScoped<T>(create<T>(std::forward<Args>(args)));
+        return bindScoped<T>(create<T>(std::forward<Args>(args)...));
     }
 }
 

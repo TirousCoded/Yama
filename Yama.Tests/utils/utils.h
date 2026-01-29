@@ -89,6 +89,13 @@ namespace {
     };
 
 
+    // Throws std::runtime_error on import error in order to force unit test to crash.
+    inline ym::Safe<YmParcel> import(YmCtx* ctx, const std::string& path) {
+        auto result = ymCtx_Import(ctx, path.c_str());
+        EXPECT_TRUE(result);
+        if (!result) throw std::runtime_error(""); // Abort test.
+        return ym::Safe(result);
+    }
     // Throws std::runtime_error on load error in order to force unit test to crash.
     inline ym::Safe<YmItem> load(YmCtx* ctx, const std::string& fullname) {
         auto result = ymCtx_Load(ctx, fullname.c_str());

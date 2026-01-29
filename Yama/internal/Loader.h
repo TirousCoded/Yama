@@ -71,7 +71,7 @@ namespace _ym {
         DmLoader();
 
 
-        bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef);
+        bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel = false);
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
@@ -89,6 +89,9 @@ namespace _ym {
 
         mutable std::shared_mutex _accessLock; // Protects _commits.
         mutable std::mutex _updateLock; // Protects _staging/_binds/_ldrState.
+
+
+        void _bindYamaParcel();
     };
 
     // Thread-unsafe loader used by contexts, existing downstream of domain loaders.

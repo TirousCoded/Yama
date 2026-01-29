@@ -6,10 +6,11 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 16);
+    static_assert(YmErrCode_Num == 17);
     switch (code) {
     case YmErrCode_IllegalSpecifier:        return "IllegalSpecifier";
     case YmErrCode_IllegalConstraint:       return "IllegalConstraint";
+    case YmErrCode_PathBindError:           return "PathBindError";
     case YmErrCode_ItemArgsError:           return "ItemArgsError";
     case YmErrCode_ParcelNotFound:          return "ParcelNotFound";
     case YmErrCode_ItemNotFound:            return "ItemNotFound";
