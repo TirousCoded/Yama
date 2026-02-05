@@ -78,6 +78,9 @@ public:
     const std::string& fullname() const noexcept;
     const std::string& localName() const noexcept;
 
+    std::optional<std::string> callsuff() const;
+    std::optional<std::string> callsig() const;
+
     YmItem* owner() noexcept;
     const YmItem* owner() const noexcept;
     ym::Safe<YmItem> self() noexcept;

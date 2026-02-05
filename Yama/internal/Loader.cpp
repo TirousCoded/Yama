@@ -53,14 +53,37 @@ std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(const std::string& normaliz
     return _commits.parcels.fetch(normalizedPath);
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& normalizedFullname) const noexcept {
+std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform) const noexcept {
     assertNormal(normalizedFullname);
+    if (failedDueToCallSigNonConform) {
+        *failedDueToCallSigNonConform = false;
+    }
+    // TODO: DmLoader and CtxLoader share callsuff checking code for fetchItem.
+    //       We can make a non-virtual base class 'fetchItem' method which handles this, and then
+    //       this can call a virtual 'doFetchItem' method.
+    //       Also, try to update _ym::DmLoader::load to generalize it's code w/ above.
+    //       Also _ym::LoaderState::_checkRefConstCallSigConformance too.
+    const auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
     std::shared_lock lk(_accessLock);
-    return _commits.items.fetch(normalizedFullname);
+    auto result = _commits.items.fetch(std::string(fullname));
+    lk.unlock(); // Don't need it anymore.
+    if (result && callsuff && result->callsuff() != callsuff) {
+        if (failedDueToCallSigNonConform) {
+            *failedDueToCallSigNonConform = true;
+        }
+        // TODO: Improve this error!
+        _ym::Global::raiseErr(
+            YmErrCode_ItemNotFound,
+            "{} does not conform to call suffix \"{}\"!",
+            result->fullname(),
+            std::string(*callsuff));
+        return nullptr;
+    }
+    return result;
 }
 
 std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& normalizedPath) {
-    assertNormal(normalizedPath);
+    assertNormalNonCallSig(normalizedPath);
     if (const auto result = fetchParcel(normalizedPath)) {
         return result;
     }
@@ -75,11 +98,23 @@ std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& normalizedPat
 
 std::shared_ptr<YmItem> _ym::DmLoader::load(const std::string& normalizedFullname) {
     assertNormal(normalizedFullname);
-    if (const auto result = fetchItem(normalizedFullname)) {
+    bool failedDueToCallSigNonConform{};
+    if (const auto result = fetchItem(normalizedFullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
+    auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
     std::scoped_lock lk(_updateLock);
-    auto result = _ldrState.load(normalizedFullname);
+    auto result = _ldrState.load(std::string(fullname));
+    if (result && callsuff && result->callsuff() != callsuff) {
+        // TODO: Improve this error!
+        _ym::Global::raiseErr(
+            YmErrCode_ItemNotFound,
+            "{} does not conform to call suffix \"{}\"!",
+            result->fullname(),
+            std::string(*callsuff));
+        _staging.discard(); // Can't forget!
+        return nullptr;
+    }
     _staging.commitOrDiscard(result, _accessLock);
     return
         result
@@ -119,9 +154,26 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(const std::string& normali
     return _commits.parcels.fetch(normalizedPath);
 }
 
-std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const std::string& normalizedFullname) const noexcept {
+std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform) const noexcept {
     assertNormal(normalizedFullname);
-    return _commits.items.fetch(normalizedFullname);
+    if (failedDueToCallSigNonConform) {
+        *failedDueToCallSigNonConform = false;
+    }
+    const auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
+    auto result = _commits.items.fetch(std::string(fullname));
+    if (result && callsuff && result->callsuff() != callsuff) {
+        if (failedDueToCallSigNonConform) {
+            *failedDueToCallSigNonConform = true;
+        }
+        // TODO: Improve this error!
+        _ym::Global::raiseErr(
+            YmErrCode_ItemNotFound,
+            "{} does not conform to call suffix \"{}\"!",
+            result->fullname(),
+            std::string(*callsuff));
+        return nullptr;
+    }
+    return result;
 }
 
 std::shared_ptr<YmParcel> _ym::CtxLoader::import(const std::string& normalizedPath) {
@@ -129,20 +181,23 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::import(const std::string& normalizedPa
     if (auto result = fetchParcel(normalizedPath)) {
         return result;
     }
+    auto parcel = upstream()->import(normalizedPath);
     return
-        _commits.parcels.push(upstream()->import(normalizedPath))
-        ? fetchParcel(normalizedPath)
+        _commits.parcels.push(parcel)
+        ? parcel
         : nullptr;
 }
 
 std::shared_ptr<YmItem> _ym::CtxLoader::load(const std::string& normalizedFullname) {
     assertNormal(normalizedFullname);
-    if (auto result = fetchItem(normalizedFullname)) {
+    bool failedDueToCallSigNonConform{};
+    if (auto result = fetchItem(normalizedFullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
+    auto item = upstream()->load(normalizedFullname);
     return
-        _commits.items.push(upstream()->load(normalizedFullname))
-        ? fetchItem(normalizedFullname)
+        _commits.items.push(item)
+        ? item
         : nullptr;
 }
 

@@ -31,17 +31,32 @@ void _ym::SpecEval::on_lexical(taul::token tkn) {
     if (tkn && tkn.lpr) {
         if (tkn.lpr->name() == "IDENTIFIER") {
             auto id = tkn.str(_input);
-            if (_idMode == _IdMode::Root)		    rootId(id);
-            else if (_idMode == _IdMode::Slash)	    slashId(id);
-            else if (_idMode == _IdMode::Colon)	    colonId(id);
-            else if (_idMode == _IdMode::DblColon)  dblColonId(id);
-            else								    YM_DEADEND;
+            if (_idMode == _IdMode::Root)		        rootId(id);
+            else if (_idMode == _IdMode::Slash)	        slashId(id);
+            else if (_idMode == _IdMode::Colon)	        colonId(id);
+            else if (_idMode == _IdMode::DblColon)      dblColonId(id);
+            else								        YM_DEADEND;
         }
-        else if (tkn.lpr->name() == "L_SQUARE")	    openArgs();
-        else if (tkn.lpr->name() == "R_SQUARE")	    closeArgs();
-        else if (tkn.lpr->name() == "SLASH")	    _idMode = _IdMode::Slash;
-        else if (tkn.lpr->name() == "COLON")	    _idMode = _IdMode::Colon;
-        else if (tkn.lpr->name() == "DBL_COLON")    _idMode = _IdMode::DblColon;
+        else if (tkn.lpr->name() == "R_ARROW") {
+            ymAssert(_stage == _Stage::CallSuffParams);
+            _stage = _Stage::CallSuffReturnType;
+            callSuffReturnType();
+        }
+        else if (tkn.lpr->name() == "L_ROUND") {
+            ymAssert(_stage == _Stage::Main);
+            _stage = _Stage::CallSuffParams;
+            openCallSuff();
+        }
+        else if (tkn.lpr->name() == "L_SQUARE")	        openItemArgs();
+        else if (tkn.lpr->name() == "R_SQUARE")	        closeItemArgs();
+        else if (tkn.lpr->name() == "COMMA") {
+            if (_stage == _Stage::Main)                 itemArgsArgDelimiter();
+            else if (_stage == _Stage::CallSuffParams)  callSuffParamDelimiter();
+            else                                        YM_DEADEND;
+        }
+        else if (tkn.lpr->name() == "SLASH")	        _idMode = _IdMode::Slash;
+        else if (tkn.lpr->name() == "COLON")	        _idMode = _IdMode::Colon;
+        else if (tkn.lpr->name() == "DBL_COLON")        _idMode = _IdMode::DblColon;
     }
 }
 
@@ -56,7 +71,11 @@ void _ym::SpecEval::on_startup() {
 }
 
 void _ym::SpecEval::on_shutdown() {
-
+    ymAssert(_stage == _Stage::Main || _stage == _Stage::CallSuffReturnType);
+    // TODO: I don't like how this fires AFTER syntaxErr.
+    if (_stage == _Stage::CallSuffReturnType) {
+        closeCallSuff();
+    }
 }
 
 void _ym::SpecEval::on_close() {

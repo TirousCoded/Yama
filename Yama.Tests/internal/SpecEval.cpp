@@ -20,13 +20,24 @@ public:
             : std::nullopt;
     }
 
-    void syntaxErr() override { output += "syntaxErr\n"; }
-    void rootId(const taul::str& id) override { output += std::format("rootId {}\n", id); }
-    void openArgs() override { output += "openArgs\n"; }
-    void closeArgs() override { output += "closeArgs\n"; }
-    void slashId(const taul::str& id) override { output += std::format("slashId {}\n", id); }
-    void colonId(const taul::str& id) override { output += std::format("colonId {}\n", id); }
-    void dblColonId(const taul::str& id) override { output += std::format("dblColonId {}\n", id); }
+
+    template<typename... Args>
+    void emit(std::format_string<Args...> fmt, Args&&... args) {
+        output += std::format(fmt, std::forward<Args>(args)...);
+    }
+
+    void syntaxErr() override { emit("{}\n", __func__); }
+    void rootId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
+    void slashId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
+    void colonId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
+    void dblColonId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
+    void openItemArgs() override { emit("{}\n", __func__); }
+    void itemArgsArgDelimiter() override { emit("{}\n", __func__); }
+    void closeItemArgs() override { emit("{}\n", __func__); }
+    void openCallSuff() override { emit("{}\n", __func__); }
+    void callSuffParamDelimiter() override { emit("{}\n", __func__); }
+    void callSuffReturnType() override { emit("{}\n", __func__); }
+    void closeCallSuff() override { emit("{}\n", __func__); }
 };
 
 void test_(int line, bool shouldSucceed, const std::string& input, const std::string& output) {
@@ -56,32 +67,63 @@ dblColonId length
     succeed("yama:List[math/vec:Vec3]::size", R"(
 rootId yama
 colonId List
-openArgs
+openItemArgs
 rootId math
 slashId vec
 colonId Vec3
-closeArgs
+closeItemArgs
 dblColonId size
 )");
     succeed("%yama:%List[%math/%vec:%Vec3]::%size", R"(
 rootId %yama
 colonId %List
-openArgs
+openItemArgs
 rootId %math
 slashId %vec
 colonId %Vec3
-closeArgs
+closeItemArgs
 dblColonId %size
 )");
     succeed("$yama:$List[$math/$vec:$Vec3]::$size", R"(
 rootId $yama
 colonId $List
-openArgs
+openItemArgs
 rootId $math
 slashId $vec
 colonId $Vec3
-closeArgs
+closeItemArgs
 dblColonId $size
+)");
+    // Test w/ multiple item args.
+    succeed("yama:Map[yama:Str, yama:Int]::contains", R"(
+rootId yama
+colonId Map
+openItemArgs
+rootId yama
+colonId Str
+itemArgsArgDelimiter
+rootId yama
+colonId Int
+closeItemArgs
+dblColonId contains
+)");
+    succeed("p:A[p:B](yama:Int, yama:Float) -> yama:None", R"(
+rootId p
+colonId A
+openItemArgs
+rootId p
+colonId B
+closeItemArgs
+openCallSuff
+rootId yama
+colonId Int
+callSuffParamDelimiter
+rootId yama
+colonId Float
+callSuffReturnType
+rootId yama
+colonId None
+closeCallSuff
 )");
     // Invalid, but legal at this level of abstraction.
     succeed("A::B/C:D", R"(

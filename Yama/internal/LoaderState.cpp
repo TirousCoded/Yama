@@ -19,7 +19,7 @@ _ym::LoaderState::LoaderState(ym::Safe<Area> staging, ym::Safe<PathBindings> bin
 }
 
 YmParcel* _ym::LoaderState::import(const std::string& normalizedPath) {
-    assertNormal(normalizedPath);
+    assertNormalNonCallSig(normalizedPath);
     ymAssert(!_staging->parcels.fetch(normalizedPath));
 #if _DUMP_LOG
     ym::println("LoaderState: Importing \"{}\".", normalizedPath);
@@ -35,7 +35,7 @@ YmParcel* _ym::LoaderState::import(const std::string& normalizedPath) {
 }
 
 YmItem* _ym::LoaderState::load(const std::string& normalizedFullname) {
-    assertNormal(normalizedFullname);
+    assertNormalNonCallSig(normalizedFullname);
     ymAssert(!_staging->items.fetch(normalizedFullname));
 #if _DUMP_LOG
     ym::println("LoaderState: Loading \"{}\".", normalizedFullname);
@@ -49,6 +49,7 @@ YmItem* _ym::LoaderState::load(const std::string& normalizedFullname) {
     _processLateResolveQueue();
     _checkConstraintTypeLegality();
     _enforceConstraints();
+    _checkRefConstCallSigConformance();
     // TODO: 'good()' check here in case late resolve and/or constraint checks fail.
     auto result1 = good() ? result0 : nullptr;
     _endLoadOrImport();
@@ -146,7 +147,7 @@ void _ym::LoaderState::normalizedPath(const std::string& normalizedPath) {
 #if _DUMP_LOG
     ym::println("LoaderState: {} {}", __func__, normalizedPath);
 #endif
-    assertNormal(normalizedPath);
+    assertNormalNonCallSig(normalizedPath);
     push(Term(normalizedPath));
 }
 
@@ -154,13 +155,14 @@ void _ym::LoaderState::normalizedFullname(const std::string& normalizedFullname)
 #if _DUMP_LOG
     ym::println("LoaderState: {} {}", __func__, normalizedFullname);
 #endif
-    assertNormal(normalizedFullname);
+    assertNormalNonCallSig(normalizedFullname);
     if (auto result = _staging->items.fetch(normalizedFullname)) {
         push(Term(ym::Safe(result.get())));
     }
     else {
         eval(normalizedFullname);
-        item();
+        // TODO: Figure out way to remove this 'good' check.
+        if (good()) item();
     }
 }
 
@@ -705,9 +707,12 @@ void _ym::LoaderState::_lateResolveRefConst(YmItem& x, ConstIndex index) {
 #if _DUMP_LOG
     ym::println("LoaderState: Resolving {} (const #{}).", fmt(constInfo), index + 1);
 #endif
+    // NOTE: We seperate out the callsuff from the symbol (if present), as that
+    //       stuff will be checked later.
+    auto [fullname, callsuff] = seperateCallSuff(constInfo.as<RefInfo>().sym);
     // TODO: normalizedFullname contains redundent checks covered by the call
     //       to concrete below.
-    normalizedFullname(constInfo.as<RefInfo>().sym);
+    normalizedFullname(std::string(fullname));
     // TODO: concrete() crashes if above fails resulting in stack not being
     //       setup correctly, so gotta check w/ 'good' first.
     x.putRefConst(index, good() ? concrete() : nullptr);
@@ -779,6 +784,41 @@ void _ym::LoaderState::_enforceConstraints() {
     }
 }
 
+void _ym::LoaderState::_checkRefConstCallSigConformance() {
+    if (!good()) {
+        return;
+    }
+#if _DUMP_LOG
+    ym::println("LoaderState: Checking ref. const callsig conformance.");
+#endif
+    for (auto& item : _staging->items) {
+#if _DUMP_LOG
+        ym::println("LoaderState: Checking {} ref consts.", item.fullname());
+#endif
+        auto& consts = item.info->consts;
+        for (size_t i = 0; i < consts.size(); i++) {
+            if (auto constInfo = consts[i].tryAs<RefInfo>()) {
+                auto [fullname, callsuff] = seperateCallSuff(constInfo->sym);
+                if (callsuff) {
+#if _DUMP_LOG
+                    ym::println("LoaderState:     {}", constInfo->sym);
+#endif
+                    auto ref = item.constAsRef(i);
+                    if (ref && /*callsuff &&*/ ref->callsuff() != callsuff) {
+                        // TODO: Improve this error!
+                        err(
+                            YmErrCode_ItemNotFound,
+                            "{}; {} does not conform to call suffix \"{}\"!",
+                            errPrefix(),
+                            ref->fullname(),
+                            std::string(*callsuff));
+                    }
+                }
+            }
+        }
+    }
+}
+
 YmParcel* _ym::LoaderState::_import(const std::string& normalizedPath) {
     assertNormal(normalizedPath);
     if (auto existing = _staging->parcels.fetch(normalizedPath)) {
@@ -804,6 +844,7 @@ std::optional<size_t> _ym::LoaderState::_countInputsToEndArgs() const noexcept {
 }
 
 void _ym::LoaderState::_printTermStk(size_t oldHeight) {
+#if _DUMP_LOG
     std::string output{};
     auto t = expectN(height());
     bool first = true;
@@ -818,6 +859,7 @@ void _ym::LoaderState::_printTermStk(size_t oldHeight) {
         first = false;
     }
     ym::println("    ({} -> {}) {}", oldHeight, height(), output);
+#endif
 }
 
 _ym::LoaderState::_Interp::_Interp(LoaderState& client) :
@@ -838,40 +880,67 @@ void _ym::LoaderState::_Interp::syntaxErr() {
 }
 
 void _ym::LoaderState::_Interp::rootId(const taul::str& id) {
-    if (!_client->good()) return;
-    using namespace taul::string_literals;
-    if (id == "%here"_str)                  _client->here();
-    else if (id == "$Self"_str)             _client->self();
-    // TODO: Remove the avoidable std::string heap alloc.
-    else if (id.substr(0, 1) == "$"_str)    _client->itemParam(std::string(id.substr(1)));
-    else                                    _client->root(std::string(id));
-}
-
-void _ym::LoaderState::_Interp::openArgs() {
-    if (!_client->good()) return;
-    _client->beginArgs();
-}
-
-void _ym::LoaderState::_Interp::closeArgs() {
-    if (!_client->good()) return;
-    _client->endArgs();
+    if (_client->good()) {
+        using namespace taul::string_literals;
+        if (id == "%here"_str)                  _client->here();
+        else if (id == "$Self"_str)             _client->self();
+        // TODO: Remove the avoidable std::string heap alloc.
+        else if (id.substr(0, 1) == "$"_str)    _client->itemParam(std::string(id.substr(1)));
+        else                                    _client->root(std::string(id));
+    }
 }
 
 void _ym::LoaderState::_Interp::slashId(const taul::str& id) {
-    if (!_client->good()) return;
-    // TODO: Remove the avoidable std::string heap alloc.
-    _client->submod(std::string(id));
+    if (_client->good()) {
+        // TODO: Remove the avoidable std::string heap alloc.
+        _client->submod(std::string(id));
+    }
 }
 
 void _ym::LoaderState::_Interp::colonId(const taul::str& id) {
-    if (!_client->good()) return;
-    // TODO: Remove the avoidable std::string heap alloc.
-    _client->itemInParcel(std::string(id));
+    if (_client->good()) {
+        // TODO: Remove the avoidable std::string heap alloc.
+        _client->itemInParcel(std::string(id));
+    }
 }
 
 void _ym::LoaderState::_Interp::dblColonId(const taul::str& id) {
-    if (!_client->good()) return;
-    // TODO: Remove the avoidable std::string heap alloc.
-    _client->member(std::string(id));
+    if (_client->good()) {
+        // TODO: Remove the avoidable std::string heap alloc.
+        _client->member(std::string(id));
+    }
+}
+
+void _ym::LoaderState::_Interp::openItemArgs() {
+    if (_client->good()) {
+        _client->beginArgs();
+    }
+}
+
+void _ym::LoaderState::_Interp::itemArgsArgDelimiter() {
+    if (_client->good()) {
+    }
+}
+
+void _ym::LoaderState::_Interp::closeItemArgs() {
+    if (_client->good()) {
+        _client->endArgs();
+    }
+}
+
+void _ym::LoaderState::_Interp::openCallSuff() {
+    YM_DEADEND;
+}
+
+void _ym::LoaderState::_Interp::callSuffParamDelimiter() {
+    YM_DEADEND;
+}
+
+void _ym::LoaderState::_Interp::callSuffReturnType() {
+    YM_DEADEND;
+}
+
+void _ym::LoaderState::_Interp::closeCallSuff() {
+    YM_DEADEND;
 }
 

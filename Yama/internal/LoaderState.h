@@ -362,11 +362,16 @@ namespace _ym {
 
             void syntaxErr() override;
             void rootId(const taul::str& id) override;
-            void openArgs() override;
-            void closeArgs() override;
             void slashId(const taul::str& id) override;
             void colonId(const taul::str& id) override;
             void dblColonId(const taul::str& id) override;
+            void openItemArgs() override;
+            void itemArgsArgDelimiter() override;
+            void closeItemArgs() override;
+            void openCallSuff() override;
+            void callSuffParamDelimiter() override;
+            void callSuffReturnType() override;
+            void closeCallSuff() override;
         };
 
 
@@ -434,6 +439,7 @@ namespace _ym {
 
         void _checkConstraintTypeLegality();
         void _enforceConstraints();
+        void _checkRefConstCallSigConformance();
 
         YmParcel* _import(const std::string& normalizedPath);
 

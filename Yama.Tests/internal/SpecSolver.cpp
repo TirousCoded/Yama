@@ -18,9 +18,9 @@ TEST(SpecSolver, Substitution) {
 
 TEST(SpecSolver, Normalizes) {
 	if (auto actual = _ym::SpecSolver()(
-		"  a  /  \r\n  b   \r\n  :  A  [ a / b : B  [ a  / b :C  ] ::m  ,a/  b \r\n : D  :: m  ]  ::  m   "_str
+		"  a  /  \r\n  b   \r\n  :  A  [ a / b : B  [ a  / b :C  ] ::m  ,a/  b \r\n : D  :: m  ]  ::  m   (  yama\n\n : List [ \r $Self ] , \ryama : \n Float )  ->   $T   "_str
 		)) {
-		EXPECT_EQ(*actual, "a/b:A[a/b:B[a/b:C]::m, a/b:D::m]::m");
+		EXPECT_EQ(*actual, "a/b:A[a/b:B[a/b:C]::m, a/b:D::m]::m(yama:List[$Self], yama:Float) -> $T");
 	}
 	else FAIL();
 }

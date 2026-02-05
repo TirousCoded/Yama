@@ -53,11 +53,16 @@ namespace _ym {
 
 		virtual void syntaxErr() = 0;
 		virtual void rootId(const taul::str& id) = 0;
-		virtual void openArgs() = 0;
-		virtual void closeArgs() = 0;
 		virtual void slashId(const taul::str& id) = 0;
 		virtual void colonId(const taul::str& id) = 0;
 		virtual void dblColonId(const taul::str& id) = 0;
+		virtual void openItemArgs() = 0;
+		virtual void itemArgsArgDelimiter() = 0;
+		virtual void closeItemArgs() = 0;
+		virtual void openCallSuff() = 0;
+		virtual void callSuffParamDelimiter() = 0;
+		virtual void callSuffReturnType() = 0;
+		virtual void closeCallSuff() = 0;
 
 
 	private:
@@ -67,10 +72,16 @@ namespace _ym {
 			Colon,
 			DblColon,
 		};
+		enum class _Stage : YmUInt8 {
+			Main,
+			CallSuffParams,
+			CallSuffReturnType,
+		};
 
 
 		bool _success = {};
 		_IdMode _idMode = {};
+		_Stage _stage = _Stage::Main;
 		taul::str _input;
 
 

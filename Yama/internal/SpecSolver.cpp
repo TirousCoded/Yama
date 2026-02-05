@@ -34,13 +34,26 @@ std::optional<std::string> _ym::SpecSolver::operator()(const std::string& specif
 	return operator()(taul::str::lit(specifier.c_str()), mustBe);
 }
 
+_ym::SpecSolver::_Scope& _ym::SpecSolver::_scope() noexcept {
+	ymAssert(!_scopes.empty());
+	return _scopes.back();
+}
+
+const _ym::SpecSolver::_Scope& _ym::SpecSolver::_scope() const noexcept {
+	ymAssert(!_scopes.empty());
+	return _scopes.back();
+}
+
+bool _ym::SpecSolver::_hasExpr() const noexcept {
+	return (bool)_scope().latest;
+}
+
 bool _ym::SpecSolver::_isPath() const noexcept {
-	ymAssert(!_expectItemNotPath.empty());
-	return !_expectItemNotPath.back();
+	return _scope().latest == _Expr::Path;
 }
 
 bool _ym::SpecSolver::_isItem() const noexcept {
-	return !_isPath();
+	return _scope().latest == _Expr::Item;
 }
 
 bool _ym::SpecSolver::_expectPath() {
@@ -51,6 +64,10 @@ bool _ym::SpecSolver::_expectPath() {
 	return _isPath();
 }
 
+bool _ym::SpecSolver::_expectPathOrNone() {
+	return !_hasExpr() || _expectPath();
+}
+
 bool _ym::SpecSolver::_expectItem() {
 #if _DUMP_LOG
 	ym::println("SpecSolver: Expects item! -> {}", _isItem());
@@ -59,23 +76,25 @@ bool _ym::SpecSolver::_expectItem() {
 	return _isItem();
 }
 
-void _ym::SpecSolver::_shouldExpectPath() noexcept {
-#if _DUMP_LOG
-	if (_isItem()) {
-		ym::println("SpecSolver: Should expect path!");
-	}
-#endif
-	ymAssert(!_expectItemNotPath.empty());
-	_expectItemNotPath.back() = false;
+bool _ym::SpecSolver::_expectItemOrNone() {
+	return !_hasExpr() || _expectItem();
 }
-void _ym::SpecSolver::_shouldExpectItem() noexcept {
+
+void _ym::SpecSolver::_markAsPath() noexcept {
 #if _DUMP_LOG
-	if (_isPath()) {
-		ym::println("SpecSolver: Should expect item!");
+	if (!_hasExpr() || _isItem()) {
+		ym::println("SpecSolver: Marked as path!");
 	}
 #endif
-	ymAssert(!_expectItemNotPath.empty());
-	_expectItemNotPath.back() = true;
+	_scope().latest = _Expr::Path;
+}
+void _ym::SpecSolver::_markAsItem() noexcept {
+#if _DUMP_LOG
+	if (!_hasExpr() || _isPath()) {
+		ym::println("SpecSolver: Marked as item!");
+	}
+#endif
+	_scope().latest = _Expr::Item;
 }
 
 bool _ym::SpecSolver::_good() const {
@@ -95,7 +114,7 @@ void _ym::SpecSolver::_beginSolve() {
 #if _DUMP_LOG
 	ym::println("SpecSolver: Begin solve!");
 #endif
-	ymAssert(_expectItemNotPath.empty());
+	ymAssert(_scopes.empty());
 	_output = "";
 	_atRootOfEntireTree = true;
 	_beginScope();
@@ -105,7 +124,7 @@ std::optional<std::string> _ym::SpecSolver::_endSolve(MustBe mustBe) {
 	if (mustBe == MustBe::Path)			_expectPath();
 	else if (mustBe == MustBe::Item)	_expectItem();
 	_endScope();
-	_expectItemNotPath.clear();
+	_scopes.clear();
 #if _DUMP_LOG
 	ym::println("SpecSolver: End solve!");
 #endif
@@ -117,12 +136,12 @@ void _ym::SpecSolver::_beginScope() {
 	ym::println("SpecSolver: Begin scope!");
 #endif
 	_firstId = true;
-	_expectItemNotPath.push_back(false);
+	_scopes.push_back(_Scope{});
 }
 
 void _ym::SpecSolver::_endScope() {
-	ymAssert(!_expectItemNotPath.empty());
-	_expectItemNotPath.pop_back();
+	ymAssert(!_scopes.empty());
+	_scopes.pop_back();
 #if _DUMP_LOG
 	ym::println("SpecSolver: End scope!");
 #endif
@@ -137,14 +156,6 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
 #if _DUMP_LOG
 		ym::println("SpecSolver: rootId {} ({} input)", id, _isPath() ? "path" : "item");
 #endif
-		if (!_firstId) {
-			_expectItem(); // Expect what's prior to ',' to be an item.
-#if _DUMP_LOG
-			ym::println("SpecSolver: Onto next item!");
-#endif
-			_emit(", ");
-			_shouldExpectPath(); // After ',' expect path, or something like $Self.
-		}
 		if (id == "%here") {
 			if (hereCallback) hereCallback();
 		}
@@ -154,57 +165,35 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
 		else if (id.substr(0, 1) == "$") {
 			if (itemParamCallback) itemParamCallback(id, _atRootOfEntireTree);
 		}
-		ymAssert(!_expectItemNotPath.back());
 		if (_here && id == "%here") {
 #if _DUMP_LOG
 			ym::println("SpecSolver: %here! -> {}", _here->path);
 #endif
 			_emit("{}", _here->path);
+			_markAsPath();
 		}
 		else if (_self && id == "$Self") {
 #if _DUMP_LOG
 			ym::println("SpecSolver: $Self! -> {}", _self->fullname());
 #endif
 			_emit("{}", _self->fullname());
-			_shouldExpectItem();
+			_markAsItem();
 		}
 		else if (auto itemParam = (id.substr(0, 1) == "$" && _itemParamCtx) ? _itemParamCtx->itemParam(std::string(id)) : nullptr) {
 #if _DUMP_LOG
 			ym::println("SpecSolver: Item param! -> {}", itemParam->fullname());
 #endif
 			_emit("{}", itemParam->fullname());
-			_shouldExpectItem();
+			_markAsItem();
 		}
 		else {
 			_emit("{}", id);
 			// Detect items in situations where _self/_itemParamCtx aren't provided.
-			if (id.substr(0, 1) == "$") _shouldExpectItem();
+			if (id.substr(0, 1) == "$") _markAsItem();
+			else						_markAsPath(); // Default
 		}
 		_firstId = false;
 		_atRootOfEntireTree = false;
-	}
-}
-
-void _ym::SpecSolver::openArgs() {
-	if (_good()) {
-#if _DUMP_LOG
-		ym::println("SpecSolver: openArgs ({} input)", _isPath() ? "path" : "item");
-#endif
-		if (_expectItem()) {
-			_emit("[");
-			_beginScope();
-		}
-	}
-}
-
-void _ym::SpecSolver::closeArgs() {
-	if (_good()) {
-#if _DUMP_LOG
-		ym::println("SpecSolver: openArgs");
-#endif
-		_emit("]");
-		_endScope();
-		_shouldExpectItem();
 	}
 }
 
@@ -215,6 +204,7 @@ void _ym::SpecSolver::slashId(const taul::str& id) {
 #endif
 		if (_expectPath()) {
 			_emit("/{}", id);
+			//_markAsPath();
 		}
 	}
 }
@@ -226,7 +216,7 @@ void _ym::SpecSolver::colonId(const taul::str& id) {
 #endif
 		if (_expectPath()) {
 			_emit(":{}", id);
-			_shouldExpectItem();
+			_markAsItem();
 		}
 	}
 }
@@ -238,8 +228,82 @@ void _ym::SpecSolver::dblColonId(const taul::str& id) {
 #endif
 		if (_expectItem()) {
 			_emit("::{}", id);
-			_shouldExpectItem();
+			//_markAsItem();
 		}
+	}
+}
+
+void _ym::SpecSolver::openItemArgs() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: openItemArgs ({} input)", _isPath() ? "path" : "item");
+#endif
+		if (_expectItem()) {
+			_emit("[");
+			_beginScope();
+		}
+	}
+}
+
+void _ym::SpecSolver::itemArgsArgDelimiter() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: itemArgsArgDelimiter");
+#endif
+		_expectItem(); // Previous arg should be an item.
+		_emit(", ");
+	}
+}
+
+void _ym::SpecSolver::closeItemArgs() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: closeItemArgs");
+#endif
+		_expectItemOrNone(); // Final arg should be an item.
+		_emit("]");
+		_endScope();
+		_markAsItem();
+	}
+}
+
+void _ym::SpecSolver::openCallSuff() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: openCallSuff");
+#endif
+		_emit("(");
+		_beginScope();
+	}
+}
+
+void _ym::SpecSolver::callSuffParamDelimiter() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: callSuffParamDelimiter");
+#endif
+		_expectItem(); // Previous param should be an item.
+		_emit(", ");
+	}
+}
+
+void _ym::SpecSolver::callSuffReturnType() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: callSuffReturnType");
+#endif
+		_expectItemOrNone(); // Final param should be an item.
+		_emit(") -> ");
+	}
+}
+
+void _ym::SpecSolver::closeCallSuff() {
+	if (_good()) {
+#if _DUMP_LOG
+		ym::println("SpecSolver: closeCallSuff");
+#endif
+		_expectItem(); // Return type should have been an item.
+		_endScope();
 	}
 }
 
@@ -250,5 +314,19 @@ void _ym::assertNormal(const std::string& specifier) noexcept {
 bool _ym::specifierHasSelf(const std::string& specifier) {
 	// TODO: Optimize this to avoid reiniting regex w/ every call.
 	return std::regex_search(specifier, std::regex("\\$Self[ \t\r\n]*([\\[\\],:/]|$)"));
+}
+
+std::pair<std::string_view, std::optional<std::string_view>> _ym::seperateCallSuff(const std::string& normalizedSpecifier) noexcept {
+	assertNormal(normalizedSpecifier);
+	const auto [fullname, callsuff] = split_s<char>(normalizedSpecifier, "(", true);
+	return std::make_pair(fullname, !callsuff.empty() ? std::make_optional(callsuff) : std::nullopt);
+}
+
+void _ym::assertNormalNonCallSig(const std::string& specifier) noexcept {
+	ymAssert(!seperateCallSuff(specifier).second.has_value());
+}
+
+void _ym::assertNormalCallSig(const std::string& specifier) noexcept {
+	ymAssert(seperateCallSuff(specifier).second.has_value());
 }
 

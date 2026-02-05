@@ -11,6 +11,10 @@ lexer section:
 
     IDENTIFIER                      : [%$]? [a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff] [0-9a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff]* ;
 
+    R_ARROW                         : '->' ;
+
+    L_ROUND                         : '(' ;
+    R_ROUND                         : ')' ;
     L_SQUARE                        : '[' ;
     R_SQUARE                        : ']' ;
 
@@ -39,9 +43,9 @@ parser section:
     #   p/a:A::m
     #   p/a:A[p/a:A, p/a:B]::m
 
-    # The root Id of an expr tree always specifies a file/directory identifier.
-
-    # Exception to this is the 'Self' keyword in context of reference symbols.
+    # The root Id of an expr tree always specifies a file/directory identifier, or an
+    # item if prefixed w/ a '$', in which case it specifies '$Self' or an item param.
+    # (This about '$' only applies to reference symbols.)
 
     # Composite Exprs:
     #   x/y         - Access file/directory y in directory x.
@@ -50,17 +54,24 @@ parser section:
     #   x[args]     - Instantiate constructed item of x parameterized by args.
 
 
-    TopLevel                        : Expr end ;
+    TopLevel                        : Expr CallSuff? end ;
 
     precedence Expr                 : Expr SLASH Id
                                     | Expr COLON Id
                                     | Expr DBL_COLON Id
-                                    | Expr Args
+                                    | Expr L_SQUARE Args? R_SQUARE
                                     | Id
                                     ;
 
-    Args                            : L_SQUARE ( Arg ( COMMA Arg )* )? R_SQUARE ;
+    # TODO: Maybe rename 'Arg(s)' to 'ItemArg(s)'.
+    Args                            : Arg ( COMMA Arg )* ;
     Arg                             : Expr ;
+
+    CallSuff                        : L_ROUND Params? R_ROUND R_ARROW ReturnType ;
+
+    Params                          : Param ( COMMA Param )* ;
+    Param                           : Expr ;
+    ReturnType                      : Expr ;
 
     Id                              : IDENTIFIER ;
 

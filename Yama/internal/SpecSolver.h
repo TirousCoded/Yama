@@ -5,7 +5,7 @@
 
 #include "SpecParser.h"
 
-#include "../yama++/print.h"
+
 namespace _ym {
 
 
@@ -41,6 +41,16 @@ namespace _ym {
 
 
     private:
+        enum class _Expr : YmUInt8 {
+            Path,
+            Item,
+        };
+        struct _Scope final {
+            // Latest expr encountered in this scope, if any.
+            std::optional<_Expr> latest = {};
+        };
+
+
         // NOTE: Take note how getting specifiers from _here, _itemParamCtx, and _self,
         //       rather than user provided strings, guarantees they'll be normalized.
 
@@ -48,21 +58,26 @@ namespace _ym {
         YmItem* _itemParamCtx = nullptr, * _self = nullptr;
         std::optional<std::string> _output;
 
-        // TODO: Maybe use thread-local field to optimize _expectItemNotPath.
+        // TODO: Maybe use thread-local field to optimize below.
 
         bool _firstId = false;
         bool _atRootOfEntireTree = false;
-        std::vector<bool> _expectItemNotPath;
+        std::vector<_Scope> _scopes;
 
+        _Scope& _scope() noexcept;
+        const _Scope& _scope() const noexcept;
 
+        bool _hasExpr() const noexcept;
         bool _isPath() const noexcept;
         bool _isItem() const noexcept;
 
         bool _expectPath();
+        bool _expectPathOrNone();
         bool _expectItem();
+        bool _expectItemOrNone();
 
-        void _shouldExpectPath() noexcept;
-        void _shouldExpectItem() noexcept;
+        void _markAsPath() noexcept;
+        void _markAsItem() noexcept;
 
         bool _good() const;
         void _fail();
@@ -71,7 +86,6 @@ namespace _ym {
         inline void _emit(std::format_string<Args...> fmt, Args&&... args) {
             if (_output) {
                 *_output += std::format(fmt, std::forward<Args>(args)...);
-                //ym::println("_emit -> {}", *_output);
             }
         }
 
@@ -84,11 +98,16 @@ namespace _ym {
 
         void syntaxErr() override;
         void rootId(const taul::str& id) override;
-        void openArgs() override;
-        void closeArgs() override;
         void slashId(const taul::str& id) override;
         void colonId(const taul::str& id) override;
         void dblColonId(const taul::str& id) override;
+        void openItemArgs() override;
+        void itemArgsArgDelimiter() override;
+        void closeItemArgs() override;
+        void openCallSuff() override;
+        void callSuffParamDelimiter() override;
+        void callSuffReturnType() override;
+        void closeCallSuff() override;
     };
 
 
@@ -97,5 +116,10 @@ namespace _ym {
 
     // Returns if specifier contains $Self anywhere within it.
     bool specifierHasSelf(const std::string& specifier);
+
+    std::pair<std::string_view, std::optional<std::string_view>> seperateCallSuff(const std::string& normalizedSpecifier) noexcept;
+
+    void assertNormalNonCallSig(const std::string& specifier) noexcept;
+    void assertNormalCallSig(const std::string& specifier) noexcept;
 }
 

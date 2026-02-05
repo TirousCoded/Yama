@@ -265,6 +265,16 @@ extern "C" {
     */
 
 
+    /* TODO: Currently, we lack testing for whether callsig specifiers in direct/direct loads normalize
+    *        as expected.
+    * 
+    *        Also, we lack tests for whether callsig specifiers can properly handle nuanced things like
+    *        $Self or item params appearing in their param/return type parts.
+    * 
+    *        Also, our indirect load tests for callsig specifiers is lacking in thorough failure testing.
+    */
+
+
     /* TODO: Revise our policy on thread-safety to be per-function.
     */
     /* NOTE: Resources are thread-unsafe unless otherwise specified.

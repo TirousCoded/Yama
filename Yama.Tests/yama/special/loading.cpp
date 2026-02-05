@@ -966,6 +966,106 @@ TEST(Loading, MemberAccess_SelfAndItemParamRefs) {
     EXPECT_EQ(ymItem_Ref(A_B, B_m2_ref), B_m2);
 }
 
+// TODO: What about situation where callsig load fails due to attempt to use callsig w/
+//       a GENERIC type W/OUT item arguments? Our tests don't cover things like that.
+
+TEST(Loading, CallSigs_DirectLoad) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "A", {});
+    setup_struct(p_def, "B", {});
+    
+    auto f_ind = setup_fn(p_def, "f", "p:A", {});
+    ymParcelDef_AddParam(p_def, f_ind, "a", "p:A");
+    
+    auto g_ind = setup_fn(p_def, "g", "$U", {}, { { "T", "p:Any" }, { "U", "p:Any" } });
+    ymParcelDef_AddParam(p_def, g_ind, "a", "$T");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(load(ctx, "p:f(p:A) -> p:A"), load(ctx, "p:f"));
+    EXPECT_EQ(load(ctx, "p:g[p:A, p:A](p:A) -> p:A"), load(ctx, "p:g[p:A, p:A]"));
+    EXPECT_EQ(load(ctx, "p:g[p:B, p:A](p:B) -> p:A"), load(ctx, "p:g[p:B, p:A]"));
+    EXPECT_EQ(load(ctx, "p:g[p:A, p:B](p:A) -> p:B"), load(ctx, "p:g[p:A, p:B]"));
+
+    err.reset();
+
+    // NOTE: The ONLY thing preventing below loads from succeeding is the fact that
+    //       they're callsigs, nothing else.
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:f(p:B) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:f(p:A) -> p:B"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:f(p:A, p:A) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:f() -> p:A"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 4);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:A](p:B) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:A](p:A) -> p:B"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:A](p:A, p:A) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:A]() -> p:A"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 4);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:B, p:A](p:A) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:B, p:A](p:B) -> p:B"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:B, p:A](p:B, p:B) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:B, p:A]() -> p:A"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 4);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:B](p:B) -> p:B"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:B](p:A) -> p:A"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:B](p:A, p:A) -> p:B"), nullptr);
+    EXPECT_EQ(ymCtx_Load(ctx, "p:g[p:A, p:B]() -> p:B"), nullptr);
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 4);
+}
+
+TEST(Loading, CallSigs_IndirectLoad) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "A", {});
+    setup_struct(p_def, "B", {});
+
+    auto f_ind = setup_fn(p_def, "f", "p:A", {});
+    ymParcelDef_AddParam(p_def, f_ind, "a", "p:A");
+
+    auto g_ind = setup_fn(p_def, "g", "$U", {}, { { "T", "p:Any" }, { "U", "p:Any" } });
+    ymParcelDef_AddParam(p_def, g_ind, "a", "$T");
+
+    auto SUCC_ind = setup_struct(p_def, "SUCC", {});
+    auto SUCC_ref1 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:f(p:A) -> p:A");
+    auto SUCC_ref2 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:A, p:A](p:A) -> p:A");
+    auto SUCC_ref3 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:B, p:A](p:B) -> p:A");
+    auto SUCC_ref4 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:A, p:B](p:A) -> p:B");
+
+    // TODO: Currently, as shown below, our failure tests for indirect loads via callsig only
+    //       really tests on case, and *presumes* that the more thorough failure testing of
+    //       direct loads via callsig holds for indirect ones.
+    //
+    //       In the future we may want to improve this about our unit tests.
+
+    auto FAIL_ind = setup_struct(p_def, "FAIL", { "p:f(p:B) -> p:A" });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    auto SUCC = load(ctx, "p:SUCC");
+    EXPECT_EQ(ymItem_Ref(SUCC, SUCC_ref1), load(ctx, "p:f"));
+    EXPECT_EQ(ymItem_Ref(SUCC, SUCC_ref2), load(ctx, "p:g[p:A, p:A]"));
+    EXPECT_EQ(ymItem_Ref(SUCC, SUCC_ref3), load(ctx, "p:g[p:B, p:A]"));
+    EXPECT_EQ(ymItem_Ref(SUCC, SUCC_ref4), load(ctx, "p:g[p:A, p:B]"));
+
+    EXPECT_FALSE(ymCtx_Load(ctx, "p:FAIL"));
+    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+}
+
 TEST(Loading, Fail_IllegalSpecifier_DirectLoad) {
     for (const auto& fullname : illegalFullnames) {
         SETUP_ALL(ctx);

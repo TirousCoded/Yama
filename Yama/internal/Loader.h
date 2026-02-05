@@ -38,7 +38,7 @@ namespace _ym {
 
         // Acquires item w/out attempting to load.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname) const noexcept = 0;
+        virtual std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept = 0;
 
         // Acquires parcel, attempting import if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
@@ -75,7 +75,7 @@ namespace _ym {
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname) const noexcept override;
+        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
         std::shared_ptr<YmParcel> import(const std::string& normalizedPath) override;
         std::shared_ptr<YmItem> load(const std::string& normalizedFullname) override;
 
@@ -104,7 +104,7 @@ namespace _ym {
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname) const noexcept override;
+        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
         std::shared_ptr<YmParcel> import(const std::string& normalizedPath) override;
         std::shared_ptr<YmItem> load(const std::string& normalizedFullname) override;
         const Area& commits() const override;

@@ -21,6 +21,30 @@ const std::string& YmItem::localName() const noexcept {
     return info->localName;
 }
 
+std::optional<std::string> YmItem::callsuff() const {
+    if (!ymKind_IsCallable(kind())) {
+        return std::nullopt;
+    }
+    std::string result{};
+    result += "(";
+    for (YmParams i = 0; i < params(); i++) {
+        if (i >= 1) {
+            result += ", ";
+        }
+        result += paramType(i)->fullname();
+    }
+    result += ") -> ";
+    result += returnType()->fullname();
+    return ym::retopt(result);
+}
+
+std::optional<std::string> YmItem::callsig() const {
+    if (auto result = callsuff()) {
+        return fullname() + *result;
+    }
+    return std::nullopt;
+}
+
 YmItem* YmItem::owner() noexcept {
     return
         ymKind_IsMember(kind())
