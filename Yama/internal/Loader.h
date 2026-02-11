@@ -13,6 +13,7 @@
 #include "general.h"
 #include "LoaderState.h"
 #include "PathBindings.h"
+#include "Redirects.h"
 #include "YmItem.h"
 #include "YmParcel.h"
 
@@ -72,6 +73,7 @@ namespace _ym {
 
 
         bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel = false);
+        bool addRedirect(const std::string& subject, const std::string& before, const std::string& after);
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
@@ -82,13 +84,14 @@ namespace _ym {
 
     private:
         PathBindings _binds;
+        Redirects _redirects;
         Area _commits, _staging;
         LoaderState _ldrState;
 
-        // NOTE: _updateLock protects _binds as it's data is used during loading.
+        // NOTE: _updateLock protects _binds/_redirects as their data is used during loading.
 
         mutable std::shared_mutex _accessLock; // Protects _commits.
-        mutable std::mutex _updateLock; // Protects _staging/_binds/_ldrState.
+        mutable std::mutex _updateLock; // Protects _staging/_binds/_redirects/_ldrState.
 
 
         void _bindYamaParcel();

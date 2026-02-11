@@ -75,6 +75,10 @@ YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) 
     return (YmBool)Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
 }
 
+YmBool ymDm_AddRedirect(YmDm* dm, const YmChar* subject, const YmChar* before, const YmChar* after) {
+    return (YmBool)Safe(dm)->addRedirect(std::string(Safe(subject)), std::string(Safe(before)), std::string(Safe(after)));
+}
+
 YmCtx* ymCtx_Create(YmDm* dm) {
     return new YmCtx(Safe(dm));
 }

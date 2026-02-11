@@ -435,6 +435,69 @@ extern "C" {
     /* Behaviour is undefined if parceldef is invalid. */
     YmBool ymDm_BindParcelDef(struct YmDm* dm, const YmChar* path, struct YmParcelDef* parceldef);
 
+    /* NOTE: Imported parcels have a set of import paths depended-upon by its types. However, these paths
+    *        may not always line up w/ the paths in the actual import environment needed to reach the desired
+    *        parcels. In these situations 'redirects' are used to redirect part or all of a dependency path
+    *        to correct it.
+    * 
+    *        Redirects are contextual: each use a 'subject' path prefix to define the parcels subject to the
+    *        redirect (ie. for its dependency paths) as the set of parcels who's import path contains the
+    *        prefix.
+    * 
+    *        Each redirect defines 'before' and 'after' path prefixes, the former defining the prefixes of
+    *        dependency paths which get substituted w/ the 'after' path prefix.
+    * 
+    *        Given a parcel w/ an import path which contains the subject path prefix of two redirects, and
+    *        the 'before' path prefix of the two are identical, the one selected is the one w/ the more
+    *        specific import path prefix (which'll also be the longer of the two.)
+    * 
+    *        Given a reference symbol containing the 'before' path prefixes of two redirects in the set of
+    *        its parcel, the one selected is the one w/ the more specific import path prefix (which'll also
+    *        be the longer of the two.)
+    */
+
+    /* TODO: When we add things like importing parcels from filesystem, be sure to add redirect tests that
+    *        ensure that redirects can affect them.
+    */
+
+    /* TODO: Overwriting redirects, plus their 'locking' semantics, presents a number of possible scenarios
+    *        in which confusing redirect behaviour could occur due to the amount of implicit respecting/ignoring
+    *        of redirects going on.
+    * 
+    *        For example, consider the following series of events:
+    *           1) Add redirect 'p': 'alt' -> 'q1'.
+    *           2) Load 'p:A'.
+    *           3) Add redirect 'p': 'alt' -> 'q2'.
+    *           4) Load 'p:B'.
+    *           5) Load 'p/a:C'.
+    * 
+    *        Above, after the overwrite of redirect at #3, p:B load will treat 'alt' differently than how
+    *        the load of 'p/a:C' will treat it, w/ this occurring implicitly. This behaviour could be confusing,
+    *        so again, I'm not 100% sure about redirect overwriting, but we'll keep it for now.
+    */
+
+    /* TODO: I don't think our redirect overwriting tests cover a situation where an NEEDED redirect was not
+    *        added until AFTER the import that needed it occurred. What should happen then?
+    */
+
+    /* TODO: Is it okay if before/after in a redirect is '%here'? Do we need explicit tests for this? Does
+    *        it present problems that warrant it being forbidden?
+    */
+
+    /* Adds a new redirect, or overwrites an existing one, returning if successful. */
+    /* The redirects of a parcel are locked for it upon import. */
+    /* subject defines the path prefix of parcels subject to the redirect. */
+    /* before defines the path prefix being redirected. */
+    /* after defines the path prefix before is substituted with. */
+    /* Fails if subject specified is illegal. */
+    /* Fails if before specified is illegal. */
+    /* Fails if after specified is illegal. */
+    /* Behaviour is undefined if dm is invalid. */
+    /* Behaviour is undefined if subject (as a pointer) is invalid. */
+    /* Behaviour is undefined if before (as a pointer) is invalid. */
+    /* Behaviour is undefined if after (as a pointer) is invalid. */
+    YmBool ymDm_AddRedirect(struct YmDm* dm, const YmChar* subject, const YmChar* before, const YmChar* after);
+
 
     /* Context API */
 

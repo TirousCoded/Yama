@@ -3,6 +3,7 @@
 #pragma once
 
 
+#include "Redirects.h"
 #include "SpecParser.h"
 
 
@@ -31,7 +32,8 @@ namespace _ym {
         SpecSolver(
             YmParcel* here = nullptr,
             YmItem* itemParamsCtx = nullptr,
-            YmItem* self = nullptr
+            YmItem* self = nullptr,
+            RedirectSet* redirects = nullptr
         ) noexcept;
 
 
@@ -48,6 +50,7 @@ namespace _ym {
         struct _Scope final {
             // Latest expr encountered in this scope, if any.
             std::optional<_Expr> latest = {};
+            std::string output = "";
         };
 
 
@@ -56,14 +59,16 @@ namespace _ym {
 
         YmParcel* _here = nullptr;
         YmItem* _itemParamCtx = nullptr, * _self = nullptr;
-        std::optional<std::string> _output;
+        RedirectSet* _redirects = nullptr;
 
         // TODO: Maybe use thread-local field to optimize below.
 
+        bool _failFlag = false;
         bool _firstId = false;
         bool _atRootOfEntireTree = false;
         std::vector<_Scope> _scopes;
 
+        bool _hasScope() const noexcept;
         _Scope& _scope() noexcept;
         const _Scope& _scope() const noexcept;
 
@@ -79,13 +84,15 @@ namespace _ym {
         void _markAsPath() noexcept;
         void _markAsItem() noexcept;
 
+        void _handleRedirectsIfPath();
+
         bool _good() const;
         void _fail();
 
         template<typename... Args>
         inline void _emit(std::format_string<Args...> fmt, Args&&... args) {
-            if (_output) {
-                *_output += std::format(fmt, std::forward<Args>(args)...);
+            if (_good()) {
+                _scope().output += std::format(fmt, std::forward<Args>(args)...);
             }
         }
 
@@ -93,7 +100,8 @@ namespace _ym {
         std::optional<std::string> _endSolve(MustBe mustBe);
 
         void _beginScope();
-        void _endScope();
+        std::string _endScope();
+        void _endScopeAndEmit();
 
 
         void syntaxErr() override;

@@ -12,7 +12,7 @@
 
 _ym::DmLoader::DmLoader() :
     SynchronizedLoader(),
-    _ldrState(_staging, _binds) {
+    _ldrState(_staging, _binds, _redirects) {
     _staging.setUpstream(&_commits);
     _bindYamaParcel();
 }
@@ -41,9 +41,39 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
     }
 }
 
+bool _ym::DmLoader::addRedirect(const std::string& subject, const std::string& before, const std::string& after) {
+    auto normalizedSubject = SpecSolver{}(subject, SpecSolver::MustBe::Path);
+    auto normalizedBefore = SpecSolver{}(before, SpecSolver::MustBe::Path);
+    auto normalizedAfter = SpecSolver{}(after, SpecSolver::MustBe::Path);
+    if (!normalizedSubject) {
+        Global::raiseErr(
+            YmErrCode_IllegalSpecifier,
+            "Cannot add redirect; subject path \"{}\" is illegal!",
+            subject);
+        return false;
+    }
+    if (!normalizedBefore) {
+        Global::raiseErr(
+            YmErrCode_IllegalSpecifier,
+            "Cannot add redirect; 'before' path \"{}\" is illegal!",
+            before);
+        return false;
+    }
+    if (!normalizedAfter) {
+        Global::raiseErr(
+            YmErrCode_IllegalSpecifier,
+            "Cannot add redirect; 'after' path \"{}\" is illegal!",
+            after);
+        return false;
+    }
+    std::scoped_lock lk(_updateLock);
+    _redirects.add(*normalizedSubject, *normalizedBefore, *normalizedAfter);
+    return true;
+}
+
 void _ym::DmLoader::reset() noexcept {
     std::scoped_lock lk(_accessLock, _updateLock);
-    // TODO: Should also reset _commits/_binds? (If so, call _bindYamaParcel.)
+    // TODO: Should also reset _commits/_binds/_redirects? (If so, remember to call _bindYamaParcel.)
     _staging.discard(true);
 }
 

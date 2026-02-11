@@ -10,6 +10,8 @@
 //       At some point we'd be best to figure out what our priorities regarding it are, and try
 //       to revise it to be more uniform and consistent in terms of comprehensiveness.
 
+// NOTE: Redirects are tested in redirects.cpp.
+
 
 TEST(Loading, WorksWithAllItemKinds) {
     static_assert(YmKind_Num == 4);

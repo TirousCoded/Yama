@@ -13,9 +13,10 @@
 #endif
 
 
-_ym::LoaderState::LoaderState(ym::Safe<Area> staging, ym::Safe<PathBindings> binds) :
+_ym::LoaderState::LoaderState(ym::Safe<Area> staging, ym::Safe<PathBindings> binds, ym::Safe<Redirects> redirects) :
     _staging(staging),
-    _binds(binds) {
+    _binds(binds),
+    _redirects(redirects) {
 }
 
 YmParcel* _ym::LoaderState::import(const std::string& normalizedPath) {
@@ -707,9 +708,14 @@ void _ym::LoaderState::_lateResolveRefConst(YmItem& x, ConstIndex index) {
 #if _DUMP_LOG
     ym::println("LoaderState: Resolving {} (const #{}).", fmt(constInfo), index + 1);
 #endif
-    // NOTE: We seperate out the callsuff from the symbol (if present), as that
-    //       stuff will be checked later.
-    auto [fullname, callsuff] = seperateCallSuff(constInfo.as<RefInfo>().sym);
+    // Filter the ref sym such that redirections are handled.
+    auto refSymAfterRedirects = SpecSolver(nullptr, nullptr, nullptr, &x.parcel->redirects.value())(constInfo.as<RefInfo>().sym).value();
+#if _DUMP_LOG
+    ym::println("LoaderState: Redirecting {} -> {}.", constInfo.as<RefInfo>().sym, refSymAfterRedirects);
+#endif
+    // We seperate out the callsuff from the symbol (if present), as that
+    // stuff will be checked later.
+    auto [fullname, callsuff] = seperateCallSuff(refSymAfterRedirects);
     // TODO: normalizedFullname contains redundent checks covered by the call
     //       to concrete below.
     normalizedFullname(std::string(fullname));
@@ -798,10 +804,18 @@ void _ym::LoaderState::_checkRefConstCallSigConformance() {
         auto& consts = item.info->consts;
         for (size_t i = 0; i < consts.size(); i++) {
             if (auto constInfo = consts[i].tryAs<RefInfo>()) {
-                auto [fullname, callsuff] = seperateCallSuff(constInfo->sym);
+                // TODO: This being recomputed here, even though it was already computed when
+                //       handling late resolved consts, is wasteful, so try and find a way to
+                //       refactor out this recompute.
+                // Filter the ref sym such that redirections are handled.
+                auto refSymAfterRedirects = SpecSolver(nullptr, nullptr, nullptr, &item.parcel->redirects.value())(constInfo->sym).value();
+#if _DUMP_LOG
+                ym::println("LoaderState: Redirecting {} -> {}.", constInfo->sym, refSymAfterRedirects);
+#endif
+                auto [fullname, callsuff] = seperateCallSuff(refSymAfterRedirects);
                 if (callsuff) {
 #if _DUMP_LOG
-                    ym::println("LoaderState:     {}", constInfo->sym);
+                    ym::println("LoaderState:     {}", refSymAfterRedirects);
 #endif
                     auto ref = item.constAsRef(i);
                     if (ref && /*callsuff &&*/ ref->callsuff() != callsuff) {
@@ -824,7 +838,10 @@ YmParcel* _ym::LoaderState::_import(const std::string& normalizedPath) {
     if (auto existing = _staging->parcels.fetch(normalizedPath)) {
         return existing.get();
     }
-    if (!_staging->parcels.push(_binds->get(normalizedPath))) {
+    if (auto binding = _binds->get(normalizedPath); _staging->parcels.push(binding)) {
+        binding->resolveRedirects(*_redirects);
+    }
+    else {
         err(
             YmErrCode_ParcelNotFound,
             "{}; no parcel found at path \"{}\"!",

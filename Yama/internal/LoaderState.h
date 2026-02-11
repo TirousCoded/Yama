@@ -12,6 +12,7 @@
 #include "Area.h"
 #include "ParcelInfo.h"
 #include "PathBindings.h"
+#include "Redirects.h"
 #include "SpecParser.h"
 #include "YmItem.h"
 
@@ -157,7 +158,8 @@ namespace _ym {
 
         LoaderState(
             ym::Safe<Area> staging,
-            ym::Safe<PathBindings> binds);
+            ym::Safe<PathBindings> binds,
+            ym::Safe<Redirects> redirects);
 
 
         // NOTE: Loading occurs via the following:
@@ -377,6 +379,7 @@ namespace _ym {
 
         ym::Safe<Area> _staging;
         ym::Safe<PathBindings> _binds;
+        ym::Safe<Redirects> _redirects;
 
         bool _failureFlag = false;
         Mode _mode = Mode{};

@@ -11,6 +11,7 @@
 #include "../yama++/general.h"
 #include "../yama++/Safe.h"
 #include "ParcelInfo.h"
+#include "Redirects.h"
 
 
 struct YmParcel final : public std::enable_shared_from_this<YmParcel> {
@@ -20,6 +21,7 @@ public:
 
     const Name path;
     const std::shared_ptr<_ym::ParcelInfo> info;
+    std::optional<_ym::RedirectSet> redirects;
 
 
     YmParcel(std::string path, std::shared_ptr<_ym::ParcelInfo> info);
@@ -29,5 +31,13 @@ public:
     const _ym::ItemInfo* item(const std::string& localName) const noexcept;
 
     inline const Name& getName() const noexcept { return path; }
+
+
+    // NOTE: This overwrites existing redirects value, which is important as we NEED to recompute
+    //       in circumstances where an import calls this on a binding, but then fails, and then a
+    //       later import of the binding succeeds, resulting in the first result value becoming
+    //       stale.
+
+    void resolveRedirects(_ym::Redirects& state);
 };
 
