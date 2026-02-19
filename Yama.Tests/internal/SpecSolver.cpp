@@ -11,6 +11,8 @@
 using namespace taul::string_literals;
 
 
+// TODO: These tests don't cover redirects.
+
 TEST(SpecSolver, Substitution) {
 	// TODO: Due to chicken-n'-egg problem, this can't really be tested right now.
 	//		 Try writing a nice test for this later (maybe make SpecSolver env mockable?)

@@ -4,10 +4,10 @@
 
 
 #include <memory>
-#include <string>
 #include <unordered_map>
 
 #include "YmParcel.h"
+#include "Spec.h"
 
 
 namespace _ym {
@@ -18,13 +18,13 @@ namespace _ym {
 		PathBindings() = default;
 
 
-		std::shared_ptr<YmParcel> get(const std::string& path) const;
-		void set(const std::string& path, std::shared_ptr<YmParcel> x);
+		std::shared_ptr<YmParcel> get(const Spec& path) const;
+		void set(const Spec& path, std::shared_ptr<YmParcel> x);
 		void reset() noexcept;
 
 
 	private:
-		std::unordered_map<std::string, std::shared_ptr<YmParcel>> _bindings;
+		std::unordered_map<Spec, std::shared_ptr<YmParcel>> _bindings;
 	};
 }
 

@@ -11,7 +11,7 @@
 #include "../yama/yama.h"
 #include "Area.h"
 #include "general.h"
-#include "LoaderState.h"
+#include "LoadManager.h"
 #include "PathBindings.h"
 #include "Redirects.h"
 #include "YmItem.h"
@@ -35,19 +35,19 @@ namespace _ym {
 
         // Acquires parcel w/out attempting to import.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept = 0;
+        virtual std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept = 0;
 
         // Acquires item w/out attempting to load.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept = 0;
+        virtual std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept = 0;
 
         // Acquires parcel, attempting import if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmParcel> import(const std::string& normalizedPath) = 0;
+        virtual std::shared_ptr<YmParcel> import(const Spec& path) = 0;
 
         // Acquires item, attempting load if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> load(const std::string& normalizedFullname) = 0;
+        virtual std::shared_ptr<YmItem> load(const Spec& fullname) = 0;
     };
 
     // Base class of all unsynchronized loader.
@@ -76,17 +76,17 @@ namespace _ym {
         bool addRedirect(const std::string& subject, const std::string& before, const std::string& after);
 
         void reset() noexcept override;
-        std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
-        std::shared_ptr<YmParcel> import(const std::string& normalizedPath) override;
-        std::shared_ptr<YmItem> load(const std::string& normalizedFullname) override;
+        std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
+        std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
+        std::shared_ptr<YmParcel> import(const Spec& path) override;
+        std::shared_ptr<YmItem> load(const Spec& fullname) override;
 
 
     private:
         PathBindings _binds;
         Redirects _redirects;
         Area _commits, _staging;
-        LoaderState _ldrState;
+        LoadManager _ldr;
 
         // NOTE: _updateLock protects _binds/_redirects as their data is used during loading.
 
@@ -106,10 +106,10 @@ namespace _ym {
         std::shared_ptr<Loader> upstream() const;
 
         void reset() noexcept override;
-        std::shared_ptr<YmParcel> fetchParcel(const std::string& normalizedPath) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
-        std::shared_ptr<YmParcel> import(const std::string& normalizedPath) override;
-        std::shared_ptr<YmItem> load(const std::string& normalizedFullname) override;
+        std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
+        std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
+        std::shared_ptr<YmParcel> import(const Spec& path) override;
+        std::shared_ptr<YmItem> load(const Spec& fullname) override;
         const Area& commits() const override;
 
 

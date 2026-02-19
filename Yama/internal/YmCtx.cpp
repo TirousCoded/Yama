@@ -13,8 +13,8 @@ YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     loader(std::make_shared<_ym::CtxLoader>(domain->loader)) {}
 
 std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
-    if (auto normalizedPath = _ym::SpecSolver()(path, _ym::SpecSolver::MustBe::Path)) {
-        return loader->import(*normalizedPath);
+    if (auto s = _ym::Spec::path(path)) {
+        return loader->import(*s);
     }
     else {
         _ym::Global::raiseErr(
@@ -26,8 +26,8 @@ std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
 }
 
 std::shared_ptr<YmItem> YmCtx::load(const std::string& fullname) {
-    if (auto normalizedFullname = _ym::SpecSolver()(fullname, _ym::SpecSolver::MustBe::Item)) {
-        return loader->load(*normalizedFullname);
+    if (auto s = _ym::Spec::item(fullname)) {
+        return loader->load(*s);
     }
     else {
         _ym::Global::raiseErr(

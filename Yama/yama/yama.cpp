@@ -200,7 +200,7 @@ YmRef ymParcelDef_AddRef(
 }
 
 const YmChar* ymParcel_Path(YmParcel* parcel) {
-    return Safe(parcel)->path.c_str();
+    return Safe(parcel)->path.string().c_str();
 }
 
 YmParcel* ymItem_Parcel(YmItem* item) {
@@ -208,7 +208,7 @@ YmParcel* ymItem_Parcel(YmItem* item) {
 }
 
 const YmChar* ymItem_Fullname(YmItem* item) {
-    return Safe(item)->fullname().c_str();
+    return Safe(item)->fullname().string().c_str();
 }
 
 YmKind ymItem_Kind(YmItem* item) {

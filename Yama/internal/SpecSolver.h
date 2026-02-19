@@ -14,6 +14,10 @@ namespace _ym {
     // This also performs 'normalization' of input specifiers.
     class SpecSolver final : public SpecEval {
     public:
+        enum class Type : YmUInt8 {
+            Path,
+            Item,
+        };
         enum class MustBe : YmUInt8 {
             Path,
             Item,
@@ -37,19 +41,18 @@ namespace _ym {
         ) noexcept;
 
 
+        std::optional<std::string> operator()(const SpecParser::Result& specifier, Type& type, MustBe mustBe = MustBe::Either);
         std::optional<std::string> operator()(const SpecParser::Result& specifier, MustBe mustBe = MustBe::Either);
+        std::optional<std::string> operator()(const taul::str& specifier, Type& type, MustBe mustBe = MustBe::Either);
         std::optional<std::string> operator()(const taul::str& specifier, MustBe mustBe = MustBe::Either);
+        std::optional<std::string> operator()(const std::string& specifier, Type& type, MustBe mustBe = MustBe::Either);
         std::optional<std::string> operator()(const std::string& specifier, MustBe mustBe = MustBe::Either);
 
 
     private:
-        enum class _Expr : YmUInt8 {
-            Path,
-            Item,
-        };
         struct _Scope final {
             // Latest expr encountered in this scope, if any.
-            std::optional<_Expr> latest = {};
+            std::optional<Type> latest = {};
             std::string output = "";
         };
 
@@ -97,7 +100,7 @@ namespace _ym {
         }
 
         void _beginSolve();
-        std::optional<std::string> _endSolve(MustBe mustBe);
+        std::optional<std::string> _endSolve(Type& type, MustBe mustBe);
 
         void _beginScope();
         std::string _endScope();

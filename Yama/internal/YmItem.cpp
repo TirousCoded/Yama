@@ -9,11 +9,11 @@
 #define _DUMP_CONFORMS_LOG 0
 
 
-const std::string& YmItem::path() const noexcept {
+const _ym::Spec& YmItem::path() const noexcept {
     return parcel->path;
 }
 
-const std::string& YmItem::fullname() const noexcept {
+const _ym::Spec& YmItem::fullname() const noexcept {
     return _fullname;
 }
 
@@ -31,18 +31,34 @@ std::optional<std::string> YmItem::callsuff() const {
         if (i >= 1) {
             result += ", ";
         }
-        result += paramType(i)->fullname();
+        result += paramType(i)->fullname().string();
     }
     result += ") -> ";
-    result += returnType()->fullname();
+    result += returnType()->fullname().string();
     return ym::retopt(result);
 }
 
-std::optional<std::string> YmItem::callsig() const {
+std::optional<_ym::Spec> YmItem::callsig() const {
     if (auto result = callsuff()) {
-        return fullname() + *result;
+        return _ym::Spec::itemFast(fullname().string() + *result);
     }
     return std::nullopt;
+}
+
+bool YmItem::checkCallSuff(std::string_view callsuff) const {
+    // TODO: A heap allocation being needed here is suboptimal.
+    auto ours = this->callsuff();
+    return
+        ours
+        ? *ours == callsuff
+        : true;
+}
+
+bool YmItem::checkCallSuff(std::optional<std::string_view> callsuff) const {
+    return
+        callsuff
+        ? checkCallSuff(*callsuff)
+        : true;
 }
 
 YmItem* YmItem::owner() noexcept {
@@ -188,9 +204,11 @@ bool YmItem::conforms(ym::Safe<YmItem> protocol) const noexcept {
         else {
             // If symOfItemInPMemb contains $Self, then solve ref sym to item in pMemb such that $Self is
             // substituted w/ match.fullname() (+ other needed substitutions.)
-            auto solvedSpecOfItemInPMemb = _ym::SpecSolver(pMemb.parcel, pMemb.self(), match.self())(symOfItemInPMemb);
+            auto solvedSpecOfItemInPMemb = symOfItemInPMemb.transformed(nullptr, pMemb.parcel, pMemb.self(), match.self());
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmItem::conforms:     {} vs. {} (from {})", itemInMatch.fullname(), solvedSpecOfItemInPMemb.value_or("**Error**"), symOfItemInPMemb);
+            // TODO: Original code has 'solvedSpecOfItemInPMemb.value_or("**Error**")', so if ever we encounter a situation
+            //       where solvedSpecOfItemInPMemb needs to be std::nullopt, add this part back in.
+            ym::println("YmItem::conforms:     {} vs. {} (from {})", itemInMatch.fullname(), solvedSpecOfItemInPMemb, symOfItemInPMemb);
 #endif
             return solvedSpecOfItemInPMemb == itemInMatch.fullname();
         }
@@ -281,16 +299,16 @@ void YmItem::_initFullname() {
             if (!first) {
                 argPack += ", ";
             }
-            argPack += arg->fullname();
+            argPack += arg->fullname().string();
             first = false;
         }
         argPack += "]";
     }
-    _fullname = std::format("{}:{}{}{}", path(), (std::string)owner, argPack, (std::string)memberExt);
+    _fullname = _ym::Spec::itemFast(std::format("{}:{}{}{}", path(), (std::string)owner, argPack, (std::string)memberExt));
 }
 
 void YmItem::_initFullname(YmItem& owner) {
     const auto [_, memberExt] = _ym::split_s<YmChar>(localName(), "::", true);
-    _fullname = std::format("{}{}", owner.fullname(), memberExt);
+    _fullname = _ym::Spec::itemFast(std::format("{}{}", owner.fullname(), memberExt));
 }
 

@@ -20,23 +20,38 @@ _ym::SpecSolver::SpecSolver(YmParcel* here, YmItem* itemParamsCtx, YmItem* self,
     _redirects(redirects) {
 }
 
-std::optional<std::string> _ym::SpecSolver::operator()(const SpecParser::Result& specifier, MustBe mustBe) {
+std::optional<std::string> _ym::SpecSolver::operator()(const SpecParser::Result& specifier, Type& type, MustBe mustBe) {
     if (!specifier) {
         return std::nullopt;
     }
     _beginSolve();
     eval(specifier);
-    return _endSolve(mustBe);
+    return _endSolve(type, mustBe);
 }
 
-std::optional<std::string> _ym::SpecSolver::operator()(const taul::str& specifier, MustBe mustBe) {
+std::optional<std::string> _ym::SpecSolver::operator()(const SpecParser::Result& specifier, MustBe mustBe) {
+    Type t{};
+    return operator()(specifier, t, mustBe);
+}
+
+std::optional<std::string> _ym::SpecSolver::operator()(const taul::str& specifier, Type& type, MustBe mustBe) {
     return operator()(SpecParser{}(specifier), mustBe);
 }
 
-std::optional<std::string> _ym::SpecSolver::operator()(const std::string& specifier, MustBe mustBe) {
+std::optional<std::string> _ym::SpecSolver::operator()(const taul::str& specifier, MustBe mustBe) {
+    Type t{};
+    return operator()(specifier, t, mustBe);
+}
+
+std::optional<std::string> _ym::SpecSolver::operator()(const std::string& specifier, Type& type, MustBe mustBe) {
     // NOTE: It's safe to pass a non-owning taul::str here, as we know 100% that the parse
     //		 tree memory that will ref it won't outlive this fn call.
     return operator()(taul::str::lit(specifier.c_str()), mustBe);
+}
+
+std::optional<std::string> _ym::SpecSolver::operator()(const std::string& specifier, MustBe mustBe) {
+    Type t{};
+    return operator()(specifier, t, mustBe);
 }
 
 bool _ym::SpecSolver::_hasScope() const noexcept {
@@ -58,11 +73,11 @@ bool _ym::SpecSolver::_hasExpr() const noexcept {
 }
 
 bool _ym::SpecSolver::_isPath() const noexcept {
-    return _scope().latest == _Expr::Path;
+    return _scope().latest == Type::Path;
 }
 
 bool _ym::SpecSolver::_isItem() const noexcept {
-    return _scope().latest == _Expr::Item;
+    return _scope().latest == Type::Item;
 }
 
 bool _ym::SpecSolver::_expectPath() {
@@ -95,7 +110,7 @@ void _ym::SpecSolver::_markAsPath() noexcept {
         ym::println("SpecSolver: Marked as path!");
     }
 #endif
-    _scope().latest = _Expr::Path;
+    _scope().latest = Type::Path;
 }
 void _ym::SpecSolver::_markAsItem() noexcept {
 #if _DUMP_LOG
@@ -103,7 +118,7 @@ void _ym::SpecSolver::_markAsItem() noexcept {
         ym::println("SpecSolver: Marked as item!");
     }
 #endif
-    _scope().latest = _Expr::Item;
+    _scope().latest = Type::Item;
 }
 
 void _ym::SpecSolver::_handleRedirectsIfPath() {
@@ -111,7 +126,8 @@ void _ym::SpecSolver::_handleRedirectsIfPath() {
 #if _DUMP_LOG
         auto old = _scope().output;
 #endif
-        _scope().output = _redirects->resolve(_scope().output);
+        // TODO: This conversion into and then out of Spec is suboptimal.
+        _scope().output = _redirects->resolve(Spec::pathFast(_scope().output)).string();
 #if _DUMP_LOG
         if (_scope().output != old) {
             ym::println("SpecSolver: Redirect! {} -> {}", old, _scope().output);
@@ -143,10 +159,11 @@ void _ym::SpecSolver::_beginSolve() {
     _beginScope();
 }
 
-std::optional<std::string> _ym::SpecSolver::_endSolve(MustBe mustBe) {
+std::optional<std::string> _ym::SpecSolver::_endSolve(Type& type, MustBe mustBe) {
     _handleRedirectsIfPath();
     if (mustBe == MustBe::Path)			_expectPath();
     else if (mustBe == MustBe::Item)    _expectItem();
+    type = _scope().latest.value_or(Type::Path);
     auto result = _endScope();
 #if _DUMP_LOG
     ym::println("SpecSolver: End solve! -> {}, {}", _good(), result);

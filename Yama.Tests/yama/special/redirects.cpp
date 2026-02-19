@@ -184,7 +184,9 @@ TEST(Redirects, BeforePrefixPathsShadowRedirectsWithLessSpecificOnes) {
 	YmItem* q_c_A = load(ctx, "q/c:A");
 	YmItem* instead_A = load(ctx, "instead:A");
 	EXPECT_EQ(ymItem_ReturnType(f), q_a_A);
-	EXPECT_EQ(ymItem_ParamType(f, 0), instead_A);
+	EXPECT_EQ(ymItem_ParamType(f, 0), instead_A)
+		<< ymItem_Fullname(ymItem_ParamType(f, 0)) << "\n"
+		<< ymItem_Fullname(instead_A);
 	EXPECT_EQ(ymItem_ParamType(f, 1), q_c_A);
 }
 

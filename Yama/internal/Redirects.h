@@ -6,6 +6,8 @@
 #include <string>
 #include <map>
 
+#include "Spec.h"
+
 
 namespace _ym {
 
@@ -25,7 +27,7 @@ namespace _ym {
 
 
 		// Returns path modified by the appropriate redirect, or unmodified is no redirect for it was found.
-		std::string resolve(std::string path) const;
+		Spec resolve(const Spec& path) const;
 
 
 	private:
@@ -33,7 +35,7 @@ namespace _ym {
 
 
 		// Maps 'before' paths to 'after' paths.
-		std::map<std::string, std::string> _redirects;
+		std::map<Spec, Spec> _redirects;
 	};
 
 	class Redirects final {
@@ -41,15 +43,15 @@ namespace _ym {
 		Redirects() = default;
 
 
-		void add(const std::string& subject, const std::string& before, const std::string& after);
+		void add(const Spec& subject, const Spec& before, const Spec& after);
 
 		// Computes the redirect set for path.
-		RedirectSet compute(const std::string& path) const;
+		RedirectSet compute(const Spec& path) const;
 
 
 	private:
 		// Maps pair of 'subject' and 'before' paths to 'after' paths.
-		std::map<std::pair<std::string, std::string>, std::string> _redirects;
+		std::map<std::pair<Spec, Spec>, Spec> _redirects;
 	};
 }
 

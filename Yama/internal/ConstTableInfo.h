@@ -12,6 +12,7 @@
 #include "../yama++/Variant.h"
 
 #include "general.h"
+#include "Spec.h"
 
 
 namespace _ym {
@@ -48,7 +49,7 @@ namespace _ym {
 
 
     struct RefInfo final {
-        std::string sym;
+        Spec sym;
 
 
         bool operator==(const RefInfo&) const noexcept = default;
@@ -131,7 +132,7 @@ namespace _ym {
         inline auto fetchVal(const T& x, size_t sizeLimit = size_t(-1)) const noexcept {
             return fetch(ConstInfo(x), sizeLimit);
         }
-        inline auto fetchRef(std::string symbol, size_t sizeLimit = size_t(-1)) const noexcept {
+        inline auto fetchRef(Spec symbol, size_t sizeLimit = size_t(-1)) const noexcept {
             return fetch(ConstInfo(RefInfo{ .sym = std::move(symbol) }), sizeLimit);
         }
 
@@ -151,7 +152,7 @@ namespace _ym {
         inline auto pullVal(const T& x, size_t sizeLimit = size_t(-1)) {
             return pull(ConstInfo(x), sizeLimit);
         }
-        inline auto pullRef(std::string symbol, size_t sizeLimit = size_t(-1)) {
+        inline auto pullRef(Spec symbol, size_t sizeLimit = size_t(-1)) {
             return pull(ConstInfo(RefInfo{ .sym = std::move(symbol) }), sizeLimit);
         }
 

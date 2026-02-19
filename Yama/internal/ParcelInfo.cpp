@@ -7,8 +7,8 @@
 #include "../yama++/general.h"
 
 
-std::optional<std::string> _ym::normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver) {
-    if (auto result = solver(symbol, SpecSolver::MustBe::Item)) {
+std::optional<_ym::Spec> _ym::normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver) {
+    if (auto result = Spec::item(symbol, solver)) {
         return result;
     }
     _ym::Global::raiseErr(
@@ -219,10 +219,10 @@ void _ym::ItemInfo::attemptSetupAsMember(ParcelInfo& parcel) {
         auto membName = (std::string)memberName().value();
         // Bind this->owner to a ref to our new owner.
         // Using $Self here nicely accounts for things like generics.
-        this->owner = consts.pullRef("$Self").value();
+        this->owner = consts.pullRef(Spec::itemFast("$Self")).value();
         // Pull ref constant of *this for our owner to be setup w/.
         // Using $Self::[MEMBER] here nicely accounts for things like generics.
-        auto ref = owner->consts.pullRef(std::format("$Self::{}", membName)).value();
+        auto ref = owner->consts.pullRef(Spec::itemFast(std::move(std::format("$Self::{}", membName)))).value();
         // Bind ref to by-index/name lookup in *owner.
         owner->membersByIndex.push_back(ref);
         owner->membersByName.try_emplace(membName, std::move(ref)); // Move ref.

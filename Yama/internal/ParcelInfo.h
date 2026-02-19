@@ -26,7 +26,7 @@ namespace _ym {
     class ParcelInfo;
 
 
-    std::optional<std::string> normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver = {});
+    std::optional<Spec> normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver = {});
     bool checkCallable(const ItemInfo& item, std::string_view msg);
     bool checkNonMember(const ItemInfo& item, std::string_view msg);
 

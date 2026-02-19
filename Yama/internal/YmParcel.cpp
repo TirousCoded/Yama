@@ -3,7 +3,7 @@
 #include "YmParcel.h"
 
 
-YmParcel::YmParcel(std::string path, std::shared_ptr<_ym::ParcelInfo> info) :
+YmParcel::YmParcel(_ym::Spec path, std::shared_ptr<_ym::ParcelInfo> info) :
     path(std::move(path)),
     info(std::move(info)) {
 }

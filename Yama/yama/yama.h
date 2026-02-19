@@ -92,6 +92,9 @@ extern "C" {
     *                 'kinds' (ie. RC, non-RC, subres) for the above to be added.
     */
 
+    /* TODO: Actually, I think I prefer to call them 'files', to specifically keep
+    *        concept names IN LINE W/ the filesystem.
+    */
     /* TODO: Make it so that we call each file/directory name-like part of the path
     *        a 'module' (or 'submodule'.)
     * 

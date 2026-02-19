@@ -16,6 +16,7 @@
 #include "../yama++/Safe.h"
 #include "ConstTableInfo.h"
 #include "ParcelInfo.h"
+#include "Spec.h"
 #include "YmParcel.h"
 
 
@@ -41,7 +42,7 @@ namespace _ym {
 
 struct YmItem final : public std::enable_shared_from_this<YmItem> {
 public:
-    using Name = std::string;
+    using Name = _ym::Spec;
 
 
     const ym::Safe<YmParcel> parcel;
@@ -55,7 +56,9 @@ public:
         std::vector<ym::Safe<YmItem>> itemArgs = {}) :
         parcel(parcel),
         info(info),
-        itemArgs(std::move(itemArgs)) {
+        itemArgs(std::move(itemArgs)),
+        // TODO: This 'dummy' Spec is gross.
+        _fullname(_ym::Spec::pathFast("dummy")) {
         ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname();
@@ -66,7 +69,9 @@ public:
         YmItem& owner) :
         parcel(parcel),
         info(info),
-        itemArgs(std::move(itemArgs)) {
+        itemArgs(std::move(itemArgs)),
+        // TODO: This 'dummy' Spec is gross.
+        _fullname(_ym::Spec::pathFast("dummy")) {
         ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname(owner);
@@ -74,12 +79,16 @@ public:
 
 
     inline YmKind kind() const noexcept { return info->kind; }
-    const std::string& path() const noexcept;
-    const std::string& fullname() const noexcept;
+    const _ym::Spec& path() const noexcept;
+    const _ym::Spec& fullname() const noexcept;
     const std::string& localName() const noexcept;
 
     std::optional<std::string> callsuff() const;
-    std::optional<std::string> callsig() const;
+    std::optional<_ym::Spec> callsig() const;
+
+    bool checkCallSuff(std::string_view callsuff) const;
+    // Succeeds by default if callsuff is empty.
+    bool checkCallSuff(std::optional<std::string_view> callsuff) const;
 
     YmItem* owner() noexcept;
     const YmItem* owner() const noexcept;
@@ -123,7 +132,7 @@ public:
 
 
 private:
-    std::string _fullname;
+    _ym::Spec _fullname;
 
     // TODO: Later revise to make our _consts inline w/ the memory block of YmItem itself via HAStruct.
 

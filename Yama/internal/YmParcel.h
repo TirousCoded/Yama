@@ -16,7 +16,7 @@
 
 struct YmParcel final : public std::enable_shared_from_this<YmParcel> {
 public:
-    using Name = std::string;
+    using Name = _ym::Spec;
 
 
     const Name path;
@@ -24,7 +24,7 @@ public:
     std::optional<_ym::RedirectSet> redirects;
 
 
-    YmParcel(std::string path, std::shared_ptr<_ym::ParcelInfo> info);
+    YmParcel(_ym::Spec path, std::shared_ptr<_ym::ParcelInfo> info);
 
 
     size_t items() const noexcept;

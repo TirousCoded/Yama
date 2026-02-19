@@ -12,14 +12,14 @@
 
 _ym::DmLoader::DmLoader() :
     SynchronizedLoader(),
-    _ldrState(_staging, _binds, _redirects) {
+    _ldr(_staging, _binds, _redirects) {
     _staging.setUpstream(&_commits);
     _bindYamaParcel();
 }
 
 bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel) {
-    if (auto normalizedPath = SpecSolver{}(path, SpecSolver::MustBe::Path)) {
-        if (!bindIsForYamaParcel && *normalizedPath == "yama") {
+    if (auto p = Spec::path(path)) {
+        if (!bindIsForYamaParcel && *p == "yama") {
             _ym::Global::raiseErr(
                 YmErrCode_PathBindError,
                 "Cannot bind parcel def.; would overwrite \"yama\" parcel!");
@@ -29,7 +29,7 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
             return false;
         }
         std::scoped_lock lk(_updateLock);
-        _binds.set(*normalizedPath, std::make_shared<YmParcel>(*normalizedPath, parceldef->info));
+        _binds.set(*p, std::make_shared<YmParcel>(*p, parceldef->info));
         return true;
     }
     else {
@@ -42,24 +42,24 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
 }
 
 bool _ym::DmLoader::addRedirect(const std::string& subject, const std::string& before, const std::string& after) {
-    auto normalizedSubject = SpecSolver{}(subject, SpecSolver::MustBe::Path);
-    auto normalizedBefore = SpecSolver{}(before, SpecSolver::MustBe::Path);
-    auto normalizedAfter = SpecSolver{}(after, SpecSolver::MustBe::Path);
-    if (!normalizedSubject) {
+    auto pSubject = Spec::path(subject);
+    auto pBefore = Spec::path(before);
+    auto pAfter = Spec::path(after);
+    if (!pSubject) {
         Global::raiseErr(
             YmErrCode_IllegalSpecifier,
             "Cannot add redirect; subject path \"{}\" is illegal!",
             subject);
         return false;
     }
-    if (!normalizedBefore) {
+    if (!pBefore) {
         Global::raiseErr(
             YmErrCode_IllegalSpecifier,
             "Cannot add redirect; 'before' path \"{}\" is illegal!",
             before);
         return false;
     }
-    if (!normalizedAfter) {
+    if (!pAfter) {
         Global::raiseErr(
             YmErrCode_IllegalSpecifier,
             "Cannot add redirect; 'after' path \"{}\" is illegal!",
@@ -67,7 +67,7 @@ bool _ym::DmLoader::addRedirect(const std::string& subject, const std::string& b
         return false;
     }
     std::scoped_lock lk(_updateLock);
-    _redirects.add(*normalizedSubject, *normalizedBefore, *normalizedAfter);
+    _redirects.add(*pSubject, *pBefore, *pAfter);
     return true;
 }
 
@@ -77,14 +77,12 @@ void _ym::DmLoader::reset() noexcept {
     _staging.discard(true);
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(const std::string& normalizedPath) const noexcept {
-    assertNormal(normalizedPath);
+std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(const Spec& path) const noexcept {
     std::shared_lock lk(_accessLock);
-    return _commits.parcels.fetch(normalizedPath);
+    return _commits.parcels.fetch(path);
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform) const noexcept {
-    assertNormal(normalizedFullname);
+std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
     if (failedDueToCallSigNonConform) {
         *failedDueToCallSigNonConform = false;
     }
@@ -92,12 +90,11 @@ std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& normalizedFu
     //       We can make a non-virtual base class 'fetchItem' method which handles this, and then
     //       this can call a virtual 'doFetchItem' method.
     //       Also, try to update _ym::DmLoader::load to generalize it's code w/ above.
-    //       Also _ym::LoaderState::_checkRefConstCallSigConformance too.
-    const auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
+    //       Also _ym::LoaderManager::_checkRefConstCallSigConformance too.
     std::shared_lock lk(_accessLock);
-    auto result = _commits.items.fetch(std::string(fullname));
+    auto result = _commits.items.fetch(fullname.removeCallSuff());
     lk.unlock(); // Don't need it anymore.
-    if (result && callsuff && result->callsuff() != callsuff) {
+    if (result && !result->checkCallSuff(fullname.callsuff())) {
         if (failedDueToCallSigNonConform) {
             *failedDueToCallSigNonConform = true;
         }
@@ -106,19 +103,18 @@ std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const std::string& normalizedFu
             YmErrCode_ItemNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
-            std::string(*callsuff));
+            std::string(*fullname.callsuff()));
         return nullptr;
     }
     return result;
 }
 
-std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& normalizedPath) {
-    assertNormalNonCallSig(normalizedPath);
-    if (const auto result = fetchParcel(normalizedPath)) {
+std::shared_ptr<YmParcel> _ym::DmLoader::import(const Spec& path) {
+    if (const auto result = fetchParcel(path)) {
         return result;
     }
     std::scoped_lock lk(_updateLock);
-    auto result = _ldrState.import(normalizedPath);
+    auto result = _ldr.import(path);
     _staging.commitOrDiscard(result, _accessLock);
     return
         result
@@ -126,22 +122,20 @@ std::shared_ptr<YmParcel> _ym::DmLoader::import(const std::string& normalizedPat
         : nullptr;
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::load(const std::string& normalizedFullname) {
-    assertNormal(normalizedFullname);
+std::shared_ptr<YmItem> _ym::DmLoader::load(const Spec& fullname) {
     bool failedDueToCallSigNonConform{};
-    if (const auto result = fetchItem(normalizedFullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
+    if (const auto result = fetchItem(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
-    auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
     std::scoped_lock lk(_updateLock);
-    auto result = _ldrState.load(std::string(fullname));
-    if (result && callsuff && result->callsuff() != callsuff) {
+    auto result = _ldr.load(fullname.removeCallSuff());
+    if (result && !result->checkCallSuff(fullname.callsuff())) {
         // TODO: Improve this error!
         _ym::Global::raiseErr(
             YmErrCode_ItemNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
-            std::string(*callsuff));
+            std::string(*fullname.callsuff()));
         _staging.discard(); // Can't forget!
         return nullptr;
     }
@@ -179,19 +173,16 @@ void _ym::CtxLoader::reset() noexcept {
     _commits.discard(true);
 }
 
-std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(const std::string& normalizedPath) const noexcept {
-    assertNormal(normalizedPath);
-    return _commits.parcels.fetch(normalizedPath);
+std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(const Spec& path) const noexcept {
+    return _commits.parcels.fetch(path);
 }
 
-std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const std::string& normalizedFullname, bool* failedDueToCallSigNonConform) const noexcept {
-    assertNormal(normalizedFullname);
+std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
     if (failedDueToCallSigNonConform) {
         *failedDueToCallSigNonConform = false;
     }
-    const auto [fullname, callsuff] = seperateCallSuff(normalizedFullname);
-    auto result = _commits.items.fetch(std::string(fullname));
-    if (result && callsuff && result->callsuff() != callsuff) {
+    auto result = _commits.items.fetch(fullname.removeCallSuff());
+    if (result && !result->checkCallSuff(fullname.callsuff())) {
         if (failedDueToCallSigNonConform) {
             *failedDueToCallSigNonConform = true;
         }
@@ -200,31 +191,29 @@ std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const std::string& normalizedF
             YmErrCode_ItemNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
-            std::string(*callsuff));
+            std::string(*fullname.callsuff()));
         return nullptr;
     }
     return result;
 }
 
-std::shared_ptr<YmParcel> _ym::CtxLoader::import(const std::string& normalizedPath) {
-    assertNormal(normalizedPath);
-    if (auto result = fetchParcel(normalizedPath)) {
+std::shared_ptr<YmParcel> _ym::CtxLoader::import(const Spec& path) {
+    if (auto result = fetchParcel(path)) {
         return result;
     }
-    auto parcel = upstream()->import(normalizedPath);
+    auto parcel = upstream()->import(path);
     return
         _commits.parcels.push(parcel)
         ? parcel
         : nullptr;
 }
 
-std::shared_ptr<YmItem> _ym::CtxLoader::load(const std::string& normalizedFullname) {
-    assertNormal(normalizedFullname);
+std::shared_ptr<YmItem> _ym::CtxLoader::load(const Spec& fullname) {
     bool failedDueToCallSigNonConform{};
-    if (auto result = fetchItem(normalizedFullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
+    if (auto result = fetchItem(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
-    auto item = upstream()->load(normalizedFullname);
+    auto item = upstream()->load(fullname);
     return
         _commits.items.push(item)
         ? item
