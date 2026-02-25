@@ -115,7 +115,7 @@ namespace {
         return ym::Safe(result);
     }
     // Throws std::runtime_error on load error in order to force unit test to crash.
-    inline ym::Safe<YmItem> load(YmCtx* ctx, const std::string& fullname) {
+    inline ym::Safe<YmType> load(YmCtx* ctx, const std::string& fullname) {
         auto result = ymCtx_Load(ctx, fullname.c_str());
         EXPECT_TRUE(result);
         if (!result) throw std::runtime_error(""); // Abort test.
@@ -136,11 +136,6 @@ auto dm_ = ym::bindScoped(ym::Safe(dm))
 
 #define SETUP_CTX(name) \
 YmCtx* name = ymCtx_Create(dm); \
-ASSERT_TRUE(name); \
-auto name ## _ = ym::bindScoped(ym::Safe(name))
-
-#define SETUP_CALLSIGDEF(name) \
-YmCallSigDef* name = ymCallSigDef_Create(); \
 ASSERT_TRUE(name); \
 auto name ## _ = ym::bindScoped(ym::Safe(name))
 

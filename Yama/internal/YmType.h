@@ -30,7 +30,7 @@ namespace _ym {
         YmBool,
         YmRune,
 
-        ym::Safe<YmItem>
+        ym::Safe<YmType>
     >;
     static_assert(Const::size == ConstTypes);
 
@@ -40,39 +40,39 @@ namespace _ym {
 }
 
 
-struct YmItem final : public std::enable_shared_from_this<YmItem> {
+struct YmType final : public std::enable_shared_from_this<YmType> {
 public:
     using Name = _ym::Spec;
 
 
     const ym::Safe<YmParcel> parcel;
-    const ym::Safe<const _ym::ItemInfo> info;
-    const std::vector<ym::Safe<YmItem>> itemArgs;
+    const ym::Safe<const _ym::TypeInfo> info;
+    const std::vector<ym::Safe<YmType>> typeArgs;
 
 
-    inline YmItem(
+    inline YmType(
         ym::Safe<YmParcel> parcel,
-        ym::Safe<const _ym::ItemInfo> info,
-        std::vector<ym::Safe<YmItem>> itemArgs = {}) :
+        ym::Safe<const _ym::TypeInfo> info,
+        std::vector<ym::Safe<YmType>> typeArgs = {}) :
         parcel(parcel),
         info(info),
-        itemArgs(std::move(itemArgs)),
+        typeArgs(std::move(typeArgs)),
         // TODO: This 'dummy' Spec is gross.
         _fullname(_ym::Spec::pathFast("dummy")) {
-        ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
+        ymAssert(!ymKind_IsMember(kind()) || this->typeArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname();
     }
-    inline YmItem(
+    inline YmType(
         ym::Safe<YmParcel> parcel,
-        ym::Safe<const _ym::ItemInfo> info,
-        YmItem& owner) :
+        ym::Safe<const _ym::TypeInfo> info,
+        YmType& owner) :
         parcel(parcel),
         info(info),
-        itemArgs(std::move(itemArgs)),
+        typeArgs(std::move(typeArgs)),
         // TODO: This 'dummy' Spec is gross.
         _fullname(_ym::Spec::pathFast("dummy")) {
-        ymAssert(!ymKind_IsMember(kind()) || this->itemArgs.empty());
+        ymAssert(!ymKind_IsMember(kind()) || this->typeArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname(owner);
     }
@@ -90,28 +90,28 @@ public:
     // Succeeds by default if callsuff is empty.
     bool checkCallSuff(std::optional<std::string_view> callsuff) const;
 
-    YmItem* owner() noexcept;
-    const YmItem* owner() const noexcept;
-    ym::Safe<YmItem> self() noexcept;
-    ym::Safe<const YmItem> self() const noexcept;
+    YmType* owner() noexcept;
+    const YmType* owner() const noexcept;
+    ym::Safe<YmType> self() noexcept;
+    ym::Safe<const YmType> self() const noexcept;
     YmMembers members() const noexcept;
-    YmItem* member(YmMemberIndex member) const noexcept;
-    YmItem* member(const std::string& name) const noexcept;
-    YmItemParams itemParams() const noexcept;
-    YmItem* itemParam(YmItemParamIndex index) const noexcept;
-    YmItem* itemParam(const std::string& name) const noexcept;
-    YmItem* itemParamConstraint(YmItemParamIndex index) const noexcept;
-    YmItem* itemParamConstraint(const std::string& name) const noexcept;
+    YmType* member(YmMemberIndex member) const noexcept;
+    YmType* member(const std::string& name) const noexcept;
+    YmTypeParams typeParams() const noexcept;
+    YmType* typeParam(YmTypeParamIndex index) const noexcept;
+    YmType* typeParam(const std::string& name) const noexcept;
+    YmType* typeParamConstraint(YmTypeParamIndex index) const noexcept;
+    YmType* typeParamConstraint(const std::string& name) const noexcept;
 
-    YmItem* returnType() const noexcept;
+    YmType* returnType() const noexcept;
     inline YmParams params() const noexcept { return YmParams(info->params.size()); }
     const YmChar* paramName(YmParamIndex param) const;
-    YmItem* paramType(YmParamIndex param) const;
+    YmType* paramType(YmParamIndex param) const;
 
-    YmItem* ref(YmRef reference) const noexcept;
-    std::optional<YmRef> findRef(ym::Safe<YmItem> referenced) const noexcept;
+    YmType* ref(YmRef reference) const noexcept;
+    std::optional<YmRef> findRef(ym::Safe<YmType> referenced) const noexcept;
 
-    bool conforms(ym::Safe<YmItem> protocol) const noexcept;
+    bool conforms(ym::Safe<YmType> protocol) const noexcept;
 
     inline const Name& getName() const noexcept { return fullname(); }
 
@@ -122,26 +122,26 @@ public:
         ymAssert(_ym::constTypeOf(consts()[index]) == I);
         return consts()[index].as<size_t(I)>();
     }
-    inline ym::Safe<YmItem> constAsRef(size_t index) const noexcept {
+    inline ym::Safe<YmType> constAsRef(size_t index) const noexcept {
         return constAs<_ym::ConstType::Ref>(index);
     }
 
     void putValConst(size_t index);
     // Fails quietly if ref == nullptr.
-    void putRefConst(size_t index, YmItem* ref);
+    void putRefConst(size_t index, YmType* ref);
 
 
 private:
     _ym::Spec _fullname;
 
-    // TODO: Later revise to make our _consts inline w/ the memory block of YmItem itself via HAStruct.
+    // TODO: Later revise to make our _consts inline w/ the memory block of YmType itself via HAStruct.
 
     std::vector<_ym::Const> _consts;
 
 
     void _initConstsArrayToDummyIntConsts();
     void _initFullname();
-    void _initFullname(YmItem& owner);
+    void _initFullname(YmType& owner);
 
     template<typename T>
     inline void _putValConstAs(size_t index) {

@@ -13,20 +13,20 @@
 // NOTE: Yama defines explicit and implicit conversions, the ladder called 'coercions'.
 
 
-static void conv(YmItem* from, YmItem* to, bool succeedIfExplicit, bool succeedIfImplicit, int line) {
-    EXPECT_EQ(ymItem_Converts(from, to, false) == YM_TRUE, succeedIfExplicit)
-        << "line: " << line << ", " << ymItem_Fullname(from) << " -> " << ymItem_Fullname(to);
+static void conv(YmType* from, YmType* to, bool succeedIfExplicit, bool succeedIfImplicit, int line) {
+    EXPECT_EQ(ymType_Converts(from, to, false) == YM_TRUE, succeedIfExplicit)
+        << "line: " << line << ", " << ymType_Fullname(from) << " -> " << ymType_Fullname(to);
 
-    EXPECT_EQ(ymItem_Converts(from, to, true) == YM_TRUE, succeedIfImplicit)
-        << "line: " << line << ", " << ymItem_Fullname(from) << " -> " << ymItem_Fullname(to) << " (coercion)";
+    EXPECT_EQ(ymType_Converts(from, to, true) == YM_TRUE, succeedIfImplicit)
+        << "line: " << line << ", " << ymType_Fullname(from) << " -> " << ymType_Fullname(to) << " (coercion)";
 }
 
 #define CONV(from, to, succeedIfExplicit, succeedIfImplicit) \
 conv((from), (to), (succeedIfExplicit), (succeedIfImplicit), __LINE__)
 
 
-static std::optional<std::vector<YmItem*>> mkItemsVec(YmCtx* ctx, std::vector<std::string> fullnames) {
-    std::vector<YmItem*> result{};
+static std::optional<std::vector<YmType*>> mkTypesVec(YmCtx* ctx, std::vector<std::string> fullnames) {
+    std::vector<YmType*> result{};
     result.reserve(fullnames.size());
     for (const auto& fullname : fullnames) {
         result.push_back(ymCtx_Load(ctx, fullname.c_str()));
@@ -49,22 +49,22 @@ TEST(Conversions, Identity_IncludeGenerics) {
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
     auto B_ind = ymParcelDef_AddStruct(p_def, "B");
     auto C_ind = ymParcelDef_AddStruct(p_def, "C");
-    ymParcelDef_AddItemParam(p_def, C_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, C_ind, "T", "p:Any");
     
     auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
     auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
-    ymParcelDef_AddItemParam(p_def, Q_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, Q_ind, "T", "p:Any");
     
     auto f_ind = ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     auto g_ind = ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddItemParam(p_def, g_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, g_ind, "T", "p:Any");
     
     auto A_m_ind = ymParcelDef_AddMethod(p_def, A_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
     auto C_m_ind = ymParcelDef_AddMethod(p_def, C_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
     
     ymDm_BindParcelDef(dm, "p", p_def);
 
-    auto items = mkItemsVec(ctx, {
+    auto types = mkTypesVec(ctx, {
         "p:A",
         "p:B",
         "p:C[p:A]",
@@ -81,7 +81,7 @@ TEST(Conversions, Identity_IncludeGenerics) {
         })
         .value();
 
-    for (const auto& t : items) {
+    for (const auto& t : types) {
         CONV(t, t, true, true);
     }
 }
@@ -104,12 +104,12 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
     auto B_ind = ymParcelDef_AddStruct(p_def, "B");
     auto C_ind = ymParcelDef_AddStruct(p_def, "C");
-    ymParcelDef_AddItemParam(p_def, C_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, C_ind, "T", "p:Any");
 
     ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
     auto h_ind = ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddItemParam(p_def, h_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, h_ind, "T", "p:Any");
 
     ymParcelDef_AddMethod(p_def, A_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, A_ind, "m2", "p:A", ymInertCallBhvrFn, nullptr);
@@ -118,7 +118,7 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
-    auto items = mkItemsVec(ctx, {
+    auto types = mkTypesVec(ctx, {
         "p:A",
         "p:B",
         "p:C[p:A]",
@@ -135,8 +135,8 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
         })
         .value();
 
-    for (const auto& from : items) {
-        for (const auto& to : items) {
+    for (const auto& from : types) {
+        for (const auto& to : types) {
             if (&from == &to) continue; // Skip identity convs.
             CONV(from, to, false, false);
         }
@@ -168,7 +168,7 @@ TEST(Conversions, NonProtocolToProtocol) {
     ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
 
     auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
-    ymParcelDef_AddItemParam(p_def, P4_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, P4_ind, "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -216,7 +216,7 @@ TEST(Conversions, ProtocolToNonProtocol) {
     ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
 
     auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
-    ymParcelDef_AddItemParam(p_def, P4_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, P4_ind, "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -259,12 +259,12 @@ TEST(Conversions, ProtocolToProtocol) {
     ymParcelDef_AddMethodReq(p_def, Q_ind, "mB", "p:A");
     
     auto R_ind = ymParcelDef_AddProtocol(p_def, "R");
-    ymParcelDef_AddItemParam(p_def, R_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, R_ind, "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, R_ind, "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
     
-    auto items = mkItemsVec(ctx, {
+    auto types = mkTypesVec(ctx, {
         "p:P",
         "p:Q",
         "p:R[p:A]",
@@ -274,8 +274,8 @@ TEST(Conversions, ProtocolToProtocol) {
 
     // NOTE: For P -> Q, then Q -> P should also be true.
 
-    for (const auto& from : items) {
-        for (const auto& to : items) {
+    for (const auto& from : types) {
+        for (const auto& to : types) {
             if (&from == &to) continue; // Skip identity convs.
             CONV(from, to, true, true);
         }

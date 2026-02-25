@@ -27,8 +27,8 @@ public:
     YmParcel(_ym::Spec path, std::shared_ptr<_ym::ParcelInfo> info);
 
 
-    size_t items() const noexcept;
-    const _ym::ItemInfo* item(const std::string& localName) const noexcept;
+    size_t types() const noexcept;
+    const _ym::TypeInfo* type(const std::string& localName) const noexcept;
 
     inline const Name& getName() const noexcept { return path; }
 

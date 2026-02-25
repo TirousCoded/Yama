@@ -15,10 +15,14 @@
 #include "../yama/yama.h"
 #include "general.h"
 #include "ParcelInfo.h"
+#include "RefCounter.h"
 
 
 struct YmParcelDef final {
 public:
+    // refs is not managed internally by this class.
+    _ym::AtomicRefCounter<YmRefCount> refs;
+
     std::shared_ptr<_ym::ParcelInfo> info;
 
 
@@ -29,34 +33,34 @@ public:
 
     bool verify() const;
 
-    std::optional<YmItemIndex> addStruct(
+    std::optional<YmTypeIndex> addStruct(
         const std::string& name);
-    std::optional<YmItemIndex> addProtocol(
+    std::optional<YmTypeIndex> addProtocol(
         const std::string& name);
-    std::optional<YmItemIndex> addFn(
+    std::optional<YmTypeIndex> addFn(
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
-    std::optional<YmItemIndex> addMethod(
-        YmItemIndex owner,
+    std::optional<YmTypeIndex> addMethod(
+        YmTypeIndex owner,
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
-    std::optional<YmItemIndex> addMethodReq(
-        YmItemIndex owner,
+    std::optional<YmTypeIndex> addMethodReq(
+        YmTypeIndex owner,
         const std::string& name,
         std::string returnTypeSymbol);
 
-    std::optional<YmItemParamIndex> addItemParam(
-        YmItemIndex item,
+    std::optional<YmTypeParamIndex> addTypeParam(
+        YmTypeIndex type,
         std::string name,
         std::string constraintTypeSymbol);
     std::optional<YmParamIndex> addParam(
-        YmItemIndex item,
+        YmTypeIndex type,
         std::string name,
         std::string paramTypeSymbol);
     std::optional<YmRef> addRef(
-        YmItemIndex item,
+        YmTypeIndex type,
         std::string symbol);
 };
 

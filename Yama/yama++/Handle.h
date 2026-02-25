@@ -15,7 +15,7 @@ namespace ym {
 
 
     // Base class of handles to Yama resources.
-    // Destroyable resources have non-copyable RAII handles.
+    // RAII manages RC/ARC resources.
     template<typename T>
     class Handle {
     public:
@@ -42,30 +42,58 @@ namespace ym {
         inline operator T* () const noexcept { return get(); } // Implicit
 
 
+        // Dissociates the handle from its resource, invalidating the handle.
+        inline void disown() noexcept {
+            _res = nullptr;
+        }
+
+
     private:
         // _res is raw pointer so _res has a value when moved-from.
         T* _res = nullptr;
     };
 
     // Base class of handles to Yama resources.
-    // Destroyable resources have non-copyable RAII handles.
-    template<UserManagedRes T>
+    // RAII manages RC/ARC resources.
+    template<RefCountedRes T>
     class Handle<T> {
     public:
+        // Does not increment the ref count of resource.
         inline explicit Handle(Safe<T> resource) noexcept :
             _res(resource) {
         }
 
         inline virtual ~Handle() noexcept {
-            drop(); // RAII
+            release(); // RAII
         }
 
-        // NOTE: Resources which can be destroyed won't get copy ctor/assign.
+        inline Handle(const Handle& other) :
+            Handle(other.get()) {
+            ym::secure(other);
+        }
+        inline Handle(Handle&& other) noexcept :
+            Handle(other.get()) {
+            other.disown();
+        }
+        inline Handle& operator=(const Handle& other) {
+            if (&other != this) {
+                release();
+                _res = other._res;
+            }
+            return *this;
+        }
+        inline Handle& operator=(Handle&& other) noexcept {
+            if (&other != this) {
+                release();
+                std::swap(_res, other._res); // Invalidate other.
+            }
+            return *this;
+        }
 
-        Handle(const Handle&) = delete;
-        Handle(Handle&&) noexcept = default;
-        Handle& operator=(const Handle&) = delete;
-        Handle& operator=(Handle&&) noexcept = default;
+
+        inline YmRefCount refCount() const noexcept {
+            return ym::refCount(get());
+        }
 
 
         inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
@@ -76,15 +104,16 @@ namespace ym {
         inline operator T* () const noexcept { return get(); } // Implicit
 
 
-        // Disowns the ownership this handle's resource, invalidating the handle.
+        // Dissociates the handle from its resource, invalidating the handle.
+        // Does not release the resource of the handle.
         inline void disown() noexcept {
             _res = nullptr;
         }
-
-        // Destroys the resource owned by this handle, invalidating the handle.
-        inline void drop() noexcept {
-            destroy(_res);
-            // NOTE: This stops dtor from attempting destroy.
+        // Dissociates the handle from its resource, invalidating the handle.
+        // Releases the resource of the handle.
+        inline void release() noexcept {
+            ym::release(_res);
+            // NOTE: dtor will double-free if disown isn't called here.
             disown();
         }
 

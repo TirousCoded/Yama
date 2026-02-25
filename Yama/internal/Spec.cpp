@@ -19,22 +19,22 @@ std::optional<_ym::Spec> _ym::Spec::path(const std::string& path) {
 	return Spec::path(path, s);
 }
 
-std::optional<_ym::Spec> _ym::Spec::item(const std::string& fullname, SpecSolver& solver) {
-	if (auto s = solver(fullname, SpecSolver::MustBe::Item)) {
-		return ym::retopt(Spec(std::move(*s), Type::Item));
+std::optional<_ym::Spec> _ym::Spec::type(const std::string& fullname, SpecSolver& solver) {
+	if (auto s = solver(fullname, SpecSolver::MustBe::Type)) {
+		return ym::retopt(Spec(std::move(*s), Type::Type));
 	}
 	return std::nullopt;
 }
 
-std::optional<_ym::Spec> _ym::Spec::item(const std::string& fullname) {
+std::optional<_ym::Spec> _ym::Spec::type(const std::string& fullname) {
 	SpecSolver s{};
-	return Spec::item(fullname, s);
+	return Spec::type(fullname, s);
 }
 
 std::optional<_ym::Spec> _ym::Spec::either(const std::string& specifier, SpecSolver& solver) {
 	SpecSolver::Type t{};
 	if (auto s = solver(specifier, t)) {
-		return ym::retopt(Spec(std::move(*s), t == SpecSolver::Type::Path ? Type::Path : Type::Item));
+		return ym::retopt(Spec(std::move(*s), t == SpecSolver::Type::Path ? Type::Path : Type::Type));
 	}
 	return std::nullopt;
 }
@@ -49,9 +49,9 @@ _ym::Spec _ym::Spec::pathFast(std::string normalizedPath) {
 	return std::move(Spec(std::move(normalizedPath), Type::Path).assertPath());
 }
 
-_ym::Spec _ym::Spec::itemFast(std::string normalizedFullname) {
+_ym::Spec _ym::Spec::typeFast(std::string normalizedFullname) {
 	assertNormal(normalizedFullname);
-	return std::move(Spec(std::move(normalizedFullname), Type::Item).assertItem());
+	return std::move(Spec(std::move(normalizedFullname), Type::Type).assertType());
 }
 
 std::strong_ordering _ym::Spec::operator<=>(const Spec& other) const noexcept {
@@ -78,8 +78,8 @@ bool _ym::Spec::isPath() const noexcept {
 	return type() == Type::Path;
 }
 
-bool _ym::Spec::isItem() const noexcept {
-	return type() == Type::Item;
+bool _ym::Spec::isType() const noexcept {
+	return type() == Type::Type;
 }
 
 _ym::Spec& _ym::Spec::assertPath() noexcept {
@@ -92,13 +92,13 @@ const _ym::Spec& _ym::Spec::assertPath() const noexcept {
 	return *this;
 }
 
-_ym::Spec& _ym::Spec::assertItem() noexcept {
-	ymAssert(isItem());
+_ym::Spec& _ym::Spec::assertType() noexcept {
+	ymAssert(isType());
 	return *this;
 }
 
-const _ym::Spec& _ym::Spec::assertItem() const noexcept {
-	ymAssert(isItem());
+const _ym::Spec& _ym::Spec::assertType() const noexcept {
+	ymAssert(isType());
 	return *this;
 }
 
@@ -120,8 +120,8 @@ std::string _ym::Spec::fmt() const {
 	return _spec;
 }
 
-_ym::Spec _ym::Spec::transformed(RedirectSet* redirects, YmParcel* here, YmItem* itemParamsCtx, YmItem* self) const {
-	return Spec(SpecSolver(here, itemParamsCtx, self, redirects)(_spec).value(), type());
+_ym::Spec _ym::Spec::transformed(RedirectSet* redirects, YmParcel* here, YmType* typeParamsCtx, YmType* self) const {
+	return Spec(SpecSolver(here, typeParamsCtx, self, redirects)(_spec).value(), type());
 }
 
 _ym::Spec _ym::Spec::removeCallSuff() const {

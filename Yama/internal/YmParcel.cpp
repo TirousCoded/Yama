@@ -8,12 +8,12 @@ YmParcel::YmParcel(_ym::Spec path, std::shared_ptr<_ym::ParcelInfo> info) :
     info(std::move(info)) {
 }
 
-size_t YmParcel::items() const noexcept {
-    return info->items();
+size_t YmParcel::types() const noexcept {
+    return info->types();
 }
 
-const _ym::ItemInfo* YmParcel::item(const std::string& localName) const noexcept {
-    return info->item(localName);
+const _ym::TypeInfo* YmParcel::type(const std::string& localName) const noexcept {
+    return info->type(localName);
 }
 
 void YmParcel::resolveRedirects(_ym::Redirects& state) {

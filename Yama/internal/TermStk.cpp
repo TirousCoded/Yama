@@ -14,11 +14,11 @@ _ym::TermStk::TermStk(
     Area& staging,
     PathBindings& binds,
     Redirects& redirects,
-    GenNonMemberItemDataCallback genNonMemberItemDataCallback) :
+    GenNonMemberTypeDataCallback genNonMemberTypeDataCallback) :
     staging(staging),
     binds(binds),
     redirects(redirects),
-    genNonMemberItemDataCallback(std::move(genNonMemberItemDataCallback)) {
+    genNonMemberTypeDataCallback(std::move(genNonMemberTypeDataCallback)) {
 }
 
 size_t _ym::TermStk::height() const noexcept {
@@ -54,16 +54,16 @@ std::span<const _ym::Term> _ym::TermStk::topN(size_t n) const noexcept {
         : std::span<const Term>{};
 }
 
-void _ym::TermStk::beginSession(std::string errPrefix, YmItem& item, std::string here, YmItem& self) {
+void _ym::TermStk::beginSession(std::string errPrefix, YmType& type, std::string here, YmType& self) {
 #if _DUMP_LOG
-    ym::println("TermStk: {} {}, {}, {}, {}", __func__, errPrefix, item.fullname(), here, self.fullname());
+    ym::println("TermStk: {} {}, {}, {}, {}", __func__, errPrefix, type.fullname(), here, self.fullname());
 #endif
     ymAssert(!_session.has_value());
     ymAssert(height() == 0);
     _session = _Sess{
         .errPrefix = std::move(errPrefix),
         .env = _Env{
-            .item = item,
+            .type = type,
             .here = std::move(here),
             .self = self,
         },
@@ -137,7 +137,7 @@ bool _ym::TermStk::verifyInputs(size_t n) {
     return true;
 }
 
-bool _ym::TermStk::expectItem() const {
+bool _ym::TermStk::expectType() const {
 #if _DUMP_LOG
     ym::println("TermStk: {}", __func__);
 #endif
@@ -146,11 +146,11 @@ bool _ym::TermStk::expectItem() const {
     if (t.isErr()) {
         return false;
     }
-    if (!t.isItem()) {
+    if (!t.isType()) {
         _err(
             // TODO: Not 100% sure what error this should be.
             YmErrCode_InternalError,
-            "{}; \"{}\" is not an item!",
+            "{}; \"{}\" is not an type!",
             _errPrefix(),
             t.fmt());
         return false;
@@ -158,7 +158,7 @@ bool _ym::TermStk::expectItem() const {
     return true;
 }
 
-YmItem* _ym::TermStk::expectConcrete() const {
+YmType* _ym::TermStk::expectConcrete() const {
 #if _DUMP_LOG
     ym::println("TermStk: {}", __func__);
 #endif
@@ -169,8 +169,8 @@ YmItem* _ym::TermStk::expectConcrete() const {
     }
     if (!t.isConcrete()) {
         _err(
-            YmErrCode_GenericItem,
-            "{}; \"{}\" is a generic item!",
+            YmErrCode_GenericType,
+            "{}; \"{}\" is a generic type!",
             _errPrefix(),
             t.fmt());
         return nullptr;
@@ -189,8 +189,8 @@ bool _ym::TermStk::expectGeneric() const {
     }
     if (!t.isGeneric()) {
         _err(
-            YmErrCode_ConcreteItem,
-            "{}; \"{}\" is a concrete item!",
+            YmErrCode_ConcreteType,
+            "{}; \"{}\" is a concrete type!",
             _errPrefix(),
             t.fmt());
         return false;
@@ -242,12 +242,12 @@ void _ym::TermStk::fullname(const Spec& fullname) {
 #endif
     _assertSess();
     fullname.assertNoCallSuff();
-    if (auto result = staging->items.fetch(fullname)) {
+    if (auto result = staging->types.fetch(fullname)) {
         push(Term(ym::Safe(result.get())));
     }
     else {
         specifier(fullname);
-        expectItem();
+        expectType();
     }
 }
 
@@ -307,7 +307,7 @@ void _ym::TermStk::self() {
     if (!_env()) {
         operErr(
             0,
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{}; $Self illegal!",
             _errPrefix());
     }
@@ -316,7 +316,7 @@ void _ym::TermStk::self() {
     }
 }
 
-void _ym::TermStk::itemParam(const std::string& id) {
+void _ym::TermStk::typeParam(const std::string& id) {
 #if _DUMP_LOG
     ym::println("TermStk: {} {}", __func__, id);
 #endif
@@ -324,42 +324,42 @@ void _ym::TermStk::itemParam(const std::string& id) {
     if (!_env()) {
         operErr(
             0,
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{}; ${} illegal!",
             _errPrefix(),
             id);
     }
-    else if (auto arg = _env()->self->itemParam(id)) {
+    else if (auto arg = _env()->self->typeParam(id)) {
         push(Term(ym::Safe(arg)));
     }
     else {
         operErr(
             0,
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{}; ${} illegal!",
             _errPrefix(),
             id);
     }
 }
 
-void _ym::TermStk::itemInParcel(const std::string& id) {
+void _ym::TermStk::typeInParcel(const std::string& id) {
 #if _DUMP_LOG
     ym::println("TermStk: {} {}", __func__, id);
 #endif
     _assertSess();
     if (auto p = importParcel()) {
-        if (auto info = p->item(id)) {
+        if (auto info = p->type(id)) {
             transact(
                 1,
                 !info->isParameterized()
-                ? Term(genNonMemberItemDataCallback(*p, *info, {})) // Concrete (ie. and w/out item params.)
+                ? Term(genNonMemberTypeDataCallback(*p, *info, {})) // Concrete (ie. and w/out type params.)
                 : Term(p->path, *info));                            // Generic
         }
         else {
             operErr(
                 1,
-                YmErrCode_ItemNotFound,
-                "{}; {} contains no item \"{}\"!",
+                YmErrCode_TypeNotFound,
+                "{}; {} contains no type \"{}\"!",
                 _errPrefix(),
                 p->path,
                 id);
@@ -382,7 +382,7 @@ void _ym::TermStk::member(const std::string& id) {
             1,
             // TODO: Not 100% sure what error this should be.
             YmErrCode_InternalError,
-            "{}; \"{}\" is not an item!",
+            "{}; \"{}\" is not an type!",
             _errPrefix(),
             t.fmt());
     }
@@ -394,15 +394,15 @@ void _ym::TermStk::member(const std::string& id) {
         //       look into this w/ regards to revising our code.
         operErr(
             1,
-            YmErrCode_GenericItem,
-            "{}; \"{}\" is not a concrete item!",
+            YmErrCode_GenericType,
+            "{}; \"{}\" is not a concrete type!",
             _errPrefix(),
             t.fmt());
     }
     else if (!t.hasMembers()) {
         operErr(
             1,
-            YmErrCode_ItemCannotHaveMembers,
+            YmErrCode_TypeCannotHaveMembers,
             "{}; \"{}\" has no members!",
             _errPrefix(),
             t.fmt());
@@ -410,7 +410,7 @@ void _ym::TermStk::member(const std::string& id) {
     else if (!t.hasMember(id)) {
         operErr(
             1,
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{}; \"{}\" has no member \"{}\"!",
             _errPrefix(),
             t.fmt(),
@@ -426,7 +426,7 @@ void _ym::TermStk::beginArgs() {
     ym::println("TermStk: {}", __func__);
 #endif
     _assertSess();
-    // We don't check if term we're marking is correctly a generic item term, w/
+    // We don't check if term we're marking is correctly a generic type term, w/
     // that being deferred until endArgs.
     term(-1).awaitingArgs = true;
 }
@@ -460,7 +460,7 @@ void _ym::TermStk::endArgs() {
             inputs.size(),
             // TODO: Not 100% sure what error this should be.
             YmErrCode_InternalError,
-            "{}; \"{}\" is not an item!",
+            "{}; \"{}\" is not an type!",
             _errPrefix(),
             generic.fmt());
         return;
@@ -468,26 +468,26 @@ void _ym::TermStk::endArgs() {
     if (generic.isConcrete()) {
         operErr(
             inputs.size(),
-            YmErrCode_ConcreteItem,
-            "{}; \"{}\" is not a generic item!",
+            YmErrCode_ConcreteType,
+            "{}; \"{}\" is not a generic type!",
             _errPrefix(),
             generic.fmt());
         return;
     }
-    if (args.size() != generic.itemParamCount()) {
+    if (args.size() != generic.typeParamCount()) {
         operErr(
             inputs.size(),
-            YmErrCode_ItemArgsError,
-            "{}; \"{}\" has {} item argument(s), but expects {}!",
+            YmErrCode_TypeArgsError,
+            "{}; \"{}\" has {} type argument(s), but expects {}!",
             _errPrefix(),
             fmtConstructed(),
             args.size(),
-            generic.itemParamCount());
+            generic.typeParamCount());
         return;
     }
     bool badArgs = false;
     for (size_t i = 0; i < args.size(); i++) {
-        auto& itemParamName = ym::deref(generic.info()).itemParams[i]->name;
+        auto& typeParamName = ym::deref(generic.info()).typeParams[i]->name;
         auto& arg = args[i];
         if (arg.isPath()) {
             badArgs = true;
@@ -495,11 +495,11 @@ void _ym::TermStk::endArgs() {
             _err(
                 // TODO: Not 100% sure what error this should be.
                 YmErrCode_InternalError,
-                "{}; \"{}\" item argument #{} ({}=\"{}\") is not an item!",
+                "{}; \"{}\" type argument #{} ({}=\"{}\") is not an type!",
                 _errPrefix(),
                 fmtConstructed(),
                 i + 1,
-                itemParamName,
+                typeParamName,
                 arg.fmt());
             continue;
         }
@@ -507,12 +507,12 @@ void _ym::TermStk::endArgs() {
             badArgs = true;
             // NOTE: Since multiple errors can arise here, don't use operErr.
             _err(
-                YmErrCode_GenericItem,
-                "{}; \"{}\" item argument #{} ({}=\"{}\") is not a concrete item!",
+                YmErrCode_GenericType,
+                "{}; \"{}\" type argument #{} ({}=\"{}\") is not a concrete type!",
                 _errPrefix(),
                 fmtConstructed(),
                 i + 1,
-                itemParamName,
+                typeParamName,
                 arg.fmt());
             continue;
         }
@@ -524,10 +524,10 @@ void _ym::TermStk::endArgs() {
     }
     transact(
         inputs.size(),
-        Term(genNonMemberItemDataCallback(
+        Term(genNonMemberTypeDataCallback(
             ym::deref(_import(generic.path().value())),
             ym::deref(generic.info()),
-            _assembleItemArgs(args))));
+            _assembleTypeArgs(args))));
 }
 
 size_t _ym::TermStk::_absInd(TermIndex index) const noexcept {
@@ -582,10 +582,10 @@ std::optional<size_t> _ym::TermStk::_countInputsToEndArgs() const noexcept {
     return std::nullopt;
 }
 
-std::vector<ym::Safe<YmItem>> _ym::TermStk::_assembleItemArgs(std::span<const Term> args) {
-    std::vector<ym::Safe<YmItem>> result{};
+std::vector<ym::Safe<YmType>> _ym::TermStk::_assembleTypeArgs(std::span<const Term> args) {
+    std::vector<ym::Safe<YmType>> result{};
     for (const auto& arg : args) {
-        result.push_back(ym::Safe(arg.item()));
+        result.push_back(ym::Safe(arg.type()));
     }
     return result;
 }
@@ -631,7 +631,7 @@ void _ym::TermStk::_Interp::rootId(const taul::str& id) {
     if (id == "%here"_str)                  _client->here();
     else if (id == "$Self"_str)             _client->self();
     // TODO: Remove the avoidable std::string heap alloc.
-    else if (id.substr(0, 1) == "$"_str)    _client->itemParam(std::string(id.substr(1)));
+    else if (id.substr(0, 1) == "$"_str)    _client->typeParam(std::string(id.substr(1)));
     else                                    _client->root(std::string(id));
 }
 
@@ -642,7 +642,7 @@ void _ym::TermStk::_Interp::slashId(const taul::str& id) {
 
 void _ym::TermStk::_Interp::colonId(const taul::str& id) {
     // TODO: Remove the avoidable std::string heap alloc.
-    _client->itemInParcel(std::string(id));
+    _client->typeInParcel(std::string(id));
 }
 
 void _ym::TermStk::_Interp::dblColonId(const taul::str& id) {
@@ -650,15 +650,15 @@ void _ym::TermStk::_Interp::dblColonId(const taul::str& id) {
     _client->member(std::string(id));
 }
 
-void _ym::TermStk::_Interp::openItemArgs() {
+void _ym::TermStk::_Interp::openTypeArgs() {
     _client->beginArgs();
 }
 
-void _ym::TermStk::_Interp::itemArgsArgDelimiter() {
+void _ym::TermStk::_Interp::typeArgsArgDelimiter() {
     //
 }
 
-void _ym::TermStk::_Interp::closeItemArgs() {
+void _ym::TermStk::_Interp::closeTypeArgs() {
     _client->endArgs();
 }
 

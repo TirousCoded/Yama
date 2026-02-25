@@ -15,19 +15,19 @@ extern "C" {
         YmErrCode_IllegalSpecifier = 0,     /* Illegal specifier (in some import/load context.) */
         YmErrCode_IllegalConstraint,        /* Illegal type parameter constraint. */
         YmErrCode_PathBindError,            /* Path binding error. */
-        YmErrCode_ItemArgsError,            /* Item arguments error. */
+        YmErrCode_TypeArgsError,            /* Type arguments error. */
         YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
-        YmErrCode_ItemNotFound,             /* Couldn't find a specific item. */
+        YmErrCode_TypeNotFound,             /* Couldn't find a specific type. */
         YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
         YmErrCode_NameConflict,             /* Name conflict detected. */
         YmErrCode_LimitReached,             /* Known limit reached. */
-        YmErrCode_ConcreteItem,             /* Item is concrete (ie. not generic.) */
-        YmErrCode_GenericItem,              /* Item is generic (ie. not concrete.) */
-        YmErrCode_MemberItem,               /* Item is a member. */
-        YmErrCode_NonCallableItem,          /* Item is non-callable. */
-        YmErrCode_ItemCannotHaveMembers,    /* Item cannot have members. */
-        YmErrCode_ProtocolItem,             /* Item is a protocol. */
-        YmErrCode_NonProtocolItem,          /* Item is a non-protocol. */
+        YmErrCode_ConcreteType,             /* Type is concrete (ie. not generic.) */
+        YmErrCode_GenericType,              /* Type is generic (ie. not concrete.) */
+        YmErrCode_MemberType,               /* Type is a member. */
+        YmErrCode_NonCallableType,          /* Type is non-callable. */
+        YmErrCode_TypeCannotHaveMembers,    /* Type cannot have members. */
+        YmErrCode_ProtocolType,             /* Type is a protocol. */
+        YmErrCode_NonProtocolType,          /* Type is a non-protocol. */
         YmErrCode_InternalError,            /* Internal Error */
 
         YmErrCode_Num,                      /* Enum size. Not a valid error code. */

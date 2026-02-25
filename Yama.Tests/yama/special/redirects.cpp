@@ -13,9 +13,9 @@ TEST(Redirects, IndirectLoad) {
 	ymParcelDef_AddFn(p_def, "f", "alt:Int", ymInertCallBhvrFn, nullptr);
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "yama"));
-	YmItem* Int = load(ctx, "yama:Int");
-	YmItem* f = load(ctx, "p:f");
-	EXPECT_EQ(ymItem_ReturnType(f), Int);
+	YmType* Int = load(ctx, "yama:Int");
+	YmType* f = load(ctx, "p:f");
+	EXPECT_EQ(ymType_ReturnType(f), Int);
 }
 
 TEST(Redirects, DirectImport_Fails) {
@@ -47,9 +47,9 @@ TEST(Redirects, ParcelDefBindings) {
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ymDm_BindParcelDef(dm, "q", q_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "q"));
-	YmItem* f = load(ctx, "p:f");
-	YmItem* q_A = load(ctx, "q:A");
-	EXPECT_EQ(ymItem_ReturnType(f), q_A);
+	YmType* f = load(ctx, "p:f");
+	YmType* q_A = load(ctx, "q:A");
+	EXPECT_EQ(ymType_ReturnType(f), q_A);
 }
 
 TEST(Redirects, SubjectPrefixPathsCoverAllPathsContainingThem) {
@@ -67,13 +67,13 @@ TEST(Redirects, SubjectPrefixPathsCoverAllPathsContainingThem) {
 	ymDm_BindParcelDef(dm, "p/c", p_c_def);
 	ymDm_BindParcelDef(dm, "q", q_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "q"));
-	YmItem* p_a_f = load(ctx, "p/a:f");
-	YmItem* p_b_f = load(ctx, "p/b:f");
-	YmItem* p_c_f = load(ctx, "p/c:f");
-	YmItem* q_A = load(ctx, "q:A");
-	EXPECT_EQ(ymItem_ReturnType(p_a_f), q_A);
-	EXPECT_EQ(ymItem_ReturnType(p_b_f), q_A);
-	EXPECT_EQ(ymItem_ReturnType(p_c_f), q_A);
+	YmType* p_a_f = load(ctx, "p/a:f");
+	YmType* p_b_f = load(ctx, "p/b:f");
+	YmType* p_c_f = load(ctx, "p/c:f");
+	YmType* q_A = load(ctx, "q:A");
+	EXPECT_EQ(ymType_ReturnType(p_a_f), q_A);
+	EXPECT_EQ(ymType_ReturnType(p_b_f), q_A);
+	EXPECT_EQ(ymType_ReturnType(p_c_f), q_A);
 }
 
 TEST(Redirects, SubjectPrefixPathsShadowRedirectsWithLessSpecificOnes) {
@@ -95,16 +95,16 @@ TEST(Redirects, SubjectPrefixPathsShadowRedirectsWithLessSpecificOnes) {
 	ymDm_BindParcelDef(dm, "instead", instead_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "q"));
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p/b", "alt", "instead"));
-	YmItem* p_a_f = load(ctx, "p/a:f");
-	YmItem* p_b_f = load(ctx, "p/b:f");
-	YmItem* p_c_f = load(ctx, "p/c:f");
-	YmItem* q_A = load(ctx, "q:A");
-	YmItem* instead_A = load(ctx, "instead:A");
-	EXPECT_EQ(ymItem_ReturnType(p_a_f), q_A);
-	EXPECT_EQ(ymItem_ReturnType(p_b_f), instead_A)
-		<< ymItem_Fullname(ymItem_ReturnType(p_b_f)) << "\n"
-		<< ymItem_Fullname(instead_A);
-	EXPECT_EQ(ymItem_ReturnType(p_c_f), q_A);
+	YmType* p_a_f = load(ctx, "p/a:f");
+	YmType* p_b_f = load(ctx, "p/b:f");
+	YmType* p_c_f = load(ctx, "p/c:f");
+	YmType* q_A = load(ctx, "q:A");
+	YmType* instead_A = load(ctx, "instead:A");
+	EXPECT_EQ(ymType_ReturnType(p_a_f), q_A);
+	EXPECT_EQ(ymType_ReturnType(p_b_f), instead_A)
+		<< ymType_Fullname(ymType_ReturnType(p_b_f)) << "\n"
+		<< ymType_Fullname(instead_A);
+	EXPECT_EQ(ymType_ReturnType(p_c_f), q_A);
 }
 
 TEST(Redirects, SubjectPrefixPathsSegregateRedirects) {
@@ -123,12 +123,12 @@ TEST(Redirects, SubjectPrefixPathsSegregateRedirects) {
 	ymDm_BindParcelDef(dm, "q/b", q_b_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p/a", "alt", "q/a"));
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p/b", "alt", "q/b"));
-	YmItem* p_a_f = load(ctx, "p/a:f");
-	YmItem* p_b_f = load(ctx, "p/b:f");
-	YmItem* q_a_A = load(ctx, "q/a:A");
-	YmItem* q_b_A = load(ctx, "q/b:A");
-	EXPECT_EQ(ymItem_ReturnType(p_a_f), q_a_A);
-	EXPECT_EQ(ymItem_ReturnType(p_b_f), q_b_A);
+	YmType* p_a_f = load(ctx, "p/a:f");
+	YmType* p_b_f = load(ctx, "p/b:f");
+	YmType* q_a_A = load(ctx, "q/a:A");
+	YmType* q_b_A = load(ctx, "q/b:A");
+	EXPECT_EQ(ymType_ReturnType(p_a_f), q_a_A);
+	EXPECT_EQ(ymType_ReturnType(p_b_f), q_b_A);
 }
 
 TEST(Redirects, BeforePrefixPathsCoverAllPathsContainingThem) {
@@ -148,13 +148,13 @@ TEST(Redirects, BeforePrefixPathsCoverAllPathsContainingThem) {
 	ymDm_BindParcelDef(dm, "q/b", q_b_def);
 	ymDm_BindParcelDef(dm, "q/c", q_c_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "q"));
-	YmItem* f = load(ctx, "p:f");
-	YmItem* q_a_A = load(ctx, "q/a:A");
-	YmItem* q_b_A = load(ctx, "q/b:A");
-	YmItem* q_c_A = load(ctx, "q/c:A");
-	EXPECT_EQ(ymItem_ReturnType(f), q_a_A);
-	EXPECT_EQ(ymItem_ParamType(f, 0), q_b_A);
-	EXPECT_EQ(ymItem_ParamType(f, 1), q_c_A);
+	YmType* f = load(ctx, "p:f");
+	YmType* q_a_A = load(ctx, "q/a:A");
+	YmType* q_b_A = load(ctx, "q/b:A");
+	YmType* q_c_A = load(ctx, "q/c:A");
+	EXPECT_EQ(ymType_ReturnType(f), q_a_A);
+	EXPECT_EQ(ymType_ParamType(f, 0), q_b_A);
+	EXPECT_EQ(ymType_ParamType(f, 1), q_c_A);
 }
 
 TEST(Redirects, BeforePrefixPathsShadowRedirectsWithLessSpecificOnes) {
@@ -178,33 +178,33 @@ TEST(Redirects, BeforePrefixPathsShadowRedirectsWithLessSpecificOnes) {
 	ymDm_BindParcelDef(dm, "instead", instead_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "q"));
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt/b", "instead"));
-	YmItem* f = load(ctx, "p:f");
-	YmItem* q_a_A = load(ctx, "q/a:A");
-	YmItem* q_b_A = load(ctx, "q/b:A");
-	YmItem* q_c_A = load(ctx, "q/c:A");
-	YmItem* instead_A = load(ctx, "instead:A");
-	EXPECT_EQ(ymItem_ReturnType(f), q_a_A);
-	EXPECT_EQ(ymItem_ParamType(f, 0), instead_A)
-		<< ymItem_Fullname(ymItem_ParamType(f, 0)) << "\n"
-		<< ymItem_Fullname(instead_A);
-	EXPECT_EQ(ymItem_ParamType(f, 1), q_c_A);
+	YmType* f = load(ctx, "p:f");
+	YmType* q_a_A = load(ctx, "q/a:A");
+	YmType* q_b_A = load(ctx, "q/b:A");
+	YmType* q_c_A = load(ctx, "q/c:A");
+	YmType* instead_A = load(ctx, "instead:A");
+	EXPECT_EQ(ymType_ReturnType(f), q_a_A);
+	EXPECT_EQ(ymType_ParamType(f, 0), instead_A)
+		<< ymType_Fullname(ymType_ParamType(f, 0)) << "\n"
+		<< ymType_Fullname(instead_A);
+	EXPECT_EQ(ymType_ParamType(f, 1), q_c_A);
 }
 
-TEST(Redirects, WorksInItemArgsAndCallSuffParamAndReturnTypes) {
+TEST(Redirects, WorksInTypeArgsAndCallSuffParamAndReturnTypes) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
 	ymParcelDef_AddFn(p_def, "f", "alt1:g[alt2:Int](alt2:Int) -> alt2:Int", ymInertCallBhvrFn, nullptr);
 	SETUP_PARCELDEF(q_def);
 	auto q_g_ind = ymParcelDef_AddFn(q_def, "g", "$T", ymInertCallBhvrFn, nullptr);
-	ymParcelDef_AddItemParam(q_def, q_g_ind, "T", "yama:Any");
+	ymParcelDef_AddTypeParam(q_def, q_g_ind, "T", "yama:Any");
 	ymParcelDef_AddParam(q_def, q_g_ind, "a", "$T");
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ymDm_BindParcelDef(dm, "q", q_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt1", "q"));
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt2", "yama"));
-	YmItem* p_f = load(ctx, "p:f");
-	YmItem* q_g_yama_Int = load(ctx, "q:g[yama:Int](yama:Int) -> yama:Int");
-	EXPECT_EQ(ymItem_ReturnType(p_f), q_g_yama_Int);
+	YmType* p_f = load(ctx, "p:f");
+	YmType* q_g_yama_Int = load(ctx, "q:g[yama:Int](yama:Int) -> yama:Int");
+	EXPECT_EQ(ymType_ReturnType(p_f), q_g_yama_Int);
 }
 
 TEST(Redirects, OriginalPathCanStillBeUsedIfItIsntShadowedByAnotherRedirect) {
@@ -214,10 +214,10 @@ TEST(Redirects, OriginalPathCanStillBeUsedIfItIsntShadowedByAnotherRedirect) {
 	ymParcelDef_AddParam(p_def, p_f_ind, "a", "alt:Int");
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "yama"));
-	YmItem* Int = load(ctx, "yama:Int");
-	YmItem* p_f = load(ctx, "p:f");
-	EXPECT_EQ(ymItem_ReturnType(p_f), Int);
-	EXPECT_EQ(ymItem_ParamType(p_f, 0), Int);
+	YmType* Int = load(ctx, "yama:Int");
+	YmType* p_f = load(ctx, "p:f");
+	EXPECT_EQ(ymType_ReturnType(p_f), Int);
+	EXPECT_EQ(ymType_ParamType(p_f, 0), Int);
 }
 
 TEST(Redirects, RedirectsCanSubstituteInInvalidPaths) {

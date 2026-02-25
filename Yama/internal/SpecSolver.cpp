@@ -3,7 +3,7 @@
 #include "SpecSolver.h"
 
 #include "../yama++/general.h"
-#include "YmItem.h"
+#include "YmType.h"
 
 
 #define _DUMP_LOG 0
@@ -13,9 +13,9 @@
 #endif
 
 
-_ym::SpecSolver::SpecSolver(YmParcel* here, YmItem* itemParamsCtx, YmItem* self, RedirectSet* redirects) noexcept :
+_ym::SpecSolver::SpecSolver(YmParcel* here, YmType* typeParamsCtx, YmType* self, RedirectSet* redirects) noexcept :
     _here(here),
-    _itemParamCtx(itemParamsCtx),
+    _typeParamCtx(typeParamsCtx),
     _self(self),
     _redirects(redirects) {
 }
@@ -76,8 +76,8 @@ bool _ym::SpecSolver::_isPath() const noexcept {
     return _scope().latest == Type::Path;
 }
 
-bool _ym::SpecSolver::_isItem() const noexcept {
-    return _scope().latest == Type::Item;
+bool _ym::SpecSolver::_isType() const noexcept {
+    return _scope().latest == Type::Type;
 }
 
 bool _ym::SpecSolver::_expectPath() {
@@ -92,33 +92,33 @@ bool _ym::SpecSolver::_expectPathOrNone() {
     return !_hasExpr() || _expectPath();
 }
 
-bool _ym::SpecSolver::_expectItem() {
+bool _ym::SpecSolver::_expectType() {
 #if _DUMP_LOG
-    ym::println("SpecSolver: Expects item! -> {}", _isItem());
+    ym::println("SpecSolver: Expects type! -> {}", _isType());
 #endif
-    if (!_isItem()) _fail();
-    return _isItem();
+    if (!_isType()) _fail();
+    return _isType();
 }
 
-bool _ym::SpecSolver::_expectItemOrNone() {
-    return !_hasExpr() || _expectItem();
+bool _ym::SpecSolver::_expectTypeOrNone() {
+    return !_hasExpr() || _expectType();
 }
 
 void _ym::SpecSolver::_markAsPath() noexcept {
 #if _DUMP_LOG
-    if (!_hasExpr() || _isItem()) {
+    if (!_hasExpr() || _isType()) {
         ym::println("SpecSolver: Marked as path!");
     }
 #endif
     _scope().latest = Type::Path;
 }
-void _ym::SpecSolver::_markAsItem() noexcept {
+void _ym::SpecSolver::_markAsType() noexcept {
 #if _DUMP_LOG
     if (!_hasExpr() || _isPath()) {
-        ym::println("SpecSolver: Marked as item!");
+        ym::println("SpecSolver: Marked as type!");
     }
 #endif
-    _scope().latest = Type::Item;
+    _scope().latest = Type::Type;
 }
 
 void _ym::SpecSolver::_handleRedirectsIfPath() {
@@ -162,7 +162,7 @@ void _ym::SpecSolver::_beginSolve() {
 std::optional<std::string> _ym::SpecSolver::_endSolve(Type& type, MustBe mustBe) {
     _handleRedirectsIfPath();
     if (mustBe == MustBe::Path)			_expectPath();
-    else if (mustBe == MustBe::Item)    _expectItem();
+    else if (mustBe == MustBe::Type)    _expectType();
     type = _scope().latest.value_or(Type::Path);
     auto result = _endScope();
 #if _DUMP_LOG
@@ -202,7 +202,7 @@ void _ym::SpecSolver::syntaxErr() {
 void _ym::SpecSolver::rootId(const taul::str& id) {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: rootId {} ({} input)", id, _isPath() ? "path" : "item");
+        ym::println("SpecSolver: rootId {} ({} input)", id, _isPath() ? "path" : "type");
 #endif
         if (id == "%here") {
             if (hereCallback) hereCallback();
@@ -211,7 +211,7 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
             if (selfCallback) selfCallback();
         }
         else if (id.substr(0, 1) == "$") {
-            if (itemParamCallback) itemParamCallback(id, _atRootOfEntireTree);
+            if (typeParamCallback) typeParamCallback(id, _atRootOfEntireTree);
         }
         if (_here && id == "%here") {
 #if _DUMP_LOG
@@ -225,19 +225,19 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
             ym::println("SpecSolver: $Self! -> {}", _self->fullname());
 #endif
             _emit("{}", _self->fullname());
-            _markAsItem();
+            _markAsType();
         }
-        else if (auto itemParam = (id.substr(0, 1) == "$" && _itemParamCtx) ? _itemParamCtx->itemParam(std::string(id)) : nullptr) {
+        else if (auto typeParam = (id.substr(0, 1) == "$" && _typeParamCtx) ? _typeParamCtx->typeParam(std::string(id)) : nullptr) {
 #if _DUMP_LOG
-            ym::println("SpecSolver: Item param! -> {}", itemParam->fullname());
+            ym::println("SpecSolver: Type param! -> {}", typeParam->fullname());
 #endif
-            _emit("{}", itemParam->fullname());
-            _markAsItem();
+            _emit("{}", typeParam->fullname());
+            _markAsType();
         }
         else {
             _emit("{}", id);
-            // Detect items in situations where _self/_itemParamCtx aren't provided.
-            if (id.substr(0, 1) == "$") _markAsItem();
+            // Detect types in situations where _self/_typeParamCtx aren't provided.
+            if (id.substr(0, 1) == "$") _markAsType();
             else						_markAsPath(); // Default
         }
         _firstId = false;
@@ -248,7 +248,7 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
 void _ym::SpecSolver::slashId(const taul::str& id) {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: slashId {} ({} input)", id, _isPath() ? "path" : "item");
+        ym::println("SpecSolver: slashId {} ({} input)", id, _isPath() ? "path" : "type");
 #endif
         if (_expectPath()) {
             _emit("/{}", id);
@@ -260,12 +260,12 @@ void _ym::SpecSolver::slashId(const taul::str& id) {
 void _ym::SpecSolver::colonId(const taul::str& id) {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: colonId {} ({} input)", id, _isPath() ? "path" : "item");
+        ym::println("SpecSolver: colonId {} ({} input)", id, _isPath() ? "path" : "type");
 #endif
         if (_expectPath()) {
             _handleRedirectsIfPath();
             _emit(":{}", id);
-            _markAsItem();
+            _markAsType();
         }
     }
 }
@@ -273,48 +273,48 @@ void _ym::SpecSolver::colonId(const taul::str& id) {
 void _ym::SpecSolver::dblColonId(const taul::str& id) {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: dblColonId {} ({} input)", id, _isPath() ? "path" : "item");
+        ym::println("SpecSolver: dblColonId {} ({} input)", id, _isPath() ? "path" : "type");
 #endif
-        if (_expectItem()) {
+        if (_expectType()) {
             _emit("::{}", id);
-            //_markAsItem();
+            //_markAsType();
         }
     }
 }
 
-void _ym::SpecSolver::openItemArgs() {
+void _ym::SpecSolver::openTypeArgs() {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: openItemArgs ({} input)", _isPath() ? "path" : "item");
+        ym::println("SpecSolver: openTypeArgs ({} input)", _isPath() ? "path" : "type");
 #endif
-        if (_expectItem()) {
+        if (_expectType()) {
             _emit("[");
             _beginScope();
         }
     }
 }
 
-void _ym::SpecSolver::itemArgsArgDelimiter() {
+void _ym::SpecSolver::typeArgsArgDelimiter() {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: itemArgsArgDelimiter");
+        ym::println("SpecSolver: typeArgsArgDelimiter");
 #endif
-        _expectItem(); // Previous arg should be an item.
+        _expectType(); // Previous arg should be an type.
         _endScopeAndEmit();
         _emit(", ");
         _beginScope();
     }
 }
 
-void _ym::SpecSolver::closeItemArgs() {
+void _ym::SpecSolver::closeTypeArgs() {
     if (_good()) {
 #if _DUMP_LOG
-        ym::println("SpecSolver: closeItemArgs");
+        ym::println("SpecSolver: closeTypeArgs");
 #endif
-        _expectItemOrNone(); // Final arg should be an item.
+        _expectTypeOrNone(); // Final arg should be an type.
         _endScopeAndEmit();
         _emit("]");
-        _markAsItem();
+        _markAsType();
     }
 }
 
@@ -333,7 +333,7 @@ void _ym::SpecSolver::callSuffParamDelimiter() {
 #if _DUMP_LOG
         ym::println("SpecSolver: callSuffParamDelimiter");
 #endif
-        _expectItem(); // Previous param should be an item.
+        _expectType(); // Previous param should be an type.
         _endScopeAndEmit();
         _emit(", ");
         _beginScope();
@@ -345,7 +345,7 @@ void _ym::SpecSolver::callSuffReturnType() {
 #if _DUMP_LOG
         ym::println("SpecSolver: callSuffReturnType");
 #endif
-        _expectItemOrNone(); // Final param should be an item.
+        _expectTypeOrNone(); // Final param should be an type.
         _endScopeAndEmit();
         _emit(") -> ");
         _beginScope();
@@ -357,7 +357,7 @@ void _ym::SpecSolver::closeCallSuff() {
 #if _DUMP_LOG
         ym::println("SpecSolver: closeCallSuff");
 #endif
-        _expectItem(); // Return type should have been an item.
+        _expectType(); // Return type should have been an type.
         _endScopeAndEmit();
     }
 }

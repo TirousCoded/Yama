@@ -33,16 +33,18 @@ namespace _ym {
 
         constexpr const UInt& count() const noexcept { return _refs; }
 
-        inline void addRef() noexcept {
+        // Returns the old ref count value.
+        inline UInt addRef() noexcept {
             ymAssert(_refs < std::numeric_limits<UInt>::max());
             _refs++;
+            return _refs - 1;
         }
 
-        // Returns if the reference count reached 0.
-        inline bool drop() noexcept {
+        // Returns the old ref count value.
+        inline UInt drop() noexcept {
             ymAssert(_refs >= 1);
             _refs--;
-            return _refs == 0;
+            return _refs + 1;
         }
 
 
@@ -64,16 +66,18 @@ namespace _ym {
             return _refs.load(std::memory_order_relaxed);
         }
 
-        inline void addRef() noexcept {
+        // Returns the old ref count value.
+        inline UInt addRef() noexcept {
             const auto old = _refs.fetch_add(1, std::memory_order_relaxed);
             ymAssert(old < std::numeric_limits<UInt>::max());
+            return old;
         }
 
-        // Returns if the reference count reached 0.
-        inline bool drop() noexcept {
+        // Returns the old ref count value.
+        inline UInt drop() noexcept {
             const auto old = _refs.fetch_sub(1, std::memory_order_acq_rel);
             ymAssert(old >= 1);
-            return old == 1;
+            return old;
         }
 
 

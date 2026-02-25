@@ -12,6 +12,22 @@ TEST(Domains, CreateAndDestroy) {
     SETUP_DM; // Macro will do the create/destroy.
 }
 
+TEST(Domains, RefCounting) {
+    SETUP_ERRCOUNTER;
+    auto dm = ymDm_Create();
+    ASSERT_TRUE(dm);
+    EXPECT_EQ(ymDm_RefCount(dm), 1); // Initial
+    EXPECT_EQ(ymDm_Secure(dm), 1); // 1 -> 2
+    EXPECT_EQ(ymDm_RefCount(dm), 2);
+    EXPECT_EQ(ymDm_Secure(dm), 2); // 2 -> 3
+    EXPECT_EQ(ymDm_RefCount(dm), 3);
+    EXPECT_EQ(ymDm_Release(dm), 3); // 3 -> 2
+    EXPECT_EQ(ymDm_RefCount(dm), 2);
+    EXPECT_EQ(ymDm_Release(dm), 2); // 2 -> 1
+    EXPECT_EQ(ymDm_RefCount(dm), 1);
+    EXPECT_EQ(ymDm_Release(dm), 1); // Destroys
+}
+
 TEST(Domains, BindParcelDef) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -68,9 +84,9 @@ TEST(Domains, AddRedirect) {
     ymParcelDef_AddFn(p_def, "f", "alt:Int", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     ASSERT_EQ(ymDm_AddRedirect(dm, "p", "alt", "yama"), YM_TRUE);
-    YmItem* Int = load(ctx, "yama:Int");
-    YmItem* p_f = load(ctx, "p:f");
-    EXPECT_EQ(ymItem_ReturnType(p_f), Int);
+    YmType* Int = load(ctx, "yama:Int");
+    YmType* p_f = load(ctx, "p:f");
+    EXPECT_EQ(ymType_ReturnType(p_f), Int);
 }
 
 TEST(Domains, AddRedirect_Normalizes) {
@@ -82,10 +98,10 @@ TEST(Domains, AddRedirect_Normalizes) {
     ymDm_BindParcelDef(dm, "p/a", p_a_def);
     ymDm_BindParcelDef(dm, "q/a", q_a_def);
     ASSERT_EQ(ymDm_AddRedirect(dm, "  p  \n\r  /  a \r\r\r   ", " \n\t alt   / \na   ", "  q  \n\t\n  /\r\r  a \t\t\t  "), YM_TRUE);
-    YmItem* Int = load(ctx, "yama:Int");
-    YmItem* p_a_f = load(ctx, "p/a:f");
-    YmItem* q_a_A = load(ctx, "q/a:A");
-    EXPECT_EQ(ymItem_ReturnType(p_a_f), q_a_A);
+    YmType* Int = load(ctx, "yama:Int");
+    YmType* p_a_f = load(ctx, "p/a:f");
+    YmType* q_a_A = load(ctx, "q/a:A");
+    EXPECT_EQ(ymType_ReturnType(p_a_f), q_a_A);
 }
 
 TEST(Domains, AddRedirect_Overwriting) {
@@ -95,9 +111,9 @@ TEST(Domains, AddRedirect_Overwriting) {
     ymDm_BindParcelDef(dm, "p", p_def);
     ASSERT_EQ(ymDm_AddRedirect(dm, "p", "alt", "missing"), YM_TRUE); // Overwrite this.
     ASSERT_EQ(ymDm_AddRedirect(dm, "p", "alt", "yama"), YM_TRUE);
-    YmItem* Int = load(ctx, "yama:Int");
-    YmItem* p_f = load(ctx, "p:f");
-    EXPECT_EQ(ymItem_ReturnType(p_f), Int);
+    YmType* Int = load(ctx, "yama:Int");
+    YmType* p_f = load(ctx, "p:f");
+    EXPECT_EQ(ymType_ReturnType(p_f), Int);
 }
 
 TEST(Domains, AddRedirect_Overwriting_ParcelRedirectsAreLockedUponFirstImport) {
@@ -107,13 +123,13 @@ TEST(Domains, AddRedirect_Overwriting_ParcelRedirectsAreLockedUponFirstImport) {
     ymParcelDef_AddFn(p_def, "g", "alt:Float", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     ASSERT_EQ(ymDm_AddRedirect(dm, "p", "alt", "yama"), YM_TRUE);
-    YmItem* p_f = load(ctx, "p:f");
+    YmType* p_f = load(ctx, "p:f");
     ASSERT_EQ(ymDm_AddRedirect(dm, "p", "alt", "missing"), YM_TRUE); // Should be ignored.
-    YmItem* p_g = load(ctx, "p:g");
-    YmItem* Int = load(ctx, "yama:Int");
-    YmItem* Float = load(ctx, "yama:Float");
-    EXPECT_EQ(ymItem_ReturnType(p_f), Int);
-    EXPECT_EQ(ymItem_ReturnType(p_g), Float);
+    YmType* p_g = load(ctx, "p:g");
+    YmType* Int = load(ctx, "yama:Int");
+    YmType* Float = load(ctx, "yama:Float");
+    EXPECT_EQ(ymType_ReturnType(p_f), Int);
+    EXPECT_EQ(ymType_ReturnType(p_g), Float);
 }
 
 TEST(Domains, AddRedirect_IllegalSpecifier) {

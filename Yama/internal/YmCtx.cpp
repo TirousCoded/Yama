@@ -4,7 +4,7 @@
 
 #include "general.h"
 #include "YmParcel.h"
-#include "YmItem.h"
+#include "YmType.h"
 #include "SpecSolver.h"
 
 
@@ -25,8 +25,8 @@ std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
     }
 }
 
-std::shared_ptr<YmItem> YmCtx::load(const std::string& fullname) {
-    if (auto s = _ym::Spec::item(fullname)) {
+std::shared_ptr<YmType> YmCtx::load(const std::string& fullname) {
+    if (auto s = _ym::Spec::type(fullname)) {
         return loader->load(*s);
     }
     else {

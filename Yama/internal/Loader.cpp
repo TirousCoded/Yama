@@ -82,17 +82,17 @@ std::shared_ptr<YmParcel> _ym::DmLoader::fetchParcel(const Spec& path) const noe
     return _commits.parcels.fetch(path);
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
+std::shared_ptr<YmType> _ym::DmLoader::fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
     if (failedDueToCallSigNonConform) {
         *failedDueToCallSigNonConform = false;
     }
-    // TODO: DmLoader and CtxLoader share callsuff checking code for fetchItem.
-    //       We can make a non-virtual base class 'fetchItem' method which handles this, and then
-    //       this can call a virtual 'doFetchItem' method.
+    // TODO: DmLoader and CtxLoader share callsuff checking code for fetchType.
+    //       We can make a non-virtual base class 'fetchType' method which handles this, and then
+    //       this can call a virtual 'doFetchType' method.
     //       Also, try to update _ym::DmLoader::load to generalize it's code w/ above.
     //       Also _ym::LoaderManager::_checkRefConstCallSigConformance too.
     std::shared_lock lk(_accessLock);
-    auto result = _commits.items.fetch(fullname.removeCallSuff());
+    auto result = _commits.types.fetch(fullname.removeCallSuff());
     lk.unlock(); // Don't need it anymore.
     if (result && !result->checkCallSuff(fullname.callsuff())) {
         if (failedDueToCallSigNonConform) {
@@ -100,7 +100,7 @@ std::shared_ptr<YmItem> _ym::DmLoader::fetchItem(const Spec& fullname, bool* fai
         }
         // TODO: Improve this error!
         _ym::Global::raiseErr(
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
             std::string(*fullname.callsuff()));
@@ -122,9 +122,9 @@ std::shared_ptr<YmParcel> _ym::DmLoader::import(const Spec& path) {
         : nullptr;
 }
 
-std::shared_ptr<YmItem> _ym::DmLoader::load(const Spec& fullname) {
+std::shared_ptr<YmType> _ym::DmLoader::load(const Spec& fullname) {
     bool failedDueToCallSigNonConform{};
-    if (const auto result = fetchItem(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
+    if (const auto result = fetchType(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
     std::scoped_lock lk(_updateLock);
@@ -132,7 +132,7 @@ std::shared_ptr<YmItem> _ym::DmLoader::load(const Spec& fullname) {
     if (result && !result->checkCallSuff(fullname.callsuff())) {
         // TODO: Improve this error!
         _ym::Global::raiseErr(
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
             std::string(*fullname.callsuff()));
@@ -177,18 +177,18 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::fetchParcel(const Spec& path) const no
     return _commits.parcels.fetch(path);
 }
 
-std::shared_ptr<YmItem> _ym::CtxLoader::fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
+std::shared_ptr<YmType> _ym::CtxLoader::fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform) const noexcept {
     if (failedDueToCallSigNonConform) {
         *failedDueToCallSigNonConform = false;
     }
-    auto result = _commits.items.fetch(fullname.removeCallSuff());
+    auto result = _commits.types.fetch(fullname.removeCallSuff());
     if (result && !result->checkCallSuff(fullname.callsuff())) {
         if (failedDueToCallSigNonConform) {
             *failedDueToCallSigNonConform = true;
         }
         // TODO: Improve this error!
         _ym::Global::raiseErr(
-            YmErrCode_ItemNotFound,
+            YmErrCode_TypeNotFound,
             "{} does not conform to call suffix \"{}\"!",
             result->fullname(),
             std::string(*fullname.callsuff()));
@@ -208,15 +208,15 @@ std::shared_ptr<YmParcel> _ym::CtxLoader::import(const Spec& path) {
         : nullptr;
 }
 
-std::shared_ptr<YmItem> _ym::CtxLoader::load(const Spec& fullname) {
+std::shared_ptr<YmType> _ym::CtxLoader::load(const Spec& fullname) {
     bool failedDueToCallSigNonConform{};
-    if (auto result = fetchItem(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
+    if (auto result = fetchType(fullname, &failedDueToCallSigNonConform); result || failedDueToCallSigNonConform) {
         return result;
     }
-    auto item = upstream()->load(fullname);
+    auto type = upstream()->load(fullname);
     return
-        _commits.items.push(item)
-        ? item
+        _commits.types.push(type)
+        ? type
         : nullptr;
 }
 

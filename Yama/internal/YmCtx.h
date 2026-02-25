@@ -13,11 +13,15 @@
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
 #include "Loader.h"
+#include "RefCounter.h"
 #include "YmDm.h"
 
 
 struct YmCtx final {
 public:
+    // refs is not managed internally by this class.
+    _ym::AtomicRefCounter<YmRefCount> refs;
+
     const ym::Safe<YmDm> domain;
     const std::shared_ptr<_ym::CtxLoader> loader;
 
@@ -26,7 +30,7 @@ public:
 
 
     std::shared_ptr<YmParcel> import(const std::string& path);
-    std::shared_ptr<YmItem> load(const std::string& fullname);
+    std::shared_ptr<YmType> load(const std::string& fullname);
 
 
     static void pIterStart(ym::Safe<YmCtx> ctx) noexcept;

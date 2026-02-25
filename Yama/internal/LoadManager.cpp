@@ -13,8 +13,8 @@
 _ym::LoadManager::LoadManager(Area& staging, PathBindings& binds, Redirects& redirects) :
     staging(staging),
     _termStk(staging, binds, redirects,
-        [this](YmParcel& p, const ItemInfo& info, std::vector<ym::Safe<YmItem>> itemArgs) -> ym::Safe<YmItem> {
-            return _genNonMemberItemData(p, info, std::move(itemArgs));
+        [this](YmParcel& p, const TypeInfo& info, std::vector<ym::Safe<YmType>> typeArgs) -> ym::Safe<YmType> {
+            return _genNonMemberTypeData(p, info, std::move(typeArgs));
         }) {
 }
 
@@ -30,9 +30,9 @@ YmParcel* _ym::LoadManager::import(const Spec& path) {
     return result;
 }
 
-YmItem* _ym::LoadManager::load(const Spec& fullname) {
-    fullname.assertItem().assertNoCallSuff();
-    ymAssert(!staging->items.fetch(fullname));
+YmType* _ym::LoadManager::load(const Spec& fullname) {
+    fullname.assertType().assertNoCallSuff();
+    ymAssert(!staging->types.fetch(fullname));
 #if _DUMP_LOG
     ym::println("LoadManager: Loading \"{}\".", fullname);
 #endif
@@ -70,84 +70,84 @@ void _ym::LoadManager::_clearFlag() noexcept {
     _failFlag = false;
 }
 
-_ym::LoadManager::_GenItemDataResult _ym::LoadManager::_genItemData(
+_ym::LoadManager::_GenTypeDataResult _ym::LoadManager::_genTypeData(
     ym::Safe<YmParcel> parcel,
-    ym::Safe<const _ym::ItemInfo> info,
-    YmItem* owner,
-    std::vector<ym::Safe<YmItem>> itemArgs) {
-    ymAssert(!owner || itemArgs.empty());
+    ym::Safe<const _ym::TypeInfo> info,
+    YmType* owner,
+    std::vector<ym::Safe<YmType>> typeArgs) {
+    ymAssert(!owner || typeArgs.empty());
     ymAssert(bool(owner) != info->isOwner());
-    // Generate our new item data.
-    auto newItem =
+    // Generate our new type data.
+    auto newType =
         !owner
-        ? std::make_shared<YmItem>(parcel, info, std::move(itemArgs))
-        : std::make_shared<YmItem>(parcel, info, *owner);
-    // Lookup if an item w/ same fullname is already loaded, aborting upload if
+        ? std::make_shared<YmType>(parcel, info, std::move(typeArgs))
+        : std::make_shared<YmType>(parcel, info, *owner);
+    // Lookup if an type w/ same fullname is already loaded, aborting upload if
     // found, quietly returning it instead.
-    if (auto existing = staging->items.fetch(newItem->fullname())) {
-        return _GenItemDataResult{
-            .item = *existing,
+    if (auto existing = staging->types.fetch(newType->fullname())) {
+        return _GenTypeDataResult{
+            .type = *existing,
             .original = false,
         };
     }
 #if _DUMP_LOG
-    ym::println("LoadManager: Generating {} item data.", newItem->fullname());
+    ym::println("LoadManager: Generating {} type data.", newType->fullname());
 #endif
     // Push before resolving consts to ensure that the loading resource is available
-    // for lookup for resolving the consts of other items.
-    if (!staging->items.push(newItem)) {
+    // for lookup for resolving the consts of other types.
+    if (!staging->types.push(newType)) {
         YM_DEADEND;
     }
-    return _GenItemDataResult{
-        .item = *newItem,
+    return _GenTypeDataResult{
+        .type = *newType,
         .original = true,
     };
 }
 
-ym::Safe<YmItem> _ym::LoadManager::_genNonMemberItemData(
+ym::Safe<YmType> _ym::LoadManager::_genNonMemberTypeData(
     ym::Safe<YmParcel> parcel,
-    ym::Safe<const _ym::ItemInfo> info,
-    std::vector<ym::Safe<YmItem>> itemArgs) {
+    ym::Safe<const _ym::TypeInfo> info,
+    std::vector<ym::Safe<YmType>> typeArgs) {
     ymAssert(info->isOwner());
-    auto newItem = _genItemData(parcel, info, nullptr, std::move(itemArgs));
-    if (newItem.original) {
-        _scheduleLateResolve(*newItem.item);
-        _genItemDataForMembers(parcel, info, newItem.item);
-        _earlyResolveItem(*newItem.item, newItem.item);
+    auto newType = _genTypeData(parcel, info, nullptr, std::move(typeArgs));
+    if (newType.original) {
+        _scheduleLateResolve(*newType.type);
+        _genTypeDataForMembers(parcel, info, newType.type);
+        _earlyResolveType(*newType.type, newType.type);
     }
-    return newItem.item;
+    return newType.type;
 }
 
-void _ym::LoadManager::_genItemDataForMembers(
+void _ym::LoadManager::_genTypeDataForMembers(
     ym::Safe<YmParcel> parcel,
-    ym::Safe<const _ym::ItemInfo> info,
-    ym::Safe<YmItem> self) {
+    ym::Safe<const _ym::TypeInfo> info,
+    ym::Safe<YmType> self) {
     ymAssert(info->isOwner());
     for (const auto& [name, constInd] : info->membersByName) {
-        _genMemberItemData(parcel, ym::Safe(_lookupMemberInfo(parcel, *info, name)), self);
+        _genMemberTypeData(parcel, ym::Safe(_lookupMemberInfo(parcel, *info, name)), self);
     }
 }
 
-void _ym::LoadManager::_genMemberItemData(
+void _ym::LoadManager::_genMemberTypeData(
     ym::Safe<YmParcel> parcel,
-    ym::Safe<const _ym::ItemInfo> info,
-    ym::Safe<YmItem> self) {
+    ym::Safe<const _ym::TypeInfo> info,
+    ym::Safe<YmType> self) {
     ymAssert(!info->isOwner());
-    if (auto newItem = _genItemData(parcel, info, self); newItem.original) {
-        _scheduleLateResolve(*newItem.item);
-        _earlyResolveItem(*newItem.item, self);
+    if (auto newType = _genTypeData(parcel, info, self); newType.original) {
+        _scheduleLateResolve(*newType.type);
+        _earlyResolveType(*newType.type, self);
     }
 }
 
-const _ym::ItemInfo* _ym::LoadManager::_lookupMemberInfo(
+const _ym::TypeInfo* _ym::LoadManager::_lookupMemberInfo(
     ym::Safe<YmParcel> parcel,
-    const _ym::ItemInfo& ownerInfo,
+    const _ym::TypeInfo& ownerInfo,
     const std::string& memberName) const {
-    return parcel->item(_localNameOfMember(ownerInfo, memberName));
+    return parcel->type(_localNameOfMember(ownerInfo, memberName));
 }
 
 std::string _ym::LoadManager::_localNameOfMember(
-    const _ym::ItemInfo& ownerInfo,
+    const _ym::TypeInfo& ownerInfo,
     const std::string& memberName) {
     ymAssert(ownerInfo.isOwner());
     return std::format("{}::{}", ownerInfo.localName, memberName);
@@ -161,14 +161,14 @@ bool _ym::LoadManager::_isEarlyResolveConst(const ConstInfo& constInfo) const {
         : std::regex_match(constInfo.as<RefInfo>().sym.string(), earlyResolvedRefSymPattern);
 }
 
-void _ym::LoadManager::_earlyResolveItem(YmItem& x, ym::Safe<YmItem> self) {
+void _ym::LoadManager::_earlyResolveType(YmType& x, ym::Safe<YmType> self) {
 #if _DUMP_LOG
     ym::println("LoadManager: Early resolving {} consts.", x.fullname());
 #endif
     _earlyResolveConsts(x, self);
 }
 
-void _ym::LoadManager::_earlyResolveConsts(YmItem& x, ym::Safe<YmItem> self) {
+void _ym::LoadManager::_earlyResolveConsts(YmType& x, ym::Safe<YmType> self) {
     auto& consts = x.info->consts;
     for (ConstIndex i = 0; i < consts.size(); i++) {
         if (_isEarlyResolveConst(consts[i])) {
@@ -184,13 +184,13 @@ void _ym::LoadManager::_earlyResolveConsts(YmItem& x, ym::Safe<YmItem> self) {
             else {
                 // NOTE: Important we use 'self->fullname()' here.
                 auto memberName = std::format("{}::{}", self->fullname(), consts[i].as<RefInfo>().sym.string().substr(strlen("$Self::")));
-                x.putRefConst(i, ym::Safe(staging->items.fetch(Spec::itemFast(memberName)).get()));
+                x.putRefConst(i, ym::Safe(staging->types.fetch(Spec::typeFast(memberName)).get()));
             }
         }
     }
 }
 
-void _ym::LoadManager::_scheduleLateResolve(YmItem& x) {
+void _ym::LoadManager::_scheduleLateResolve(YmType& x) {
 #if _DUMP_LOG
     ym::println("LoadManager: Scheduling {} late resolution.", x.fullname());
 #endif
@@ -206,19 +206,19 @@ void _ym::LoadManager::_processLateResolveQueue() {
 #endif
     // Stop processing once queue empties, or an error arises.
     while (!_lateResolveQueue.empty() && _good()) {
-        _lateResolveItem(*_lateResolveQueue.front());
+        _lateResolveType(*_lateResolveQueue.front());
         _lateResolveQueue.pop();
     }
 }
 
-void _ym::LoadManager::_lateResolveItem(YmItem& x) {
+void _ym::LoadManager::_lateResolveType(YmType& x) {
 #if _DUMP_LOG
     ym::println("LoadManager: Late resolving {} consts.", x.fullname());
 #endif
     _lateResolveConsts(x);
 }
 
-void _ym::LoadManager::_lateResolveConsts(YmItem& x) {
+void _ym::LoadManager::_lateResolveConsts(YmType& x) {
     auto& consts = x.info->consts;
     for (ConstIndex i = 0; i < consts.size(); i++) {
         if (!_isEarlyResolveConst(consts[i])) {
@@ -227,7 +227,7 @@ void _ym::LoadManager::_lateResolveConsts(YmItem& x) {
     }
 }
 
-void _ym::LoadManager::_lateResolveRefConst(YmItem& x, ConstIndex index) {
+void _ym::LoadManager::_lateResolveRefConst(YmType& x, ConstIndex index) {
     auto& constInfo = x.info->consts[index];
 #if _DUMP_LOG
     ym::println("LoadManager: Resolving {} (const #{}).", fmt(constInfo), index + 1);
@@ -274,7 +274,7 @@ YmParcel* _ym::LoadManager::_initialImport(const Spec& path) {
     return result;
 }
 
-YmItem* _ym::LoadManager::_initialLoad(const Spec& fullname) {
+YmType* _ym::LoadManager::_initialLoad(const Spec& fullname) {
     _termStk.beginSession(fullname);
     _termStk.fullname(fullname);
     auto result = _termStk.expectConcrete();
@@ -292,31 +292,31 @@ void _ym::LoadManager::_checkConstraintTypeLegality() {
 #if _DUMP_LOG
     ym::println("LoadManager: Checking constraint type legality.");
 #endif
-    for (auto& item : staging->items) {
+    for (auto& type : staging->types) {
 #if _DUMP_LOG
-        ym::println("LoadManager: Checking {} item params.", item.fullname());
+        ym::println("LoadManager: Checking {} type params.", type.fullname());
 #endif
-        for (YmItemParamIndex i = 0; i < item.info->itemParamCount(); i++) {
-            auto& itemParamConstraint = ym::deref(item.itemParamConstraint(i));
-            if (itemParamConstraint.kind() != YmKind_Protocol) {
+        for (YmTypeParamIndex i = 0; i < type.info->typeParamCount(); i++) {
+            auto& typeParamConstraint = ym::deref(type.typeParamConstraint(i));
+            if (typeParamConstraint.kind() != YmKind_Protocol) {
                 _err(
-                    YmErrCode_NonProtocolItem,
-                    "{} item parameter #{} ({}) constraint type {} is not a protocol!",
-                    item.fullname(),
+                    YmErrCode_NonProtocolType,
+                    "{} type parameter #{} ({}) constraint type {} is not a protocol!",
+                    type.fullname(),
                     i + 1,
-                    item.info->itemParams[i]->name,
-                    itemParamConstraint.fullname());
+                    type.info->typeParams[i]->name,
+                    typeParamConstraint.fullname());
             }
-            static const auto immediateItemParamRefConstraintRefSymPattern = std::regex("^(?!\\$Self)([^\\[:/]+)$");
-            const auto& itemParamConstraintRefSym = item.info->consts[item.info->itemParams[i]->constraint].as<RefInfo>().sym;
-            if (std::regex_match(itemParamConstraintRefSym.string(), immediateItemParamRefConstraintRefSymPattern)) {
+            static const auto immediateTypeParamRefConstraintRefSymPattern = std::regex("^(?!\\$Self)([^\\[:/]+)$");
+            const auto& typeParamConstraintRefSym = type.info->consts[type.info->typeParams[i]->constraint].as<RefInfo>().sym;
+            if (std::regex_match(typeParamConstraintRefSym.string(), immediateTypeParamRefConstraintRefSymPattern)) {
                 _err(
                     YmErrCode_IllegalConstraint,
-                    "{} item parameter #{} ({}) constraint type symbol {} cannot use item parameter as a constraint type (as the constraining protocol's interface would be indeterminate!)",
-                    item.fullname(),
+                    "{} type parameter #{} ({}) constraint type symbol {} cannot use type parameter as a constraint type (as the constraining protocol's interface would be indeterminate!)",
+                    type.fullname(),
                     i + 1,
-                    item.info->itemParams[i]->name,
-                    itemParamConstraintRefSym);
+                    type.info->typeParams[i]->name,
+                    typeParamConstraintRefSym);
             }
         }
     }
@@ -329,22 +329,22 @@ void _ym::LoadManager::_enforceConstraints() {
 #if _DUMP_LOG
     ym::println("LoadManager: Enforcing constraints.");
 #endif
-    for (auto& item : staging->items) {
+    for (auto& type : staging->types) {
 #if _DUMP_LOG
-        ym::println("LoadManager: Checking {} item args.", item.fullname());
+        ym::println("LoadManager: Checking {} type args.", type.fullname());
 #endif
-        for (YmItemParamIndex i = 0; i < item.info->itemParamCount(); i++) {
-            auto& itemArg = ym::deref(item.itemParam(i));
-            auto& itemParamConstraint = ym::deref(item.itemParamConstraint(i));
-            if (!itemArg.conforms(itemParamConstraint)) {
+        for (YmTypeParamIndex i = 0; i < type.info->typeParamCount(); i++) {
+            auto& typeArg = ym::deref(type.typeParam(i));
+            auto& typeParamConstraint = ym::deref(type.typeParamConstraint(i));
+            if (!typeArg.conforms(typeParamConstraint)) {
                 _err(
-                    YmErrCode_ItemArgsError,
-                    "{} item argument #{} ({}={}) doesn't conform to constraint {}!",
-                    item.fullname(),
+                    YmErrCode_TypeArgsError,
+                    "{} type argument #{} ({}={}) doesn't conform to constraint {}!",
+                    type.fullname(),
                     i + 1,
-                    item.info->itemParams[i]->name,
-                    itemArg.fullname(),
-                    itemParamConstraint.fullname());
+                    type.info->typeParams[i]->name,
+                    typeArg.fullname(),
+                    typeParamConstraint.fullname());
             }
         }
     }
@@ -357,11 +357,11 @@ void _ym::LoadManager::_checkRefConstCallSigConformance() {
 #if _DUMP_LOG
     ym::println("LoadManager: Checking ref. const callsig conformance.");
 #endif
-    for (auto& item : staging->items) {
+    for (auto& type : staging->types) {
 #if _DUMP_LOG
-        ym::println("LoadManager: Checking {} ref consts.", item.fullname());
+        ym::println("LoadManager: Checking {} ref consts.", type.fullname());
 #endif
-        auto& consts = item.info->consts;
+        auto& consts = type.info->consts;
         for (size_t i = 0; i < consts.size(); i++) {
             if (auto constInfo = consts[i].tryAs<RefInfo>()) {
                 // TODO: This being recomputed here, even though it was already computed when
@@ -369,7 +369,7 @@ void _ym::LoadManager::_checkRefConstCallSigConformance() {
                 //       refactor out this recompute.
                 auto& originalRefSym = constInfo->sym;
                 // Filter the ref sym such that redirections are handled.
-                auto refSymAfterRedirects = originalRefSym.transformed(&item.parcel->redirects.value());
+                auto refSymAfterRedirects = originalRefSym.transformed(&type.parcel->redirects.value());
 #if _DUMP_LOG
                 ym::println("LoadManager: Redirecting {} -> {}.", originalRefSym, refSymAfterRedirects);
 #endif
@@ -377,11 +377,11 @@ void _ym::LoadManager::_checkRefConstCallSigConformance() {
 #if _DUMP_LOG
                     ym::println("LoadManager:     {}", refSymAfterRedirects);
 #endif
-                    auto ref = item.constAsRef(i);
+                    auto ref = type.constAsRef(i);
                     if (ref && !ref->checkCallSuff(callsuff)) {
                         // TODO: Improve this error!
                         _err(
-                            YmErrCode_ItemNotFound,
+                            YmErrCode_TypeNotFound,
                             "{} does not conform to call suffix {}!",
                             ref->fullname(),
                             std::string(*callsuff));

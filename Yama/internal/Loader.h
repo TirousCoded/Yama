@@ -14,7 +14,7 @@
 #include "LoadManager.h"
 #include "PathBindings.h"
 #include "Redirects.h"
-#include "YmItem.h"
+#include "YmType.h"
 #include "YmParcel.h"
 
 
@@ -37,17 +37,17 @@ namespace _ym {
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept = 0;
 
-        // Acquires item w/out attempting to load.
+        // Acquires type w/out attempting to load.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept = 0;
+        virtual std::shared_ptr<YmType> fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept = 0;
 
         // Acquires parcel, attempting import if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
         virtual std::shared_ptr<YmParcel> import(const Spec& path) = 0;
 
-        // Acquires item, attempting load if necessary.
+        // Acquires type, attempting load if necessary.
         // In synchronized loaders this is guaranteed to be thread-safe.
-        virtual std::shared_ptr<YmItem> load(const Spec& fullname) = 0;
+        virtual std::shared_ptr<YmType> load(const Spec& fullname) = 0;
     };
 
     // Base class of all unsynchronized loader.
@@ -56,7 +56,7 @@ namespace _ym {
         UnsynchronizedLoader() = default;
 
 
-        // Returns an area containing all fully imported/loaded parcels/items.
+        // Returns an area containing all fully imported/loaded parcels/types.
         virtual const Area& commits() const = 0;
     };
 
@@ -77,9 +77,9 @@ namespace _ym {
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
+        std::shared_ptr<YmType> fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
         std::shared_ptr<YmParcel> import(const Spec& path) override;
-        std::shared_ptr<YmItem> load(const Spec& fullname) override;
+        std::shared_ptr<YmType> load(const Spec& fullname) override;
 
 
     private:
@@ -107,9 +107,9 @@ namespace _ym {
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
-        std::shared_ptr<YmItem> fetchItem(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
+        std::shared_ptr<YmType> fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
         std::shared_ptr<YmParcel> import(const Spec& path) override;
-        std::shared_ptr<YmItem> load(const Spec& fullname) override;
+        std::shared_ptr<YmType> load(const Spec& fullname) override;
         const Area& commits() const override;
 
 

@@ -16,11 +16,11 @@ namespace _ym {
     public:
         enum class Type : YmUInt8 {
             Path,
-            Item,
+            Type,
         };
         enum class MustBe : YmUInt8 {
             Path,
-            Item,
+            Type,
             Either,
         };
 
@@ -30,13 +30,13 @@ namespace _ym {
 
         std::function<void()> hereCallback;
         std::function<void()> selfCallback;
-        std::function<void(taul::str id, bool rootOfEntireTree)> itemParamCallback;
+        std::function<void(taul::str id, bool rootOfEntireTree)> typeParamCallback;
 
 
         SpecSolver(
             YmParcel* here = nullptr,
-            YmItem* itemParamsCtx = nullptr,
-            YmItem* self = nullptr,
+            YmType* typeParamsCtx = nullptr,
+            YmType* self = nullptr,
             RedirectSet* redirects = nullptr
         ) noexcept;
 
@@ -57,11 +57,11 @@ namespace _ym {
         };
 
 
-        // NOTE: Take note how getting specifiers from _here, _itemParamCtx, and _self,
+        // NOTE: Take note how getting specifiers from _here, _typeParamCtx, and _self,
         //       rather than user provided strings, guarantees they'll be normalized.
 
         YmParcel* _here = nullptr;
-        YmItem* _itemParamCtx = nullptr, * _self = nullptr;
+        YmType* _typeParamCtx = nullptr, * _self = nullptr;
         RedirectSet* _redirects = nullptr;
 
         // TODO: Maybe use thread-local field to optimize below.
@@ -77,15 +77,15 @@ namespace _ym {
 
         bool _hasExpr() const noexcept;
         bool _isPath() const noexcept;
-        bool _isItem() const noexcept;
+        bool _isType() const noexcept;
 
         bool _expectPath();
         bool _expectPathOrNone();
-        bool _expectItem();
-        bool _expectItemOrNone();
+        bool _expectType();
+        bool _expectTypeOrNone();
 
         void _markAsPath() noexcept;
-        void _markAsItem() noexcept;
+        void _markAsType() noexcept;
 
         void _handleRedirectsIfPath();
 
@@ -112,9 +112,9 @@ namespace _ym {
         void slashId(const taul::str& id) override;
         void colonId(const taul::str& id) override;
         void dblColonId(const taul::str& id) override;
-        void openItemArgs() override;
-        void itemArgsArgDelimiter() override;
-        void closeItemArgs() override;
+        void openTypeArgs() override;
+        void typeArgsArgDelimiter() override;
+        void closeTypeArgs() override;
         void openCallSuff() override;
         void callSuffParamDelimiter() override;
         void callSuffReturnType() override;

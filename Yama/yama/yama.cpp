@@ -64,39 +64,97 @@ void ymInertCallBhvrFn(YmCtx*, void*) {
 }
 
 YmDm* ymDm_Create(void) {
-    return new YmDm();
+    auto result = new YmDm();
+    result->refs.addRef();
+    return result;
 }
 
-void ymDm_Destroy(YmDm* dm) {
-    delete Safe(dm).get();
+YmRefCount ymDm_Secure(YmDm* dm) {
+    return Safe(dm)->refs.addRef();
 }
 
-YmBool ymDm_BindParcelDef(YmDm* dm, const YmChar* path, YmParcelDef* parceldef) {
+YmRefCount ymDm_Release(YmDm* dm) {
+    auto old = Safe(dm)->refs.drop();
+    if (old == 1) {
+        delete Safe(dm).get();
+    }
+    return old;
+}
+
+YmRefCount ymDm_RefCount(YmDm* dm) {
+    return Safe(dm)->refs.count();
+}
+
+YmBool ymDm_BindParcelDef(YmDm* dm, YmPath path, YmParcelDef* parceldef) {
     return (YmBool)Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
 }
 
-YmBool ymDm_AddRedirect(YmDm* dm, const YmChar* subject, const YmChar* before, const YmChar* after) {
+YmBool ymDm_AddRedirect(YmDm* dm, YmPath subject, YmPath before, YmPath after) {
     return (YmBool)Safe(dm)->addRedirect(std::string(Safe(subject)), std::string(Safe(before)), std::string(Safe(after)));
 }
 
 YmCtx* ymCtx_Create(YmDm* dm) {
-    return new YmCtx(Safe(dm));
+    auto result = new YmCtx(Safe(dm));
+    result->refs.addRef();
+    return result;
 }
 
-void ymCtx_Destroy(YmCtx* ctx) {
-    delete Safe(ctx).get();
+YmRefCount ymCtx_Secure(YmCtx* ctx) {
+    return Safe(ctx)->refs.addRef();
+}
+
+YmRefCount ymCtx_Release(YmCtx* ctx) {
+    auto old = Safe(ctx)->refs.drop();
+    if (old == 1) {
+        delete Safe(ctx).get();
+    }
+    return old;
+}
+
+YmRefCount ymCtx_RefCount(YmCtx* ctx) {
+    return Safe(ctx)->refs.count();
 }
 
 YmDm* ymCtx_Dm(YmCtx* ctx) {
     return Safe(ctx)->domain;
 }
 
-YmParcel* ymCtx_Import(YmCtx* ctx, const YmChar* path) {
+YmParcel* ymCtx_Import(YmCtx* ctx, YmPath path) {
     return Safe(ctx)->import(std::string(Safe(path))).get();
 }
 
-YmItem* ymCtx_Load(YmCtx* ctx, const YmChar* fullname) {
+YmType* ymCtx_Load(YmCtx* ctx, YmFullname fullname) {
     return Safe(ctx)->load(std::string(Safe(fullname))).get();
+}
+
+YmType* ymCtx_LdNone(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:None");
+}
+
+YmType* ymCtx_LdInt(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:Int");
+}
+
+YmType* ymCtx_LdUInt(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:UInt");
+}
+
+YmType* ymCtx_LdFloat(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:Float");
+}
+
+YmType* ymCtx_LdBool(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:Bool");
+}
+
+YmType* ymCtx_LdRune(YmCtx* ctx) {
+    // TODO: Add actual fast path later.
+    return ymCtx_Load(ctx, "yama:Rune");
 }
 
 void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
@@ -105,35 +163,49 @@ void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
     // TODO
 }
 
-void ymCtx_NaturalizeItem(YmCtx* ctx, YmItem* item) {
+void ymCtx_NaturalizeType(YmCtx* ctx, YmType* type) {
     assertSafe(ctx);
-    assertSafe(item);
+    assertSafe(type);
     // TODO
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
-    return new YmParcelDef();
+    auto result = new YmParcelDef();
+    result->refs.addRef();
+    return result;
 }
 
-void ymParcelDef_Destroy(YmParcelDef* parceldef) {
-    delete Safe(parceldef).get();
+YmRefCount ymParcelDef_Secure(YmParcelDef* parceldef) {
+    return Safe(parceldef)->refs.addRef();
 }
 
-YmItemIndex ymParcelDef_AddStruct(
+YmRefCount ymParcelDef_Release(YmParcelDef* parceldef) {
+    auto old = Safe(parceldef)->refs.drop();
+    if (old == 1) {
+        delete Safe(parceldef).get();
+    }
+    return old;
+}
+
+YmRefCount ymParcelDef_RefCount(YmParcelDef* parceldef) {
+    return Safe(parceldef)->refs.count();
+}
+
+YmTypeIndex ymParcelDef_AddStruct(
     YmParcelDef* parceldef,
     const YmChar* name) {
     return Safe(parceldef)->addStruct(
         std::string(Safe(name)))
-        .value_or(YM_NO_ITEM_INDEX);
+        .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddProtocol(YmParcelDef* parceldef, const YmChar* name) {
+YmTypeIndex ymParcelDef_AddProtocol(YmParcelDef* parceldef, const YmChar* name) {
     return Safe(parceldef)->addProtocol(
         std::string(Safe(name)))
-        .value_or(YM_NO_ITEM_INDEX);
+        .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddFn(
+YmTypeIndex ymParcelDef_AddFn(
     YmParcelDef* parceldef,
     const YmChar* name,
     YmRefSym returnType,
@@ -143,12 +215,12 @@ YmItemIndex ymParcelDef_AddFn(
         std::string(Safe(name)),
         std::string(Safe(returnType)),
         _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData))
-        .value_or(YM_NO_ITEM_INDEX);
+        .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddMethod(
+YmTypeIndex ymParcelDef_AddMethod(
     YmParcelDef* parceldef,
-    YmItemIndex owner,
+    YmTypeIndex owner,
     const YmChar* name,
     YmRefSym returnType,
     YmCallBhvrCallbackFn callBehaviour,
@@ -158,32 +230,32 @@ YmItemIndex ymParcelDef_AddMethod(
         std::string(Safe(name)),
         std::string(Safe(returnType)),
         _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData))
-        .value_or(YM_NO_ITEM_INDEX);
+        .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmItemIndex ymParcelDef_AddMethodReq(YmParcelDef* parceldef, YmItemIndex owner, const YmChar* name, YmRefSym returnType) {
+YmTypeIndex ymParcelDef_AddMethodReq(YmParcelDef* parceldef, YmTypeIndex owner, const YmChar* name, YmRefSym returnType) {
     return Safe(parceldef)->addMethodReq(
         owner,
         std::string(Safe(name)),
         std::string(Safe(returnType)))
-        .value_or(YM_NO_ITEM_INDEX);
+        .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmItemParamIndex ymParcelDef_AddItemParam(YmParcelDef* parceldef, YmItemIndex item, const YmChar* name, YmRefSym constraintType) {
-    return Safe(parceldef)->addItemParam(
-        item,
+YmTypeParamIndex ymParcelDef_AddTypeParam(YmParcelDef* parceldef, YmTypeIndex type, const YmChar* name, YmRefSym constraintType) {
+    return Safe(parceldef)->addTypeParam(
+        type,
         std::string(Safe(name)),
         std::string(Safe(constraintType)))
-        .value_or(YM_NO_ITEM_PARAM_INDEX);
+        .value_or(YM_NO_TYPE_PARAM_INDEX);
 }
 
 YmParamIndex ymParcelDef_AddParam(
     YmParcelDef* parceldef,
-    YmItemIndex item,
+    YmTypeIndex type,
     const YmChar* name,
     YmRefSym paramType) {
     return Safe(parceldef)->addParam(
-        item,
+        type,
         std::string(Safe(name)),
         std::string(Safe(paramType)))
         .value_or(YM_NO_PARAM_INDEX);
@@ -191,83 +263,83 @@ YmParamIndex ymParcelDef_AddParam(
 
 YmRef ymParcelDef_AddRef(
     YmParcelDef* parceldef,
-    YmItemIndex item,
+    YmTypeIndex type,
     YmRefSym symbol) {
     return Safe(parceldef)->addRef(
-        item,
+        type,
         std::string(Safe(symbol)))
         .value_or(YM_NO_REF);
 }
 
-const YmChar* ymParcel_Path(YmParcel* parcel) {
+YmPath ymParcel_Path(YmParcel* parcel) {
     return Safe(parcel)->path.string().c_str();
 }
 
-YmParcel* ymItem_Parcel(YmItem* item) {
-    return Safe(item)->parcel;
+YmParcel* ymType_Parcel(YmType* type) {
+    return Safe(type)->parcel;
 }
 
-const YmChar* ymItem_Fullname(YmItem* item) {
-    return Safe(item)->fullname().string().c_str();
+YmFullname ymType_Fullname(YmType* type) {
+    return Safe(type)->fullname().string().c_str();
 }
 
-YmKind ymItem_Kind(YmItem* item) {
-    return Safe(item)->kind();
+YmKind ymType_Kind(YmType* type) {
+    return Safe(type)->kind();
 }
 
-YmItem* ymItem_Owner(YmItem* item) {
-    return Safe(item)->owner();
+YmType* ymType_Owner(YmType* type) {
+    return Safe(type)->owner();
 }
 
-YmMembers ymItem_Members(YmItem* item) {
-    return Safe(item)->members();
+YmMembers ymType_Members(YmType* type) {
+    return Safe(type)->members();
 }
 
-YmItem* ymItem_MemberByIndex(YmItem* item, YmMemberIndex member) {
-    return Safe(item)->member(member);
+YmType* ymType_MemberByIndex(YmType* type, YmMemberIndex member) {
+    return Safe(type)->member(member);
 }
 
-YmItem* ymItem_MemberByName(YmItem* item, const YmChar* name) {
-    return Safe(item)->member(std::string(Safe(name)));
+YmType* ymType_MemberByName(YmType* type, const YmChar* name) {
+    return Safe(type)->member(std::string(Safe(name)));
 }
 
-YmItemParams ymItem_ItemParams(YmItem* item) {
-    return Safe(item)->itemParams();
+YmTypeParams ymType_TypeParams(YmType* type) {
+    return Safe(type)->typeParams();
 }
 
-YmItem* ymItem_ItemParamByIndex(YmItem* item, YmItemParamIndex itemParam) {
-    return Safe(item)->itemParam(itemParam);
+YmType* ymType_TypeParamByIndex(YmType* type, YmTypeParamIndex typeParam) {
+    return Safe(type)->typeParam(typeParam);
 }
 
-YmItem* ymItem_ItemParamByName(YmItem* item, const YmChar* name) {
-    return Safe(item)->itemParam(std::string(Safe(name)));
+YmType* ymType_TypeParamByName(YmType* type, const YmChar* name) {
+    return Safe(type)->typeParam(std::string(Safe(name)));
 }
 
-YmItem* ymItem_ReturnType(YmItem* item) {
-    return Safe(item)->returnType();
+YmType* ymType_ReturnType(YmType* type) {
+    return Safe(type)->returnType();
 }
 
-YmParams ymItem_Params(YmItem* item) {
-    return Safe(item)->params();
+YmParams ymType_Params(YmType* type) {
+    return Safe(type)->params();
 }
 
-const YmChar* ymItem_ParamName(YmItem* item, YmParamIndex param) {
-    return Safe(item)->paramName(param);
+const YmChar* ymType_ParamName(YmType* type, YmParamIndex param) {
+    return Safe(type)->paramName(param);
 }
 
-YmItem* ymItem_ParamType(YmItem* item, YmParamIndex param) {
-    return Safe(item)->paramType(param);
+YmType* ymType_ParamType(YmType* type, YmParamIndex param) {
+    return Safe(type)->paramType(param);
 }
 
-YmItem* ymItem_Ref(YmItem* item, YmRef reference) {
-    return Safe(item)->ref(reference);
+YmType* ymType_Ref(YmType* type, YmRef reference) {
+    return Safe(type)->ref(reference);
 }
 
-YmRef ymItem_FindRef(YmItem* item, YmItem* referenced) {
-    return Safe(item)->findRef(Safe(referenced)).value_or(YM_NO_REF);
+YmRef ymType_FindRef(YmType* type, YmType* referenced) {
+    return Safe(type)->findRef(Safe(referenced)).value_or(YM_NO_REF);
 }
 
-YmBool ymItem_Converts(YmItem* from, YmItem* to, YmBool coercion) {
+YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
     Safe _from(from), _to(to);
     if (_from == _to) {
         return YM_TRUE;

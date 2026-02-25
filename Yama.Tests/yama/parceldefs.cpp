@@ -13,17 +13,33 @@ TEST(ParcelDefs, CreateAndDestroy) {
     SETUP_PARCELDEF(p_def); // Macro will do the create/destroy.
 }
 
+TEST(ParcelDefs, RefCounting) {
+    SETUP_ERRCOUNTER;
+    auto parceldef = ymParcelDef_Create();
+    ASSERT_TRUE(parceldef);
+    EXPECT_EQ(ymParcelDef_RefCount(parceldef), 1); // Initial
+    EXPECT_EQ(ymParcelDef_Secure(parceldef), 1); // 1 -> 2
+    EXPECT_EQ(ymParcelDef_RefCount(parceldef), 2);
+    EXPECT_EQ(ymParcelDef_Secure(parceldef), 2); // 2 -> 3
+    EXPECT_EQ(ymParcelDef_RefCount(parceldef), 3);
+    EXPECT_EQ(ymParcelDef_Release(parceldef), 3); // 3 -> 2
+    EXPECT_EQ(ymParcelDef_RefCount(parceldef), 2);
+    EXPECT_EQ(ymParcelDef_Release(parceldef), 2); // 2 -> 1
+    EXPECT_EQ(ymParcelDef_RefCount(parceldef), 1);
+    EXPECT_EQ(ymParcelDef_Release(parceldef), 1); // Destroys
+}
+
 TEST(ParcelDefs, AddStruct) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
-    YmItemIndex foo_index = ymParcelDef_AddStruct(p_def, "foo");
-    YmItemIndex bar_index = ymParcelDef_AddStruct(p_def, "bar");
-    YmItemIndex other_index = ymParcelDef_AddStruct(p_def, nonASCIIName.c_str());
-    ASSERT_NE(foo_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(bar_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(other_index, YM_NO_ITEM_INDEX);
+    YmTypeIndex foo_index = ymParcelDef_AddStruct(p_def, "foo");
+    YmTypeIndex bar_index = ymParcelDef_AddStruct(p_def, "bar");
+    YmTypeIndex other_index = ymParcelDef_AddStruct(p_def, nonASCIIName.c_str());
+    ASSERT_NE(foo_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(bar_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(other_index, YM_NO_TYPE_INDEX);
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto foo = ymCtx_Load(ctx, "p:foo");
@@ -32,28 +48,28 @@ TEST(ParcelDefs, AddStruct) {
     ASSERT_TRUE(foo);
     ASSERT_TRUE(bar);
     ASSERT_TRUE(other);
-    EXPECT_EQ(ymItem_Parcel(foo), parcel);
-    EXPECT_EQ(ymItem_Parcel(bar), parcel);
-    EXPECT_EQ(ymItem_Parcel(other), parcel);
-    EXPECT_STREQ(ymItem_Fullname(foo), "p:foo");
-    EXPECT_STREQ(ymItem_Fullname(bar), "p:bar");
-    EXPECT_STREQ(ymItem_Fullname(other), nonASCIIFullname.c_str());
-    EXPECT_EQ(ymItem_Kind(foo), YmKind_Struct);
-    EXPECT_EQ(ymItem_Kind(bar), YmKind_Struct);
-    EXPECT_EQ(ymItem_Kind(other), YmKind_Struct);
-    EXPECT_EQ(ymItem_ReturnType(foo), nullptr);
-    EXPECT_EQ(ymItem_ReturnType(bar), nullptr);
-    EXPECT_EQ(ymItem_ReturnType(other), nullptr);
-    EXPECT_EQ(ymItem_Params(foo), 0);
-    EXPECT_EQ(ymItem_Params(bar), 0);
-    EXPECT_EQ(ymItem_Params(other), 0);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(bar), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(bar), "p:bar");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Struct);
+    EXPECT_EQ(ymType_Kind(bar), YmKind_Struct);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Struct);
+    EXPECT_EQ(ymType_ReturnType(foo), nullptr);
+    EXPECT_EQ(ymType_ReturnType(bar), nullptr);
+    EXPECT_EQ(ymType_ReturnType(other), nullptr);
+    EXPECT_EQ(ymType_Params(foo), 0);
+    EXPECT_EQ(ymType_Params(bar), 0);
+    EXPECT_EQ(ymType_Params(other), 0);
 }
 
 TEST(ParcelDefs, AddStruct_NameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
@@ -62,12 +78,12 @@ TEST(ParcelDefs, AddProtocol) {
     SETUP_PARCELDEF(p_def);
     std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
     std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
-    YmItemIndex foo_index = ymParcelDef_AddProtocol(p_def, "foo");
-    YmItemIndex bar_index = ymParcelDef_AddProtocol(p_def, "bar");
-    YmItemIndex other_index = ymParcelDef_AddProtocol(p_def, nonASCIIName.c_str());
-    ASSERT_NE(foo_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(bar_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(other_index, YM_NO_ITEM_INDEX);
+    YmTypeIndex foo_index = ymParcelDef_AddProtocol(p_def, "foo");
+    YmTypeIndex bar_index = ymParcelDef_AddProtocol(p_def, "bar");
+    YmTypeIndex other_index = ymParcelDef_AddProtocol(p_def, nonASCIIName.c_str());
+    ASSERT_NE(foo_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(bar_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(other_index, YM_NO_TYPE_INDEX);
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto foo = ymCtx_Load(ctx, "p:foo");
@@ -76,28 +92,28 @@ TEST(ParcelDefs, AddProtocol) {
     ASSERT_TRUE(foo);
     ASSERT_TRUE(bar);
     ASSERT_TRUE(other);
-    EXPECT_EQ(ymItem_Parcel(foo), parcel);
-    EXPECT_EQ(ymItem_Parcel(bar), parcel);
-    EXPECT_EQ(ymItem_Parcel(other), parcel);
-    EXPECT_STREQ(ymItem_Fullname(foo), "p:foo");
-    EXPECT_STREQ(ymItem_Fullname(bar), "p:bar");
-    EXPECT_STREQ(ymItem_Fullname(other), nonASCIIFullname.c_str());
-    EXPECT_EQ(ymItem_Kind(foo), YmKind_Protocol);
-    EXPECT_EQ(ymItem_Kind(bar), YmKind_Protocol);
-    EXPECT_EQ(ymItem_Kind(other), YmKind_Protocol);
-    EXPECT_EQ(ymItem_ReturnType(foo), nullptr);
-    EXPECT_EQ(ymItem_ReturnType(bar), nullptr);
-    EXPECT_EQ(ymItem_ReturnType(other), nullptr);
-    EXPECT_EQ(ymItem_Params(foo), 0);
-    EXPECT_EQ(ymItem_Params(bar), 0);
-    EXPECT_EQ(ymItem_Params(other), 0);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(bar), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(bar), "p:bar");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Protocol);
+    EXPECT_EQ(ymType_Kind(bar), YmKind_Protocol);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Protocol);
+    EXPECT_EQ(ymType_ReturnType(foo), nullptr);
+    EXPECT_EQ(ymType_ReturnType(bar), nullptr);
+    EXPECT_EQ(ymType_ReturnType(other), nullptr);
+    EXPECT_EQ(ymType_Params(foo), 0);
+    EXPECT_EQ(ymType_Params(bar), 0);
+    EXPECT_EQ(ymType_Params(other), 0);
 }
 
 TEST(ParcelDefs, AddProtocol_NameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddProtocol(p_def, "foo"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddProtocol(p_def, "foo"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
@@ -110,14 +126,14 @@ TEST(ParcelDefs, AddFn) {
     ymParcelDef_AddStruct(p_def, "B");
     ymParcelDef_AddStruct(p_def, "C");
 
-    YmItemIndex foo_index = ymParcelDef_AddFn(p_def, "foo", "p:A", ymInertCallBhvrFn, nullptr); // w/out params
+    YmTypeIndex foo_index = ymParcelDef_AddFn(p_def, "foo", "p:A", ymInertCallBhvrFn, nullptr); // w/out params
 
-    YmItemIndex bar_index = ymParcelDef_AddFn(p_def, "bar", "p:A", ymInertCallBhvrFn, nullptr); // w/ params
+    YmTypeIndex bar_index = ymParcelDef_AddFn(p_def, "bar", "p:A", ymInertCallBhvrFn, nullptr); // w/ params
     ymParcelDef_AddParam(p_def, bar_index, "x", "p:A");
     ymParcelDef_AddParam(p_def, bar_index, "y", "p:B");
     ymParcelDef_AddParam(p_def, bar_index, "z", "p:C");
 
-    YmItemIndex other_index = ymParcelDef_AddFn(p_def, nonASCIIName.c_str(), "p:A", ymInertCallBhvrFn, nullptr); // w/out params
+    YmTypeIndex other_index = ymParcelDef_AddFn(p_def, nonASCIIName.c_str(), "p:A", ymInertCallBhvrFn, nullptr); // w/out params
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto A = ymCtx_Load(ctx, "p:A");
@@ -132,27 +148,27 @@ TEST(ParcelDefs, AddFn) {
     ASSERT_TRUE(foo);
     ASSERT_TRUE(bar);
     ASSERT_TRUE(other);
-    EXPECT_EQ(ymItem_Parcel(foo), parcel);
-    EXPECT_EQ(ymItem_Parcel(bar), parcel);
-    EXPECT_EQ(ymItem_Parcel(other), parcel);
-    EXPECT_STREQ(ymItem_Fullname(foo), "p:foo");
-    EXPECT_STREQ(ymItem_Fullname(bar), "p:bar");
-    EXPECT_STREQ(ymItem_Fullname(other), nonASCIIFullname.c_str());
-    EXPECT_EQ(ymItem_Kind(foo), YmKind_Fn);
-    EXPECT_EQ(ymItem_Kind(bar), YmKind_Fn);
-    EXPECT_EQ(ymItem_Kind(other), YmKind_Fn);
-    EXPECT_EQ(ymItem_ReturnType(foo), A);
-    EXPECT_EQ(ymItem_ReturnType(bar), A);
-    EXPECT_EQ(ymItem_ReturnType(other), A);
-    EXPECT_EQ(ymItem_Params(foo), 0);
-    EXPECT_EQ(ymItem_Params(bar), 3);
-    EXPECT_EQ(ymItem_Params(other), 0);
-    EXPECT_STREQ(ymItem_ParamName(bar, 0), "x");
-    EXPECT_STREQ(ymItem_ParamName(bar, 1), "y");
-    EXPECT_STREQ(ymItem_ParamName(bar, 2), "z");
-    EXPECT_EQ(ymItem_ParamType(bar, 0), A);
-    EXPECT_EQ(ymItem_ParamType(bar, 1), B);
-    EXPECT_EQ(ymItem_ParamType(bar, 2), C);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(bar), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(bar), "p:bar");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Fn);
+    EXPECT_EQ(ymType_Kind(bar), YmKind_Fn);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Fn);
+    EXPECT_EQ(ymType_ReturnType(foo), A);
+    EXPECT_EQ(ymType_ReturnType(bar), A);
+    EXPECT_EQ(ymType_ReturnType(other), A);
+    EXPECT_EQ(ymType_Params(foo), 0);
+    EXPECT_EQ(ymType_Params(bar), 3);
+    EXPECT_EQ(ymType_Params(other), 0);
+    EXPECT_STREQ(ymType_ParamName(bar, 0), "x");
+    EXPECT_STREQ(ymType_ParamName(bar, 1), "y");
+    EXPECT_STREQ(ymType_ParamName(bar, 2), "z");
+    EXPECT_EQ(ymType_ParamType(bar, 0), A);
+    EXPECT_EQ(ymType_ParamType(bar, 1), B);
+    EXPECT_EQ(ymType_ParamType(bar, 2), C);
 }
 
 TEST(ParcelDefs, AddFn_Normalizes_ReturnType) {
@@ -169,22 +185,22 @@ TEST(ParcelDefs, AddFn_Normalizes_ReturnType) {
     ASSERT_TRUE(A);
     ASSERT_TRUE(f);
 
-    ASSERT_EQ(ymItem_ReturnType(f), A);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_ReturnType(f)), "p:A");
+    ASSERT_EQ(ymType_ReturnType(f), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_ReturnType(f)), "p:A");
 }
 
 TEST(ParcelDefs, AddFn_NameConflict) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
 TEST(ParcelDefs, AddFn_IllegalSpecifier_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "/", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "/", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
@@ -197,14 +213,14 @@ TEST(ParcelDefs, AddMethod) {
     ymParcelDef_AddStruct(p_def, "B");
     ymParcelDef_AddStruct(p_def, "C");
 
-    YmItemIndex foo_index = ymParcelDef_AddMethod(p_def, A_index, "foo", "p:C", ymInertCallBhvrFn, nullptr); // w/out params
+    YmTypeIndex foo_index = ymParcelDef_AddMethod(p_def, A_index, "foo", "p:C", ymInertCallBhvrFn, nullptr); // w/out params
 
-    YmItemIndex bar_index = ymParcelDef_AddMethod(p_def, A_index, "bar", "p:C", ymInertCallBhvrFn, nullptr); // w/ params
+    YmTypeIndex bar_index = ymParcelDef_AddMethod(p_def, A_index, "bar", "p:C", ymInertCallBhvrFn, nullptr); // w/ params
     ymParcelDef_AddParam(p_def, bar_index, "x", "p:C");
     ymParcelDef_AddParam(p_def, bar_index, "y", "p:B");
     ymParcelDef_AddParam(p_def, bar_index, "z", "p:C");
 
-    YmItemIndex other_index = ymParcelDef_AddMethod(p_def, A_index, nonASCIIName.c_str(), "p:C", ymInertCallBhvrFn, nullptr); // w/out params
+    YmTypeIndex other_index = ymParcelDef_AddMethod(p_def, A_index, nonASCIIName.c_str(), "p:C", ymInertCallBhvrFn, nullptr); // w/out params
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto A = ymCtx_Load(ctx, "p:A");
@@ -219,30 +235,30 @@ TEST(ParcelDefs, AddMethod) {
     ASSERT_TRUE(A_foo);
     ASSERT_TRUE(A_bar);
     ASSERT_TRUE(A_other);
-    EXPECT_EQ(ymItem_Parcel(A_foo), parcel);
-    EXPECT_EQ(ymItem_Parcel(A_bar), parcel);
-    EXPECT_EQ(ymItem_Parcel(A_other), parcel);
-    EXPECT_STREQ(ymItem_Fullname(A_foo), "p:A::foo");
-    EXPECT_STREQ(ymItem_Fullname(A_bar), "p:A::bar");
-    EXPECT_STREQ(ymItem_Fullname(A_other), nonASCIIFullname.c_str());
-    EXPECT_EQ(ymItem_Kind(A_foo), YmKind_Method);
-    EXPECT_EQ(ymItem_Kind(A_bar), YmKind_Method);
-    EXPECT_EQ(ymItem_Kind(A_other), YmKind_Method);
-    EXPECT_EQ(ymItem_Owner(A_foo), A);
-    EXPECT_EQ(ymItem_Owner(A_bar), A);
-    EXPECT_EQ(ymItem_Owner(A_other), A);
-    EXPECT_EQ(ymItem_ReturnType(A_foo), C);
-    EXPECT_EQ(ymItem_ReturnType(A_bar), C);
-    EXPECT_EQ(ymItem_ReturnType(A_other), C);
-    EXPECT_EQ(ymItem_Params(A_foo), 0);
-    EXPECT_EQ(ymItem_Params(A_bar), 3);
-    EXPECT_EQ(ymItem_Params(A_other), 0);
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 0), "x");
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 1), "y");
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 2), "z");
-    EXPECT_EQ(ymItem_ParamType(A_bar, 0), C);
-    EXPECT_EQ(ymItem_ParamType(A_bar, 1), B);
-    EXPECT_EQ(ymItem_ParamType(A_bar, 2), C);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_bar), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_bar), "p:A::bar");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Method);
+    EXPECT_EQ(ymType_Kind(A_bar), YmKind_Method);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Method);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_bar), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_ReturnType(A_foo), C);
+    EXPECT_EQ(ymType_ReturnType(A_bar), C);
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_Params(A_foo), 0);
+    EXPECT_EQ(ymType_Params(A_bar), 3);
+    EXPECT_EQ(ymType_Params(A_other), 0);
+    EXPECT_STREQ(ymType_ParamName(A_bar, 0), "x");
+    EXPECT_STREQ(ymType_ParamName(A_bar, 1), "y");
+    EXPECT_STREQ(ymType_ParamName(A_bar, 2), "z");
+    EXPECT_EQ(ymType_ParamType(A_bar, 0), C);
+    EXPECT_EQ(ymType_ParamType(A_bar, 1), B);
+    EXPECT_EQ(ymType_ParamType(A_bar, 2), C);
 }
 
 TEST(ParcelDefs, AddMethod_Normalizes_ReturnType) {
@@ -259,28 +275,28 @@ TEST(ParcelDefs, AddMethod_Normalizes_ReturnType) {
     ASSERT_TRUE(A);
     ASSERT_TRUE(A_m);
 
-    ASSERT_EQ(ymItem_ReturnType(A_m), A);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_ReturnType(A_m)), "p:A");
+    ASSERT_EQ(ymType_ReturnType(A_m), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_ReturnType(A_m)), "p:A");
 }
 
-TEST(ParcelDefs, AddMethod_NameConflict_Item) {
+TEST(ParcelDefs, AddMethod_NameConflict_Type) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddMethod_NameConflict_ItemParam) {
+TEST(ParcelDefs, AddMethod_NameConflict_TypeParam) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(ymParcelDef_AddItemParam(p_def, A_index, "m", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, A_index, "m", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
@@ -288,42 +304,42 @@ TEST(ParcelDefs, AddMethod_NameConflict_Self) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "Self", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "Self", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddMethod_ItemNotFound_InvalidOwner) {
+TEST(ParcelDefs, AddMethod_TypeNotFound_InvalidOwner) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, 5'000, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, 5'000, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
-TEST(ParcelDefs, AddMethod_ItemCannotHaveMembers) {
+TEST(ParcelDefs, AddMethod_TypeCannotHaveMembers) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr);
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ItemCannotHaveMembers], 1);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveMembers], 1);
 }
 
-TEST(ParcelDefs, AddMethod_ProtocolItem) {
+TEST(ParcelDefs, AddMethod_ProtocolType) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ProtocolItem], 1);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
 }
 
 TEST(ParcelDefs, AddMethod_IllegalSpecifier_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "/", ymInertCallBhvrFn, nullptr), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethod(p_def, A_index, "m", "/", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
@@ -336,14 +352,14 @@ TEST(ParcelDefs, AddMethodReq) {
     ymParcelDef_AddStruct(p_def, "B");
     ymParcelDef_AddStruct(p_def, "C");
 
-    YmItemIndex foo_index = ymParcelDef_AddMethodReq(p_def, A_index, "foo", "p:C"); // w/out params
+    YmTypeIndex foo_index = ymParcelDef_AddMethodReq(p_def, A_index, "foo", "p:C"); // w/out params
 
-    YmItemIndex bar_index = ymParcelDef_AddMethodReq(p_def, A_index, "bar", "p:C"); // w/ params
+    YmTypeIndex bar_index = ymParcelDef_AddMethodReq(p_def, A_index, "bar", "p:C"); // w/ params
     ymParcelDef_AddParam(p_def, bar_index, "x", "p:C");
     ymParcelDef_AddParam(p_def, bar_index, "y", "p:B");
     ymParcelDef_AddParam(p_def, bar_index, "z", "p:C");
 
-    YmItemIndex other_index = ymParcelDef_AddMethodReq(p_def, A_index, nonASCIIName.c_str(), "p:C"); // w/out params
+    YmTypeIndex other_index = ymParcelDef_AddMethodReq(p_def, A_index, nonASCIIName.c_str(), "p:C"); // w/out params
 
     BIND_AND_IMPORT(ctx, parcel, p_def, "p");
     auto A = ymCtx_Load(ctx, "p:A");
@@ -358,30 +374,30 @@ TEST(ParcelDefs, AddMethodReq) {
     ASSERT_TRUE(A_foo);
     ASSERT_TRUE(A_bar);
     ASSERT_TRUE(A_other);
-    EXPECT_EQ(ymItem_Parcel(A_foo), parcel);
-    EXPECT_EQ(ymItem_Parcel(A_bar), parcel);
-    EXPECT_EQ(ymItem_Parcel(A_other), parcel);
-    EXPECT_STREQ(ymItem_Fullname(A_foo), "p:A::foo");
-    EXPECT_STREQ(ymItem_Fullname(A_bar), "p:A::bar");
-    EXPECT_STREQ(ymItem_Fullname(A_other), nonASCIIFullname.c_str());
-    EXPECT_EQ(ymItem_Kind(A_foo), YmKind_Method);
-    EXPECT_EQ(ymItem_Kind(A_bar), YmKind_Method);
-    EXPECT_EQ(ymItem_Kind(A_other), YmKind_Method);
-    EXPECT_EQ(ymItem_Owner(A_foo), A);
-    EXPECT_EQ(ymItem_Owner(A_bar), A);
-    EXPECT_EQ(ymItem_Owner(A_other), A);
-    EXPECT_EQ(ymItem_ReturnType(A_foo), C);
-    EXPECT_EQ(ymItem_ReturnType(A_bar), C);
-    EXPECT_EQ(ymItem_ReturnType(A_other), C);
-    EXPECT_EQ(ymItem_Params(A_foo), 0);
-    EXPECT_EQ(ymItem_Params(A_bar), 3);
-    EXPECT_EQ(ymItem_Params(A_other), 0);
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 0), "x");
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 1), "y");
-    EXPECT_STREQ(ymItem_ParamName(A_bar, 2), "z");
-    EXPECT_EQ(ymItem_ParamType(A_bar, 0), C);
-    EXPECT_EQ(ymItem_ParamType(A_bar, 1), B);
-    EXPECT_EQ(ymItem_ParamType(A_bar, 2), C);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_bar), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_bar), "p:A::bar");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Method);
+    EXPECT_EQ(ymType_Kind(A_bar), YmKind_Method);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Method);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_bar), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_ReturnType(A_foo), C);
+    EXPECT_EQ(ymType_ReturnType(A_bar), C);
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_Params(A_foo), 0);
+    EXPECT_EQ(ymType_Params(A_bar), 3);
+    EXPECT_EQ(ymType_Params(A_other), 0);
+    EXPECT_STREQ(ymType_ParamName(A_bar, 0), "x");
+    EXPECT_STREQ(ymType_ParamName(A_bar, 1), "y");
+    EXPECT_STREQ(ymType_ParamName(A_bar, 2), "z");
+    EXPECT_EQ(ymType_ParamType(A_bar, 0), C);
+    EXPECT_EQ(ymType_ParamType(A_bar, 1), B);
+    EXPECT_EQ(ymType_ParamType(A_bar, 2), C);
 }
 
 TEST(ParcelDefs, AddMethodReq_Normalizes_ReturnType) {
@@ -399,28 +415,28 @@ TEST(ParcelDefs, AddMethodReq_Normalizes_ReturnType) {
     ASSERT_TRUE(A);
     ASSERT_TRUE(P_m);
 
-    ASSERT_EQ(ymItem_ReturnType(P_m), A);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_ReturnType(P_m)), "p:A");
+    ASSERT_EQ(ymType_ReturnType(P_m), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_ReturnType(P_m)), "p:A");
 }
 
-TEST(ParcelDefs, AddMethodReq_NameConflict_Item) {
+TEST(ParcelDefs, AddMethodReq_NameConflict_Type) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddMethodReq_NameConflict_ItemParam) {
+TEST(ParcelDefs, AddMethodReq_NameConflict_TypeParam) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_NE(ymParcelDef_AddItemParam(p_def, A_index, "m", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, A_index, "m", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
@@ -428,45 +444,45 @@ TEST(ParcelDefs, AddMethodReq_NameConflict_Self) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "Self", "p:B"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "Self", "p:B"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddMethodReq_ItemNotFound_InvalidOwner) {
+TEST(ParcelDefs, AddMethodReq_TypeNotFound_InvalidOwner) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, 5'000, "m", "p:B"), YM_NO_ITEM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, 5'000, "m", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
-TEST(ParcelDefs, AddMethodReq_NonProtocolItem) {
+TEST(ParcelDefs, AddMethodReq_NonProtocolType) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_ITEM_INDEX);
-    EXPECT_EQ(err[YmErrCode_NonProtocolItem], 1);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NonProtocolType], 1);
 }
 
 TEST(ParcelDefs, AddMethodReq_IllegalSpecifier_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
-    ASSERT_NE(A_index, YM_NO_ITEM_INDEX);
-    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "/"), YM_NO_ITEM_INDEX);
+    ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, A_index, "m", "/"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
-TEST(ParcelDefs, AddItemParam) {
+TEST(ParcelDefs, AddTypeParam) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     ymParcelDef_AddStruct(p_def, "Float");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ASSERT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any"), 0);
-    ASSERT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "U", "p:Any"), 1);
+    ASSERT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:Any"), 0);
+    ASSERT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "U", "p:Any"), 1);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A_Int_Float = ymCtx_Load(ctx, "p:A[p:Int, p:Float]");
     auto Int = ymCtx_Load(ctx, "p:Int");
@@ -474,12 +490,12 @@ TEST(ParcelDefs, AddItemParam) {
     ASSERT_TRUE(A_Int_Float);
     ASSERT_TRUE(Int);
     ASSERT_TRUE(Float);
-    ASSERT_EQ(ymItem_ItemParams(A_Int_Float), 2);
-    EXPECT_EQ(ymItem_ItemParamByIndex(A_Int_Float, 0), Int);
-    EXPECT_EQ(ymItem_ItemParamByIndex(A_Int_Float, 1), Float);
+    ASSERT_EQ(ymType_TypeParams(A_Int_Float), 2);
+    EXPECT_EQ(ymType_TypeParamByIndex(A_Int_Float, 0), Int);
+    EXPECT_EQ(ymType_TypeParamByIndex(A_Int_Float, 1), Float);
 }
 
-TEST(ParcelDefs, AddItemParam_Normalizes_ConstraintType) {
+TEST(ParcelDefs, AddTypeParam_Normalizes_ConstraintType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -487,7 +503,7 @@ TEST(ParcelDefs, AddItemParam_Normalizes_ConstraintType) {
     auto Int_index = ymParcelDef_AddStruct(p_def, "Int");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
     auto A_T_constraintType = "  p  : \n\n Any  ";
-    ymParcelDef_AddItemParam(p_def, A_index, "T", A_T_constraintType);
+    ymParcelDef_AddTypeParam(p_def, A_index, "T", A_T_constraintType);
 
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A_Int = ymCtx_Load(ctx, "p:A[p:Int]");
@@ -495,20 +511,20 @@ TEST(ParcelDefs, AddItemParam_Normalizes_ConstraintType) {
     ASSERT_TRUE(A_Int);
     ASSERT_TRUE(Int);
 
-    ASSERT_EQ(ymItem_ItemParamByName(A_Int, "T"), Int);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_ItemParamByName(A_Int, "T")), "p:Int");
+    ASSERT_EQ(ymType_TypeParamByName(A_Int, "T"), Int);
+    EXPECT_STREQ(ymType_Fullname(ymType_TypeParamByName(A_Int, "T")), "p:Int");
 }
 
-TEST(ParcelDefs, AddItemParam_MaxItemParams) {
+TEST(ParcelDefs, AddTypeParam_MaxTypeParams) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     ymParcelDef_AddStruct(p_def, "Float");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    for (YmItemParamIndex i = 0; i < YM_MAX_ITEM_PARAMS; i++) {
+    for (YmTypeParamIndex i = 0; i < YM_MAX_TYPE_PARAMS; i++) {
         auto name = std::format("T{}", i + 1);
-        ASSERT_EQ(ymParcelDef_AddItemParam(p_def, A_index, name.c_str(), "p:Any"), i);
+        ASSERT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, name.c_str(), "p:Any"), i);
     }
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A[p:Int, p:Int, p:Int, p:Int, p:Float, p:Int, p:Int, p:Int, p:Int, p:Float, p:Int, p:Int, p:Int, p:Int, p:Float, p:Int, p:Int, p:Int, p:Int, p:Float, p:Int, p:Int, p:Int, p:Int, p:Float]");
@@ -517,90 +533,90 @@ TEST(ParcelDefs, AddItemParam_MaxItemParams) {
     ASSERT_TRUE(A);
     ASSERT_TRUE(Int);
     ASSERT_TRUE(Float);
-    ASSERT_EQ(ymItem_ItemParams(A), YM_MAX_ITEM_PARAMS);
-    for (YmItemParamIndex i = 0; i < YM_MAX_ITEM_PARAMS; i++) {
+    ASSERT_EQ(ymType_TypeParams(A), YM_MAX_TYPE_PARAMS);
+    for (YmTypeParamIndex i = 0; i < YM_MAX_TYPE_PARAMS; i++) {
         auto name = std::format("T{}", i + 1);
         auto t = i % 5 == 4 ? Float : Int;
-        EXPECT_EQ(ymItem_ItemParamByIndex(A, i), t);
-        EXPECT_EQ(ymItem_ItemParamByName(A, name.c_str()), t);
+        EXPECT_EQ(ymType_TypeParamByIndex(A, i), t);
+        EXPECT_EQ(ymType_TypeParamByName(A, name.c_str()), t);
     }
 }
 
-TEST(ParcelDefs, AddItemParam_ItemNotFound) {
+TEST(ParcelDefs, AddTypeParam_TypeNotFound) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, 500, "T", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, 500, "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_MemberItem) {
+TEST(ParcelDefs, AddTypeParam_MemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
     auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_m_index, "T", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_MemberItem], 1);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_m_index, "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    EXPECT_EQ(err[YmErrCode_MemberType], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_NameConflict_MemberItem) {
+TEST(ParcelDefs, AddTypeParam_NameConflict_MemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "m", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "m", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_NameConflict_ItemParam) {
+TEST(ParcelDefs, AddTypeParam_NameConflict_TypeParam) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    EXPECT_NE(ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_NE(ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_NameConflict_Self) {
+TEST(ParcelDefs, AddTypeParam_NameConflict_Self) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "Self", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "Self", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_IllegalSpecifier_InvalidConstraint) {
+TEST(ParcelDefs, AddTypeParam_IllegalSpecifier_InvalidConstraint) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "T", "/"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "T", "/"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_IllegalSpecifier_ContainsRefsToItemParamsNotYetDefined) {
-    // NOTE: This test can be implemented via checking for any EXISTING item param, but the actual
-    //       semantic being enforced is more about, given say 'A[T: P[U], U: Q]', item param T
+TEST(ParcelDefs, AddTypeParam_IllegalSpecifier_ContainsRefsToTypeParamsNotYetDefined) {
+    // NOTE: This test can be implemented via checking for any EXISTING type param, but the actual
+    //       semantic being enforced is more about, given say 'A[T: P[U], U: Q]', type param T
     //       not being allowed to refer to U, as a matter of definition order, REGARDLESS of whether
     //       U has/hasn't been formally defined during parcel construction yet.
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto P_index = ymParcelDef_AddProtocol(p_def, "P");
-    ymParcelDef_AddItemParam(p_def, P_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, P_index, "T", "p:Any");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "T", "p:P[$U]"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:P[$U]"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_IllegalConstraint_ImmediateItemParamRefCannotBeUsedAsConstraintType) {
+TEST(ParcelDefs, AddTypeParam_IllegalConstraint_ImmediateTypeParamRefCannotBeUsedAsConstraintType) {
     // NOTE: To be clear, something like 'A[T: Any, U: B[T]]' is fine, as U's usage of T
     //       wraps it in B. The problem only arises in cases like 'A[T: Any, U: T]', where
     //       we're trying to use T as the constraint itself, in which case we run into the
@@ -618,22 +634,22 @@ TEST(ParcelDefs, AddItemParam_IllegalConstraint_ImmediateItemParamRefCannotBeUse
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    EXPECT_NE(ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any"), YM_NO_ITEM_PARAM_INDEX);
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "U", "$T"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_NE(ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "U", "$T"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalConstraint], 1);
 }
 
-TEST(ParcelDefs, AddItemParam_LimitReached_MaxItemParams) {
+TEST(ParcelDefs, AddTypeParam_LimitReached_MaxTypeParams) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
     ymParcelDef_AddStruct(p_def, "Int");
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    for (YmItemParamIndex i = 0; i < YM_MAX_ITEM_PARAMS; i++) {
+    for (YmTypeParamIndex i = 0; i < YM_MAX_TYPE_PARAMS; i++) {
         auto name = std::format("T{}", i + 1);
-        ASSERT_EQ(ymParcelDef_AddItemParam(p_def, A_index, name.c_str(), "p:Any"), i);
+        ASSERT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, name.c_str(), "p:Any"), i);
     }
-    EXPECT_EQ(ymParcelDef_AddItemParam(p_def, A_index, "TXX", "p:Int"), YM_NO_ITEM_PARAM_INDEX);
+    EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, A_index, "TXX", "p:Int"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_LimitReached], 1);
 }
 
@@ -656,13 +672,13 @@ TEST(ParcelDefs, AddParam) {
     ASSERT_TRUE(B);
     ASSERT_TRUE(C);
     ASSERT_TRUE(D);
-    ASSERT_EQ(ymItem_Params(A), 3);
-    EXPECT_STREQ(ymItem_ParamName(A, 0), "x");
-    EXPECT_STREQ(ymItem_ParamName(A, 1), "y");
-    EXPECT_STREQ(ymItem_ParamName(A, 2), "z");
-    EXPECT_EQ(ymItem_ParamType(A, 0), B);
-    EXPECT_EQ(ymItem_ParamType(A, 1), C);
-    EXPECT_EQ(ymItem_ParamType(A, 2), D);
+    ASSERT_EQ(ymType_Params(A), 3);
+    EXPECT_STREQ(ymType_ParamName(A, 0), "x");
+    EXPECT_STREQ(ymType_ParamName(A, 1), "y");
+    EXPECT_STREQ(ymType_ParamName(A, 2), "z");
+    EXPECT_EQ(ymType_ParamType(A, 0), B);
+    EXPECT_EQ(ymType_ParamType(A, 1), C);
+    EXPECT_EQ(ymType_ParamType(A, 2), D);
 }
 
 TEST(ParcelDefs, AddParam_Normalizes_ParamType) {
@@ -680,8 +696,8 @@ TEST(ParcelDefs, AddParam_Normalizes_ParamType) {
     ASSERT_TRUE(f);
     ASSERT_TRUE(Int);
 
-    ASSERT_EQ(ymItem_ParamType(f, 0), Int);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_ParamType(f, 0)), "p:Int");
+    ASSERT_EQ(ymType_ParamType(f, 0), Int);
+    EXPECT_STREQ(ymType_Fullname(ymType_ParamType(f, 0)), "p:Int");
 }
 
 TEST(ParcelDefs, AddParam_MaxParams) {
@@ -698,27 +714,27 @@ TEST(ParcelDefs, AddParam_MaxParams) {
     auto B = ymCtx_Load(ctx, "p:B");
     ASSERT_TRUE(A);
     ASSERT_TRUE(B);
-    ASSERT_EQ(ymItem_Params(A), YM_MAX_PARAMS);
+    ASSERT_EQ(ymType_Params(A), YM_MAX_PARAMS);
     for (YmParamIndex i = 0; i < YM_MAX_PARAMS; i++) {
         std::string paramName = std::format("a{}", i);
-        EXPECT_STREQ(ymItem_ParamName(A, i), paramName.c_str()) << "i == " << i;
-        EXPECT_EQ(ymItem_ParamType(A, i), B) << "i == " << i;
+        EXPECT_STREQ(ymType_ParamName(A, i), paramName.c_str()) << "i == " << i;
+        EXPECT_EQ(ymType_ParamType(A, i), B) << "i == " << i;
     }
 }
 
-TEST(ParcelDefs, AddParam_ItemNotFound) {
+TEST(ParcelDefs, AddParam_TypeNotFound) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     EXPECT_EQ(ymParcelDef_AddParam(p_def, 500, "x", "p:B"), YM_NO_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
-TEST(ParcelDefs, AddParam_NonCallableItem) {
+TEST(ParcelDefs, AddParam_NonCallableType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, A_index, "x", "p:B"), YM_NO_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_NonCallableItem], 1);
+    EXPECT_EQ(err[YmErrCode_NonCallableType], 1);
 }
 
 TEST(ParcelDefs, AddParam_NameConflict_BetweenParams) {
@@ -762,7 +778,7 @@ TEST(ParcelDefs, AddRef) {
     auto B = ymCtx_Load(ctx, "p:B");
     ASSERT_TRUE(A);
     ASSERT_TRUE(B);
-    EXPECT_EQ(ymItem_Ref(A, A_ref_B), B);
+    EXPECT_EQ(ymType_Ref(A, A_ref_B), B);
 }
 
 TEST(ParcelDefs, AddRef_Normalizes_Symbol) {
@@ -781,23 +797,23 @@ TEST(ParcelDefs, AddRef_Normalizes_Symbol) {
     ASSERT_TRUE(A);
     ASSERT_TRUE(Int);
 
-    ASSERT_EQ(ymItem_Ref(A, A_ref), Int);
-    EXPECT_STREQ(ymItem_Fullname(ymItem_Ref(A, A_ref)), "p:Int");
+    ASSERT_EQ(ymType_Ref(A, A_ref), Int);
+    EXPECT_STREQ(ymType_Fullname(ymType_Ref(A, A_ref)), "p:Int");
 }
 
-TEST(ParcelDefs, AddRef_ItemNotFound) {
+TEST(ParcelDefs, AddRef_TypeNotFound) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     ASSERT_EQ(ymParcelDef_AddRef(p_def, 5'000, "p:B"), YM_NO_REF);
-    EXPECT_EQ(err[YmErrCode_ItemNotFound], 1);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
 TEST(ParcelDefs, AddRef_IllegalSpecifier) {
     for (const auto& fullname : illegalFullnames) {
         SETUP_ERRCOUNTER;
         SETUP_PARCELDEF(p_def);
-        YmItemIndex p_A_index = ymParcelDef_AddStruct(p_def, "A");
-        ASSERT_NE(p_A_index, YM_NO_ITEM_INDEX);
+        YmTypeIndex p_A_index = ymParcelDef_AddStruct(p_def, "A");
+        ASSERT_NE(p_A_index, YM_NO_TYPE_INDEX);
         EXPECT_EQ(ymParcelDef_AddRef(p_def, p_A_index, fullname.c_str()), YM_NO_REF) << "fullname==" << fullname;
         EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1) << "fullname==" << fullname;
     }

@@ -13,9 +13,27 @@ TEST(Contexts, CreateAndDestroy) {
     SETUP_CTX(ctx); // Macro will do the create/destroy.
 }
 
+TEST(Contexts, RefCounting) {
+    SETUP_ERRCOUNTER;
+    SETUP_DM;
+    auto ctx = ymCtx_Create(dm);
+    ASSERT_TRUE(ctx);
+    EXPECT_EQ(ymCtx_RefCount(ctx), 1); // Initial
+    EXPECT_EQ(ymCtx_Secure(ctx), 1); // 1 -> 2
+    EXPECT_EQ(ymCtx_RefCount(ctx), 2);
+    EXPECT_EQ(ymCtx_Secure(ctx), 2); // 2 -> 3
+    EXPECT_EQ(ymCtx_RefCount(ctx), 3);
+    EXPECT_EQ(ymCtx_Release(ctx), 3); // 3 -> 2
+    EXPECT_EQ(ymCtx_RefCount(ctx), 2);
+    EXPECT_EQ(ymCtx_Release(ctx), 2); // 2 -> 1
+    EXPECT_EQ(ymCtx_RefCount(ctx), 1);
+    EXPECT_EQ(ymCtx_Release(ctx), 1); // Destroys
+}
+
 TEST(Contexts, Dm) {
     SETUP_ALL(ctx);
     EXPECT_EQ(ymCtx_Dm(ctx), dm);
+    EXPECT_EQ(ymDm_RefCount(dm), 1); // Unchanged
 }
 
 // NOTE: See special/importing.cpp for unit tests covering importing semantics.
@@ -63,11 +81,11 @@ TEST(Contexts, Load) {
     std::string fullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
     ymParcelDef_AddStruct(p_def, name.c_str());
     BIND_AND_IMPORT(ctx, p, p_def, "p");
-    YmItem* item = ymCtx_Load(ctx, fullname.c_str());
-    ASSERT_NE(item, nullptr);
-    EXPECT_EQ(ymItem_Parcel(item), ymCtx_Import(ctx, "p"));
-    EXPECT_STREQ(ymItem_Fullname(item), fullname.c_str());
-    EXPECT_EQ(ymItem_Kind(item), YmKind_Struct);
+    YmType* type = ymCtx_Load(ctx, fullname.c_str());
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(ymType_Parcel(type), ymCtx_Import(ctx, "p"));
+    EXPECT_STREQ(ymType_Fullname(type), fullname.c_str());
+    EXPECT_EQ(ymType_Kind(type), YmKind_Struct);
 }
 
 TEST(Contexts, Load_Normalizes) {
@@ -92,5 +110,15 @@ TEST(Contexts, Load_AcrossCtxBoundaries) {
     SETUP_CTX(ctx1);
     SETUP_CTX(ctx2);
     EXPECT_EQ(ymCtx_Load(ctx1, "p:A"), ymCtx_Load(ctx2, "p:A"));
+}
+
+TEST(Contexts, FastPathLoadFns) {
+    SETUP_ALL(ctx);
+    EXPECT_EQ(ymCtx_LdNone(ctx), ymCtx_Load(ctx, "yama:None"));
+    EXPECT_EQ(ymCtx_LdInt(ctx), ymCtx_Load(ctx, "yama:Int"));
+    EXPECT_EQ(ymCtx_LdUInt(ctx), ymCtx_Load(ctx, "yama:UInt"));
+    EXPECT_EQ(ymCtx_LdFloat(ctx), ymCtx_Load(ctx, "yama:Float"));
+    EXPECT_EQ(ymCtx_LdBool(ctx), ymCtx_Load(ctx, "yama:Bool"));
+    EXPECT_EQ(ymCtx_LdRune(ctx), ymCtx_Load(ctx, "yama:Rune"));
 }
 

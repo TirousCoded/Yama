@@ -25,7 +25,7 @@ public:
 
 
 private:
-	std::array<size_t, YmErrCode_Num> _counts;
+	std::array<size_t, YmErrCode_Num> _counts = {0};
 	bool _suppressLog = false;
 };
 

@@ -47,10 +47,10 @@ void _ym::SpecEval::on_lexical(taul::token tkn) {
             _stage = _Stage::CallSuffParams;
             openCallSuff();
         }
-        else if (tkn.lpr->name() == "L_SQUARE")	        openItemArgs();
-        else if (tkn.lpr->name() == "R_SQUARE")	        closeItemArgs();
+        else if (tkn.lpr->name() == "L_SQUARE")	        openTypeArgs();
+        else if (tkn.lpr->name() == "R_SQUARE")	        closeTypeArgs();
         else if (tkn.lpr->name() == "COMMA") {
-            if (_stage == _Stage::Main)                 itemArgsArgDelimiter();
+            if (_stage == _Stage::Main)                 typeArgsArgDelimiter();
             else if (_stage == _Stage::CallSuffParams)  callSuffParamDelimiter();
             else                                        YM_DEADEND;
         }

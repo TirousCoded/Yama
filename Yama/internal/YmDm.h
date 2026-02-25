@@ -13,10 +13,14 @@
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
 #include "Loader.h"
+#include "RefCounter.h"
 
 
 struct YmDm final {
 public:
+    // refs is not managed internally by this class.
+    _ym::AtomicRefCounter<YmRefCount> refs;
+
     const std::shared_ptr<_ym::DmLoader> loader;
 
 

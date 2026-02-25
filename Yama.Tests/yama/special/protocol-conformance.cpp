@@ -10,8 +10,8 @@
 // NOTE: These unit tests cover when a non-protocol types conforms to protocol types.
 
 
-#define success(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_TRUE)
-#define failure(T, P) EXPECT_TRUE(ymItem_Converts((T), (P), false) == YM_FALSE)
+#define success(T, P) EXPECT_TRUE(ymType_Converts((T), (P), false) == YM_TRUE)
+#define failure(T, P) EXPECT_TRUE(ymType_Converts((T), (P), false) == YM_FALSE)
 
 
 TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
@@ -296,9 +296,9 @@ TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting) {
     auto Y_index = ymParcelDef_AddStruct(p_def, "Y");
 
     auto G_index = ymParcelDef_AddStruct(p_def, "G");
-    ymParcelDef_AddItemParam(p_def, G_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, G_index, "T", "p:Any");
     auto H_index = ymParcelDef_AddStruct(p_def, "H");
-    ymParcelDef_AddItemParam(p_def, H_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, H_index, "T", "p:Any");
 
     auto P_index = ymParcelDef_AddProtocol(p_def, "P");
     auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:G[p:G[p:X]]");
@@ -350,13 +350,13 @@ TEST(ProtocolConformance, RefSymsContainingGenericTypeNesting_SelfAndTypeArgs) {
     ymParcelDef_AddProtocol(p_def, "Any");
 
     auto G_index = ymParcelDef_AddStruct(p_def, "G");
-    ymParcelDef_AddItemParam(p_def, G_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, G_index, "T", "p:Any");
     auto H_index = ymParcelDef_AddStruct(p_def, "H");
-    ymParcelDef_AddItemParam(p_def, H_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, H_index, "T", "p:Any");
 
     // Generic protocol containing nested $Self and $T.
     auto P_index = ymParcelDef_AddProtocol(p_def, "P");
-    ymParcelDef_AddItemParam(p_def, P_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, P_index, "T", "p:Any");
     auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:G[p:H[$T]]");
     ymParcelDef_AddParam(p_def, P_m_index, "a", "p:H[p:G[$T]]");
     ymParcelDef_AddParam(p_def, P_m_index, "b", "p:H[p:G[$Self]]");
@@ -396,22 +396,22 @@ TEST(ProtocolConformance, Generics_BothOfTheProtocolTypeAndOfTheTypesCheckedForC
     ymParcelDef_AddStruct(p_def, "Y");
 
     auto P_index = ymParcelDef_AddProtocol(p_def, "P");
-    ymParcelDef_AddItemParam(p_def, P_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, P_index, "T", "p:Any");
     auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "$T");
     ymParcelDef_AddParam(p_def, P_m_index, "a", "$Self"); // Test generic protocols work w/ $Self.
     ymParcelDef_AddParam(p_def, P_m_index, "b", "$T");
 
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    ymParcelDef_AddItemParam(p_def, A_index, "T", "p:Any");
-    ymParcelDef_AddItemParam(p_def, A_index, "U", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, A_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, A_index, "U", "p:Any");
     auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "$U", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddParam(p_def, A_m_index, "a", "$Self"); // Test generic non-protocols work w/ $Self.
     ymParcelDef_AddParam(p_def, A_m_index, "b", "$T");
 
     // p:B[T] should ALWAYS fail to conform w/ p:P[T] due to Self param missing.
     auto B_index = ymParcelDef_AddStruct(p_def, "B");
-    ymParcelDef_AddItemParam(p_def, B_index, "T", "p:Any");
-    ymParcelDef_AddItemParam(p_def, B_index, "U", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, B_index, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, B_index, "U", "p:Any");
     auto B_m_index = ymParcelDef_AddMethod(p_def, B_index, "m", "$U", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddParam(p_def, B_m_index, "b", "$T");
     

@@ -29,7 +29,7 @@ namespace _ym {
 	public:
 		enum class Type : YmUInt8 {
 			Path,
-			Item,
+			Type,
 		};
 
 
@@ -42,13 +42,13 @@ namespace _ym {
 
 		static std::optional<Spec> path(const std::string& path, SpecSolver& solver);
 		static std::optional<Spec> path(const std::string& path);
-		static std::optional<Spec> item(const std::string& fullname, SpecSolver& solver);
-		static std::optional<Spec> item(const std::string& fullname);
+		static std::optional<Spec> type(const std::string& fullname, SpecSolver& solver);
+		static std::optional<Spec> type(const std::string& fullname);
 		static std::optional<Spec> either(const std::string& specifier, SpecSolver& solver);
 		static std::optional<Spec> either(const std::string& specifier);
 
 		static Spec pathFast(std::string normalizedPath);
-		static Spec itemFast(std::string normalizedFullname);
+		static Spec typeFast(std::string normalizedFullname);
 
 
 		bool operator==(const Spec&) const noexcept = default;
@@ -69,19 +69,19 @@ namespace _ym {
 
 		Type type() const noexcept;
 		bool isPath() const noexcept;
-		bool isItem() const noexcept;
+		bool isType() const noexcept;
 
 		Spec& assertPath() noexcept;
 		const Spec& assertPath() const noexcept;
-		Spec& assertItem() noexcept;
-		const Spec& assertItem() const noexcept;
+		Spec& assertType() noexcept;
+		const Spec& assertType() const noexcept;
 		Spec& assertNoCallSuff() noexcept;
 		const Spec& assertNoCallSuff() const noexcept;
 
 		size_t hash() const noexcept;
 		std::string fmt() const;
 
-		Spec transformed(RedirectSet* redirects, YmParcel* here = nullptr, YmItem* itemParamsCtx = nullptr, YmItem* self = nullptr) const;
+		Spec transformed(RedirectSet* redirects, YmParcel* here = nullptr, YmType* typeParamsCtx = nullptr, YmType* self = nullptr) const;
 		Spec removeCallSuff() const;
 
 

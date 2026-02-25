@@ -14,7 +14,7 @@
 #include "PathBindings.h"
 #include "Redirects.h"
 #include "SpecParser.h"
-#include "YmItem.h"
+#include "YmType.h"
 
 
 namespace _ym {
@@ -25,7 +25,7 @@ namespace _ym {
     //              * These exist to make system more stable in situations where an operation fails, as
     //                instead pushing nothing to term stack leaves it malformed, which can lead to crashes.
     //          - Paths: Encapsulates path strings (ie. no actual import has necessarily occurred.)
-    //          - Items: Encapsulates concrete/generic items (ie. w/ an associated fullname.)
+    //          - Types: Encapsulates concrete/generic types (ie. w/ an associated fullname.)
 
     struct Term final {
         struct ErrorData final {
@@ -34,11 +34,11 @@ namespace _ym {
             std::string path;
         };
         struct ConcreteData final {
-            ym::Safe<YmItem> item;
+            ym::Safe<YmType> type;
         };
         struct GenericData final {
             std::string path;
-            ym::Safe<const ItemInfo> info;
+            ym::Safe<const TypeInfo> info;
         };
         ym::Variant<
             ErrorData,
@@ -65,12 +65,12 @@ namespace _ym {
         inline explicit Term(std::string path) :
             data(PathData(std::move(path))) {
         }
-        // For concrete items.
-        inline explicit Term(ym::Safe<YmItem> item) :
-            data(ConcreteData(item)) {
+        // For concrete types.
+        inline explicit Term(ym::Safe<YmType> type) :
+            data(ConcreteData(type)) {
         }
-        // For generic items.
-        inline Term(std::string path, ym::Safe<const ItemInfo> info) :
+        // For generic types.
+        inline Term(std::string path, ym::Safe<const TypeInfo> info) :
             data(GenericData{ std::move(path), info }) {
             ymAssert(info->isParameterized());
         }
@@ -78,13 +78,13 @@ namespace _ym {
 
         inline bool isErr() const noexcept { return data.index() == 0; }
         inline bool isPath() const noexcept { return data.index() == 1; }
-        inline bool isItem() const noexcept { return isConcrete() || isGeneric(); }
+        inline bool isType() const noexcept { return isConcrete() || isGeneric(); }
         inline bool isConcrete() const noexcept { return data.index() == 2; }
         inline bool isGeneric() const noexcept { return data.index() == 3; }
 
         inline std::optional<YmKind> kind() const noexcept {
             return
-                isItem()
+                isType()
                 ? std::make_optional(info()->kind)
                 : std::nullopt;
         }
@@ -95,7 +95,7 @@ namespace _ym {
         }
         inline bool hasMember(const std::string& name) const noexcept {
             return
-                isItem()
+                isType()
                 ? info()->membersByName.contains(name)
                 : false;
         }
@@ -105,28 +105,28 @@ namespace _ym {
             else if (auto result = data.tryAs<3>()) return Spec::path(result->path);
             else                                    return std::nullopt;
         }
-        inline YmItem* concrete() const noexcept {
-            if (auto result = data.tryAs<2>())  return result->item;
+        inline YmType* concrete() const noexcept {
+            if (auto result = data.tryAs<2>())  return result->type;
             else                                return nullptr;
         }
-        inline const ItemInfo* generic() const noexcept {
+        inline const TypeInfo* generic() const noexcept {
             if (auto result = data.tryAs<3>())  return result->info;
             else                                return nullptr;
         }
 
-        inline YmItem* item() const noexcept {
+        inline YmType* type() const noexcept {
             return concrete();
         }
-        inline const ItemInfo* info() const noexcept {
+        inline const TypeInfo* info() const noexcept {
             if (isConcrete())       return concrete()->info;
             else if (isGeneric())   return generic();
             else                    return nullptr;
         }
 
-        inline size_t itemParamCount() const noexcept {
+        inline size_t typeParamCount() const noexcept {
             return
-                isItem()
-                ? ym::deref(info()).itemParamCount()
+                isType()
+                ? ym::deref(info()).typeParamCount()
                 : 0;
         }
 
@@ -134,14 +134,14 @@ namespace _ym {
             if (!includeTermType) {
                 if (isErr())            return "<error>";
                 else if (isPath())      return path().value();
-                else if (isConcrete())  return item()->fullname();
+                else if (isConcrete())  return type()->fullname();
                 else if (isGeneric())   return std::format("{}:{}", path().value(), info()->localName);
                 else                    return "???";
             }
             else {
                 if (isErr())            return "[Error]";
                 else if (isPath())      return "[Path " + path().value().fmt() + "]";
-                else if (isConcrete())  return "[Concrete " + item()->fullname().string() + "]";
+                else if (isConcrete())  return "[Concrete " + type()->fullname().string() + "]";
                 else if (isGeneric())   return "[Generic " + std::format("{}:{}", path().value(), info()->localName) + "]";
                 else                    return "[???]";
             }
@@ -155,20 +155,20 @@ namespace _ym {
         // Negative values index from top-down, Lua-style, where -1 is the top term.
         using TermIndex = std::make_signed_t<size_t>;
 
-        using GenNonMemberItemDataCallback = std::function<ym::Safe<YmItem>(YmParcel& p, const ItemInfo& info, std::vector<ym::Safe<YmItem>> itemArgs)>;
+        using GenNonMemberTypeDataCallback = std::function<ym::Safe<YmType>(YmParcel& p, const TypeInfo& info, std::vector<ym::Safe<YmType>> typeArgs)>;
 
 
         const ym::Safe<Area> staging;
         const ym::Safe<PathBindings> binds;
         const ym::Safe<Redirects> redirects;
-        const GenNonMemberItemDataCallback genNonMemberItemDataCallback;
+        const GenNonMemberTypeDataCallback genNonMemberTypeDataCallback;
 
 
         TermStk(
             Area& staging,
             PathBindings& binds,
             Redirects& redirects,
-            GenNonMemberItemDataCallback genNonMemberItemDataCallback);
+            GenNonMemberTypeDataCallback genNonMemberTypeDataCallback);
 
 
         size_t height() const noexcept;
@@ -179,14 +179,14 @@ namespace _ym {
         std::span<const Term> topN(size_t n) const noexcept;
 
 
-        // item is the item who's ref syms are being processed.
+        // type is the type who's ref syms are being processed.
         // here is the %here path.
-        // self is the $Self item.
+        // self is the $Self type.
         void beginSession(
             std::string errPrefix,
-            YmItem& item,
+            YmType& type,
             std::string here,
-            YmItem& self);
+            YmType& self);
         void beginSession(
             std::string errPrefix);
         void endSession();
@@ -232,21 +232,21 @@ namespace _ym {
         // TODO: Refactor our expect*** methods to instead be based on index (ie. and so move them above)
         //       and then refactor our impl code to use these for the various checks in TermStk methods.
 
-        // StkFx: ... <item> -- ... <item>
-        // <item> is an item.
-        // Checks that <item> is an item term.
+        // StkFx: ... <type> -- ... <type>
+        // <type> is an type.
+        // Checks that <type> is an type term.
         // Returns if this check succeeds.
-        bool expectItem() const;
+        bool expectType() const;
 
-        // StkFx: ... <item> -- ... <item>
-        // <item> is an item.
-        // Checks that <item> is a concrete (ie. non-generic) item term.
-        // Returns <item> if this check succeeds.
-        YmItem* expectConcrete() const;
+        // StkFx: ... <type> -- ... <type>
+        // <type> is an type.
+        // Checks that <type> is a concrete (ie. non-generic) type term.
+        // Returns <type> if this check succeeds.
+        YmType* expectConcrete() const;
 
-        // StkFx: ... <item> -- ... <item>
-        // <item> is an item.
-        // Checks that <item> is a generic (ie. non-concrete) item term.
+        // StkFx: ... <type> -- ... <type>
+        // <type> is an type.
+        // Checks that <type> is a generic (ie. non-concrete) type term.
         // Returns if this check succeeds.
         bool expectGeneric() const;
 
@@ -267,7 +267,7 @@ namespace _ym {
 
         // StkFx: ... -- ... <result>
         // Evaluates fullname in the current scope, pushing <result>.
-        // Avoids complex parsing if an already loaded item is found, forwarding to eval otherwise.
+        // Avoids complex parsing if an already loaded type is found, forwarding to eval otherwise.
         void fullname(const Spec& fullname);
 
         // StkFx: ... -- ... <here>
@@ -284,40 +284,40 @@ namespace _ym {
         void subdir(const std::string& id);
 
         // StkFx: ... -- ... <self>
-        // <self> is the item resolved by $Self.
+        // <self> is the type resolved by $Self.
         void self();
 
-        // StkFx: ... -- ... <itemParam>
-        // <itemParam> is the item resolved by the specified item parameter (ie. '$<id>'.)
-        void itemParam(const std::string& id);
+        // StkFx: ... -- ... <typeParam>
+        // <typeParam> is the type resolved by the specified type parameter (ie. '$<id>'.)
+        void typeParam(const std::string& id);
 
-        // StkFx: ... <path> -- ... <item>
+        // StkFx: ... <path> -- ... <type>
         // <path> is an import path.
-        // <item> is an item within the parcel at <path> (ie. '<path>:<id>'.)
-        void itemInParcel(const std::string& id);
+        // <type> is an type within the parcel at <path> (ie. '<path>:<id>'.)
+        void typeInParcel(const std::string& id);
 
         // StkFx: ... <owner> -- ... <member>
-        // <owner> is a non-member item.
-        // <member> is a member item within <owner> (ie. '<owner>::<id>'.)
+        // <owner> is a non-member type.
+        // <member> is a member type within <owner> (ie. '<owner>::<id>'.)
         void member(const std::string& id);
 
         // StkFx: ... <generic> -- ... <generic>
-        // <generic> is the top-most generic item term.
-        // Marks <generic> as the item who's item arguments are being defined.
+        // <generic> is the top-most generic type term.
+        // Marks <generic> as the type who's type arguments are being defined.
         void beginArgs();
 
         // StkFx: ... <generic> <args> -- ... <concrete>
-        // <generic> is the top-most generic item term, marked by beginArgs.
-        // <args> is an array of all items above <generic>.
-        // <concrete> is the concrete item constructed by applying <args> to <generic>.
+        // <generic> is the top-most generic type term, marked by beginArgs.
+        // <args> is an array of all types above <generic>.
+        // <concrete> is the concrete type constructed by applying <args> to <generic>.
         void endArgs();
 
 
     private:
         struct _Env final {
-            ym::Safe<YmItem> item;
+            ym::Safe<YmType> type;
             std::string here;
-            ym::Safe<YmItem> self;
+            ym::Safe<YmType> self;
         };
         struct _Sess final {
             std::string errPrefix;
@@ -345,9 +345,9 @@ namespace _ym {
             void slashId(const taul::str& id) override;
             void colonId(const taul::str& id) override;
             void dblColonId(const taul::str& id) override;
-            void openItemArgs() override;
-            void itemArgsArgDelimiter() override;
-            void closeItemArgs() override;
+            void openTypeArgs() override;
+            void typeArgsArgDelimiter() override;
+            void closeTypeArgs() override;
             void openCallSuff() override;
             void callSuffParamDelimiter() override;
             void callSuffReturnType() override;
@@ -377,7 +377,7 @@ namespace _ym {
         YmParcel* _import(const Spec& path);
 
         std::optional<size_t> _countInputsToEndArgs() const noexcept;
-        static std::vector<ym::Safe<YmItem>> _assembleItemArgs(std::span<const Term> args);
+        static std::vector<ym::Safe<YmType>> _assembleTypeArgs(std::span<const Term> args);
 
         void _printTermStk(size_t oldHeight);
     };

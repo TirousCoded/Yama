@@ -7,7 +7,7 @@
 
 #include "Handle.h"
 #include "Parcel.h"
-#include "Item.h"
+#include "Type.h"
 
 
 namespace ym {
@@ -18,16 +18,12 @@ namespace ym {
     // A RAII handle wrapping a YmCtx.
     class Context final : public Handle<YmCtx> {
     public:
-        // Initializes a handle which takes RAII ownership of a newly initialized resource.
-        // Only one handle should have ownership of a resource at a time.
         inline Context(std::convertible_to<Safe<YmDm>> auto const& dm) :
             Context(Safe(ymCtx_Create(Safe<YmDm>(dm)))) {
         }
-
-        // Initializes a handle which takes RAII ownership of x.
-        // Only one handle should have ownership of a resource at a time.
-        inline explicit Context(Safe<YmCtx> x) noexcept :
-            Handle(x) {
+        // Does not increment the ref count of resource.
+        inline explicit Context(Safe<YmCtx> resource) noexcept :
+            Handle(resource) {
         }
 
 
@@ -43,12 +39,11 @@ namespace ym {
             }
             return std::nullopt;
         }
-
         // fullname is expected to be null-terminated.
-        inline std::optional<Item> load(
+        inline std::optional<Type> load(
             std::convertible_to<std::string_view> auto const& fullname) noexcept {
             if (auto result = ymCtx_Load(*this, std::string_view(fullname).data())) {
-                return Item(Safe(result));
+                return Type(Safe(result));
             }
             return std::nullopt;
         }
@@ -56,8 +51,8 @@ namespace ym {
         inline void naturalize(std::convertible_to<Safe<YmParcel>> auto const& x) noexcept {
             ymCtx_NaturalizeParcel(*this, Safe<YmParcel>(x));
         }
-        inline void naturalize(std::convertible_to<Safe<YmItem>> auto const& x) noexcept {
-            ymCtx_NaturalizeItem(*this, Safe<YmItem>(x));
+        inline void naturalize(std::convertible_to<Safe<YmType>> auto const& x) noexcept {
+            ymCtx_NaturalizeType(*this, Safe<YmType>(x));
         }
     };
 }

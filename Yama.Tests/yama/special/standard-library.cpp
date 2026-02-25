@@ -14,16 +14,16 @@ TEST(StandardLibrary, YamaParcel) {
 	EXPECT_STREQ(ymParcel_Path(p), "yama");
 }
 
-static void basics(YmCtx* ctx, YmItem* t, const std::string& fln, YmKind k, YmMembers members, YmItemParams itemParams) {
-	EXPECT_STREQ(ymItem_Fullname(t), fln.c_str());
-	EXPECT_EQ(ymItem_Kind(t), k);
-	EXPECT_EQ(ymItem_Members(t), members);
-	EXPECT_EQ(ymItem_ItemParams(t), itemParams);
+static void basics(YmCtx* ctx, YmType* t, const std::string& fln, YmKind k, YmMembers members, YmTypeParams typeParams) {
+	EXPECT_STREQ(ymType_Fullname(t), fln.c_str());
+	EXPECT_EQ(ymType_Kind(t), k);
+	EXPECT_EQ(ymType_Members(t), members);
+	EXPECT_EQ(ymType_TypeParams(t), typeParams);
 }
 
-static void conformsTo(YmCtx* ctx, YmItem* t, std::vector<std::string> protocols) {
+static void conformsTo(YmCtx* ctx, YmType* t, std::vector<std::string> protocols) {
 	for (auto& protocol : protocols) {
-		EXPECT_EQ(ymItem_Converts(t, load(ctx, protocol), YM_TRUE), YM_TRUE) << "protocol==" << protocol;
+		EXPECT_EQ(ymType_Converts(t, load(ctx, protocol), YM_TRUE), YM_TRUE) << "protocol==" << protocol;
 	}
 }
 

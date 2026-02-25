@@ -9,37 +9,37 @@ bool YmParcelDef::verify() const {
     return info->verify();
 }
 
-std::optional<YmItemIndex> YmParcelDef::addStruct(
+std::optional<YmTypeIndex> YmParcelDef::addStruct(
     const std::string& name) {
-    return info->addItem(
+    return info->addType(
         name,
         YmKind_Struct);
 }
 
-std::optional<YmItemIndex> YmParcelDef::addProtocol(
+std::optional<YmTypeIndex> YmParcelDef::addProtocol(
     const std::string& name) {
-    return info->addItem(
+    return info->addType(
         name,
         YmKind_Protocol);
 }
 
-std::optional<YmItemIndex> YmParcelDef::addFn(
+std::optional<YmTypeIndex> YmParcelDef::addFn(
     const std::string& name,
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
-    return info->addItem(
+    return info->addType(
         name,
         YmKind_Fn,
         std::make_optional(std::move(returnTypeSymbol)),
         callBehaviour);
 }
 
-std::optional<YmItemIndex> YmParcelDef::addMethod(
-    YmItemIndex owner,
+std::optional<YmTypeIndex> YmParcelDef::addMethod(
+    YmTypeIndex owner,
     const std::string& name,
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
-    return info->addItem(
+    return info->addType(
         owner,
         name,
         YmKind_Method,
@@ -47,8 +47,8 @@ std::optional<YmItemIndex> YmParcelDef::addMethod(
         callBehaviour);
 }
 
-std::optional<YmItemIndex> YmParcelDef::addMethodReq(
-    YmItemIndex owner,
+std::optional<YmTypeIndex> YmParcelDef::addMethodReq(
+    YmTypeIndex owner,
     const std::string& name,
     std::string returnTypeSymbol) {
     return addMethod(
@@ -58,31 +58,31 @@ std::optional<YmItemIndex> YmParcelDef::addMethodReq(
         _ym::CallBhvrCallbackInfo::mk(_ym::methodReqCallBhvr, (void*)std::uintptr_t(-1)));
 }
 
-std::optional<YmItemParamIndex> YmParcelDef::addItemParam(
-    YmItemIndex item,
+std::optional<YmTypeParamIndex> YmParcelDef::addTypeParam(
+    YmTypeIndex type,
     std::string name,
     std::string constraintTypeSymbol) {
-    return info->addItemParam(
-        item,
+    return info->addTypeParam(
+        type,
         std::move(name),
         std::move(constraintTypeSymbol));
 }
 
 std::optional<YmParamIndex> YmParcelDef::addParam(
-    YmItemIndex item,
+    YmTypeIndex type,
     std::string name,
     std::string paramTypeSymbol) {
     return info->addParam(
-        item,
+        type,
         std::move(name),
         std::move(paramTypeSymbol));
 }
 
 std::optional<YmRef> YmParcelDef::addRef(
-    YmItemIndex item,
+    YmTypeIndex type,
     std::string symbol) {
     return info->addRef(
-        item,
+        type,
         std::move(symbol));
 }
 

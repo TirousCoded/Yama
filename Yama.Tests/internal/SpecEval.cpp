@@ -31,9 +31,9 @@ public:
     void slashId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
     void colonId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
     void dblColonId(const taul::str& id) override { emit("{} {}\n", __func__, id); }
-    void openItemArgs() override { emit("{}\n", __func__); }
-    void itemArgsArgDelimiter() override { emit("{}\n", __func__); }
-    void closeItemArgs() override { emit("{}\n", __func__); }
+    void openTypeArgs() override { emit("{}\n", __func__); }
+    void typeArgsArgDelimiter() override { emit("{}\n", __func__); }
+    void closeTypeArgs() override { emit("{}\n", __func__); }
     void openCallSuff() override { emit("{}\n", __func__); }
     void callSuffParamDelimiter() override { emit("{}\n", __func__); }
     void callSuffReturnType() override { emit("{}\n", __func__); }
@@ -67,53 +67,53 @@ dblColonId length
     succeed("yama:List[math/vec:Vec3]::size", R"(
 rootId yama
 colonId List
-openItemArgs
+openTypeArgs
 rootId math
 slashId vec
 colonId Vec3
-closeItemArgs
+closeTypeArgs
 dblColonId size
 )");
     succeed("%yama:%List[%math/%vec:%Vec3]::%size", R"(
 rootId %yama
 colonId %List
-openItemArgs
+openTypeArgs
 rootId %math
 slashId %vec
 colonId %Vec3
-closeItemArgs
+closeTypeArgs
 dblColonId %size
 )");
     succeed("$yama:$List[$math/$vec:$Vec3]::$size", R"(
 rootId $yama
 colonId $List
-openItemArgs
+openTypeArgs
 rootId $math
 slashId $vec
 colonId $Vec3
-closeItemArgs
+closeTypeArgs
 dblColonId $size
 )");
-    // Test w/ multiple item args.
+    // Test w/ multiple type args.
     succeed("yama:Map[yama:Str, yama:Int]::contains", R"(
 rootId yama
 colonId Map
-openItemArgs
+openTypeArgs
 rootId yama
 colonId Str
-itemArgsArgDelimiter
+typeArgsArgDelimiter
 rootId yama
 colonId Int
-closeItemArgs
+closeTypeArgs
 dblColonId contains
 )");
     succeed("p:A[p:B](yama:Int, yama:Float) -> yama:None", R"(
 rootId p
 colonId A
-openItemArgs
+openTypeArgs
 rootId p
 colonId B
-closeItemArgs
+closeTypeArgs
 openCallSuff
 rootId yama
 colonId Int

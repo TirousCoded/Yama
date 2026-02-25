@@ -56,9 +56,9 @@ namespace _ym {
 		virtual void slashId(const taul::str& id) = 0;
 		virtual void colonId(const taul::str& id) = 0;
 		virtual void dblColonId(const taul::str& id) = 0;
-		virtual void openItemArgs() = 0;
-		virtual void itemArgsArgDelimiter() = 0;
-		virtual void closeItemArgs() = 0;
+		virtual void openTypeArgs() = 0;
+		virtual void typeArgsArgDelimiter() = 0;
+		virtual void closeTypeArgs() = 0;
 		virtual void openCallSuff() = 0;
 		virtual void callSuffParamDelimiter() = 0;
 		virtual void callSuffReturnType() = 0;

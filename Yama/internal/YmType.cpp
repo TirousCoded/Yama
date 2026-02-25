@@ -1,6 +1,6 @@
 
 
-#include "YmItem.h"
+#include "YmType.h"
 
 #include "general.h"
 #include "SpecSolver.h"
@@ -9,19 +9,19 @@
 #define _DUMP_CONFORMS_LOG 0
 
 
-const _ym::Spec& YmItem::path() const noexcept {
+const _ym::Spec& YmType::path() const noexcept {
     return parcel->path;
 }
 
-const _ym::Spec& YmItem::fullname() const noexcept {
+const _ym::Spec& YmType::fullname() const noexcept {
     return _fullname;
 }
 
-const std::string& YmItem::localName() const noexcept {
+const std::string& YmType::localName() const noexcept {
     return info->localName;
 }
 
-std::optional<std::string> YmItem::callsuff() const {
+std::optional<std::string> YmType::callsuff() const {
     if (!ymKind_IsCallable(kind())) {
         return std::nullopt;
     }
@@ -38,14 +38,14 @@ std::optional<std::string> YmItem::callsuff() const {
     return ym::retopt(result);
 }
 
-std::optional<_ym::Spec> YmItem::callsig() const {
+std::optional<_ym::Spec> YmType::callsig() const {
     if (auto result = callsuff()) {
-        return _ym::Spec::itemFast(fullname().string() + *result);
+        return _ym::Spec::typeFast(fullname().string() + *result);
     }
     return std::nullopt;
 }
 
-bool YmItem::checkCallSuff(std::string_view callsuff) const {
+bool YmType::checkCallSuff(std::string_view callsuff) const {
     // TODO: A heap allocation being needed here is suboptimal.
     auto ours = this->callsuff();
     return
@@ -54,49 +54,49 @@ bool YmItem::checkCallSuff(std::string_view callsuff) const {
         : true;
 }
 
-bool YmItem::checkCallSuff(std::optional<std::string_view> callsuff) const {
+bool YmType::checkCallSuff(std::optional<std::string_view> callsuff) const {
     return
         callsuff
         ? checkCallSuff(*callsuff)
         : true;
 }
 
-YmItem* YmItem::owner() noexcept {
+YmType* YmType::owner() noexcept {
     return
         ymKind_IsMember(kind())
         ? constAs<_ym::ConstType::Ref>(info->owner.value()).get()
         : nullptr;
 }
 
-const YmItem* YmItem::owner() const noexcept {
+const YmType* YmType::owner() const noexcept {
     return
         ymKind_IsMember(kind())
         ? constAs<_ym::ConstType::Ref>(info->owner.value()).get()
         : nullptr;
 }
 
-ym::Safe<YmItem> YmItem::self() noexcept {
+ym::Safe<YmType> YmType::self() noexcept {
     auto found = owner();
     return ym::Safe(found ? found : this);
 }
 
-ym::Safe<const YmItem> YmItem::self() const noexcept {
+ym::Safe<const YmType> YmType::self() const noexcept {
     auto found = owner();
     return ym::Safe(found ? found : this);
 }
 
-YmMembers YmItem::members() const noexcept {
+YmMembers YmType::members() const noexcept {
     return info->memberCount();
 }
 
-YmItem* YmItem::member(YmMemberIndex member) const noexcept {
+YmType* YmType::member(YmMemberIndex member) const noexcept {
     return
         member < members()
         ? constAs<_ym::ConstType::Ref>(info->membersByIndex[member]).get()
         : nullptr;
 }
 
-YmItem* YmItem::member(const std::string& name) const noexcept {
+YmType* YmType::member(const std::string& name) const noexcept {
     auto it = info->membersByName.find(name);
     return
         it != info->membersByName.end()
@@ -104,113 +104,113 @@ YmItem* YmItem::member(const std::string& name) const noexcept {
         : nullptr;
 }
 
-YmItemParams YmItem::itemParams() const noexcept {
-    return self()->info->itemParamCount();
+YmTypeParams YmType::typeParams() const noexcept {
+    return self()->info->typeParamCount();
 }
 
-YmItem* YmItem::itemParam(YmItemParamIndex index) const noexcept {
+YmType* YmType::typeParam(YmTypeParamIndex index) const noexcept {
     return
-        index < itemParams()
-        ? self()->itemArgs[size_t(index)].get()
+        index < typeParams()
+        ? self()->typeArgs[size_t(index)].get()
         : nullptr;
 }
 
-YmItem* YmItem::itemParam(const std::string& name) const noexcept {
-    if (auto found = self()->info->queryItemParam(name)) {
-        return self()->itemArgs[size_t(found->index)];
+YmType* YmType::typeParam(const std::string& name) const noexcept {
+    if (auto found = self()->info->queryTypeParam(name)) {
+        return self()->typeArgs[size_t(found->index)];
     }
     return nullptr;
 }
 
-YmItem* YmItem::itemParamConstraint(YmItemParamIndex index) const noexcept {
+YmType* YmType::typeParamConstraint(YmTypeParamIndex index) const noexcept {
     return
-        index < itemParams()
-        ? self()->constAsRef(self()->info->itemParams[size_t(index)]->constraint).get()
+        index < typeParams()
+        ? self()->constAsRef(self()->info->typeParams[size_t(index)]->constraint).get()
         : nullptr;
 }
 
-YmItem* YmItem::itemParamConstraint(const std::string& name) const noexcept {
-    if (auto found = self()->info->queryItemParam(name)) {
-        return self()->constAsRef(self()->info->itemParams[size_t(found->index)]->constraint);
+YmType* YmType::typeParamConstraint(const std::string& name) const noexcept {
+    if (auto found = self()->info->queryTypeParam(name)) {
+        return self()->constAsRef(self()->info->typeParams[size_t(found->index)]->constraint);
     }
     return nullptr;
 }
 
-YmItem* YmItem::returnType() const noexcept {
+YmType* YmType::returnType() const noexcept {
     return
         info->returnType
         ? constAs<_ym::ConstType::Ref>(*info->returnType).get()
         : nullptr;
 }
 
-const YmChar* YmItem::paramName(YmParamIndex param) const {
+const YmChar* YmType::paramName(YmParamIndex param) const {
     if (auto p = info->queryParam(param)) {
         return p->name.c_str();
     }
     _ym::Global::raiseErr(
         YmErrCode_ParamNotFound,
-        "Cannot query parameter name; item {}; no parameter found at index {}!",
+        "Cannot query parameter name; type {}; no parameter found at index {}!",
         fullname(),
         param);
     return nullptr;
 }
 
-YmItem* YmItem::paramType(YmParamIndex param) const {
+YmType* YmType::paramType(YmParamIndex param) const {
     if (auto p = info->queryParam(param)) {
         return constAs<_ym::ConstType::Ref>(p->type);
     }
     _ym::Global::raiseErr(
         YmErrCode_ParamNotFound,
-        "Cannot query parameter type; item {}; no parameter found at index {}!",
+        "Cannot query parameter type; type {}; no parameter found at index {}!",
         fullname(),
         param);
     return nullptr;
 }
 
-YmItem* YmItem::ref(YmRef reference) const noexcept {
+YmType* YmType::ref(YmRef reference) const noexcept {
     return
-        size_t(reference) < consts().size() && consts()[reference].is<ym::Safe<YmItem>>()
-        ? consts()[reference].as<ym::Safe<YmItem>>().get()
+        size_t(reference) < consts().size() && consts()[reference].is<ym::Safe<YmType>>()
+        ? consts()[reference].as<ym::Safe<YmType>>().get()
         : nullptr;
 }
 
-std::optional<YmRef> YmItem::findRef(ym::Safe<YmItem> referenced) const noexcept {
+std::optional<YmRef> YmType::findRef(ym::Safe<YmType> referenced) const noexcept {
     for (size_t i = 0; i < consts().size(); i++) {
         auto& c = consts()[i];
         if (_ym::constTypeOf(c) != _ym::ConstType::Ref) continue;
-        if (c.as<ym::Safe<YmItem>>() != referenced) continue;
+        if (c.as<ym::Safe<YmType>>() != referenced) continue;
         return YmRef(i);
     }
     return std::nullopt;
 }
 
-bool YmItem::conforms(ym::Safe<YmItem> protocol) const noexcept {
+bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
     // TODO: The below method impl may do things like heap alloc, and w/ that plus the variable amount
     //       of work it does generally, do look into ways to optimize w/ domain/context-level caching.
 #if _DUMP_CONFORMS_LOG
-    ym::println("YmItem::conforms: {} vs. {}", fullname(), protocol->fullname());
+    ym::println("YmType::conforms: {} vs. {}", fullname(), protocol->fullname());
 #endif
     ymAssert(protocol->kind() == YmKind_Protocol);
-    auto compare = [](YmItem& pMemb, _ym::ConstIndex constIndOfItemInPMemb, YmItem& match, YmItem& itemInMatch) -> bool {
-        auto& symOfItemInPMemb = pMemb.info->consts[constIndOfItemInPMemb].as<_ym::RefInfo>().sym;
-        if (!_ym::specifierHasSelf(symOfItemInPMemb)) {
-            // If symOfItemInPMemb contains no $Self, then simply compare YmItem* values.
-            auto& itemInPMemb = pMemb.constAs<_ym::ConstType::Ref>(constIndOfItemInPMemb);
+    auto compare = [](YmType& pMemb, _ym::ConstIndex constIndOfTypeInPMemb, YmType& match, YmType& typeInMatch) -> bool {
+        auto& symOfTypeInPMemb = pMemb.info->consts[constIndOfTypeInPMemb].as<_ym::RefInfo>().sym;
+        if (!_ym::specifierHasSelf(symOfTypeInPMemb)) {
+            // If symOfTypeInPMemb contains no $Self, then simply compare YmType* values.
+            auto& typeInPMemb = pMemb.constAs<_ym::ConstType::Ref>(constIndOfTypeInPMemb);
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmItem::conforms:     {} vs. {}", itemInMatch.fullname(), itemInPMemb->fullname());
+            ym::println("YmType::conforms:     {} vs. {}", typeInMatch.fullname(), typeInPMemb->fullname());
 #endif
-            return itemInPMemb == itemInMatch;
+            return typeInPMemb == typeInMatch;
         }
         else {
-            // If symOfItemInPMemb contains $Self, then solve ref sym to item in pMemb such that $Self is
+            // If symOfTypeInPMemb contains $Self, then solve ref sym to type in pMemb such that $Self is
             // substituted w/ match.fullname() (+ other needed substitutions.)
-            auto solvedSpecOfItemInPMemb = symOfItemInPMemb.transformed(nullptr, pMemb.parcel, pMemb.self(), match.self());
+            auto solvedSpecOfTypeInPMemb = symOfTypeInPMemb.transformed(nullptr, pMemb.parcel, pMemb.self(), match.self());
 #if _DUMP_CONFORMS_LOG
-            // TODO: Original code has 'solvedSpecOfItemInPMemb.value_or("**Error**")', so if ever we encounter a situation
-            //       where solvedSpecOfItemInPMemb needs to be std::nullopt, add this part back in.
-            ym::println("YmItem::conforms:     {} vs. {} (from {})", itemInMatch.fullname(), solvedSpecOfItemInPMemb, symOfItemInPMemb);
+            // TODO: Original code has 'solvedSpecOfTypeInPMemb.value_or("**Error**")', so if ever we encounter a situation
+            //       where solvedSpecOfTypeInPMemb needs to be std::nullopt, add this part back in.
+            ym::println("YmType::conforms:     {} vs. {} (from {})", typeInMatch.fullname(), solvedSpecOfTypeInPMemb, symOfTypeInPMemb);
 #endif
-            return solvedSpecOfItemInPMemb == itemInMatch.fullname();
+            return solvedSpecOfTypeInPMemb == typeInMatch.fullname();
         }
         };
     // Check for each member req in protocol.
@@ -218,20 +218,20 @@ bool YmItem::conforms(ym::Safe<YmItem> protocol) const noexcept {
         auto& pMemb = ym::deref(protocol->member(i));
         auto pMembName = (std::string)pMemb.info->memberName().value();
 #if _DUMP_CONFORMS_LOG
-        ym::println("YmItem::conforms: Matching \"{}\".", pMembName);
+        ym::println("YmType::conforms: Matching \"{}\".", pMembName);
 #endif
-        // Check that a matching item can be found for each member req in protocol.
+        // Check that a matching type can be found for each member req in protocol.
         if (auto match = member(pMembName)) {
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmItem::conforms: Return Types:");
+            ym::println("YmType::conforms: Return Types:");
 #endif
             // Check return types.
             if (!compare(pMemb, ym::deref(pMemb.info->returnType), *match, ym::deref(match->returnType()))) {
                 return false;
             }
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmItem::conforms: Param Count: {} vs. {}", match->params(), pMemb.params());
-            ym::println("YmItem::conforms: Params:");
+            ym::println("YmType::conforms: Param Count: {} vs. {}", match->params(), pMemb.params());
+            ym::println("YmType::conforms: Params:");
 #endif
             // Check param counts.
             if (pMemb.params() != match->params()) {
@@ -246,22 +246,22 @@ bool YmItem::conforms(ym::Safe<YmItem> protocol) const noexcept {
         }
         else {
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmItem::conforms: Match not found!", pMembName);
+            ym::println("YmType::conforms: Match not found!", pMembName);
 #endif
             return false;
         }
     }
 #if _DUMP_CONFORMS_LOG
-    ym::println("YmItem::conforms: Conforms!");
+    ym::println("YmType::conforms: Conforms!");
 #endif
     return true;
 }
 
-std::span<const _ym::Const> YmItem::consts() const noexcept {
+std::span<const _ym::Const> YmType::consts() const noexcept {
     return std::span(_consts);
 }
 
-void YmItem::putValConst(size_t index) {
+void YmType::putValConst(size_t index) {
     ymAssert(index < info->consts.size());
     ymAssert(info->consts.isVal(index));
     static_assert(_ym::ConstTypes == 6);
@@ -275,7 +275,7 @@ void YmItem::putValConst(size_t index) {
     }
 }
 
-void YmItem::putRefConst(size_t index, YmItem* ref) {
+void YmType::putRefConst(size_t index, YmType* ref) {
     ymAssert(index < info->consts.size());
     ymAssert(info->consts.isRef(index));
     if (ref) {
@@ -283,19 +283,19 @@ void YmItem::putRefConst(size_t index, YmItem* ref) {
     }
 }
 
-void YmItem::_initConstsArrayToDummyIntConsts() {
+void YmType::_initConstsArrayToDummyIntConsts() {
     ymAssert(_consts.empty());
     // Initialize _consts array to correct size w/ dummy int constants.
     _consts.resize(info->consts.size(), _ym::Const::byType<YmInt>(0));
 }
 
-void YmItem::_initFullname() {
+void YmType::_initFullname() {
     const auto [owner, memberExt] = _ym::split_s<YmChar>(localName(), "::", true);
     std::string argPack{};
-    if (!itemArgs.empty()) {
+    if (!typeArgs.empty()) {
         argPack += "[";
         bool first = true;
-        for (const auto& arg : itemArgs) {
+        for (const auto& arg : typeArgs) {
             if (!first) {
                 argPack += ", ";
             }
@@ -304,11 +304,11 @@ void YmItem::_initFullname() {
         }
         argPack += "]";
     }
-    _fullname = _ym::Spec::itemFast(std::format("{}:{}{}{}", path(), (std::string)owner, argPack, (std::string)memberExt));
+    _fullname = _ym::Spec::typeFast(std::format("{}:{}{}{}", path(), (std::string)owner, argPack, (std::string)memberExt));
 }
 
-void YmItem::_initFullname(YmItem& owner) {
+void YmType::_initFullname(YmType& owner) {
     const auto [_, memberExt] = _ym::split_s<YmChar>(localName(), "::", true);
-    _fullname = _ym::Spec::itemFast(std::format("{}{}", owner.fullname(), memberExt));
+    _fullname = _ym::Spec::typeFast(std::format("{}{}", owner.fullname(), memberExt));
 }
 

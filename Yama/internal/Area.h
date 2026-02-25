@@ -5,7 +5,7 @@
 
 #include "Resource.h"
 #include "Section.h"
-#include "YmItem.h"
+#include "YmType.h"
 #include "YmParcel.h"
 
 #include "../yama++/meta.h"
@@ -16,7 +16,7 @@ namespace _ym {
 
 	class Area final {
 	public:
-		Section<YmItem> items;
+		Section<YmType> types;
 		Section<YmParcel> parcels;
 
 
@@ -25,13 +25,13 @@ namespace _ym {
 
 		// Sets the upstream area, or no upstream area if upstream == nullptr.
 		inline void setUpstream(Area* upstream) noexcept {
-			items.setUpstream(upstream ? &upstream->items : nullptr);
+			types.setUpstream(upstream ? &upstream->types : nullptr);
 			parcels.setUpstream(upstream ? &upstream->parcels : nullptr);
 		}
 
 		// Discards all resources in the area.
 		inline void discard(bool propagateUpstream = false) noexcept {
-			items.discard(propagateUpstream);
+			types.discard(propagateUpstream);
 			parcels.discard(propagateUpstream);
 		}
 
@@ -39,12 +39,12 @@ namespace _ym {
         // Fails quietly if there is no upstream area.
         // Behaviour is undefined if a name collision occurs between this area and upstream.
         inline void commit() {
-			items.commit();
+			types.commit();
 			parcels.commit();
         }
 
         inline void commitOrDiscard(bool commit) {
-			items.commitOrDiscard(commit);
+			types.commitOrDiscard(commit);
 			parcels.commitOrDiscard(commit);
         }
 		// lockIfCommit is locked via std::scoped_lock.

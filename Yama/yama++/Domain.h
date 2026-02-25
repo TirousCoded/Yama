@@ -14,16 +14,12 @@ namespace ym {
     // A RAII handle wrapping a YmDm.
     class Domain final : public Handle<YmDm> {
     public:
-        // Initializes a handle which takes RAII ownership of a newly initialized resource.
-        // Only one handle should have ownership of a resource at a time.
         inline Domain() :
             Domain(Safe(ymDm_Create())) {
         }
-
-        // Initializes a handle which takes RAII ownership of x.
-        // Only one handle should have ownership of a resource at a time.
-        inline explicit Domain(Safe<YmDm> x) noexcept :
-            Handle(x) {
+        // Does not increment the ref count of resource.
+        inline explicit Domain(Safe<YmDm> resource) noexcept :
+            Handle(resource) {
         }
 
 
@@ -35,6 +31,19 @@ namespace ym {
                 *this,
                 std::string_view(path).data(),
                 Safe<YmParcelDef>(parceldef)) == YM_TRUE;
+        }
+        // subject is expected to be null-terminated.
+        // before is expected to be null-terminated.
+        // after is expected to be null-terminated.
+        inline bool addRedirect(
+            std::convertible_to<std::string_view> auto const& subject,
+            std::convertible_to<std::string_view> auto const& before,
+            std::convertible_to<std::string_view> auto const& after) noexcept {
+            return ymDm_AddRedirect(
+                *this,
+                std::string_view(subject).data(),
+                std::string_view(before).data(),
+                std::string_view(after).data()) == YM_TRUE;
         }
     };
 }
