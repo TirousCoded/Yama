@@ -20,27 +20,27 @@ TEST(ScalarParsing, NullptrInput) {
 TEST(ScalarParsing, OutputDiscarded) {
 	{
 		size_t bytes = size_t(-1);
-		EXPECT_EQ(ymParseInt("100", nullptr, &bytes), YmParseStatus_Success);
+		EXPECT_EQ(ymInt_Parse("100", nullptr, &bytes), YmParseStatus_Success);
 		EXPECT_EQ(bytes, 3);
 	}
 	{
 		size_t bytes = size_t(-1);
-		EXPECT_EQ(ymParseUInt("100u", nullptr, &bytes, false), YmParseStatus_Success);
+		EXPECT_EQ(ymUInt_Parse("100u", nullptr, &bytes, false), YmParseStatus_Success);
 		EXPECT_EQ(bytes, 4);
 	}
 	{
 		size_t bytes = size_t(-1);
-		EXPECT_EQ(ymParseFloat("3.14159", nullptr, &bytes), YmParseStatus_Success);
+		EXPECT_EQ(ymFloat_Parse("3.14159", nullptr, &bytes), YmParseStatus_Success);
 		EXPECT_EQ(bytes, 7);
 	}
 	{
 		size_t bytes = size_t(-1);
-		EXPECT_EQ(ymParseBool("true", nullptr, &bytes), YmParseStatus_Success);
+		EXPECT_EQ(ymBool_Parse("true", nullptr, &bytes), YmParseStatus_Success);
 		EXPECT_EQ(bytes, 4);
 	}
 	{
 		size_t bytes = size_t(-1);
-		EXPECT_EQ(ymParseRune("\\&", nullptr, &bytes), YmParseStatus_Success);
+		EXPECT_EQ(ymRune_Parse("\\&", nullptr, &bytes), YmParseStatus_Success);
 		EXPECT_EQ(bytes, 2);
 	}
 }
@@ -48,27 +48,27 @@ TEST(ScalarParsing, OutputDiscarded) {
 TEST(ScalarParsing, ByteCountDiscarded) {
 	{
 		YmInt output{};
-		EXPECT_EQ(ymParseInt("100", &output, nullptr), YmParseStatus_Success);
+		EXPECT_EQ(ymInt_Parse("100", &output, nullptr), YmParseStatus_Success);
 		EXPECT_EQ(output, 100);
 	}
 	{
 		YmUInt output{};
-		EXPECT_EQ(ymParseUInt("100u", &output, nullptr, false), YmParseStatus_Success);
+		EXPECT_EQ(ymUInt_Parse("100u", &output, nullptr, false), YmParseStatus_Success);
 		EXPECT_EQ(output, 100);
 	}
 	{
 		YmFloat output{};
-		EXPECT_EQ(ymParseFloat("3.14159", &output, nullptr), YmParseStatus_Success);
+		EXPECT_EQ(ymFloat_Parse("3.14159", &output, nullptr), YmParseStatus_Success);
 		EXPECT_DOUBLE_EQ(output, 3.14159);
 	}
 	{
 		YmBool output{};
-		EXPECT_EQ(ymParseBool("true", &output, nullptr), YmParseStatus_Success);
+		EXPECT_EQ(ymBool_Parse("true", &output, nullptr), YmParseStatus_Success);
 		EXPECT_EQ(output, true);
 	}
 	{
 		YmRune output{};
-		EXPECT_EQ(ymParseRune("\\&", &output, nullptr), YmParseStatus_Success);
+		EXPECT_EQ(ymRune_Parse("\\&", &output, nullptr), YmParseStatus_Success);
 		EXPECT_EQ(output, U'&');
 	}
 }

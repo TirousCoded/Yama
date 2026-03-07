@@ -1,5 +1,7 @@
 ﻿
 
+#include <unordered_set>
+
 #include <gtest/gtest.h>
 #include <taul/strings.h>
 #include <yama/yama.h>
@@ -141,5 +143,67 @@ TEST(Domains, AddRedirect_IllegalSpecifier) {
         EXPECT_EQ(ymDm_AddRedirect(dm, "abc", "abc", path.c_str()), YM_FALSE) << "path == \"" << path << "\"";
         EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 3);
     }
+}
+
+namespace {
+    struct ForEachParcelHelper {
+        static inline std::unordered_set<YmParcel*> visisted;
+        static inline size_t expectedIncrement = 0;
+    };
+}
+
+TEST(Domains, ForEachParcel) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(a_def);
+    SETUP_PARCELDEF(b_def);
+    SETUP_PARCELDEF(c_def);
+    SETUP_PARCELDEF(d_def);
+    SETUP_PARCELDEF(e_def);
+    SETUP_PARCELDEF(f_def);
+    ymDm_BindParcelDef(dm, "a", a_def);
+    ymDm_BindParcelDef(dm, "b", b_def);
+    ymDm_BindParcelDef(dm, "c", c_def);
+    ymDm_BindParcelDef(dm, "d", d_def);
+    ymDm_BindParcelDef(dm, "e", e_def);
+    ymDm_BindParcelDef(dm, "f", f_def);
+
+    // We DO NOT import d, meaning that while it's bound, it's not imported, and so
+    // we expect it to NOT be observed during traversal.
+    ymCtx_Import(ctx, "a");
+    ymCtx_Import(ctx, "b");
+    ymCtx_Import(ctx, "c");
+    //ymCtx_Import(ctx, "d"); <- Excluded
+    ymCtx_Import(ctx, "e");
+    ymCtx_Import(ctx, "f");
+
+    ymCtx_LdInt(ctx); // <- Import 'yama' parcel.
+
+    static constexpr size_t imports = 6;
+
+    EXPECT_EQ(
+        ymDm_ForEachParcel(dm,
+            [](YmDm* dm, void* user, YmParcel* parcel, size_t increment, size_t total) {
+                ASSERT_TRUE(parcel)
+                    << "increment==" << increment;
+                EXPECT_EQ(user, (void*)150)
+                    << "parcel==" << ymParcel_Path(parcel);
+                EXPECT_EQ(increment, ForEachParcelHelper::expectedIncrement)
+                    << "parcel==" << ymParcel_Path(parcel);
+                EXPECT_EQ(total, imports)
+                    << "parcel==" << ymParcel_Path(parcel);
+
+                ForEachParcelHelper::visisted.insert(parcel);
+                ForEachParcelHelper::expectedIncrement++;
+            },
+            (void*)150),
+        imports);
+
+    EXPECT_EQ(ForEachParcelHelper::visisted.size(), imports);
+    EXPECT_TRUE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "a")));
+    EXPECT_TRUE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "b")));
+    EXPECT_TRUE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "c")));
+    EXPECT_FALSE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "d"))); // <- Excluded
+    EXPECT_TRUE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "e")));
+    EXPECT_TRUE(ForEachParcelHelper::visisted.contains(ymCtx_Import(ctx, "f")));
 }
 

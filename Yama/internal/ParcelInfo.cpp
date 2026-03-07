@@ -335,7 +335,7 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
             YmErrCode_TypeCannotHaveMembers,
             "Cannot add type; owner {} is a {} which cannot have members!",
             ownerType.localName,
-            ymFmtKind(ownerType.kind));
+            ymKind_Fmt(ownerType.kind));
         return std::nullopt;
     }
     if (kind == YmKind_Method) {
@@ -346,7 +346,7 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
             Global::raiseErr(
                 YmErrCode_ProtocolType,
                 "Cannot add regular method to {} type {}!",
-                ymFmtKind(ownerType.kind),
+                ymKind_Fmt(ownerType.kind),
                 ownerType.localName);
             return std::nullopt;
         }
@@ -354,7 +354,7 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
             Global::raiseErr(
                 YmErrCode_NonProtocolType,
                 "Cannot add method req. to {} type {}!",
-                ymFmtKind(ownerType.kind),
+                ymKind_Fmt(ownerType.kind),
                 ownerType.localName);
             return std::nullopt;
         }

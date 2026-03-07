@@ -71,6 +71,18 @@ bool _ym::DmLoader::addRedirect(const std::string& subject, const std::string& b
     return true;
 }
 
+size_t _ym::DmLoader::forEachParcel(YmForEachParcelCallbackFn callback, void* user, YmDm* dm) {
+    ymAssert(callback != nullptr);
+    ym::assertSafe(dm);
+    std::shared_lock lk(_accessLock);
+    size_t i = 0;
+    for (auto& parcel : _commits.parcels) {
+        callback(dm, user, &parcel, i, _commits.parcels.count());
+        i++;
+    }
+    return _commits.parcels.count();
+}
+
 void _ym::DmLoader::reset() noexcept {
     std::scoped_lock lk(_accessLock, _updateLock);
     // TODO: Should also reset _commits/_binds/_redirects? (If so, remember to call _bindYamaParcel.)
@@ -161,12 +173,37 @@ void _ym::DmLoader::_bindYamaParcel() {
 _ym::CtxLoader::CtxLoader(const std::shared_ptr<Loader>& upstream) :
     UnsynchronizedLoader(),
     _upstream(upstream) {
+    _preloadBuiltins();
 }
 
 std::shared_ptr<_ym::Loader> _ym::CtxLoader::upstream() const {
     auto result = _upstream.lock();
     ymAssert(result != nullptr);
     return result;
+}
+
+YmType& _ym::CtxLoader::ldNone() const noexcept {
+    return *_builtins.value().none;
+}
+
+YmType& _ym::CtxLoader::ldInt() const noexcept {
+    return *_builtins.value().int0;
+}
+
+YmType& _ym::CtxLoader::ldUInt() const noexcept {
+    return *_builtins.value().uint;
+}
+
+YmType& _ym::CtxLoader::ldFloat() const noexcept {
+    return *_builtins.value().float0;
+}
+
+YmType& _ym::CtxLoader::ldBool() const noexcept {
+    return *_builtins.value().bool0;
+}
+
+YmType& _ym::CtxLoader::ldRune() const noexcept {
+    return *_builtins.value().rune;
 }
 
 void _ym::CtxLoader::reset() noexcept {
@@ -222,5 +259,16 @@ std::shared_ptr<YmType> _ym::CtxLoader::load(const Spec& fullname) {
 
 const _ym::Area& _ym::CtxLoader::commits() const {
     return _commits;
+}
+
+void _ym::CtxLoader::_preloadBuiltins() {
+    _builtins = _Builtins{
+        .none = ym::deref(load(Spec::typeFast("yama:None"))),
+        .int0 = ym::deref(load(Spec::typeFast("yama:Int"))),
+        .uint = ym::deref(load(Spec::typeFast("yama:UInt"))),
+        .float0 = ym::deref(load(Spec::typeFast("yama:Float"))),
+        .bool0 = ym::deref(load(Spec::typeFast("yama:Bool"))),
+        .rune = ym::deref(load(Spec::typeFast("yama:Rune"))),
+    };
 }
 

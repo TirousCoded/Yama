@@ -25,19 +25,19 @@ namespace {
 }
 
 static inline YmParseStatus parse(const YmChar* input, YmInt& output, size_t& bytes, bool) {
-	return ymParseInt(input, &output, &bytes);
+	return ymInt_Parse(input, &output, &bytes);
 }
 static inline YmParseStatus parse(const YmChar* input, YmUInt& output, size_t& bytes, bool ignoreU) {
-	return ymParseUInt(input, &output, &bytes, ignoreU);
+	return ymUInt_Parse(input, &output, &bytes, ignoreU);
 }
 static inline YmParseStatus parse(const YmChar* input, YmFloat& output, size_t& bytes, bool) {
-	return ymParseFloat(input, &output, &bytes);
+	return ymFloat_Parse(input, &output, &bytes);
 }
 static inline YmParseStatus parse(const YmChar* input, YmBool& output, size_t& bytes, bool) {
-	return ymParseBool(input, &output, &bytes);
+	return ymBool_Parse(input, &output, &bytes);
 }
 static inline YmParseStatus parse(const YmChar* input, YmRune& output, size_t& bytes, bool) {
-	return ymParseRune(input, &output, &bytes);
+	return ymRune_Parse(input, &output, &bytes);
 }
 
 template<typename T>

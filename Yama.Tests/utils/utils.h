@@ -121,6 +121,24 @@ namespace {
         if (!result) throw std::runtime_error(""); // Abort test.
         return ym::Safe(result);
     }
+
+
+    // Frees string object using std::free.
+    struct ScopedStr final {
+        const YmChar* str;
+
+
+        inline ScopedStr(const YmChar* str) :
+            str(str) {
+        }
+        inline ~ScopedStr() noexcept {
+            if (str) std::free((void*)str);
+        }
+
+        constexpr operator const YmChar* const& () const noexcept {
+            return str;
+        }
+    };
 }
 
 
@@ -148,4 +166,9 @@ auto name ## _ = ym::bindScoped(ym::Safe(name))
 EXPECT_EQ(ymDm_BindParcelDef(dm, path_cstr, def), YM_TRUE); \
 auto name = ymCtx_Import(ctx, path_cstr); \
 ASSERT_TRUE(name)
+
+#define SETUP_OBJ(name, expr) \
+YmObj* name = (expr); \
+ASSERT_TRUE(name); \
+auto name ## _ = ym::bindScoped(ym::Safe(name))
 

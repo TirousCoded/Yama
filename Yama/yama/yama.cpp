@@ -13,7 +13,7 @@ using namespace ym;
 using namespace _ym;
 
 
-const YmChar* ymFmtKind(YmKind x) {
+const YmChar* ymKind_Fmt(YmKind x) {
     static constexpr std::array<const YmChar*, YmKind_Num> names{
         "Struct",
         "Protocol",
@@ -93,6 +93,11 @@ YmBool ymDm_AddRedirect(YmDm* dm, YmPath subject, YmPath before, YmPath after) {
     return (YmBool)Safe(dm)->addRedirect(std::string(Safe(subject)), std::string(Safe(before)), std::string(Safe(after)));
 }
 
+size_t ymDm_ForEachParcel(YmDm* dm, YmForEachParcelCallbackFn callback, void* user) {
+    ymAssert(callback != nullptr);
+    return Safe(dm)->forEachParcel(callback, user);
+}
+
 YmCtx* ymCtx_Create(YmDm* dm) {
     auto result = new YmCtx(Safe(dm));
     result->refs.addRef();
@@ -128,33 +133,27 @@ YmType* ymCtx_Load(YmCtx* ctx, YmFullname fullname) {
 }
 
 YmType* ymCtx_LdNone(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:None");
+    return &Safe(ctx)->loader->ldNone();
 }
 
 YmType* ymCtx_LdInt(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:Int");
+    return &Safe(ctx)->loader->ldInt();
 }
 
 YmType* ymCtx_LdUInt(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:UInt");
+    return &Safe(ctx)->loader->ldUInt();
 }
 
 YmType* ymCtx_LdFloat(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:Float");
+    return &Safe(ctx)->loader->ldFloat();
 }
 
 YmType* ymCtx_LdBool(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:Bool");
+    return &Safe(ctx)->loader->ldBool();
 }
 
 YmType* ymCtx_LdRune(YmCtx* ctx) {
-    // TODO: Add actual fast path later.
-    return ymCtx_Load(ctx, "yama:Rune");
+    return &Safe(ctx)->loader->ldRune();
 }
 
 void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
@@ -167,6 +166,30 @@ void ymCtx_NaturalizeType(YmCtx* ctx, YmType* type) {
     assertSafe(ctx);
     assertSafe(type);
     // TODO
+}
+
+YmObj* ymCtx_NewNone(YmCtx* ctx) {
+    return Safe(ctx)->newNone();
+}
+
+YmObj* ymCtx_NewInt(YmCtx* ctx, YmInt v) {
+    return Safe(ctx)->newInt(v);
+}
+
+YmObj* ymCtx_NewUInt(YmCtx* ctx, YmUInt v) {
+    return Safe(ctx)->newUInt(v);
+}
+
+YmObj* ymCtx_NewFloat(YmCtx* ctx, YmFloat v) {
+    return Safe(ctx)->newFloat(v);
+}
+
+YmObj* ymCtx_NewBool(YmCtx* ctx, YmBool v) {
+    return Safe(ctx)->newBool(v);
+}
+
+YmObj* ymCtx_NewRune(YmCtx* ctx, YmRune v) {
+    return Safe(ctx)->newRune(v);
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
@@ -354,23 +377,51 @@ YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
     else                                                return YM_FALSE;
 }
 
-void ymParcelIter_Start(YmCtx* ctx) {
-    Global::pIterStart(Safe(ctx));
+YmRefCount ymObj_Secure(YmObj* obj) {
+    return Safe(obj)->ctx->secure(deref(obj));
 }
 
-void ymParcelIter_StartFrom(YmCtx* ctx, YmParcel* startFrom) {
-    Global::pIterStartFrom(Safe(ctx), Safe(startFrom));
+YmRefCount ymObj_Release(YmObj* obj) {
+    return Safe(obj)->ctx->release(deref(obj));
 }
 
-void ymParcelIter_Advance(size_t n) {
-    Global::pIterAdvance(n);
+YmRefCount ymObj_RefCount(YmObj* obj) {
+    return Safe(obj)->refs.count();
 }
 
-YmParcel* ymParcelIter_Get(void) {
-    return Global::pIterGet();
+YmType* ymObj_Type(YmObj* obj) {
+    return Safe(obj)->type;
 }
 
-YmBool ymParcelIter_Done(void) {
-    return Global::pIterDone();
+const YmChar* ymObj_Fmt(YmObj* obj) {
+    auto _obj = Safe(obj);
+    if (_obj->isNone())         return mkCStr("n/a");
+    else if (_obj->isInt())     return ymInt_Fmt(_obj->toInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
+    else if (_obj->isUInt())    return ymUInt_Fmt(_obj->toUInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
+    else if (_obj->isFloat())   return ymFloat_Fmt(_obj->toFloat().value(), nullptr);
+    else if (_obj->isBool())    return mkCStr(ymBool_Fmt(_obj->toBool().value()));
+    else if (_obj->isRune())    return ymRune_Fmt(_obj->toRune().value(), YM_TRUE, YM_TRUE, YM_TRUE, YM_TRUE, nullptr);
+    else                        YM_DEADEND;
+    return nullptr;
+}
+
+YmInt ymObj_ToInt(YmObj* obj) {
+    return Safe(obj)->toInt().value();
+}
+
+YmUInt ymObj_ToUInt(YmObj* obj) {
+    return Safe(obj)->toUInt().value();
+}
+
+YmFloat ymObj_ToFloat(YmObj* obj) {
+    return Safe(obj)->toFloat().value();
+}
+
+YmBool ymObj_ToBool(YmObj* obj) {
+    return Safe(obj)->toBool().value();
+}
+
+YmRune ymObj_ToRune(YmObj* obj) {
+    return Safe(obj)->toRune().value();
 }
 

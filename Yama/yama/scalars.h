@@ -61,51 +61,51 @@ extern "C" {
 
     /* Returns the amount of bytes needed to store a formatted string of x. */
     /* Return value does not count a null-terminator. */
-    size_t ymMeasureInt(YmInt x, YmIntFmt fmt);
+    size_t ymInt_Measure(YmInt x, YmIntFmt fmt);
 
     /* Returns the amount of bytes needed to store a formatted string of x. */
     /* Return value does not count a null-terminator. */
-    size_t ymMeasureUInt(YmUInt x, YmIntFmt fmt);
+    size_t ymUInt_Measure(YmUInt x, YmIntFmt fmt);
     
     /* Returns the amount of bytes needed to store a formatted string of x. */
     /* Return value does not count a null-terminator. */
-    size_t ymMeasureFloat(YmFloat x);
+    size_t ymFloat_Measure(YmFloat x);
     
     /* Returns the amount of bytes needed to store a formatted string of x. */
     /* Return value does not count a null-terminator. */
-    size_t ymMeasureBool(YmBool x);
+    size_t ymBool_Measure(YmBool x);
     
     /* Returns the amount of bytes needed to store a formatted string of x. */
     /* Return value does not count a null-terminator. */
-    size_t ymMeasureRune(YmRune x, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes);
+    size_t ymRune_Measure(YmRune x, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes);
 
     /* Returns a formatted string representation of x. */
     /* If writeTo == YM_NIL, the returned string memory must be cleaned up by the end-user via free. */
     /* If writeTo != YM_NIL, the formatted string will be written to writeTo, and writeTo will be returned. */
     /* Behaviour is undefined if writeTo != YM_NIL, but the writeTo buffer isn't large enough to contain the formatted string. */
-    const YmChar* ymFmtInt(YmInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo);
+    const YmChar* ymInt_Fmt(YmInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo);
 
     /* Returns a formatted string representation of x. */
     /* If writeTo == YM_NIL, the returned string memory must be cleaned up by the end-user via free. */
     /* If writeTo != YM_NIL, the formatted string will be written to writeTo, and writeTo will be returned. */
     /* Behaviour is undefined if writeTo != YM_NIL, but the writeTo buffer isn't large enough to contain the formatted string. */
-    const YmChar* ymFmtUInt(YmUInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo);
+    const YmChar* ymUInt_Fmt(YmUInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo);
 
     /* Returns a formatted string representation of x. */
     /* If writeTo == YM_NIL, the returned string memory must be cleaned up by the end-user via free. */
     /* If writeTo != YM_NIL, the formatted string will be written to writeTo, and writeTo will be returned. */
     /* Behaviour is undefined if writeTo != YM_NIL, but the writeTo buffer isn't large enough to contain the formatted string. */
-    const YmChar* ymFmtFloat(YmFloat x, YmChar* writeTo);
+    const YmChar* ymFloat_Fmt(YmFloat x, YmChar* writeTo);
 
     /* Returns a formatted string representation of x. */
     /* The memory of the returned string is static and is valid for the lifetime of the process. */
-    const YmChar* ymFmtBool(YmBool x);
+    const YmChar* ymBool_Fmt(YmBool x);
 
     /* Returns a formatted string representation of x. */
     /* If writeTo == YM_NIL, the returned string memory must be cleaned up by the end-user via free. */
     /* If writeTo != YM_NIL, the formatted string will be written to writeTo, and writeTo will be returned. */
     /* Behaviour is undefined if writeTo != YM_NIL, but the writeTo buffer isn't large enough to contain the formatted string. */
-    const YmChar* ymFmtRune(YmRune x, YmBool uppercaseHex, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes, YmChar* writeTo);
+    const YmChar* ymRune_Fmt(YmRune x, YmBool uppercaseHex, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes, YmChar* writeTo);
 
 
     typedef enum : YmUInt8 {
@@ -120,7 +120,7 @@ extern "C" {
     /* If present, the number of bytes parsed will be written to *bytes. */
     /* Parsed value is undefined in case of overflow/underflow. */
     /* Additional text may exist following a valid parsed value. */
-    YmParseStatus ymParseInt(const YmChar* input, YmInt* output, size_t* bytes);
+    YmParseStatus ymInt_Parse(const YmChar* input, YmInt* output, size_t* bytes);
 
     /* Parses a Yama uint from input, returning parse status. */
     /* ignoreU dictates if requiring the final 'u' is disabled, in which case suffixial 'u' characters will be ignored. */
@@ -128,7 +128,7 @@ extern "C" {
     /* If present, the number of bytes parsed will be written to *bytes. */
     /* Parsed value is undefined in case of overflow/underflow. */
     /* Additional text may exist following a valid parsed value. */
-    YmParseStatus ymParseUInt(const YmChar* input, YmUInt* output, size_t* bytes, YmBool ignoreU);
+    YmParseStatus ymUInt_Parse(const YmChar* input, YmUInt* output, size_t* bytes, YmBool ignoreU);
 
     /* TODO: Parsing supports infinities, but doesn't support NaNs.
     *        When we do add this, be sure to finish refactoring that part of our unit tests.
@@ -139,19 +139,19 @@ extern "C" {
     /* If present, the number of bytes parsed will be written to *bytes. */
     /* Parsed value is YM_INF/-YM_INF in case of overflow/underflow. */
     /* Additional text may exist following a valid parsed value. */
-    YmParseStatus ymParseFloat(const YmChar* input, YmFloat* output, size_t* bytes);
+    YmParseStatus ymFloat_Parse(const YmChar* input, YmFloat* output, size_t* bytes);
 
     /* Parses a Yama bool from input, returning parse status. */
     /* If present, the parsed value will be written to *output. */
     /* If present, the number of bytes parsed will be written to *bytes. */
     /* Additional text may exist following a valid parsed value. */
-    YmParseStatus ymParseBool(const YmChar* input, YmBool* output, size_t* bytes);
+    YmParseStatus ymBool_Parse(const YmChar* input, YmBool* output, size_t* bytes);
 
     /* Parses a Yama rune from input, returning parse status. */
     /* If present, the parsed value will be written to *output. */
     /* If present, the number of bytes parsed will be written to *bytes. */
     /* Additional text may exist following a valid parsed value. */
-    YmParseStatus ymParseRune(const YmChar* input, YmRune* output, size_t* bytes);
+    YmParseStatus ymRune_Parse(const YmChar* input, YmRune* output, size_t* bytes);
 }
 
 

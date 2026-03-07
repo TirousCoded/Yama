@@ -74,6 +74,7 @@ namespace _ym {
 
         bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel = false);
         bool addRedirect(const std::string& subject, const std::string& before, const std::string& after);
+        size_t forEachParcel(YmForEachParcelCallbackFn callback, void* user, YmDm* dm);
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
@@ -105,6 +106,13 @@ namespace _ym {
 
         std::shared_ptr<Loader> upstream() const;
 
+        YmType& ldNone() const noexcept;
+        YmType& ldInt() const noexcept;
+        YmType& ldUInt() const noexcept;
+        YmType& ldFloat() const noexcept;
+        YmType& ldBool() const noexcept;
+        YmType& ldRune() const noexcept;
+
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
         std::shared_ptr<YmType> fetchType(const Spec& fullname, bool* failedDueToCallSigNonConform = nullptr) const noexcept override;
@@ -114,8 +122,17 @@ namespace _ym {
 
 
     private:
+        struct _Builtins final {
+            ym::Safe<YmType> none, int0, uint, float0, bool0, rune;
+        };
+
+
+        std::optional<_Builtins> _builtins;
         std::weak_ptr<Loader> _upstream;
         Area _commits;
+
+
+        void _preloadBuiltins();
     };
 }
 

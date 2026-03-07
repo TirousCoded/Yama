@@ -31,5 +31,6 @@ public:
 
     bool bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef);
     bool addRedirect(const std::string& subject, const std::string& before, const std::string& after);
+    size_t forEachParcel(YmForEachParcelCallbackFn callback, void* user);
 };
 

@@ -11,7 +11,7 @@
 #include "../internal/scalar-utils.h"
 
 
-size_t ymMeasureInt(YmInt x, YmIntFmt fmt) {
+size_t ymInt_Measure(YmInt x, YmIntFmt fmt) {
     if (fmt == YmIntFmt_Dec)        return _ym::measureIntGeneric(x, 10, 0);
     else if (fmt == YmIntFmt_Hex)   return _ym::measureIntGeneric(x, 16, 2);
     else if (fmt == YmIntFmt_Bin)   return _ym::measureIntGeneric(x, 2, 2);
@@ -19,7 +19,7 @@ size_t ymMeasureInt(YmInt x, YmIntFmt fmt) {
     return size_t{};
 }
 
-size_t ymMeasureUInt(YmUInt x, YmIntFmt fmt) {
+size_t ymUInt_Measure(YmUInt x, YmIntFmt fmt) {
     if (fmt == YmIntFmt_Dec)        return _ym::measureUIntGeneric(x, 10, 0, true);
     else if (fmt == YmIntFmt_Hex)   return _ym::measureUIntGeneric(x, 16, 2, true);
     else if (fmt == YmIntFmt_Bin)   return _ym::measureUIntGeneric(x, 2, 2, true);
@@ -27,15 +27,15 @@ size_t ymMeasureUInt(YmUInt x, YmIntFmt fmt) {
     return size_t{};
 }
 
-size_t ymMeasureFloat(YmFloat x) {
+size_t ymFloat_Measure(YmFloat x) {
     return std::formatted_size("{}", x);
 }
 
-size_t ymMeasureBool(YmBool x) {
+size_t ymBool_Measure(YmBool x) {
     return bool(x) ? 4 : 5;
 }
 
-size_t ymMeasureRune(YmRune x, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes) {
+size_t ymRune_Measure(YmRune x, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes) {
     static_assert(taul::units_required(taul::utf8, U'�') == 3); // Guarantee
     const auto escapeSeqChars = std::u32string_view(U"\0\a\b\f\n\r\t\v", 9);
     if (x == U'\'')                             return escapeQuotes ? 2 : 1;        // ' or \'
@@ -57,8 +57,8 @@ static ym::Safe<YmChar> _allocBuffForFmt(size_t size, YmChar* writeTo) {
         : ym::Safe<YmChar>(std::malloc(size + 1)); // '+ 1' for null-terminator.
 }
 
-const YmChar* ymFmtInt(YmInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo) {
-    size_t size = ymMeasureInt(x, fmt);
+const YmChar* ymInt_Fmt(YmInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo) {
+    size_t size = ymInt_Measure(x, fmt);
     ym::Safe<YmChar> result = _allocBuffForFmt(size, writeTo);
     if (fmt == YmIntFmt_Dec)        _ym::fmtIntGeneric(std::span<YmChar>(result.get(), size), x, 10, taul::digit, "");
     else if (fmt == YmIntFmt_Hex)   _ym::fmtIntGeneric(std::span<YmChar>(result.get(), size), x, 16, _ym::hexDigits(uppercaseHex), "0x");
@@ -68,8 +68,8 @@ const YmChar* ymFmtInt(YmInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* write
     return result;
 }
 
-const YmChar* ymFmtUInt(YmUInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo) {
-    size_t size = ymMeasureUInt(x, fmt);
+const YmChar* ymUInt_Fmt(YmUInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* writeTo) {
+    size_t size = ymUInt_Measure(x, fmt);
     ym::Safe<YmChar> result = _allocBuffForFmt(size, writeTo);
     if (fmt == YmIntFmt_Dec)        _ym::fmtUIntGeneric(std::span<YmChar>(result.get(), size), x, 10, taul::digit, "", true);
     else if (fmt == YmIntFmt_Hex)   _ym::fmtUIntGeneric(std::span<YmChar>(result.get(), size), x, 16, _ym::hexDigits(uppercaseHex), "0x", true);
@@ -79,20 +79,20 @@ const YmChar* ymFmtUInt(YmUInt x, YmBool uppercaseHex, YmIntFmt fmt, YmChar* wri
     return result;
 }
 
-const YmChar* ymFmtFloat(YmFloat x, YmChar* writeTo) {
-    size_t size = ymMeasureFloat(x);
+const YmChar* ymFloat_Fmt(YmFloat x, YmChar* writeTo) {
+    size_t size = ymFloat_Measure(x);
     ym::Safe<YmChar> result = _allocBuffForFmt(size, writeTo);
     std::format_to_n(result, size, "{}", x);
     result[size] = '\0'; // Null-Terminator
     return result;
 }
 
-const YmChar* ymFmtBool(YmBool x) {
+const YmChar* ymBool_Fmt(YmBool x) {
     return bool(x) ? "true" : "false";
 }
 
-const YmChar* ymFmtRune(YmRune x, YmBool uppercaseHex, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes, YmChar* writeTo) {
-    size_t size = ymMeasureRune(x, escapeQuotes, escapeDblQuotes, escapeBackslashes);
+const YmChar* ymRune_Fmt(YmRune x, YmBool uppercaseHex, YmBool escapeQuotes, YmBool escapeDblQuotes, YmBool escapeBackslashes, YmChar* writeTo) {
+    size_t size = ymRune_Measure(x, escapeQuotes, escapeDblQuotes, escapeBackslashes);
     ym::Safe<YmChar> result = _allocBuffForFmt(size, writeTo);
     const auto escapeSeqChars = std::u32string_view(U"\0\a\b\f\n\r\t\v", 9);
     if (x == U'\'') {
@@ -153,7 +153,7 @@ const YmChar* ymFmtRune(YmRune x, YmBool uppercaseHex, YmBool escapeQuotes, YmBo
     return result;
 }
 
-YmParseStatus ymParseInt(const YmChar* input, YmInt* output, size_t* bytes) {
+YmParseStatus ymInt_Parse(const YmChar* input, YmInt* output, size_t* bytes) {
     if (!input) return YmParseStatus_Failure;
     auto result = _ym::parseInt(input);
     if (output) *output = result.output;
@@ -161,7 +161,7 @@ YmParseStatus ymParseInt(const YmChar* input, YmInt* output, size_t* bytes) {
     return result.status;
 }
 
-YmParseStatus ymParseUInt(const YmChar* input, YmUInt* output, size_t* bytes, YmBool ignoreU) {
+YmParseStatus ymUInt_Parse(const YmChar* input, YmUInt* output, size_t* bytes, YmBool ignoreU) {
     if (!input) return YmParseStatus_Failure;
     auto result = _ym::parseUInt(input, ignoreU);
     if (output) *output = result.output;
@@ -169,7 +169,7 @@ YmParseStatus ymParseUInt(const YmChar* input, YmUInt* output, size_t* bytes, Ym
     return result.status;
 }
 
-YmParseStatus ymParseFloat(const YmChar* input, YmFloat* output, size_t* bytes) {
+YmParseStatus ymFloat_Parse(const YmChar* input, YmFloat* output, size_t* bytes) {
     if (!input) return YmParseStatus_Failure;
     auto result = _ym::parseFloat(input);
     if (output) *output = result.output;
@@ -177,7 +177,7 @@ YmParseStatus ymParseFloat(const YmChar* input, YmFloat* output, size_t* bytes) 
     return result.status;
 }
 
-YmParseStatus ymParseBool(const YmChar* input, YmBool* output, size_t* bytes) {
+YmParseStatus ymBool_Parse(const YmChar* input, YmBool* output, size_t* bytes) {
     if (!input) return YmParseStatus_Failure;
     auto result = _ym::parseBool(input);
     if (output) *output = result.output;
@@ -185,7 +185,7 @@ YmParseStatus ymParseBool(const YmChar* input, YmBool* output, size_t* bytes) {
     return result.status;
 }
 
-YmParseStatus ymParseRune(const YmChar* input, YmRune* output, size_t* bytes) {
+YmParseStatus ymRune_Parse(const YmChar* input, YmRune* output, size_t* bytes) {
     if (!input) return YmParseStatus_Failure;
     auto result = _ym::parseRune(input);
     if (output) *output = result.output;

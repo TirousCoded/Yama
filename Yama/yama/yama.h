@@ -292,6 +292,9 @@ extern "C" {
     *              and not by the end-user via reference counting.
     */
 
+    /* NOTE: Update frontend-resources.h whenever we add new structs below.
+    */
+
     /* Domains are ARC resources encapsulating data shared between Yama contexts. */
     /* Domains are thread-safe. */
     struct YmDm;
@@ -308,6 +311,9 @@ extern "C" {
     /* Types are view resources encapsulating loaded Yama types. */
     struct YmType;
 
+    /* Objects are RC resources encapsulating a Yama object. */
+    struct YmObj;
+
 
     typedef enum : YmUInt8 {
         YmKind_Struct = 0,
@@ -318,12 +324,12 @@ extern "C" {
         YmKind_Num, /* Enum size. Not a valid type kind. */
     } YmKind;
 
-    /* TODO: ymFmtKind hasn't been unit tested.
+    /* TODO: ymKind_Fmt hasn't been unit tested.
     */
 
     /* Returns the string name of type kind x, or "???" if x is invalid. */
     /* The memory of the returned string is static and is valid for the lifetime of the process. */
-    const YmChar* ymFmtKind(YmKind x);
+    const YmChar* ymKind_Fmt(YmKind x);
 
     /* TODO: ymKind_IsCallable hasn't been unit tested.
     */
@@ -531,6 +537,27 @@ extern "C" {
     /* Behaviour is undefined if after (as a pointer) is invalid. */
     YmBool ymDm_AddRedirect(struct YmDm* dm, YmPath subject, YmPath before, YmPath after);
 
+    /* A callback function for use with ymDm_ForEachParcel. */
+    /* dm is the domain to be iterated over. */
+    /* user is a pointer used to expose callback function to external data. */
+    /* parcel is the parcel of this iteration. */
+    /* increment is the number of parcels iterated over prior to this iteration. */
+    /* total is the total number of parcels to be iterated over. */
+    typedef void(*YmForEachParcelCallbackFn)(
+        struct YmDm* dm,
+        void* user,
+        YmParcel* parcel,
+        size_t increment,
+        size_t total);
+
+    /* NOTE: ymDm_ForEachParcel blocks loads/imports for the duration of the call.
+    */
+
+    /* Iterates over all imported parcels, calling callback on each one, returning the number of parcels iterated over. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if callback is invalid. */
+    size_t ymDm_ForEachParcel(struct YmDm* dm, YmForEachParcelCallbackFn callback, void* user);
+
 
     /* Context API */
 
@@ -613,6 +640,39 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     /* Behaviour is undefined if type is invalid. */
     void ymCtx_NaturalizeType(struct YmCtx* ctx, struct YmType* type);
+
+    /* TODO: Add 'immortalization' (ie. like Python) at some point.
+    */
+
+    /* Instantiates a new yama:None. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewNone(struct YmCtx* ctx);
+
+    /* Instantiates a new yama:Int. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewInt(struct YmCtx* ctx, YmInt v);
+
+    /* Instantiates a new yama:UInt. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewUInt(struct YmCtx* ctx, YmUInt v);
+
+    /* Instantiates a new yama:Float. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewFloat(struct YmCtx* ctx, YmFloat v);
+
+    /* Instantiates a new yama:Bool. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewBool(struct YmCtx* ctx, YmBool v);
+
+    /* Instantiates a new yama:Rune. */
+    /* The new object will start off with a ref count of 1. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmObj* ymCtx_NewRune(struct YmCtx* ctx, YmRune v);
 
 
     /* Parcel Def. API */
@@ -871,71 +931,77 @@ extern "C" {
     YmBool ymType_Converts(struct YmType* from, struct YmType* to, YmBool coercion);
 
 
-    /* Parcel Iterator API */
+    /* Object API */
 
-    /* TODO: Maybe replace this API w/ a ymCtx_ForEachParcel fn which takes in a fn ptr and
-    *        a void* and calls said fn ptr w/ it for each imported parcel, letting the end-user
-    *        use the fn to observe each one.
+    /* TODO: Right now, our unit tests and impl DO NOT provide a guarantee that ALL memory
+    *        allocated for objects will be released upon context destruction/release.
     * 
-    *        Then, in yama++, we can have the ym::Context abstraction be able to provide the
-    *        end user w/ a std::vector<ym::Parcel> upon query, constructed in the backend w/
-    *        ymCtx_ForEachParcel.
-    * 
-    *        This would make thread-safety easier to deal w/, as ymCtx_ForEachParcel impl can
-    *        lock domain state for the duration of ymCtx_ForEachParcel.
-    * 
-    *        Alternatively, we could add a YmImportedParcelsInfo struct containing reflection
-    *        data about a snapshot of the current state of imported parcels, w/ us then exposing
-    *        a ymImportedParcelsInfo_*** API to query reflection data, and things like ***_Destroy
-    *        fn to cleanup w/.
+    *        To fix this, we'll need to guarantee that the backend MAS used is a derivative
+    *        of OwningMAS, and thus guaranteed to provide this memory release.
     */
 
-    /* NOTE: Parcel iterator state is invalidated EVEN IF all that changes is an adding
-    *        of a new imported parcel.
+    /* Increments the ref count of object obj. */
+    /* Returns old ref count value of obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    YmRefCount ymObj_Secure(struct YmObj* obj);
+
+    /* Decrements the ref count of object obj, destroying obj if it reaches 0. */
+    /* Returns old ref count value of obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    YmRefCount ymObj_Release(struct YmObj* obj);
+
+    /* Returns the ref count of object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    YmRefCount ymObj_RefCount(struct YmObj* obj);
+
+    /* Returns the type of object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    YmType* ymObj_Type(struct YmObj* obj);
+
+    /* TODO: We want to add user defined fmt fns in Yama code later, but this restricts
+    *        our ability to have things like a ymObj_Measure fn, and things like a writeTo
+    *        param for ymObj_Fmt.
+    * 
+    *        Figure out how to deal w/ these issues, if possible.
+    */
+    /* TODO: Of course, later when we add user defined fmt methods, we're gonna need to
+    *        update our ymObj_Fmt unit tests.
     */
 
-    /* (Re)starts parcel iteration, revalidating parcel iterator. */
-    /* Parcel iterator state is thread-local. */
-    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
-    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
-    /* Behaviour is undefined if ctx is invalid. */
-    void ymParcelIter_Start(struct YmCtx* ctx);
+    /* Returns a formatted string representation of obj. */
+    /* The returned string memory must be cleaned up by the end-user via free. */
+    /* Behaviour is undefined if obj is invalid. */
+    const YmChar* ymObj_Fmt(struct YmObj* obj);
 
-    /* (Re)starts parcel iteration, starting from startFrom, revalidating parcel iterator. */
-    /* Parcel iterator state is thread-local. */
-    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
-    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if startFrom is invalid. */
-    /* Behaviour is undefined if startFrom was not imported from ctx. */
-    void ymParcelIter_StartFrom(struct YmCtx* ctx, struct YmParcel* startFrom);
+    /* TODO: Right now, things like int extraction requires the object to be a
+    *        yama:Int, but in the future we want to allow for extraction based
+    *        on if it can be COERCED into a yama:Int, if it isn't one already.
+    */
 
-    /* Advances the parcel iterator n times. */
-    /* Parcel iterator state is thread-local. */
-    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
-    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
-    /* Behaviour is undefined if parcel iterator state is invalid. */
-    void ymParcelIter_Advance(size_t n);
+    /* Extracts an int value from object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    /* Behaviour is undefined if an int cannot be extracted. */
+    YmInt ymObj_ToInt(struct YmObj* obj);
 
-    /* Queries the parcel iterator, returning a pointer to the current parcel, or YM_NIL on failure. */
-    /* Fail indicates that the parcel iterator is past-the-end, or iteration hasn't started. */
-    /* Parcel iterator state is thread-local. */
-    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
-    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
-    /* Behaviour is undefined if parcel iterator state is invalid. */
-    struct YmParcel* ymParcelIter_Get(void);
+    /* Extracts an uint value from object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    /* Behaviour is undefined if a uint cannot be extracted. */
+    YmUInt ymObj_ToUInt(struct YmObj* obj);
 
-    /* Returns if parcel iterator is past-the-end. */
-    /* Parcel iterator state is thread-local. */
-    /* Parcel iterator state is invalidated when the set of imported parcels in the traversed context changes. */
-    /* Parcel iterator state is invalidated if traversed context is deinitialized. */
-    /* Behaviour is undefined if parcel iterator state is invalid. */
-    YmBool ymParcelIter_Done(void);
+    /* Extracts an float value from object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    /* Behaviour is undefined if a float cannot be extracted. */
+    YmFloat ymObj_ToFloat(struct YmObj* obj);
 
+    /* Extracts an bool value from object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    /* Behaviour is undefined if a bool cannot be extracted. */
+    YmBool ymObj_ToBool(struct YmObj* obj);
 
-    /* Type Iterator API */
-
-    /* TODO */
+    /* Extracts an rune value from object obj. */
+    /* Behaviour is undefined if obj is invalid. */
+    /* Behaviour is undefined if a rune cannot be extracted. */
+    YmRune ymObj_ToRune(struct YmObj* obj);
 
 
     /* Internals */

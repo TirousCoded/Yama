@@ -44,6 +44,12 @@ namespace ym {
     struct ResTraits<YmType> final {
         //
     };
+    template<>
+    struct ResTraits<YmObj> final {
+        static constexpr auto secure = ymObj_Secure;
+        static constexpr auto release = ymObj_Release;
+        static constexpr auto refCount = ymObj_RefCount;
+    };
 
 
     template<typename T>

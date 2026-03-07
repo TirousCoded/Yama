@@ -53,26 +53,6 @@ bool _ym::Global::refSymIsLegal(std::string_view refSym) {
         fullnameIsLegal(refSym);
 }
 
-void _ym::Global::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
-    YmCtx::pIterStart(ctx);
-}
-
-void _ym::Global::pIterStartFrom(ym::Safe<YmCtx> ctx, ym::Safe<YmParcel> parcel) noexcept {
-    YmCtx::pIterStartFrom(ctx, parcel);
-}
-
-void _ym::Global::pIterAdvance(size_t n) noexcept {
-    YmCtx::pIterAdvance(n);
-}
-
-YmParcel* _ym::Global::pIterGet() noexcept {
-    return YmCtx::pIterGet();
-}
-
-bool _ym::Global::pIterDone() noexcept {
-    return YmCtx::pIterDone();
-}
-
 _ym::CallBhvrCallbackInfo _ym::CallBhvrCallbackInfo::mk(YmCallBhvrCallbackFn fn, void* user) noexcept {
     ym::assertSafe(fn);
     return CallBhvrCallbackInfo{ .fn = fn, .user = user };

@@ -3,9 +3,10 @@
 #pragma once
 
 
+#include <format>
+#include <memory>
 #include <type_traits>
 #include <utility>
-#include <format>
 
 
 namespace ym {
@@ -107,6 +108,30 @@ namespace ym {
     {
         { v.try_lock() } -> std::convertible_to<bool>;
     };
+
+
+    // NOTE: This is gotten from the exposition-only concept on cppreference.
+    //          See https://cppreference.com/w/cpp/named_req/Allocator.html.
+
+    // Models C++ allocator types T.
+    template<typename T>
+    concept Allocator =
+        std::copy_constructible<T> &&
+        std::equality_comparable<T> &&
+        requires (T v, size_t n)
+    {
+        typename T::value_type;
+        { *v.allocate(n) } -> std::same_as<typename T::value_type&>;
+        // TODO: This feels like it should be noexcept, but all the cppreference stuff
+        //       on Allocator doesn't ever have it be noexcept.
+        { v.deallocate(v.allocate(n), n) };
+    };
+
+    // Models C++ allocator types T which allocate objects of type U.
+    template<typename T, typename U>
+    concept AllocatorOf =
+        Allocator<T> &&
+        std::same_as<typename T::value_type, U>;
 
 
     namespace detail {

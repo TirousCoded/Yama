@@ -64,13 +64,6 @@ namespace _ym {
         }
 
 
-        static void pIterStart(ym::Safe<YmCtx> ctx) noexcept;
-        static void pIterStartFrom(ym::Safe<YmCtx> ctx, ym::Safe<YmParcel> parcel) noexcept;
-        static void pIterAdvance(size_t n) noexcept;
-        static YmParcel* pIterGet() noexcept;
-        static bool pIterDone() noexcept;
-
-
     private:
         thread_local static ErrCallbackInfo _errCallbackInfo;
         static const std::regex _legalPathPattern, _legalFullnamePattern;
@@ -149,6 +142,17 @@ namespace _ym {
         ymAssert(aFirst <= aLast);
         ymAssert(bFirst <= bLast);
         return bFirst >= aFirst && bLast <= aLast;
+    }
+
+
+    // Returns a malloc allocated C-string containing txt.
+    inline ym::Safe<const YmChar> mkCStr(const YmChar* txt) {
+        ymAssert(txt != nullptr);
+        const auto len = std::strlen(txt);
+        auto result = ym::Safe<YmChar>(std::malloc(len + 1));
+        std::memcpy((void*)result, (void*)txt, len);
+        result[len] = '\0'; // Null-Terminator
+        return (ym::Safe<const YmChar>)result;
     }
 }
 

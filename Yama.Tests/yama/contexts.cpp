@@ -122,3 +122,44 @@ TEST(Contexts, FastPathLoadFns) {
     EXPECT_EQ(ymCtx_LdRune(ctx), ymCtx_Load(ctx, "yama:Rune"));
 }
 
+TEST(Contexts, NewNone) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdNone(ctx));
+}
+
+TEST(Contexts, NewInt) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewInt(ctx, -50));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdInt(ctx));
+    EXPECT_EQ(ymObj_ToInt(obj), -50);
+}
+
+TEST(Contexts, NewUInt) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewUInt(ctx, 50));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdUInt(ctx));
+    EXPECT_EQ(ymObj_ToUInt(obj), 50);
+}
+
+TEST(Contexts, NewFloat) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewFloat(ctx, 3.14159));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdFloat(ctx));
+    EXPECT_EQ(ymObj_ToFloat(obj), 3.14159);
+}
+
+TEST(Contexts, NewBool) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewBool(ctx, YM_TRUE));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdBool(ctx));
+    EXPECT_EQ(ymObj_ToBool(obj), YM_TRUE);
+}
+
+TEST(Contexts, NewRune) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewRune(ctx, U'y'));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdRune(ctx));
+    EXPECT_EQ(ymObj_ToRune(obj), U'y');
+}
+

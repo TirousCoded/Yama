@@ -3,14 +3,20 @@
 #include "YmCtx.h"
 
 #include "general.h"
+#include "SpecSolver.h"
+#include "YmObj.h"
 #include "YmParcel.h"
 #include "YmType.h"
-#include "SpecSolver.h"
 
 
 YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     domain(domain),
     loader(std::make_shared<_ym::CtxLoader>(domain->loader)) {}
+
+YmCtx::~YmCtx() noexcept {
+    ymAssert(objects == 0);
+    reset(); // Cleanup
+}
 
 std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
     if (auto s = _ym::Spec::path(path)) {
@@ -38,34 +44,64 @@ std::shared_ptr<YmType> YmCtx::load(const std::string& fullname) {
     }
 }
 
-void YmCtx::pIterStart(ym::Safe<YmCtx> ctx) noexcept {
-    _pIt = ctx->loader->commits().parcels.begin();
-    _pEnd = ctx->loader->commits().parcels.end();
+YmObj* YmCtx::create(YmType& type) {
+    objects++;
+    auto al = mas.allocator<int>();
+    ym::Safe result(_ym::ObjHAL::create(YmObj(*this, type), al));
+    result->refs.addRef();
+    ymAssert(result->refs.count() == 1);
+    return result;
 }
 
-void YmCtx::pIterStartFrom(ym::Safe<YmCtx> ctx, ym::Safe<YmParcel> parcel) noexcept {
-    _pIt = ctx->loader->commits().parcels.find(parcel->getName());
-    _pEnd = ctx->loader->commits().parcels.end();
+YmRefCount YmCtx::secure(YmObj& obj) {
+    return obj.refs.addRef();
 }
 
-void YmCtx::pIterAdvance(size_t n) noexcept {
-    for (size_t i = 0; i < n; i++) {
-        if (pIterDone()) return;
-        std::advance(_pIt, 1);
+YmRefCount YmCtx::release(YmObj& obj) {
+    auto old = obj.refs.drop();
+    if (old == 1) {
+        objects--;
+        auto al = mas.allocator<int>();
+        _ym::ObjHAL::destroy(obj, al);
     }
+    return old;
 }
 
-YmParcel* YmCtx::pIterGet() noexcept {
-    return
-        pIterDone()
-        ? nullptr
-        : &*_pIt;
+void YmCtx::reset() {
+    // TODO
 }
 
-bool YmCtx::pIterDone() noexcept {
-    return _pIt == _pEnd;
+ym::Safe<YmObj> YmCtx::newNone() {
+    return ym::Safe(create(loader->ldNone()));
 }
 
-thread_local _ym::Section<YmParcel>::Iterator YmCtx::_pIt = {};
-thread_local _ym::Section<YmParcel>::Iterator YmCtx::_pEnd = {};
+ym::Safe<YmObj> YmCtx::newInt(YmInt v) {
+    auto result = ym::Safe(create(loader->ldInt()));
+    result->slot(0).i = v;
+    return result;
+}
+
+ym::Safe<YmObj> YmCtx::newUInt(YmUInt v) {
+    auto result = ym::Safe(create(loader->ldUInt()));
+    result->slot(0).ui = v;
+    return result;
+}
+
+ym::Safe<YmObj> YmCtx::newFloat(YmFloat v) {
+    auto result = ym::Safe(create(loader->ldFloat()));
+    result->slot(0).f = v;
+    return result;
+}
+
+ym::Safe<YmObj> YmCtx::newBool(YmBool v) {
+    auto result = ym::Safe(create(loader->ldBool()));
+    result->slot(0).b = v;
+    return result;
+}
+
+ym::Safe<YmObj> YmCtx::newRune(YmRune v) {
+    auto result = ym::Safe(create(loader->ldRune()));
+    result->slot(0).r = v;
+    return result;
+}
 

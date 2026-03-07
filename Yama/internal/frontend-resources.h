@@ -8,4 +8,5 @@
 #include "../internal/YmParcelDef.h"
 #include "../internal/YmParcel.h"
 #include "../internal/YmType.h"
+#include "../internal/YmObj.h"
 

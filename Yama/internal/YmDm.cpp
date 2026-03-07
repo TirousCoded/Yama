@@ -17,3 +17,7 @@ bool YmDm::addRedirect(const std::string& subject, const std::string& before, co
     return loader->addRedirect(subject, before, after);
 }
 
+size_t YmDm::forEachParcel(YmForEachParcelCallbackFn callback, void* user) {
+    return loader->forEachParcel(callback, user, this);
+}
+

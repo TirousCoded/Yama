@@ -126,7 +126,7 @@ TEST(ScalarFormatting, UInt) {
 }
 
 TEST(ScalarFormatting, Float) {
-    // TODO: It's really hard to properly unit test ymFmtFloat, as it basically
+    // TODO: It's really hard to properly unit test ymFloat_Fmt, as it basically
     //       just wraps std::format, and its behaviour is hard for us to predict,
     //       since for any given float value, there's multiple equally valid ways
     //       of expressing it.
@@ -139,10 +139,10 @@ TEST(ScalarFormatting, Float) {
 }
 
 TEST(ScalarFormatting, Bool) {
-    ASSERT_TRUE(ymFmtBool(YM_TRUE));
-    ASSERT_TRUE(ymFmtBool(YM_FALSE));
-    EXPECT_STREQ(ymFmtBool(YM_TRUE), "true");
-    EXPECT_STREQ(ymFmtBool(YM_FALSE), "false");
+    ASSERT_TRUE(ymBool_Fmt(YM_TRUE));
+    ASSERT_TRUE(ymBool_Fmt(YM_FALSE));
+    EXPECT_STREQ(ymBool_Fmt(YM_TRUE), "true");
+    EXPECT_STREQ(ymBool_Fmt(YM_FALSE), "false");
 }
 
 TEST(ScalarFormatting, Rune) {
