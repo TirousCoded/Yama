@@ -27,7 +27,10 @@ void _ym::crash() noexcept {
     std::abort();
 }
 
-thread_local _ym::ErrCallbackInfo _ym::Global::_errCallbackInfo = {};
+thread_local _ym::ErrCallbackInfo _ym::Global::_errCallbackInfo = ErrCallbackInfo{
+    .fn = ymDefaultErrFn,
+    .user = nullptr,
+};
 
 const std::regex _ym::Global::_legalPathPattern = std::regex("[^/:]+(/[^/:]+)*");
 const std::regex _ym::Global::_legalFullnamePattern = std::regex("[^/:]+(/[^/:]+)*:[^/:]+(::[^/:]+)?");

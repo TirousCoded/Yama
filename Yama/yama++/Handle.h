@@ -19,6 +19,9 @@ namespace ym {
     template<typename T>
     class Handle {
     public:
+        using Resource = T;
+
+
         inline explicit Handle(Safe<T> resource) :
             _res(resource) {
         }
@@ -39,7 +42,7 @@ namespace ym {
 
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
-        inline operator T* () const noexcept { return get(); } // Implicit
+        //inline operator T* () const noexcept { return get(); } // Implicit
 
 
         // Dissociates the handle from its resource, invalidating the handle.
@@ -58,6 +61,9 @@ namespace ym {
     template<RefCountedRes T>
     class Handle<T> {
     public:
+        using Resource = T;
+
+
         // Does not increment the ref count of resource.
         inline explicit Handle(Safe<T> resource) noexcept :
             _res(resource) {
@@ -101,7 +107,7 @@ namespace ym {
 
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
-        inline operator T* () const noexcept { return get(); } // Implicit
+        //inline operator T* () const noexcept { return get(); } // Implicit
 
 
         // Dissociates the handle from its resource, invalidating the handle.

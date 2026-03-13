@@ -3,6 +3,9 @@
 #pragma once
 
 
+#include <format>
+#include <iostream>
+
 #include "Handle.h"
 #include "Parcel.h"
 
@@ -59,43 +62,46 @@ namespace ym {
 
 
         inline Parcel parcel() const noexcept {
-            return Parcel(Safe(ymType_Parcel(*this)));
+            return Parcel(Safe(ymType_Parcel(get())));
         }
         inline std::string_view fullname() const noexcept {
-            return ymType_Fullname(*this);
+            return ymType_Fullname(get());
+        }
+        inline std::string fmt() const {
+            return std::string(fullname());
         }
         inline YmKind kind() const noexcept {
-            return ymType_Kind(*this);
+            return ymType_Kind(get());
         }
         inline std::optional<Type> owner() const noexcept {
-            if (auto result = ymType_Owner(*this)) {
+            if (auto result = ymType_Owner(get())) {
                 return Type(Safe(result));
             }
             return std::nullopt;
         }
         inline YmMembers members() const noexcept {
-            return ymType_Members(*this);
+            return ymType_Members(get());
         }
         inline std::optional<Type> member(YmMemberIndex member) const noexcept {
-            if (auto result = ymType_MemberByIndex(*this, member)) {
+            if (auto result = ymType_MemberByIndex(get(), member)) {
                 return Type(Safe(result));
             }
             return std::nullopt;
         }
         inline std::optional<Type> member(std::convertible_to<std::string_view> auto const& name) const noexcept {
-            if (auto result = ymType_MemberByName(*this, std::string_view(name).data())) {
+            if (auto result = ymType_MemberByName(get(), std::string_view(name).data())) {
                 return Type(Safe(result));
             }
             return std::nullopt;
         }
         inline std::optional<Type> returnType() const noexcept {
-            if (auto result = ymType_ReturnType(*this)) {
+            if (auto result = ymType_ReturnType(get())) {
                 return Type(Safe(result));
             }
             return std::nullopt;
         }
         inline YmParams params() const noexcept {
-            return ymType_Params(*this);
+            return ymType_Params(get());
         }
         inline std::optional<Param> param(YmParamIndex index) const noexcept {
             return
@@ -104,13 +110,13 @@ namespace ym {
                 : std::nullopt;
         }
         inline std::optional<Type> ref(YmRef reference) const noexcept {
-            if (auto result = ymType_Ref(*this, reference)) {
+            if (auto result = ymType_Ref(get(), reference)) {
                 return Type(Safe(result));
             }
             return std::nullopt;
         }
         inline std::optional<YmRef> findRef(std::convertible_to<Safe<YmType>> auto const& referenced) const noexcept {
-            if (auto result = ymType_FindRef(*this, Safe<YmType>(referenced))) {
+            if (auto result = ymType_FindRef(get(), Safe<YmType>(referenced))) {
                 return result;
             }
             return std::nullopt;
@@ -125,6 +131,18 @@ namespace ym {
         std::convertible_to<Safe<YmType>> auto const& to,
         bool coercion = false) noexcept {
         return ymType_Converts(Safe<YmType>(from), Safe<YmType>(to), coercion) == YM_TRUE;
+    }
+}
+
+template<>
+struct std::formatter<ym::Type> : std::formatter<std::string> {
+    auto format(const ym::Type& x, format_context& ctx) const {
+        return formatter<string>::format(x.fmt(), ctx);
+    }
+};
+namespace std {
+    inline std::ostream& operator<<(std::ostream& stream, const ym::Type& x) {
+        return stream << x.fmt();
     }
 }
 

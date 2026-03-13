@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include <functional>
+
 #include "Handle.h"
 
 
@@ -28,7 +30,7 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& path,
             std::convertible_to<Safe<YmParcelDef>> auto const& parceldef) noexcept {
             return ymDm_BindParcelDef(
-                *this,
+                get(),
                 std::string_view(path).data(),
                 Safe<YmParcelDef>(parceldef)) == YM_TRUE;
         }
@@ -40,10 +42,32 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& before,
             std::convertible_to<std::string_view> auto const& after) noexcept {
             return ymDm_AddRedirect(
-                *this,
+                get(),
                 std::string_view(subject).data(),
                 std::string_view(before).data(),
                 std::string_view(after).data()) == YM_TRUE;
+        }
+
+        // TODO: Figure out how to optimize forEachParcel.
+
+        inline size_t forEachParcel(
+            YmForEachParcelCallbackFn x,
+            void* user) noexcept {
+            ymAssert(x != nullptr);
+            return ymDm_ForEachParcel(get(), x, user);
+        }
+        inline size_t forEachParcel(
+            const std::function<void(YmDm*, void*, YmParcel*, size_t, size_t)>& x) noexcept {
+            return forEachParcel([](
+                YmDm* dm,
+                void* user,
+                YmParcel* parcel,
+                size_t increment,
+                size_t total) {
+                    ymAssert(user != nullptr);
+                    (*(std::function<void(YmDm*, void*, YmParcel*, size_t, size_t)>*)user)(dm, nullptr, parcel, increment, total);
+                },
+                (void*)&x);
         }
     };
 }

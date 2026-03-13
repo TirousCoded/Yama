@@ -56,6 +56,7 @@ include "sandbox"
 
 include "Yama"
 include "Yama.Tests"
+include "Yama.Sandbox"
 --include "Yama.Examples"
 
 include "vendor/TAUL/taul" -- include just taul.lib part

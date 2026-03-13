@@ -50,6 +50,12 @@ extern "C" {
         const YmChar* msg,
         void* user);
 
+    /* The default YmErrCallbackFn used by Yama. */
+    void ymDefaultErrFn(
+        YmErrCode code,
+        const YmChar* msg,
+        void* user);
+
     /* TODO: ymSetErrCallback hasn't been unit tested. */
 
     /* Sets the error callback function, on a thread-local basis. */

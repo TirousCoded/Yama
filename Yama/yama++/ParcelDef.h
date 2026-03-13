@@ -28,8 +28,9 @@ namespace ym {
         inline std::optional<YmTypeIndex> addStruct(
             std::convertible_to<std::string_view> auto const& name) noexcept {
             if (auto result = ymParcelDef_AddStruct(
-                *this,
-                std::string_view(name).data())) {
+                get(),
+                std::string_view(name).data());
+                result != YM_NO_TYPE_INDEX) {
                 return result;
             }
             return std::nullopt;
@@ -37,8 +38,9 @@ namespace ym {
         inline std::optional<YmTypeIndex> addProtocol(
             std::convertible_to<std::string_view> auto const& name) noexcept {
             if (auto result = ymParcelDef_AddProtocol(
-                *this,
-                std::string_view(name).data())) {
+                get(),
+                std::string_view(name).data());
+                result != YM_NO_TYPE_INDEX) {
                 return result;
             }
             return std::nullopt;
@@ -50,11 +52,12 @@ namespace ym {
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddFn(
-                *this,
+                get(),
                 std::string_view(name).data(),
                 std::string_view(returnTypeSymbol).data(),
                 callBehaviour,
-                callBehaviourData)) {
+                callBehaviourData);
+                result != YM_NO_TYPE_INDEX) {
                 for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(result, name, typeSymbol);
                 }
@@ -70,15 +73,48 @@ namespace ym {
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddMethod(
-                *this,
+                get(),
                 owner,
                 std::string_view(name).data(),
                 std::string_view(returnTypeSymbol).data(),
                 callBehaviour,
-                callBehaviourData)) {
+                callBehaviourData);
+                result != YM_NO_TYPE_INDEX) {
                 for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(result, name, typeSymbol);
                 }
+                return result;
+            }
+            return std::nullopt;
+        }
+        inline std::optional<YmTypeIndex> addMethodReq(
+            YmTypeIndex owner,
+            std::convertible_to<std::string_view> auto const& name,
+            std::convertible_to<std::string_view> auto const& returnTypeSymbol,
+            const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols) noexcept {
+            if (auto result = ymParcelDef_AddMethodReq(
+                get(),
+                owner,
+                std::string_view(name).data(),
+                std::string_view(returnTypeSymbol).data());
+                result != YM_NO_TYPE_INDEX) {
+                for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
+                    addParam(result, name, typeSymbol);
+                }
+                return result;
+            }
+            return std::nullopt;
+        }
+        inline std::optional<YmTypeParamIndex> addTypeParam(
+            YmTypeIndex type,
+            std::convertible_to<std::string_view> auto const& name,
+            std::convertible_to<std::string_view> auto const& constraintTypeSymbol) noexcept {
+            if (auto result = ymParcelDef_AddTypeParam(
+                get(),
+                type,
+                std::string_view(name).data(),
+                std::string_view(constraintTypeSymbol).data());
+                result != YM_NO_TYPE_PARAM_INDEX) {
                 return result;
             }
             return std::nullopt;
@@ -88,10 +124,11 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& name,
             std::convertible_to<std::string_view> auto const& paramTypeSymbol) noexcept {
             if (auto result = ymParcelDef_AddParam(
-                *this,
+                get(),
                 type,
                 std::string_view(name).data(),
-                std::string_view(paramTypeSymbol).data())) {
+                std::string_view(paramTypeSymbol).data());
+                result != YM_NO_PARAM_INDEX) {
                 return result;
             }
             return std::nullopt;
@@ -100,9 +137,10 @@ namespace ym {
             YmTypeIndex type,
             std::convertible_to<std::string_view> auto const& symbol) noexcept {
             if (auto result = ymParcelDef_AddRef(
-                *this,
+                get(),
                 type,
-                std::string_view(symbol).data())) {
+                std::string_view(symbol).data());
+                result != YM_NO_REF) {
                 return result;
             }
             return std::nullopt;

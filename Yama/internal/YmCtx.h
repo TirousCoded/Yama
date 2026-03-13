@@ -29,7 +29,7 @@ public:
 
     const ym::Safe<YmDm> domain;
     const std::shared_ptr<_ym::CtxLoader> loader;
-	_ym::HeapMAS mas;
+	_ym::HeapMAS mas; // TODO: Replace later.
 
 
     YmCtx(ym::Safe<YmDm> domain);

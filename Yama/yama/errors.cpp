@@ -3,6 +3,7 @@
 #include "errors.h"
 
 #include "../internal/general.h"
+#include "../yama++/print.h"
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
@@ -26,6 +27,13 @@ const YmChar* ymFmtYmErrCode(YmErrCode code) {
     case YmErrCode_NonProtocolType:         return "NonProtocolType";
     case YmErrCode_InternalError:           return "InternalError";
     default:                                return "???";
+    }
+}
+
+void ymDefaultErrFn(YmErrCode code, const YmChar* msg, void* user) {
+    if (msg) {
+        // TODO: This doesn't output to stderr.
+        ym::println("{}", msg);
     }
 }
 
