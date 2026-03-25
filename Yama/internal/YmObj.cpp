@@ -41,6 +41,10 @@ bool YmObj::isRune() const noexcept {
 	return type == ctx->loader->ldRune();
 }
 
+bool YmObj::isType() const noexcept {
+	return type == ctx->loader->ldType();
+}
+
 std::optional<YmInt> YmObj::toInt() const noexcept {
 	return isInt() ? std::make_optional(slot(0).i) : std::nullopt;
 }
@@ -59,5 +63,9 @@ std::optional<YmBool> YmObj::toBool() const noexcept {
 
 std::optional<YmRune> YmObj::toRune() const noexcept {
 	return isRune() ? std::make_optional(slot(0).r) : std::nullopt;
+}
+
+YmType* YmObj::toType() const noexcept {
+	return isType() ? slot(0).type : nullptr;
 }
 

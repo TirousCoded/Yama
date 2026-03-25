@@ -26,6 +26,7 @@ public:
             YmFloat f;
             YmBool b;
             YmRune r;
+            YmType* type;
             YmObj* ref;
         };
     };
@@ -62,12 +63,14 @@ public:
     bool isFloat() const noexcept;
     bool isBool() const noexcept;
     bool isRune() const noexcept;
+    bool isType() const noexcept;
 
     std::optional<YmInt> toInt() const noexcept;
     std::optional<YmUInt> toUInt() const noexcept;
     std::optional<YmFloat> toFloat() const noexcept;
     std::optional<YmBool> toBool() const noexcept;
     std::optional<YmRune> toRune() const noexcept;
+    YmType* toType() const noexcept;
 };
 
 namespace _ym {

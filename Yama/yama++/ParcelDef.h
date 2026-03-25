@@ -17,11 +17,11 @@ namespace ym {
     class ParcelDef final : public Handle<YmParcelDef> {
     public:
         inline ParcelDef() :
-            ParcelDef(Safe(ymParcelDef_Create())) {
+            ParcelDef(Safe(ymParcelDef_Create()), false) {
         }
-        // Does not increment the ref count of resource.
-        inline explicit ParcelDef(Safe<YmParcelDef> resource) noexcept :
-            Handle(resource) {
+        // Increments resource's ref count if secure == true.
+        inline explicit ParcelDef(Safe<YmParcelDef> resource, bool secure) noexcept :
+            Handle(resource, secure) {
         }
 
 

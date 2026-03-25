@@ -19,9 +19,9 @@ namespace ym {
     // A RAII handle wrapping a YmObj.
     class Object final : public Handle<YmObj> {
     public:
-        // Does not increment the ref count of resource.
-        inline explicit Object(Safe<YmObj> resource) noexcept :
-            Handle(resource) {
+        // Increments resource's ref count if secure == true.
+        inline explicit Object(Safe<YmObj> resource, bool secure) noexcept :
+            Handle(resource, secure) {
         }
 
 
@@ -38,11 +38,46 @@ namespace ym {
             return result;
         }
 
-        inline YmInt toInt() const noexcept { return ymObj_ToInt(get()); }
-        inline YmUInt toUInt() const noexcept { return ymObj_ToUInt(get()); }
-        inline YmFloat toFloat() const noexcept { return ymObj_ToFloat(get()); }
-        inline YmBool toBool() const noexcept { return ymObj_ToBool(get()); }
-        inline YmRune toRune() const noexcept { return ymObj_ToRune(get()); }
+        inline std::optional<YmInt> toInt() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToInt(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(result)
+                : std::nullopt;
+        }
+        inline std::optional<YmUInt> toUInt() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToUInt(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(result)
+                : std::nullopt;
+        }
+        inline std::optional<YmFloat> toFloat() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToFloat(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(result)
+                : std::nullopt;
+        }
+        inline std::optional<YmBool> toBool() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToBool(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(result)
+                : std::nullopt;
+        }
+        inline std::optional<YmRune> toRune() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToRune(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(result)
+                : std::nullopt;
+        }
     };
 }
 

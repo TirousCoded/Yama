@@ -77,34 +77,103 @@ TEST(Objects, ToInt) {
     SETUP_ALL(ctx);
     SETUP_OBJ(obj, ymCtx_NewInt(ctx, -50));
     ASSERT_EQ(ymObj_Type(obj), ymCtx_LdInt(ctx));
-    EXPECT_EQ(ymObj_ToInt(obj), -50);
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToInt(obj, &success), -50);
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToInt_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToInt(obj, &success), 0);
+    EXPECT_EQ(success, YM_FALSE);
 }
 
 TEST(Objects, ToUInt) {
     SETUP_ALL(ctx);
     SETUP_OBJ(obj, ymCtx_NewUInt(ctx, 50));
     ASSERT_EQ(ymObj_Type(obj), ymCtx_LdUInt(ctx));
-    EXPECT_EQ(ymObj_ToUInt(obj), 50);
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToUInt(obj, &success), 50);
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToUInt_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToUInt(obj, &success), 0);
+    EXPECT_EQ(success, YM_FALSE);
 }
 
 TEST(Objects, ToFloat) {
     SETUP_ALL(ctx);
     SETUP_OBJ(obj, ymCtx_NewFloat(ctx, 3.14159));
     ASSERT_EQ(ymObj_Type(obj), ymCtx_LdFloat(ctx));
-    EXPECT_EQ(ymObj_ToFloat(obj), 3.14159);
+    YmBool success{};
+    EXPECT_DOUBLE_EQ(ymObj_ToFloat(obj, &success), 3.14159);
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToFloat_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_DOUBLE_EQ(ymObj_ToFloat(obj, &success), 0.0);
+    EXPECT_EQ(success, YM_FALSE);
 }
 
 TEST(Objects, ToBool) {
     SETUP_ALL(ctx);
     SETUP_OBJ(obj, ymCtx_NewBool(ctx, YM_TRUE));
     ASSERT_EQ(ymObj_Type(obj), ymCtx_LdBool(ctx));
-    EXPECT_EQ(ymObj_ToBool(obj), YM_TRUE);
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToBool(obj, &success), YM_TRUE);
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToBool_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToBool(obj, &success), YM_FALSE);
+    EXPECT_EQ(success, YM_FALSE);
 }
 
 TEST(Objects, ToRune) {
     SETUP_ALL(ctx);
     SETUP_OBJ(obj, ymCtx_NewRune(ctx, U'y'));
     ASSERT_EQ(ymObj_Type(obj), ymCtx_LdRune(ctx));
-    EXPECT_EQ(ymObj_ToRune(obj), U'y');
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToRune(obj, &success), U'y');
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToRune_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToRune(obj, &success), U'\0');
+    EXPECT_EQ(success, YM_FALSE);
+}
+
+TEST(Objects, ToType) {
+    SETUP_ALL(ctx);
+    auto t = ymCtx_LdInt(ctx);
+    ASSERT_TRUE(t);
+    SETUP_OBJ(obj, ymCtx_NewType(ctx, t));
+    ASSERT_EQ(ymObj_Type(obj), ymCtx_LdType(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToType(obj, &success), t);
+    EXPECT_EQ(success, YM_TRUE);
+}
+
+TEST(Objects, ToType_Failure) {
+    SETUP_ALL(ctx);
+    SETUP_OBJ(obj, ymCtx_NewNone(ctx));
+    YmBool success{};
+    EXPECT_EQ(ymObj_ToType(obj, &success), nullptr);
+    EXPECT_EQ(success, YM_FALSE);
 }
 

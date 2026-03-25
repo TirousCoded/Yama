@@ -353,8 +353,46 @@ extern "C" {
     YmBool ymKind_HasMembers(YmKind x);
 
 
+    /* NOTE: By default, Yama frontend API fns work w/ ref counts according to Python rules.
+    *           * See: https://docs.python.org/3/extending/extending.html#reference-counts
+    * 
+    *        When passing objects as arguments to API fns, any ref count increments
+    *        the end-user was responsible for will, by default, remain the resonsibility
+    *        of the end-user to release (ie. ownership of said references does not get
+    *        transferred to the API.)
+    * 
+    *        When receiving objects as return values from API calls, one ref count increment
+    *        will be made by the API, by default, and it becomes the end-user's responsibility
+    *        to release it (ie. ownership is transferred to the end-user.)
+    * 
+    *        If an API fn does NOT perform an increment which becomes end-user's responsibility,
+    *        the end-user is said to be given a 'borrowed' reference, w/ this being stated
+    *        explicitly by the API fn.
+    * 
+    *        If an API fn is said to 'steal' a reference, it means that a ref count increment
+    *        of an argument object becomes the Yama backend's responsibility to release, and
+    *        is thus no longer the end-user's.
+    */
+
     /* Reference Count */
     typedef YmUInt32 YmRefCount;
+
+    /* TODO: I gave up trying to write good descriptions for YmRefPolicy_[Borrow|Take], so do try and get that
+    *        done at some point, as properly explaining them is really important.
+    */
+    /* TODO: For 'take', maybe mention that if receiver is end-user, the Yama API impl may choose to give them
+    *        a copy of a ref, rather than actually losing ownership.
+    */
+
+    /* YmRefPolicy specifies how ref ownership does/doesn't change for refs passed-to/received-from Yama API call */
+    /* via arguments/return values. */
+    typedef enum : YmUInt8 {
+        YmRefPolicy_Borrow,
+        YmRefPolicy_Take,
+    } YmRefPolicy;
+
+#define YM_BORROW (YmRefPolicy_Borrow)
+#define YM_TAKE (YmRefPolicy_Take)
 
 
     /* TODO: Maybe do this aliasing for ALL (more or less) of our C-strings.
@@ -435,10 +473,43 @@ extern "C" {
 #define YM_MAX_PARAMS (YmParams(24))
 
 
+    /* NOTE: At the base of the call stack is a special 'user' call frame.
+    * 
+    *        The user pseudo-call defines the context inside which all operations performed
+    *        outside the context of a fn call are performed. Essentially, said operations
+    *        are treated as occurring within the environment of a pseudo-call fn which
+    *        takes no arguments, and never returns.
+    */
+
+    /* The number of call frames on a call stack. */
+    typedef YmUInt32 YmCallStackHeight;
+
+    /* TODO: Replace YM_MAX_CALL_STACK_HEIGHT w/ something more dynamic later.
+    */
+
+    /* Maximum call stack height before stack overflow. */
+#define YM_MAX_CALL_STACK_HEIGHT 100;
+
+
+    /* Index of an object on a local object stack. */
+    typedef YmUInt32 YmLocal;
+
+    /* Height of a local object stack. */
+    typedef YmLocal YmLocals;
+
+    /* Sentinel index used to tell the system to, when putting an object into a local index, push to */
+    /* a new top stack index rather than putting into an existing index. */
+#define YM_NEWTOP (YmLocal(-1))
+
+    /* Sentinel index used to tell the system to, when putting an object into a local index, instead */
+    /* discard it, releasing its ref. */
+#define YM_DISCARD (YmLocal(-2))
+
+
     /* A callback function used to perform call behaviour (ie. of a fn/method/etc.) */
     /* ctx is the context the call behaviour is to be executed with, and is guaranteed to not be YM_NIL. */
     /* user is a pointer used to expose callback function to external data. */
-    typedef void (*YmCallBhvrCallbackFn)(
+    typedef void(*YmCallBhvrCallbackFn)(
         struct YmCtx* ctx,
         void* user);
 
@@ -449,7 +520,6 @@ extern "C" {
     /* Domain API */
 
     /* Creates a new Yama domain, returning a pointer to it. */
-    /* The new domain will start off with a ref count of 1. */
     struct YmDm* ymDm_Create(void);
 
     /* Increments the ref count of domain dm. */
@@ -562,7 +632,6 @@ extern "C" {
     /* Context API */
 
     /* Creates a new Yama context, returning a pointer to it. */
-    /* The new context will start off with a ref count of 1. */
     /* domain is the Yama domain the context is to be associated with. */
     /* Behaviour is undefined if domain is invalid. */
     struct YmCtx* ymCtx_Create(struct YmDm* dm);
@@ -581,8 +650,7 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     YmRefCount ymCtx_RefCount(struct YmCtx* ctx);
 
-    /* Returns the Yama domain associated with ctx. */
-    /* Does not increment the returned domain's ref count. */
+    /* Returns a *borrowed* ref to the Yama domain associated with ctx. */
     /* Behaviour is undefined if ctx is invalid. */
     struct YmDm* ymCtx_Dm(struct YmCtx* ctx);
 
@@ -622,6 +690,10 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     struct YmType* ymCtx_LdRune(struct YmCtx* ctx);
 
+    /* Quickly loads yama:Type. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmType* ymCtx_LdType(struct YmCtx* ctx);
+
     /* TODO: Better explain the specifics of why naturalization is needed.
     * 
     *        Explain that it's needed to legally use parcel/type ptrs across
@@ -641,38 +713,167 @@ extern "C" {
     /* Behaviour is undefined if type is invalid. */
     void ymCtx_NaturalizeType(struct YmCtx* ctx, struct YmType* type);
 
+    /* TODO: When we add finalizers, we'll need to account for the fact that they can arise from, for
+    *        example, API fns like ymCtx_NewInt. This means that we'd likely be best to do something
+    *        like having finalizer calls behave as 'try-calls', meaning that panics arising therein
+    *        do not propagate outside the finalizer call.
+    *           * Still not 100% sure about this, but w/ finalizers being something where a Javascript
+    *             cross-compilation of Yama would likely have them flat-out disabled, this seems like
+    *             a reasonable compromise to me.
+    *           * If we do this, perhaps it'd be best to let end-user bind a special finalizer panic
+    *             handler callback to let them do something in response to a finalizer panicking.
+    */
+    /* TODO: Also, when we add things like finalizers, we'll need unit tests for things like context
+    *        deinitialization/reset, w/ these testing that finalization behaviour is observed for all
+    *        existing objects at the point of deinit/reset to confirm their destruction.
+    */
+    /* TODO: When we add panicking, we'll need to update API fns which can invoke Yama code and panic,
+    *        so that their doc comments describe this and tell end-user to check for panic.
+    */
+    /* TODO: Finish adding panic stuff later.
+    */
+
+    /* TODO */
+    void ymCtx_Panic(struct YmCtx* ctx, const YmChar* fmt, ...);
+
+    /* TODO */
+    void ymCtx_Recover(struct YmCtx* ctx);
+
+    /* TODO: This'll both check for panic, and query error msg.
+    */
+
+    /* TODO */
+    const YmChar* ymCtx_GetPanic(struct YmCtx* ctx);
+
     /* TODO: Add 'immortalization' (ie. like Python) at some point.
     */
 
     /* Instantiates a new yama:None. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewNone(struct YmCtx* ctx);
+    struct YmObj* ymCtx_NewNone(struct YmCtx* ctx);
 
     /* Instantiates a new yama:Int. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewInt(struct YmCtx* ctx, YmInt v);
+    struct YmObj* ymCtx_NewInt(struct YmCtx* ctx, YmInt v);
 
     /* Instantiates a new yama:UInt. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewUInt(struct YmCtx* ctx, YmUInt v);
+    struct YmObj* ymCtx_NewUInt(struct YmCtx* ctx, YmUInt v);
 
     /* Instantiates a new yama:Float. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewFloat(struct YmCtx* ctx, YmFloat v);
+    struct YmObj* ymCtx_NewFloat(struct YmCtx* ctx, YmFloat v);
 
     /* Instantiates a new yama:Bool. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewBool(struct YmCtx* ctx, YmBool v);
+    struct YmObj* ymCtx_NewBool(struct YmCtx* ctx, YmBool v);
 
     /* Instantiates a new yama:Rune. */
-    /* The new object will start off with a ref count of 1. */
     /* Behaviour is undefined if ctx is invalid. */
-    YmObj* ymCtx_NewRune(struct YmCtx* ctx, YmRune v);
+    struct YmObj* ymCtx_NewRune(struct YmCtx* ctx, YmRune v);
+
+    /* Instantiates a new yama:Type. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if v is invalid. */
+    struct YmObj* ymCtx_NewType(struct YmCtx* ctx, struct YmType* v);
+
+    /* Returns the height of the call stack. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmCallStackHeight ymCtx_CallStackHeight(struct YmCtx* ctx);
+
+    /* TODO: When we add this, take advantage of how (mutually) recursive fn calls vary often
+    *        result in sections of the call stack repeating identically over-and-over again.
+    * 
+    *        We can take advantage of this by having the output text say, basically "the above
+    *        N call frames repeat M times", rather than literally repeating them over-and-over.
+    *           * Only do this if ALL debug details are identical!
+    * 
+    *        This could greatly help debug recursive code.
+    */
+
+    /* Returns a formatted string representation of the call stack. */
+    /* skip specifies how many of the top call frames of the call stack should be ignored. */
+    /* The returned string memory must be cleaned up by the end-user via free. */
+    /* Behaviour is undefined if ctx is invalid. */
+    const YmChar* ymCtx_FmtCallStack(struct YmCtx* ctx, YmCallStackHeight skip);
+
+    /* Returns the number of arguments passed to the current call. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmUInt16 ymCtx_Args(struct YmCtx* ctx);
+
+    /* Returns a reference to the object at which in the argument array, or YM_NIL on failure. */
+    /* returnPolicy dictates if a borrowed or taken ref is returned. */
+    /* Fails quietly if which is out-of-bounds. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmObj* ymCtx_Arg(struct YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy);
+
+    /* Returns the height of the current object stack. */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmLocals ymCtx_Locals(struct YmCtx* ctx);
+    
+    /* Returns a reference to the object at where in the current object stack, or YM_NIL on failure. */
+    /* returnPolicy dictates if a borrowed or taken ref is returned. */
+    /* Fails quietly if where is out-of-bounds. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmObj* ymCtx_Local(struct YmCtx* ctx, YmLocal where, YmRefPolicy returnPolicy);
+
+    /* Pops the top n objects from the current local object stack. */
+    /* Stops prematurely if the stack is emptied. */
+    /* Behaviour is undefined if ctx is invalid. */
+    void ymCtx_PopN(struct YmCtx* ctx, YmLocals n);
+    
+    /* Pops the top object from the local object stack, returning it, or YM_NIL on failure. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmObj* ymCtx_Pop(struct YmCtx* ctx);
+
+    /* TODO: At some point we'll need a max limit on object stack (either limit per-call frame,
+    *        or of the global stack all call frame object stacks are allocated w/.)
+    * 
+    *        To this end, we'll need ymCtx_Put and other fns to have checks for this stuff.
+    */
+
+    /* Loads what into the current local object stack object at where, returning if successful. */
+    /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
+    /* Pushes to the stack if where == YM_NEWTOP. */
+    /* Does nothing to the stack if where == YM_DISCARD. */
+    /* Fails if where is out-of-bounds (ie. where == YM_[NEWTOP|DISCARD] notwithstanding.) */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if what is invalid. */
+    YmBool ymCtx_Put(struct YmCtx* ctx, YmLocal where, struct YmObj* what, YmRefPolicy whatPolicy);
+
+    YmBool ymCtx_PutNone(struct YmCtx* ctx, YmLocal where);
+    YmBool ymCtx_PutInt(struct YmCtx* ctx, YmLocal where, YmInt v);
+    YmBool ymCtx_PutUInt(struct YmCtx* ctx, YmLocal where, YmUInt v);
+    YmBool ymCtx_PutFloat(struct YmCtx* ctx, YmLocal where, YmFloat v);
+    YmBool ymCtx_PutBool(struct YmCtx* ctx, YmLocal where, YmBool v);
+    YmBool ymCtx_PutRune(struct YmCtx* ctx, YmLocal where, YmRune v);
+    YmBool ymCtx_PutType(struct YmCtx* ctx, YmLocal where, struct YmType* v);
+
+    /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
+    */
+
+    /* Performs a call to fn, passing top argsN stack objects as args, writing return value to returnTo. */
+    /* The passed arg objects are consumed from the stack after the call (and before writing to returnTo.) */
+    /* The passed arg objects are not consumed on failure. */
+    /* Pushes to the stack if where == YM_NEWTOP. */
+    /* Discards result of call, writing nothing, if where == YM_DISCARD. */
+    /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
+    /* Fails if fn is not a callable type. */
+    /* Fails if argsN is the wrong number of args. */
+    /* Fails if argsN exceeds the height of the local object stack. */
+    /* Fails if arg objects are the wrong types. */
+    /* Fails if no return value object bound (by call behaviour.) */
+    /* Fails if return value object is the wrong type. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if fn is invalid. */
+    YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, YmLocal returnTo);
+
+    /* Binds what as the return value of the current call, overwriting existing bindings. */
+    /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
+    /* Fails quietly if in the user call frame. */
+    /* Fails quietly if what == YM_NIL. */
+    /* Behaviour is undefined if ctx is invalid. */
+    void ymCtx_Ret(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
 
 
     /* Parcel Def. API */
@@ -682,7 +883,6 @@ extern "C" {
     */
 
     /* Creates a new Yama parcel def., returning a pointer to it. */
-    /* The new parcel def. will start off with a ref count of 1. */
     struct YmParcelDef* ymParcelDef_Create(void);
 
     /* Increments the ref count of parcel def. parceldef. */
@@ -978,30 +1178,35 @@ extern "C" {
     *        on if it can be COERCED into a yama:Int, if it isn't one already.
     */
 
-    /* Extracts an int value from object obj. */
+    /* Extracts an int value from object obj, or 0 on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
     /* Behaviour is undefined if obj is invalid. */
-    /* Behaviour is undefined if an int cannot be extracted. */
-    YmInt ymObj_ToInt(struct YmObj* obj);
+    YmInt ymObj_ToInt(struct YmObj* obj, YmBool* succeeded);
 
-    /* Extracts an uint value from object obj. */
+    /* Extracts an uint value from object obj, or 0 on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
     /* Behaviour is undefined if obj is invalid. */
-    /* Behaviour is undefined if a uint cannot be extracted. */
-    YmUInt ymObj_ToUInt(struct YmObj* obj);
+    YmUInt ymObj_ToUInt(struct YmObj* obj, YmBool* succeeded);
 
-    /* Extracts an float value from object obj. */
+    /* Extracts an float value from object obj, or 0.0 on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
     /* Behaviour is undefined if obj is invalid. */
-    /* Behaviour is undefined if a float cannot be extracted. */
-    YmFloat ymObj_ToFloat(struct YmObj* obj);
+    YmFloat ymObj_ToFloat(struct YmObj* obj, YmBool* succeeded);
 
-    /* Extracts an bool value from object obj. */
+    /* Extracts an bool value from object obj, or YM_FALSE on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
     /* Behaviour is undefined if obj is invalid. */
-    /* Behaviour is undefined if a bool cannot be extracted. */
-    YmBool ymObj_ToBool(struct YmObj* obj);
+    YmBool ymObj_ToBool(struct YmObj* obj, YmBool* succeeded);
 
-    /* Extracts an rune value from object obj. */
+    /* Extracts an rune value from object obj, or U'\0' on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
     /* Behaviour is undefined if obj is invalid. */
-    /* Behaviour is undefined if a rune cannot be extracted. */
-    YmRune ymObj_ToRune(struct YmObj* obj);
+    YmRune ymObj_ToRune(struct YmObj* obj, YmBool* succeeded);
+
+    /* Extracts a type value from object obj, or YM_NIL on failure. */
+    /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
+    /* Behaviour is undefined if obj is invalid. */
+    struct YmType* ymObj_ToType(struct YmObj* obj, YmBool* succeeded);
 
 
     /* Internals */

@@ -17,11 +17,11 @@ namespace ym {
     class Domain final : public Handle<YmDm> {
     public:
         inline Domain() :
-            Domain(Safe(ymDm_Create())) {
+            Domain(Safe(ymDm_Create()), false) {
         }
-        // Does not increment the ref count of resource.
-        inline explicit Domain(Safe<YmDm> resource) noexcept :
-            Handle(resource) {
+        // Increments resource's ref count if secure == true.
+        inline explicit Domain(Safe<YmDm> resource, bool secure) noexcept :
+            Handle(resource, secure) {
         }
 
 

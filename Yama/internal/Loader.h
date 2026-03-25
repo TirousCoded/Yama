@@ -112,6 +112,7 @@ namespace _ym {
         YmType& ldFloat() const noexcept;
         YmType& ldBool() const noexcept;
         YmType& ldRune() const noexcept;
+        YmType& ldType() const noexcept;
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
@@ -123,7 +124,7 @@ namespace _ym {
 
     private:
         struct _Builtins final {
-            ym::Safe<YmType> none, int0, uint, float0, bool0, rune;
+            ym::Safe<YmType> none, int0, uint, float0, bool0, rune, type;
         };
 
 

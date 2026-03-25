@@ -21,6 +21,21 @@ int32_t main(int32_t argc, char** argv) {
         ymInertCallBhvrFn
     ).value();
     (void)p_def.addTypeParam(identity_ind, "T", "yama:Any").value();
+    (void)p_def.addFn(
+        "recurse",
+        "yama:None",
+        { { "level", "yama:UInt" } },
+        [](YmCtx* ctx_, void*) {
+            auto ctx = ym::Context(ym::Safe<YmCtx>(ctx_), true);
+            ctx.ret(ctx.newNone());
+            auto n = ctx.arg(0).value().toUInt().value();
+            ym::println("recurse({})\n{}", n, ctx.callStack());
+            if (n > 1) {
+                ctx.pushUInt(n - 1);
+                ctx.calld(ctx.load("p:recurse").value(), 1);
+            }
+            ctx.disown();
+        }).value();
 
     ym::ParcelDef a_def{};
     auto A_ind = a_def.addStruct("A").value();
@@ -57,6 +72,12 @@ int32_t main(int32_t argc, char** argv) {
         size_t total) {
             ym::println("-- {}", ym::Parcel(*parcel));
         });
+
+    ctx.pushUInt(10);
+    ctx.calld(ctx.load("p:recurse").value(), 1);
+
+#error figure out how to fix UX issue w/ YmRef(s), as right now we don't really
+#error have a good way to send YmType*(s) into fn bodies
 
     return 0;
 }

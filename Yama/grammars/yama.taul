@@ -1,0 +1,241 @@
+
+
+# Yama Grammar
+
+
+# (Yama Escape Sequences)
+# 
+#   \0              <- Null
+#   \a				<- Bell (Alert)
+#   \b				<- Backspace
+#   \f				<- Form Feed
+#   \n				<- New Line
+#   \r				<- Carriage Return
+#   \t				<- Horizontal Tab
+#   \v				<- Vertical Tab
+#   \'				<- Single Quotation
+#   \"				<- Double Quotation
+#   \\				<- Backslash
+#   \xhh			<- Hex Literal (8-bit)
+#   \uhhhh          <- Hex Literal (16-bit)
+#   \Uhhhhhhhh      <- Hex Literal (32-bit)
+
+# Escaped characters which do not form any of the above are *literalized*,
+# meaning the opening '\' is simply removed.
+
+# Yama doesn't support octal literal escape sequences.
+
+# Yama hex literal escape sequences are *case-insensitive*.
+
+# Yama hex literals which are malformed are interpreted as literalized 'x'.
+
+
+# (Yama Floating Point Format)
+
+# Yama floats are designed to take (almost) all forms C++/std::format 
+# float take.
+
+# Yama floats expressing regular and subnormal values take the forms:
+
+#       <integer> . <fraction>                  (eg. 3.14159)
+#       <integer> . <fraction> e <exponent>     (eg. 12.3e-4 or 1.2e13)
+#       . <fraction>                            (eg. .312)
+#       . <fraction> e <exponent>               (eg. .314159e1)
+#       <integer> e <exponent>                  (eg. 314159e-5)
+
+# Yama floats may take the following additional form, however, this
+# form is not allowed in Yama language lexing due to how it would
+# interfere w/ Yama integer lexing:
+
+#       <integer>                               (eg. 3)
+
+# The above form is allowed as the output of functions like yama::fmt_float,
+# and can be parsed by functions like yama::parse_float.
+
+# Yama float infinity and NaN take the forms:
+
+#       inf
+#       nan
+
+# The below two forms are, however, not allowed due to how they interfere 
+# w/ member access syntax.
+
+#       <integer> .                             (eg. 3.)
+#       <integer> . e <exponent>                (eg. 3.e-2)
+
+
+lexer section:
+
+
+    # EOW ('End Of Word') is used to specify that no further letters/digits/underscores
+    # may appear following a given token.
+
+    support EOW                     : -[0-9a-zA-Z_] | end ;
+
+
+    # Keywords
+
+    TRUE                            : 'true' EOW ;
+    FALSE                           : 'false' EOW ;
+    INF                             : 'inf' EOW ;
+    NAN                             : 'nan' EOW ;
+    SELF                            : 'Self' EOW ;
+    CONST                           : 'const' EOW ;
+    VAR                             : 'var' EOW ;
+    FN                              : 'fn' EOW ;
+    STRUCT                          : 'struct' EOW ;
+    IF                              : 'if' EOW ;
+    ELSE                            : 'else' EOW ;
+    LOOP                            : 'loop' EOW ;
+    BREAK                           : 'break' EOW ;
+    CONTINUE                        : 'continue' EOW ;
+    RETURN                          : 'return' EOW ;
+    IMPORT                          : 'import' EOW ;
+
+
+    # General
+
+    IDENTIFIER                      : [a-zA-Z_] [0-9a-zA-Z_]* ;
+
+    # NOTE: Negation of int/float values will be done via prefixing w/ a MINUS.
+    # NOTE: Putting FLOAT before [U]INT_[DEC|HEX|BIN] as the ladder will mess up the former otherwise.
+    # NOTE: 'inf' and 'nan' float values are handled via INF and NAN keywords, not FLOAT tokens.
+
+    # TODO: Maybe add a warning for if string/char literal contains invisible chars.
+
+    support DIGITS_DEC              : [0-9] ( '_'? [0-9] )* ;
+    support DIGITS_HEX              : [0-9a-fA-F] ( '_'? [0-9a-fA-F] )* ;
+    support DIGITS_BIN              : [01] ( '_'? [01] )* ;
+
+    support EXPONENT                : 'e' [+\-]? DIGITS_DEC ;
+
+    FLOAT                           : '-'? ( DIGITS_DEC ( '.' DIGITS_DEC EXPONENT? | EXPONENT ) | '.' DIGITS_DEC EXPONENT? ) EOW ;
+    INT_DEC                         : '-'? DIGITS_DEC EOW ;
+    INT_HEX                         : '-'? '0x' DIGITS_HEX EOW ;
+    INT_BIN                         : '-'? '0b' DIGITS_BIN EOW ;
+    UINT_DEC                        : DIGITS_DEC 'u' EOW ;
+    UINT_HEX                        : '0x' DIGITS_HEX 'u' EOW ;
+    UINT_BIN                        : '0b' DIGITS_BIN 'u' EOW ;
+    CHAR                            : '\'' ( '\\' any | ~[\'\\] )* '\'' ;
+    
+
+    # Operators & Punctuation
+
+    R_ARROW                         : '->' ;
+
+    #MINUS                           : '-' ;
+    
+    ASSIGN                          : '=' ;
+
+    L_ROUND                         : '(' ;
+    R_ROUND                         : ')' ;
+    L_SQUARE                        : '[' ;
+    R_SQUARE                        : ']' ;
+    L_CURLY                         : '{' ;
+    R_CURLY                         : '}' ;
+
+    DOT                             : '.' ;
+    COMMA                           : ',' ;
+    DBL_COLON                       : '::' ;
+    COLON                           : ':' ;
+    SEMI                            : ';' ;
+
+
+    # Whitespace & Comments
+
+    skip WHITESPACE                 : [ \t]+ ;
+    skip NEWLINE                    : '\n' | '\r' '\n'? ;
+
+    #skip DOC_COMMENT                : '///' ~[\r\n]* ;
+    skip SL_COMMENT                 : '//' ~[\r\n]* ;
+
+
+parser section:
+
+
+    Chunk                           : Decl* end ;
+
+    # NOTE: Decl excludes ParamDecl as it is introduced in a unique way.
+
+    Decl                            : ImportDecl
+                                    | VarDecl
+                                    | FnDecl
+                                    | StructDecl
+                                    ;
+
+    ImportDecl                      : IMPORT IDENTIFIER ( COLON IDENTIFIER )? RelativePath? SEMI ;
+    RelativePath                    : ( DOT IDENTIFIER )+ ;
+
+    # NOTE: VarDecl is for specifying local and non-local variables.
+    # NOTE: FnDecl is used generally for fn-like things (fns, methods, etc.)
+
+    VarDecl                         : VAR IDENTIFIER TypeAnnot? Assign? SEMI ;
+    FnDecl                          : FN IDENTIFIER ( DBL_COLON IDENTIFIER )? CallSig Block ;
+    StructDecl                      : STRUCT IDENTIFIER L_CURLY R_CURLY ;
+
+    CallSig                         : L_ROUND ( ParamDecl ( COMMA ParamDecl )* )? R_ROUND Result? ;
+    ParamDecl                       : IDENTIFIER TypeAnnot? ;
+    Result                          : R_ARROW TypeSpec ;
+
+    Block                           : L_CURLY Stmt* R_CURLY ;
+
+    # NOTE: Certain statements (ie. assignment) are parsed as exprs, due to
+    #       how their syntax would otherwise be ambiguous w/ them.
+
+    Stmt                            : Decl
+                                    | ExprStmt
+                                    | IfStmt
+                                    | LoopStmt
+                                    | BreakStmt
+                                    | ContinueStmt
+                                    | ReturnStmt
+                                    ;
+
+    ExprStmt                        : Expr Assign? SEMI ;               # expr/assign stmt
+    IfStmt                          : IF L_ROUND Expr R_ROUND Block ( ELSE ( Block | IfStmt ) )? ;
+    LoopStmt                        : LOOP Block ;
+    BreakStmt                       : BREAK SEMI ;
+    ContinueStmt                    : CONTINUE SEMI ;
+    ReturnStmt                      : RETURN Expr? SEMI ;
+
+    precedence Expr                 : Expr Args                         # call-like expr
+                                    | Expr DBL_COLON TypeMember         # type member access expr
+                                    | Expr DOT
+                                        ( ObjectMember                  # object member access expr
+                                        | Conv                          # conversion expr
+                                        )
+                                    | OwnerTypeExpr                     # owner type expr
+                                    | ConstexprGuaranteeExpr            # constexpr guarantee expr
+                                    | ParenthesizedExpr                 # parenthesized expr
+                                    | PrimaryExpr                       # primary expr
+                                    ;
+
+    PrimaryExpr                     : IDENTIFIER ( COLON IDENTIFIER )?  # identifier expr
+                                    | Lit                               # literal expr
+                                    ;
+    ParenthesizedExpr               : L_ROUND Expr R_ROUND ;
+    ConstexprGuaranteeExpr          : CONST L_ROUND Expr R_ROUND ;
+    OwnerTypeExpr                   : SELF ;
+
+    Lit                             : IntLit
+                                    | UIntLit
+                                    | FloatLit
+                                    | BoolLit
+                                    | CharLit
+                                    ;
+    
+    IntLit                          : INT_DEC | INT_HEX | INT_BIN ;
+    UIntLit                         : UINT_DEC | UINT_HEX | UINT_BIN ;
+    FloatLit                        : FLOAT | INF | NAN ;
+    BoolLit                         : TRUE | FALSE ;
+    CharLit                         : CHAR ;
+
+    Assign                          : ASSIGN Expr ;
+    Args                            : L_ROUND ( Expr ( COMMA Expr )* )? R_ROUND ;
+    Conv                            : L_SQUARE Expr R_SQUARE ;
+    TypeMember                      : IDENTIFIER ;
+    ObjectMember                    : IDENTIFIER ;
+
+    TypeAnnot                       : COLON TypeSpec ;
+    TypeSpec                        : Expr ;
+

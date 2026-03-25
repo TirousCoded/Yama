@@ -42,7 +42,7 @@ namespace ym {
 
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
-        //inline operator T* () const noexcept { return get(); } // Implicit
+        inline explicit operator T* () const noexcept { return get(); } // Implicit
 
 
         // Dissociates the handle from its resource, invalidating the handle.
@@ -64,9 +64,12 @@ namespace ym {
         using Resource = T;
 
 
-        // Does not increment the ref count of resource.
-        inline explicit Handle(Safe<T> resource) noexcept :
+        // Increments resource's ref count if secure == true.
+        inline explicit Handle(Safe<T> resource, bool secure) noexcept :
             _res(resource) {
+            if (secure) {
+                ym::secure(resource);
+            }
         }
 
         inline virtual ~Handle() noexcept {
@@ -107,7 +110,7 @@ namespace ym {
 
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
-        //inline operator T* () const noexcept { return get(); } // Implicit
+        inline explicit operator T* () const noexcept { return get(); } // Implicit
 
 
         // Dissociates the handle from its resource, invalidating the handle.

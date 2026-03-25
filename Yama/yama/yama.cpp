@@ -156,6 +156,10 @@ YmType* ymCtx_LdRune(YmCtx* ctx) {
     return &Safe(ctx)->loader->ldRune();
 }
 
+YmType* ymCtx_LdType(YmCtx* ctx) {
+    return &Safe(ctx)->loader->ldType();
+}
+
 void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
     assertSafe(ctx);
     assertSafe(parcel);
@@ -166,6 +170,18 @@ void ymCtx_NaturalizeType(YmCtx* ctx, YmType* type) {
     assertSafe(ctx);
     assertSafe(type);
     // TODO
+}
+
+void ymCtx_Panic(YmCtx* ctx, const YmChar* fmt, ...) {
+    // TODO
+}
+
+void ymCtx_Recover(YmCtx* ctx) {
+    // TODO
+}
+
+const YmChar* ymCtx_GetPanic(YmCtx* ctx) {
+    return nullptr;
 }
 
 YmObj* ymCtx_NewNone(YmCtx* ctx) {
@@ -190,6 +206,83 @@ YmObj* ymCtx_NewBool(YmCtx* ctx, YmBool v) {
 
 YmObj* ymCtx_NewRune(YmCtx* ctx, YmRune v) {
     return Safe(ctx)->newRune(v);
+}
+
+YmObj* ymCtx_NewType(YmCtx* ctx, YmType* v) {
+    return Safe(ctx)->newType(Safe(v));
+}
+
+YmCallStackHeight ymCtx_CallStackHeight(YmCtx* ctx) {
+    return Safe(ctx)->callStkHeight();
+}
+
+const YmChar* ymCtx_FmtCallStack(YmCtx* ctx, YmCallStackHeight skip) {
+    auto temp = Safe(ctx)->fmtCallStk(skip);
+    return mkCStr(temp.c_str());
+}
+
+YmUInt16 ymCtx_Args(YmCtx* ctx) {
+    return Safe(ctx)->args();
+}
+
+YmObj* ymCtx_Arg(YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy) {
+    return Safe(ctx)->arg(which, returnPolicy);
+}
+
+YmLocals ymCtx_Locals(YmCtx* ctx) {
+    return Safe(ctx)->locals();
+}
+
+YmObj* ymCtx_Local(YmCtx* ctx, YmLocal where, YmRefPolicy returnPolicy) {
+    return Safe(ctx)->local(where, returnPolicy);
+}
+
+void ymCtx_PopN(YmCtx* ctx, YmLocals n) {
+    Safe(ctx)->popN(n);
+}
+
+YmObj* ymCtx_Pop(YmCtx* ctx) {
+    return Safe(ctx)->pop();
+}
+
+YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {
+    return Safe(ctx)->put(where, deref(what), whatPolicy);
+}
+
+YmBool ymCtx_PutNone(YmCtx* ctx, YmLocal where) {
+    return ymCtx_Put(ctx, where, ymCtx_NewNone(ctx), YM_TAKE);
+}
+
+YmBool ymCtx_PutInt(YmCtx* ctx, YmLocal where, YmInt v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewInt(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutUInt(YmCtx* ctx, YmLocal where, YmUInt v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewUInt(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutFloat(YmCtx* ctx, YmLocal where, YmFloat v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewFloat(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutBool(YmCtx* ctx, YmLocal where, YmBool v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewBool(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutRune(YmCtx* ctx, YmLocal where, YmRune v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewRune(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
+    return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, YmLocal returnTo) {
+    return Safe(ctx)->call(deref(fn), argsN, returnTo);
+}
+
+void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
+    Safe(ctx)->ret(what, whatPolicy);
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
@@ -405,23 +498,51 @@ const YmChar* ymObj_Fmt(YmObj* obj) {
     return nullptr;
 }
 
-YmInt ymObj_ToInt(YmObj* obj) {
-    return Safe(obj)->toInt().value();
+YmInt ymObj_ToInt(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toInt();
+    if (succeeded) {
+        *succeeded = r.has_value();
+    }
+    return r.value_or(0);
 }
 
-YmUInt ymObj_ToUInt(YmObj* obj) {
-    return Safe(obj)->toUInt().value();
+YmUInt ymObj_ToUInt(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toUInt();
+    if (succeeded) {
+        *succeeded = r.has_value();
+    }
+    return r.value_or(0);
 }
 
-YmFloat ymObj_ToFloat(YmObj* obj) {
-    return Safe(obj)->toFloat().value();
+YmFloat ymObj_ToFloat(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toFloat();
+    if (succeeded) {
+        *succeeded = r.has_value();
+    }
+    return r.value_or(0.0);
 }
 
-YmBool ymObj_ToBool(YmObj* obj) {
-    return Safe(obj)->toBool().value();
+YmBool ymObj_ToBool(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toBool();
+    if (succeeded) {
+        *succeeded = r.has_value();
+    }
+    return r.value_or(YM_FALSE);
 }
 
-YmRune ymObj_ToRune(YmObj* obj) {
-    return Safe(obj)->toRune().value();
+YmRune ymObj_ToRune(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toRune();
+    if (succeeded) {
+        *succeeded = r.has_value();
+    }
+    return r.value_or(U'\0');
+}
+
+YmType* ymObj_ToType(YmObj* obj, YmBool* succeeded) {
+    auto r = Safe(obj)->toType();
+    if (succeeded) {
+        *succeeded = (bool)r;
+    }
+    return r;
 }
 

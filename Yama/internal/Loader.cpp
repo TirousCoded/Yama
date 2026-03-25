@@ -166,6 +166,7 @@ void _ym::DmLoader::_bindYamaParcel() {
     p->addStruct("Float");
     p->addStruct("Bool");
     p->addStruct("Rune");
+    p->addStruct("Type");
     p->addProtocol("Any");
     if (!bindParcelDef("yama", *p, true)) YM_DEADEND;
 }
@@ -204,6 +205,10 @@ YmType& _ym::CtxLoader::ldBool() const noexcept {
 
 YmType& _ym::CtxLoader::ldRune() const noexcept {
     return *_builtins.value().rune;
+}
+
+YmType& _ym::CtxLoader::ldType() const noexcept {
+    return *_builtins.value().type;
 }
 
 void _ym::CtxLoader::reset() noexcept {
@@ -269,6 +274,7 @@ void _ym::CtxLoader::_preloadBuiltins() {
         .float0 = ym::deref(load(Spec::typeFast("yama:Float"))),
         .bool0 = ym::deref(load(Spec::typeFast("yama:Bool"))),
         .rune = ym::deref(load(Spec::typeFast("yama:Rune"))),
+        .type = ym::deref(load(Spec::typeFast("yama:Type"))),
     };
 }
 
