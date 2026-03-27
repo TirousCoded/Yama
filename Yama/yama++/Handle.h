@@ -68,7 +68,7 @@ namespace ym {
         inline explicit Handle(Safe<T> resource, bool secure) noexcept :
             _res(resource) {
             if (secure) {
-                ym::secure(resource);
+                ym::secure(_res);
             }
         }
 
@@ -77,11 +77,10 @@ namespace ym {
         }
 
         inline Handle(const Handle& other) :
-            Handle(other.get()) {
-            ym::secure(other);
+            Handle(other.get(), true) {
         }
         inline Handle(Handle&& other) noexcept :
-            Handle(other.get()) {
+            Handle(other.get(), false) {
             other.disown();
         }
         inline Handle& operator=(const Handle& other) {

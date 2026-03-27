@@ -169,19 +169,18 @@ YmType* YmType::paramType(YmParamIndex param) const {
 
 YmType* YmType::ref(YmRef reference) const noexcept {
     return
-        size_t(reference) < consts().size() && consts()[reference].is<ym::Safe<YmType>>()
-        ? consts()[reference].as<ym::Safe<YmType>>().get()
+        size_t(reference) < _refs.size()
+        ? _refs[reference]
         : nullptr;
 }
 
-std::optional<YmRef> YmType::findRef(ym::Safe<YmType> referenced) const noexcept {
-    for (size_t i = 0; i < consts().size(); i++) {
-        auto& c = consts()[i];
+bool YmType::depends(ym::Safe<YmType> other) const noexcept {
+    for (auto& c : consts()) {
         if (_ym::constTypeOf(c) != _ym::ConstType::Ref) continue;
-        if (c.as<ym::Safe<YmType>>() != referenced) continue;
-        return YmRef(i);
+        if (c.as<ym::Safe<YmType>>() != other) continue;
+        return true;
     }
-    return std::nullopt;
+    return false;
 }
 
 bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
@@ -280,6 +279,14 @@ void YmType::putRefConst(size_t index, YmType* ref) {
     ymAssert(info->consts.isRef(index));
     if (ref) {
         _consts[index] = _ym::Const::byIndex<size_t(_ym::ConstType::Ref)>(ym::Safe(ref));
+    }
+}
+
+void YmType::buildRefs() {
+    for (size_t i = 0; i < info->refs.size(); i++) {
+        if (auto ref = _consts.at(info->refs.at(i)).tryAs<ym::Safe<YmType>>()) {
+            _refs.push_back(ref->get());
+        }
     }
 }
 

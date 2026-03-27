@@ -216,6 +216,7 @@ void _ym::LoadManager::_lateResolveType(YmType& x) {
     ym::println("LoadManager: Late resolving {} consts.", x.fullname());
 #endif
     _lateResolveConsts(x);
+    x.buildRefs();
 }
 
 void _ym::LoadManager::_lateResolveConsts(YmType& x) {

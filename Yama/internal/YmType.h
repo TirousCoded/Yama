@@ -109,7 +109,7 @@ public:
     YmType* paramType(YmParamIndex param) const;
 
     YmType* ref(YmRef reference) const noexcept;
-    std::optional<YmRef> findRef(ym::Safe<YmType> referenced) const noexcept;
+    bool depends(ym::Safe<YmType> other) const noexcept;
 
     bool conforms(ym::Safe<YmType> protocol) const noexcept;
 
@@ -130,6 +130,11 @@ public:
     // Fails quietly if ref == nullptr.
     void putRefConst(size_t index, YmType* ref);
 
+    // Call this after fully populating the constant table of the type.
+    // Populates _refs w/ nullptr(s) for indices who's corresponding constant is not a ref (ie. such
+    // as when its still a dummy int const due to a resolve failure.)
+    void buildRefs();
+
 
 private:
     _ym::Spec _fullname;
@@ -137,6 +142,12 @@ private:
     // TODO: Later revise to make our _consts inline w/ the memory block of YmType itself via HAStruct.
 
     std::vector<_ym::Const> _consts;
+
+    // TODO: I REALLY dislike how we have two seperate vectors for consts: the main one, and then this
+    //       second one for user specified refs. When we do the above w/ _consts, try to fuse _refs
+    //       into the same inline memory block too.
+
+    std::vector<YmType*> _refs;
 
 
     void _initConstsArrayToDummyIntConsts();

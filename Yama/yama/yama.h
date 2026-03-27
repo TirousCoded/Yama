@@ -488,7 +488,7 @@ extern "C" {
     */
 
     /* Maximum call stack height before stack overflow. */
-#define YM_MAX_CALL_STACK_HEIGHT 100;
+#define YM_MAX_CALL_STACK_HEIGHT (100)
 
 
     /* Index of an object on a local object stack. */
@@ -650,9 +650,10 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     YmRefCount ymCtx_RefCount(struct YmCtx* ctx);
 
-    /* Returns a *borrowed* ref to the Yama domain associated with ctx. */
+    /* Returns the domain associated with ctx. */
+    /* returnPolicy dictates if a borrowed or taken ref is returned. */
     /* Behaviour is undefined if ctx is invalid. */
-    struct YmDm* ymCtx_Dm(struct YmCtx* ctx);
+    struct YmDm* ymCtx_Dm(struct YmCtx* ctx, YmRefPolicy returnPolicy);
 
     /* Imports the parcel at path, returning a pointer to it, or YM_NIL on failure. */
     /* Behaviour is undefined if ctx is invalid. */
@@ -807,6 +808,11 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     struct YmObj* ymCtx_Arg(struct YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy);
 
+    /* Returns the type at reference in the type reference array of the current call, or YM_NIL on failure. */
+    /* Fails quietly if reference is out-of-bounds. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmType* ymCtx_Ref(struct YmCtx* ctx, YmRef reference);
+
     /* Returns the height of the current object stack. */
     /* Behaviour is undefined if ctx is invalid. */
     YmLocals ymCtx_Locals(struct YmCtx* ctx);
@@ -849,6 +855,19 @@ extern "C" {
     YmBool ymCtx_PutRune(struct YmCtx* ctx, YmLocal where, YmRune v);
     YmBool ymCtx_PutType(struct YmCtx* ctx, YmLocal where, struct YmType* v);
 
+    /* TODO: Later, add a little *exception* for fn/method/etc. types instead initialize values
+    *        of type 'yama:FnValue#'. Be sure to mention this in doc string below!
+    */
+    /* TODO: Later, we'll need to account for if default init fn call panics.
+    */
+
+    /* Default inits an object of type, loading it into the current local object stack object at where, returning if successful. */
+    /* Pushes to the stack if where == YM_NEWTOP. */
+    /* Does nothing to the stack if where == YM_DISCARD. */
+    /* Fails if where is out-of-bounds (ie. where == YM_[NEWTOP|DISCARD] notwithstanding.) */
+    /* Behaviour is undefined if ctx is invalid. */
+    YmBool ymCtx_PutDefault(struct YmCtx* ctx, YmLocal where, struct YmType* type);
+
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
 
@@ -864,6 +883,7 @@ extern "C" {
     /* Fails if arg objects are the wrong types. */
     /* Fails if no return value object bound (by call behaviour.) */
     /* Fails if return value object is the wrong type. */
+    /* Fails if call stack overflow. */
     /* Behaviour is undefined if ctx is invalid. */
     /* Behaviour is undefined if fn is invalid. */
     YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, YmLocal returnTo);
@@ -1028,8 +1048,9 @@ extern "C" {
         const YmChar* name,
         YmRefSym paramType);
 
-    /* Explicitly adds to type in parceldef a reference to the type specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
-    /* These IDs are not guaranteed to be unique, nor sequential. */
+    /* Adds to a type in parceldef a reference to the type specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
+    /* These references' IDs are sequential, incrementing from 0. */
+    /* Each reference gets a unique ID increment, even if two reference share the same symbol. */
     /* Fails if type is not the index of a type in parceldef. */
     /* Fails if symbol is illegal. */
     /* Fails if Yama API internals are unable to allocate a reference ID. */
@@ -1119,10 +1140,10 @@ extern "C" {
     /* Behaviour is undefined if type is invalid. */
     YmType* ymType_Ref(struct YmType* type, YmRef reference);
 
-    /* Returns if the reference ID type has for its reference to referenced, or YM_NO_REF if type doesn't reference referenced. */
+    /* Returns if type depends upon type other to be able to load/function properly. */
     /* Behaviour is undefined if type is invalid. */
-    /* Behaviour is undefined if referenced is invalid. */
-    YmRef ymType_FindRef(struct YmType* type, struct YmType* referenced);
+    /* Behaviour is undefined if other is invalid. */
+    YmBool ymType_Depends(struct YmType* type, struct YmType* other);
 
     /* Returns if the conversion 'from -> to' is legal. */
     /* coercion specifies if 'from -> to' is a legal coercion (aka. implicit conversion.) */

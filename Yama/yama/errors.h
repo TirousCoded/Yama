@@ -30,6 +30,7 @@ extern "C" {
         YmErrCode_NonProtocolType,          /* Type is a non-protocol. */
         YmErrCode_LocalNotFound,            /* Local object stack index out-of-bounds. */
         YmErrCode_CallProcedureError,       /* Call procedure error. */
+        YmErrCode_CallStackOverflow,        /* Call stack overflow. */
         YmErrCode_InternalError,            /* Internal Error */
 
         YmErrCode_Num,                      /* Enum size. Not a valid error code. */

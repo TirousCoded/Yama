@@ -49,6 +49,7 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& name,
             std::convertible_to<std::string_view> auto const& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
+            const std::vector<std::string>& refTypeSymbols,
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddFn(
@@ -61,6 +62,9 @@ namespace ym {
                 for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(result, name, typeSymbol);
                 }
+                for (const auto& typeSymbol : refTypeSymbols) {
+                    addRef(result, typeSymbol);
+                }
                 return result;
             }
             return std::nullopt;
@@ -70,6 +74,7 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& name,
             std::convertible_to<std::string_view> auto const& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
+            const std::vector<std::string>& refTypeSymbols,
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
             if (auto result = ymParcelDef_AddMethod(
@@ -82,6 +87,9 @@ namespace ym {
                 result != YM_NO_TYPE_INDEX) {
                 for (const auto& [name, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(result, name, typeSymbol);
+                }
+                for (const auto& typeSymbol : refTypeSymbols) {
+                    addRef(result, typeSymbol);
                 }
                 return result;
             }

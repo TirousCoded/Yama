@@ -203,7 +203,8 @@ std::optional<YmRef> _ym::TypeInfo::addRef(std::string symbol) {
         return std::nullopt;
     }
     if (auto result = consts.pullRef(std::move(normalizedSymbol.value()), size_t(YmRef(-1)))) {
-        return (YmRef)result.value();
+        refs.push_back(result.value());
+        return YmRef(refs.size() - 1);
     }
     _ym::Global::raiseErr(
         YmErrCode_InternalError,

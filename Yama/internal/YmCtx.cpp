@@ -182,6 +182,13 @@ YmObj* YmCtx::arg(YmUInt16 which, YmRefPolicy returnPolicy) {
     return result;
 }
 
+YmType* YmCtx::ref(YmRef reference) {
+    return
+        _callStk.back().fn
+        ? _callStk.back().fn->ref(reference)
+        : nullptr;
+}
+
 YmObj* YmCtx::local(YmLocal where, YmRefPolicy returnPolicy) {
     auto result =
         where < locals()
@@ -328,6 +335,13 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
                 fn.paramType(i)->fullname());
             return false;
         }
+    }
+    if (callStkHeight() == YM_MAX_CALL_STACK_HEIGHT) {
+        _ym::Global::raiseErr(
+            YmErrCode_CallStackOverflow,
+            "Call to {} failed; call stack overflow!",
+            fn.fullname());
+        return false;
     }
     _callStk.push_back(_CallFrame{
         .fn = &fn,

@@ -67,6 +67,7 @@ namespace _ym {
         std::optional<ConstIndex> returnType;
         std::vector<ParamInfo> params;
         ConstTableInfo consts;
+        std::vector<ConstIndex> refs;
 
 
         bool returnTypeIsSelf() const noexcept;

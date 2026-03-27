@@ -420,22 +420,30 @@ TEST(Types, Ref_Failure) {
     EXPECT_EQ(ymType_Ref(A, 100), nullptr);
 }
 
-TEST(Types, FindRef) {
+TEST(Types, Depends) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    YmTypeIndex A_index = ymParcelDef_AddStruct(p_def, "A");
-    YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
+    auto f_ind = ymParcelDef_AddFn(p_def, "f", "yama:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddRef(p_def, f_ind, "p:A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddStruct(p_def, "B");
-    ymParcelDef_AddStruct(p_def, "C");
     ymDm_BindParcelDef(dm, "p", p_def);
+    YmType* f = ymCtx_Load(ctx, "p:f");
     YmType* A = ymCtx_Load(ctx, "p:A");
     YmType* B = ymCtx_Load(ctx, "p:B");
-    YmType* C = ymCtx_Load(ctx, "p:C");
+    YmType* Int = ymCtx_LdInt(ctx);
+    ASSERT_TRUE(f);
     ASSERT_TRUE(A);
     ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
+    ASSERT_TRUE(Int);
 
-    EXPECT_EQ(ymType_FindRef(A, B), A_ref_B);
-    EXPECT_EQ(ymType_FindRef(A, C), YM_NO_REF);
+    EXPECT_EQ(ymType_Depends(f, Int), YM_TRUE); // Implicit
+    EXPECT_EQ(ymType_Depends(f, A), YM_TRUE); // Explicit
+    EXPECT_EQ(ymType_Depends(f, B), YM_FALSE);
+
+    EXPECT_EQ(ymType_Depends(f, f), YM_FALSE);
+    EXPECT_EQ(ymType_Depends(Int, f), YM_FALSE);
+    EXPECT_EQ(ymType_Depends(A, f), YM_FALSE);
+    EXPECT_EQ(ymType_Depends(B, f), YM_FALSE);
 }
 

@@ -120,7 +120,10 @@ YmRefCount ymCtx_RefCount(YmCtx* ctx) {
     return Safe(ctx)->refs.count();
 }
 
-YmDm* ymCtx_Dm(YmCtx* ctx) {
+YmDm* ymCtx_Dm(YmCtx* ctx, YmRefPolicy returnPolicy) {
+    if (returnPolicy == YM_TAKE) {
+        ymDm_Secure(Safe(ctx)->domain);
+    }
     return Safe(ctx)->domain;
 }
 
@@ -229,6 +232,10 @@ YmObj* ymCtx_Arg(YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy) {
     return Safe(ctx)->arg(which, returnPolicy);
 }
 
+YmType* ymCtx_Ref(YmCtx* ctx, YmRef reference) {
+    return Safe(ctx)->ref(reference);
+}
+
 YmLocals ymCtx_Locals(YmCtx* ctx) {
     return Safe(ctx)->locals();
 }
@@ -275,6 +282,10 @@ YmBool ymCtx_PutRune(YmCtx* ctx, YmLocal where, YmRune v) {
 
 YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
     return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
+}
+
+YmBool ymCtx_PutDefault(YmCtx* ctx, YmLocal where, YmType* type) {
+    return YM_FALSE;
 }
 
 YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, YmLocal returnTo) {
@@ -451,8 +462,8 @@ YmType* ymType_Ref(YmType* type, YmRef reference) {
     return Safe(type)->ref(reference);
 }
 
-YmRef ymType_FindRef(YmType* type, YmType* referenced) {
-    return Safe(type)->findRef(Safe(referenced)).value_or(YM_NO_REF);
+YmBool ymType_Depends(YmType* type, YmType* other) {
+    return (YmBool)Safe(type)->depends(Safe(other));
 }
 
 YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {

@@ -18,6 +18,7 @@ int32_t main(int32_t argc, char** argv) {
         "identity",
         "$T",
         { { "v", "$T" } },
+        {},
         ymInertCallBhvrFn
     ).value();
     (void)p_def.addTypeParam(identity_ind, "T", "yama:Any").value();
@@ -25,6 +26,7 @@ int32_t main(int32_t argc, char** argv) {
         "recurse",
         "yama:None",
         { { "level", "yama:UInt" } },
+        { "p:recurse" },
         [](YmCtx* ctx_, void*) {
             auto ctx = ym::Context(ym::Safe<YmCtx>(ctx_), true);
             ctx.ret(ctx.newNone());
@@ -32,18 +34,18 @@ int32_t main(int32_t argc, char** argv) {
             ym::println("recurse({})\n{}", n, ctx.callStack());
             if (n > 1) {
                 ctx.pushUInt(n - 1);
-                ctx.calld(ctx.load("p:recurse").value(), 1);
+                ctx.calld(ctx.ref(0).value(), 1);
             }
             ctx.disown();
         }).value();
 
     ym::ParcelDef a_def{};
     auto A_ind = a_def.addStruct("A").value();
-    (void)a_def.addMethod(A_ind, "hash", "yama:UInt", {}, ymInertCallBhvrFn);
+    (void)a_def.addMethod(A_ind, "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
     auto B_ind = a_def.addStruct("B").value();
-    (void)a_def.addMethod(B_ind, "hash", "yama:UInt", {}, ymInertCallBhvrFn);
+    (void)a_def.addMethod(B_ind, "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
     auto Hash_ind = a_def.addProtocol("Hash").value();
-    (void)a_def.addMethodReq(Hash_ind, "hash", "yama:UInt", {});
+    (void)a_def.addMethodReq(Hash_ind, "hash", "yama:UInt", {}).value();
 
     dm.bind("p", p_def);
     dm.bind("a", a_def);
@@ -75,9 +77,6 @@ int32_t main(int32_t argc, char** argv) {
 
     ctx.pushUInt(10);
     ctx.calld(ctx.load("p:recurse").value(), 1);
-
-#error figure out how to fix UX issue w/ YmRef(s), as right now we don't really
-#error have a good way to send YmType*(s) into fn bodies
 
     return 0;
 }

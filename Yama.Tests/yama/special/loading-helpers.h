@@ -100,7 +100,7 @@ inline void test_type_basics(
     EXPECT_STREQ(ymType_Fullname(type), fullname.c_str());
     EXPECT_EQ(ymType_Kind(type), kind);
     for (YmType* ref : refs) {
-        EXPECT_NE(ymType_FindRef(type, ref), YM_NO_REF)
+        EXPECT_EQ(ymType_Depends(type, ref), YM_TRUE)
             << "ymType_Fullname(ref)==" << ymType_Fullname(ref);
     }
     ASSERT_EQ(typeArgs.size(), ymType_TypeParams(type));

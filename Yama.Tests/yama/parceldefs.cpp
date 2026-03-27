@@ -769,16 +769,30 @@ TEST(ParcelDefs, AddParam_LimitReached_MaxParams) {
 TEST(ParcelDefs, AddRef) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
+
     auto A_index = ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddStruct(p_def, "B");
-    YmRef A_ref_B = ymParcelDef_AddRef(p_def, A_index, "p:B");
-    ASSERT_NE(A_ref_B, YM_NO_REF);
+    ymParcelDef_AddStruct(p_def, "C");
+    
+    YmRef A_ref_B_1 = ymParcelDef_AddRef(p_def, A_index, "p:B");
+    YmRef A_ref_C = ymParcelDef_AddRef(p_def, A_index, "p:C");
+    YmRef A_ref_B_2 = ymParcelDef_AddRef(p_def, A_index, "p:B"); // Duplicates get unique IDs.
+    // Ref IDs should be sequential as expected.
+    ASSERT_EQ(A_ref_B_1, 0);
+    ASSERT_EQ(A_ref_C, 1);
+    ASSERT_EQ(A_ref_B_2, 2);
+    
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
     ASSERT_TRUE(A);
     ASSERT_TRUE(B);
-    EXPECT_EQ(ymType_Ref(A, A_ref_B), B);
+    ASSERT_TRUE(C);
+    
+    EXPECT_EQ(ymType_Ref(A, A_ref_B_1), B);
+    EXPECT_EQ(ymType_Ref(A, A_ref_C), C);
+    EXPECT_EQ(ymType_Ref(A, A_ref_B_2), B);
 }
 
 TEST(ParcelDefs, AddRef_Normalizes_Symbol) {

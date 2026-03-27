@@ -6,9 +6,10 @@
 #include <optional>
 
 #include "Handle.h"
+#include "Domain.h"
+#include "Object.h"
 #include "Parcel.h"
 #include "Type.h"
-#include "Object.h"
 
 
 namespace ym {
@@ -62,8 +63,8 @@ namespace ym {
         }
 
 
-        inline Safe<YmDm> domain() const noexcept {
-            return Safe(ymCtx_Dm(get()));
+        inline Domain domain() const noexcept {
+            return Domain(Safe(ymCtx_Dm(get(), YM_TAKE)), false);
         }
 
         // path is expected to be null-terminated.
@@ -106,7 +107,6 @@ namespace ym {
 
         inline CallStack callStack() const noexcept { return CallStack(*this); }
         inline YmUInt16 args() const noexcept { return ymCtx_Args(get()); }
-        inline YmLocals locals() const noexcept { return ymCtx_Locals(get()); }
         inline std::optional<Object> arg(YmUInt16 which) noexcept {
             auto temp = ymCtx_Arg(get(), which, YM_TAKE);
             return
@@ -114,6 +114,14 @@ namespace ym {
                 ? std::make_optional(Object(*temp, false))
                 : std::nullopt;
         }
+        inline std::optional<Type> ref(YmRef reference) const noexcept {
+            auto temp = ymCtx_Ref(get(), reference);
+            return
+                temp
+                ? std::make_optional(Type(*temp))
+                : std::nullopt;
+        }
+        inline YmLocals locals() const noexcept { return ymCtx_Locals(get()); }
         inline std::optional<Object> local(YmLocal where) noexcept {
             auto temp = ymCtx_Local(get(), where, YM_TAKE);
             return

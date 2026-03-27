@@ -56,6 +56,7 @@ public:
 	YmUInt16 args() const noexcept;
 	YmLocals locals() const noexcept;
 	YmObj* arg(YmUInt16 which, YmRefPolicy returnPolicy = YM_BORROW);
+	YmType* ref(YmRef reference);
 	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
 
 	YmObj* pop() noexcept; // Returns taken ref.
