@@ -82,7 +82,12 @@ TEST(Conversions, Identity_IncludeGenerics) {
         .value();
 
     for (const auto& t : types) {
-        CONV(t, t, true, true);
+        if (ymKind_IsCallable(ymType_Kind(t)) == YM_FALSE) {
+            CONV(t, t, true, true);
+        }
+        else {
+            CONV(t, t, false, false);
+        }
     }
 }
 

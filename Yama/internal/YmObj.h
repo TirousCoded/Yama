@@ -51,11 +51,21 @@ public:
 
     // Returns the number of slots this object has.
     constexpr size_t size() const noexcept {
+        // TODO: I think we're incorrectly giving regular structs 1 slot.
         return isNone() ? 0 : 1;
     }
 
     Slot& slot(size_t index) noexcept;
     const Slot& slot(size_t index) const noexcept;
+
+    // NOTE: Certain internal code expects is*** and to*** methods to operate
+    //       such that they require the object's type to be SPECIFICALLY the
+    //       primitive type in question.
+    //
+    //       To this end, when we add in things like frontend being able to
+    //       marshal an object into a primitive as part of querying its value
+    //       as a specific primitive type, the below methods should NOT be
+    //       where we impl this.
 
     bool isNone() const noexcept;
     bool isInt() const noexcept;

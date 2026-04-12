@@ -7,7 +7,7 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 20);
+    static_assert(YmErrCode_Num == 22);
     switch (code) {
     case YmErrCode_IllegalSpecifier:        return "IllegalSpecifier";
     case YmErrCode_IllegalConstraint:       return "IllegalConstraint";
@@ -28,6 +28,8 @@ const YmChar* ymFmtYmErrCode(YmErrCode code) {
     case YmErrCode_LocalNotFound:           return "LocalNotFound";
     case YmErrCode_CallProcedureError:      return "CallProcedureError";
     case YmErrCode_CallStackOverflow:       return "CallStackOverflow";
+    case YmErrCode_NoDefaultValue:          return "NoDefaultValue";
+    case YmErrCode_IllegalConversion:       return "IllegalConversion";
     case YmErrCode_InternalError:           return "InternalError";
     default:                                return "???";
     }

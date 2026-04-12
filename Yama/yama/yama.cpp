@@ -212,7 +212,7 @@ YmObj* ymCtx_NewRune(YmCtx* ctx, YmRune v) {
 }
 
 YmObj* ymCtx_NewType(YmCtx* ctx, YmType* v) {
-    return Safe(ctx)->newType(Safe(v));
+    return Safe(ctx)->newType(deref(v));
 }
 
 YmCallStackHeight ymCtx_CallStackHeight(YmCtx* ctx) {
@@ -285,6 +285,9 @@ YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
 }
 
 YmBool ymCtx_PutDefault(YmCtx* ctx, YmLocal where, YmType* type) {
+    if (auto obj = Safe(ctx)->newDefault(deref(type))) {
+        return ymCtx_Put(ctx, where, obj, YM_TAKE);
+    }
     return YM_FALSE;
 }
 
@@ -294,6 +297,10 @@ YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, YmLocal returnTo) {
 
 void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
     Safe(ctx)->ret(what, whatPolicy);
+}
+
+YmBool ymCtx_Convert(YmCtx* ctx, YmType* type, YmLocal returnTo) {
+    return Safe(ctx)->convert(deref(type), returnTo);
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
@@ -468,17 +475,59 @@ YmBool ymType_Depends(YmType* type, YmType* other) {
 
 YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
     Safe _from(from), _to(to);
+    auto fromK = _from->kind();
+    auto toK = _to->kind();
+    if (ymKind_IsCallable(fromK) == YM_TRUE || ymKind_IsCallable(toK) == YM_TRUE) {
+        return YM_FALSE;
+    }
     if (_from == _to) {
         return YM_TRUE;
     }
-    auto fromK = _from->kind();
-    auto toK = _to->kind();
-    bool fromIsP = fromK == YmKind_Protocol;
-    bool toIsP = toK == YmKind_Protocol;
-    if (fromIsP && toIsP)                               return YM_TRUE;
-    else if (!fromIsP && toIsP && _from->conforms(_to)) return YM_TRUE;
-    else if (fromIsP && !toIsP && _to->conforms(_from)) return (YmBool)!coercion;
-    else                                                return YM_FALSE;
+    // TODO: The usage of fullname specs below is suboptimal compared to using the
+    //       actual YmType* themselves. Try to fix this later, which may require
+    //       the moving of this fn over to ymCtx_*** fns to let it use ymCtx_Ld***.
+    auto& fromFln = _from->fullname();
+    auto& toFln = _to->fullname();
+    if (toFln == "yama:None" && !coercion) {
+        return YM_TRUE;
+    }
+    else if (fromFln == "yama:Int" && !coercion) {
+        return YmBool(
+            toFln == "yama:UInt" ||
+            toFln == "yama:Float" ||
+            toFln == "yama:Rune");
+    }
+    else if (fromFln == "yama:UInt" && !coercion) {
+        return YmBool(
+            toFln == "yama:Int" ||
+            toFln == "yama:Float" ||
+            toFln == "yama:Rune");
+    }
+    else if (fromFln == "yama:Float" && !coercion) {
+        return YmBool(
+            toFln == "yama:Int" ||
+            toFln == "yama:UInt" ||
+            toFln == "yama:Rune");
+    }
+    else if (fromFln == "yama:Bool" && !coercion) {
+        return YmBool(
+            toFln == "yama:Int" ||
+            toFln == "yama:UInt" ||
+            toFln == "yama:Float");
+    }
+    else if (fromFln == "yama:Rune" && !coercion) {
+        return YmBool(
+            toFln == "yama:Int" ||
+            toFln == "yama:UInt");
+    }
+    else {
+        bool fromIsP = fromK == YmKind_Protocol;
+        bool toIsP = toK == YmKind_Protocol;
+        if (fromIsP && toIsP)                               return YM_TRUE;
+        else if (!fromIsP && toIsP && _from->conforms(_to)) return YM_TRUE;
+        else if (fromIsP && !toIsP && _to->conforms(_from)) return (YmBool)!coercion;
+    }
+    return YM_FALSE;
 }
 
 YmRefCount ymObj_Secure(YmObj* obj) {

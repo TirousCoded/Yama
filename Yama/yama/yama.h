@@ -746,6 +746,16 @@ extern "C" {
     /* TODO */
     const YmChar* ymCtx_GetPanic(struct YmCtx* ctx);
 
+    /* TODO: Right now we're having an issue where it's not clear what should go into
+    *        ymCtx_*** and what into ymObj_***.
+    * 
+    *        I think we should put all stack transaction stuff into ymCtx_***, and then
+    *        put our other stuff into ymObj_***.
+    * 
+    *        In this case, that would mean we should maybe move ymCtx_New*** into ymObj_***,
+    *        though I'm still not 100% sure about this yet...
+    */
+
     /* TODO: Add 'immortalization' (ie. like Python) at some point.
     */
 
@@ -855,27 +865,34 @@ extern "C" {
     YmBool ymCtx_PutRune(struct YmCtx* ctx, YmLocal where, YmRune v);
     YmBool ymCtx_PutType(struct YmCtx* ctx, YmLocal where, struct YmType* v);
 
-    /* TODO: Later, add a little *exception* for fn/method/etc. types instead initialize values
-    *        of type 'yama:FnValue#'. Be sure to mention this in doc string below!
+    /* TODO: Below, 'default value' encapsulates a notion which encompasses both default initialized
+    *        objects via ctors, and other default init processes which don't involve this usual way.
     */
     /* TODO: Later, we'll need to account for if default init fn call panics.
     */
+    /* TODO: Later, we'll need to account for types w/out default init ctor fns.
+    */
+    /* TODO: Later, when we add 'yama:Fn#' types, we'll need to add semantics where fn/method/etc.
+    *        types, w/ ymCtx_PutDefault, init to 'yama:FnValue#' values.
+    */
 
-    /* Default inits an object of type, loading it into the current local object stack object at where, returning if successful. */
+    /* Loads default value object of type into the current local object stack object at where, returning if successful. */
     /* Pushes to the stack if where == YM_NEWTOP. */
     /* Does nothing to the stack if where == YM_DISCARD. */
     /* Fails if where is out-of-bounds (ie. where == YM_[NEWTOP|DISCARD] notwithstanding.) */
+    /* Fails if type has no default value. */
     /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if type is invalid. */
     YmBool ymCtx_PutDefault(struct YmCtx* ctx, YmLocal where, struct YmType* type);
 
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
 
-    /* Performs a call to fn, passing top argsN stack objects as args, writing return value to returnTo. */
+    /* Performs a call to fn, passing top argsN stack objects as args, writing return value to returnTo, returning if successful. */
     /* The passed arg objects are consumed from the stack after the call (and before writing to returnTo.) */
     /* The passed arg objects are not consumed on failure. */
-    /* Pushes to the stack if where == YM_NEWTOP. */
-    /* Discards result of call, writing nothing, if where == YM_DISCARD. */
+    /* Pushes to the stack if returnTo == YM_NEWTOP. */
+    /* Discards result of call, writing nothing, if returnTo == YM_DISCARD. */
     /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
     /* Fails if fn is not a callable type. */
     /* Fails if argsN is the wrong number of args. */
@@ -894,6 +911,22 @@ extern "C" {
     /* Fails quietly if what == YM_NIL. */
     /* Behaviour is undefined if ctx is invalid. */
     void ymCtx_Ret(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
+
+    /* NOTE: Due to coercions only really being important to Yama during compilation, I've excluded the
+    *        distinction from ymCtx_Convert, which thus always explicitly converts.
+    */
+
+    /* Creates a new object by converting the top local object to type, writing return value to returnTo, returning if successful. */
+    /* The top local is consumed from the stack after the conversion (and before writing to returnTo.) */
+    /* The top local is not consumed on failure. */
+    /* Pushes to the stack if returnTo == YM_NEWTOP. */
+    /* Discards result of call, writing nothing, if returnTo == YM_DISCARD. */
+    /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
+    /* Fails if local object stack is empty. */
+    /* Fails if the conversion is illegal. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if type is invalid. */
+    YmBool ymCtx_Convert(struct YmCtx* ctx, struct YmType* type, YmLocal returnTo);
 
 
     /* Parcel Def. API */
@@ -1084,6 +1117,9 @@ extern "C" {
     /* This string's memory is managed internally. */
     /* Behaviour is undefined if type is invalid. */
     YmFullname ymType_Fullname(struct YmType* type);
+
+    /* TODO: Maybe add a YmKind_Unknown, and have that be return value if type == YM_NIL.
+    */
     
     /* Returns the kind of type. */
     /* Behaviour is undefined if type is invalid. */
@@ -1147,6 +1183,7 @@ extern "C" {
 
     /* Returns if the conversion 'from -> to' is legal. */
     /* coercion specifies if 'from -> to' is a legal coercion (aka. implicit conversion.) */
+    /* Behaviour is undefined if ctx is invalid. */
     /* Behaviour is undefined if from is invalid. */
     /* Behaviour is undefined if to is invalid. */
     YmBool ymType_Converts(struct YmType* from, struct YmType* to, YmBool coercion);
@@ -1156,9 +1193,6 @@ extern "C" {
 
     /* TODO: Right now, our unit tests and impl DO NOT provide a guarantee that ALL memory
     *        allocated for objects will be released upon context destruction/release.
-    * 
-    *        To fix this, we'll need to guarantee that the backend MAS used is a derivative
-    *        of OwningMAS, and thus guaranteed to provide this memory release.
     */
 
     /* Increments the ref count of object obj. */

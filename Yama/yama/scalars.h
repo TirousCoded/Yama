@@ -18,10 +18,25 @@ extern "C" {
     typedef int32_t YmInt32;
     typedef int64_t YmInt64;
 
+#define YM_MIN_INT8 INT8_MIN
+#define YM_MIN_INT16 INT16_MIN
+#define YM_MIN_INT32 INT32_MIN
+#define YM_MIN_INT64 INT64_MIN
+
+#define YM_MAX_INT8 INT8_MAX
+#define YM_MAX_INT16 INT16_MAX
+#define YM_MAX_INT32 INT32_MAX
+#define YM_MAX_INT64 INT64_MAX
+
     typedef uint8_t YmUInt8;
     typedef uint16_t YmUInt16;
     typedef uint32_t YmUInt32;
     typedef uint64_t YmUInt64;
+
+#define YM_MAX_UINT8 UINT8_MAX
+#define YM_MAX_UINT16 UINT16_MAX
+#define YM_MAX_UINT32 UINT32_MAX
+#define YM_MAX_UINT64 UINT64_MAX
 
     typedef float YmFloat32;
     typedef double YmFloat64;

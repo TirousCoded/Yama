@@ -115,11 +115,8 @@ namespace ym {
             }
             return std::nullopt;
         }
-        inline std::optional<YmRef> findRef(std::convertible_to<Safe<YmType>> auto const& referenced) const noexcept {
-            if (auto result = ymType_FindRef(get(), Safe<YmType>(referenced))) {
-                return result;
-            }
-            return std::nullopt;
+        inline bool depends(const Type& other) const noexcept {
+            return ymType_Depends(get(), other.get());
         }
     };
 

@@ -1220,6 +1220,29 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint) {
     EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
 }
 
+TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnAndMethodTypesCannotConformToConstraints) {
+    static_assert(YmKind_Num == 4);
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_fn(p_def, "f", "yama:None", {});
+
+    auto A_ind = setup_struct(p_def, "A", {});
+    setup_method(p_def, A_ind, "m", "yama:None", {});
+
+    auto B_ind = setup_struct(p_def, "B", {}, { { "T", "yama:Any" } });
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:f]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:A::m]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+}
+
 TEST(Loading, Fail_TypeArgsError_TooManyArgs) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);

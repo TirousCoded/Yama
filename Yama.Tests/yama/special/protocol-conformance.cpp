@@ -43,10 +43,10 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
 
     success(STRUCT1, Any);
     success(STRUCT2, Any);
-    success(FN1, Any);
-    success(FN2, Any);
-    success(METHOD1, Any);
-    success(METHOD2, Any);
+    failure(FN1, Any);
+    failure(FN2, Any);
+    failure(METHOD1, Any);
+    failure(METHOD2, Any);
 }
 
 TEST(ProtocolConformance, NonEmptyProtocol) {

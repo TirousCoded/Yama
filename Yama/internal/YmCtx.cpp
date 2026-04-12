@@ -8,6 +8,9 @@
 #include "YmParcel.h"
 #include "YmType.h"
 
+#include "../yama++/resources.h"
+#include "../yama++/print.h"
+
 
 YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     domain(domain),
@@ -114,14 +117,35 @@ ym::Safe<YmObj> YmCtx::newBool(YmBool v) {
 
 ym::Safe<YmObj> YmCtx::newRune(YmRune v) {
     auto result = ym::Safe(create(loader->ldRune()));
-    result->slot(0).r = v;
+    result->slot(0).r = _uint2rune((YmUInt)v);
     return result;
 }
 
-ym::Safe<YmObj> YmCtx::newType(ym::Safe<YmType> v) {
+ym::Safe<YmObj> YmCtx::newType(YmType& v) {
     auto result = ym::Safe(create(loader->ldType()));
-    result->slot(0).type = v;
+    result->slot(0).type = &v;
     return result;
+}
+
+YmObj* YmCtx::newDefault(YmType& type) {
+    static_assert(YmKind_Num == 4);
+    if (type.sameAs(loader->ldNone()))          return newNone();
+    else if (type.sameAs(loader->ldInt()))      return newInt(0);
+    else if (type.sameAs(loader->ldUInt()))     return newUInt(0);
+    else if (type.sameAs(loader->ldFloat()))    return newFloat(0.0);
+    else if (type.sameAs(loader->ldBool()))     return newBool(YM_FALSE);
+    else if (type.sameAs(loader->ldRune()))     return newRune(U'\0');
+    else if (type.sameAs(loader->ldType()))     return newType(loader->ldNone());
+    else if (type.kind() == YmKind_Struct)      return create(type); // TODO: Add ctor calls + handle panics.
+    //else if (type.kind() == YmKind_Fn)          return create(type);
+    //else if (type.kind() == YmKind_Method)      return create(type);
+    else {
+        _ym::Global::raiseErr(
+            YmErrCode_NoDefaultValue,
+            "{} has no default value!",
+            type.fullname());
+        return nullptr;
+    }
 }
 
 YmCallStackHeight YmCtx::callStkHeight() const noexcept {
@@ -275,6 +299,127 @@ bool YmCtx::ret(YmObj* what, YmRefPolicy whatPolicy) {
     return true;
 }
 
+bool YmCtx::convert(YmType& type, YmLocal returnTo) {
+    if (returnTo != YM_NEWTOP && returnTo != YM_DISCARD && returnTo >= locals()) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Conversion failed; local object index {} out-of-bounds!",
+            returnTo);
+        return false;
+    }
+    if (locals() == 0) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Conversion failed; local object stack is empty!");
+        return false;
+    }
+    auto& input = ym::deref(local(locals() - 1));
+    if (ymType_Converts(input.type, &type, YM_FALSE) == YM_FALSE) {
+        _ym::Global::raiseErr(
+            YmErrCode_IllegalConversion,
+            "Conversion failed; {} -> {} is illegal!",
+            input.type->fullname(),
+            type.fullname());
+        return false;
+    }
+    // TODO: Right now, only identity conversions are legal, w/ us specially
+    //       forbidding protocol stuff until we're ready to impl those.
+    if (input.type->kind() == YmKind_Protocol || type.kind() == YmKind_Protocol) {
+        _ym::Global::raiseErr(
+            YmErrCode_InternalError,
+            "Conversion failed; conversions to/from/between protocols not legal yet!",
+            input.type->fullname(),
+            type.fullname());
+        return false;
+    }
+    if (input.type == &type) {
+        return ymCtx_Put(this, returnTo, pop(), YM_TAKE) == YM_TRUE;
+    }
+    else if (&type == ymCtx_LdNone(this)) {
+        popN(1);
+        return ymCtx_PutNone(this, returnTo) == YM_TRUE;
+    }
+    else if (auto v = input.toInt()) {
+        if (&type == ymCtx_LdUInt(this)) {
+            popN(1);
+            return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdFloat(this)) {
+            popN(1);
+            return ymCtx_PutFloat(this, returnTo, (YmFloat)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdRune(this)) {
+            popN(1);
+            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+        }
+        else return false;
+    }
+    else if (auto v = input.toUInt()) {
+        if (&type == ymCtx_LdInt(this)) {
+            popN(1);
+            return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdFloat(this)) {
+            popN(1);
+            return ymCtx_PutFloat(this, returnTo, (YmFloat)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdRune(this)) {
+            popN(1);
+            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+        }
+        else return false;
+    }
+    else if (auto v = input.toFloat()) {
+        if (&type == ymCtx_LdInt(this)) {
+            popN(1);
+            return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdUInt(this)) {
+            popN(1);
+            return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdRune(this)) {
+            popN(1);
+            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+        }
+        else return false;
+    }
+    else if (auto v = input.toBool()) {
+        if (&type == ymCtx_LdInt(this)) {
+            popN(1);
+            return ymCtx_PutInt(this, returnTo, v == YM_TRUE ? 1 : 0) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdUInt(this)) {
+            popN(1);
+            return ymCtx_PutUInt(this, returnTo, v == YM_TRUE ? 1 : 0) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdFloat(this)) {
+            popN(1);
+            return ymCtx_PutFloat(this, returnTo, v == YM_TRUE ? 1.0 : 0.0) == YM_TRUE;
+        }
+        else return false;
+    }
+    else if (auto v = input.toRune()) {
+        if (&type == ymCtx_LdInt(this)) {
+            popN(1);
+            return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
+        }
+        else if (&type == ymCtx_LdUInt(this)) {
+            popN(1);
+            return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
+        }
+        else return false;
+    }
+    else {
+        _ym::Global::raiseErr(
+            YmErrCode_InternalError,
+            "{} -> {} is ymType_Converts defined, but its behaviour isn't!",
+            input.type->fullname(),
+            type.fullname());
+        return false;
+    }
+}
+
 void YmCtx::_beginUserPseudoCall() {
     ymAssert(_callStk.empty());
     _callStk.push_back(_CallFrame{
@@ -383,5 +528,10 @@ bool YmCtx::_endCall() noexcept {
         popN(cf.args);
         return put(cf.returnTo, *cf.returnValue);
     }
+}
+
+YmRune YmCtx::_uint2rune(YmUInt x) noexcept {
+    // TODO: Is there a bitwise trick we can use to avoid modulus?
+    return x % 0x110000;
 }
 

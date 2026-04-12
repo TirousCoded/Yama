@@ -47,7 +47,8 @@ public:
 	ym::Safe<YmObj> newFloat(YmFloat v);
 	ym::Safe<YmObj> newBool(YmBool v);
 	ym::Safe<YmObj> newRune(YmRune v);
-	ym::Safe<YmObj> newType(ym::Safe<YmType> v);
+	ym::Safe<YmObj> newType(YmType& v);
+	YmObj* newDefault(YmType& type);
 
 	YmCallStackHeight callStkHeight() const noexcept;
 	std::string fmtCallStk(YmCallStackHeight skip = 0) const;
@@ -64,6 +65,7 @@ public:
 	bool put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool call(YmType& fn, YmUInt16 argsN, YmLocal returnTo);
 	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
+	bool convert(YmType& type, YmLocal returnTo);
 
 
 private:
@@ -91,5 +93,7 @@ private:
 	void _beginUserPseudoCall();
 	bool _beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo);
 	bool _endCall() noexcept;
+
+	static YmRune _uint2rune(YmUInt x) noexcept;
 };
 

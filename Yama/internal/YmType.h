@@ -86,6 +86,8 @@ public:
     std::optional<std::string> callsuff() const;
     std::optional<_ym::Spec> callsig() const;
 
+    inline bool sameAs(YmType& other) const noexcept { return this == &other; }
+
     bool checkCallSuff(std::string_view callsuff) const;
     // Succeeds by default if callsuff is empty.
     bool checkCallSuff(std::optional<std::string_view> callsuff) const;

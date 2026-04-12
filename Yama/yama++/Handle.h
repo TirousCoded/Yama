@@ -107,6 +107,7 @@ namespace ym {
         inline bool operator==(std::convertible_to<Safe<T>> auto const& x) const noexcept { return get() == x; }
         inline bool operator!=(std::convertible_to<Safe<T>> auto const& x) const noexcept { return !(*this == x); }
 
+        // Returns a borrowed reference.
         inline Safe<T> get() const noexcept { return Safe(_res); }
         inline operator Safe<T>() const noexcept { return get(); } // Implicit
         inline explicit operator T* () const noexcept { return get(); } // Implicit

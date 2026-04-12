@@ -78,6 +78,14 @@ namespace ym {
                 ? std::make_optional(result)
                 : std::nullopt;
         }
+        inline std::optional<Type> toType() const noexcept {
+            YmBool success{};
+            auto result = ymObj_ToType(get(), &success);
+            return
+                success == YM_TRUE
+                ? std::make_optional(Type(Safe(result)))
+                : std::nullopt;
+        }
     };
 }
 

@@ -190,6 +190,12 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
     ym::println("YmType::conforms: {} vs. {}", fullname(), protocol->fullname());
 #endif
     ymAssert(protocol->kind() == YmKind_Protocol);
+    if (ymKind_IsCallable(kind()) == YM_TRUE) {
+#if _DUMP_CONFORMS_LOG
+        ym::println("YmType::conforms:     Failed; {} is a callable type!", fullname());
+#endif
+        return false;
+    }
     auto compare = [](YmType& pMemb, _ym::ConstIndex constIndOfTypeInPMemb, YmType& match, YmType& typeInMatch) -> bool {
         auto& symOfTypeInPMemb = pMemb.info->consts[constIndOfTypeInPMemb].as<_ym::RefInfo>().sym;
         if (!_ym::specifierHasSelf(symOfTypeInPMemb)) {

@@ -90,6 +90,7 @@ namespace ym {
         inline Type ldFloat() const noexcept { return Type(Safe(ymCtx_LdFloat(get()))); }
         inline Type ldBool() const noexcept { return Type(Safe(ymCtx_LdBool(get()))); }
         inline Type ldRune() const noexcept { return Type(Safe(ymCtx_LdRune(get()))); }
+        inline Type ldType() const noexcept { return Type(Safe(ymCtx_LdType(get()))); }
 
         inline void naturalize(std::convertible_to<Safe<YmParcel>> auto const& x) noexcept {
             ymCtx_NaturalizeParcel(get(), Safe<YmParcel>(x));
@@ -104,6 +105,7 @@ namespace ym {
         inline Object newFloat(YmFloat v) noexcept { return Object(Safe(ymCtx_NewFloat(get(), v)), false); }
         inline Object newBool(YmBool v) noexcept { return Object(Safe(ymCtx_NewBool(get(), v)), false); }
         inline Object newRune(YmRune v) noexcept { return Object(Safe(ymCtx_NewRune(get(), v)), false); }
+        inline Object newType(const Type& v) noexcept { return Object(Safe(ymCtx_NewType(get(), v.get())), false); }
 
         inline CallStack callStack() const noexcept { return CallStack(*this); }
         inline YmUInt16 args() const noexcept { return ymCtx_Args(get()); }
@@ -149,6 +151,7 @@ namespace ym {
         inline bool putBool(YmLocal where, bool v) noexcept { return ymCtx_PutBool(get(), where, YmBool(v)) == YM_TRUE; }
         inline bool putRune(YmLocal where, YmRune v) noexcept { return ymCtx_PutRune(get(), where, v) == YM_TRUE; }
         inline bool putType(YmLocal where, const Type& v) noexcept { return ymCtx_PutType(get(), where, v.get()) == YM_TRUE; }
+        inline bool putDefault(YmLocal where, const Type& type) noexcept { return ymCtx_PutDefault(get(), where, type.get()) == YM_TRUE; }
 
         inline bool push(const Object& what) noexcept { return put(YM_NEWTOP, what); }
         inline bool pushNone() noexcept { return putNone(YM_NEWTOP); }
@@ -158,6 +161,7 @@ namespace ym {
         inline bool pushBool(bool v) noexcept { return putBool(YM_NEWTOP, v); }
         inline bool pushRune(YmRune v) noexcept { return putRune(YM_NEWTOP, v); }
         inline bool pushType(const Type& v) noexcept { return putType(YM_NEWTOP, v); }
+        inline bool pushDefault(const Type& type) noexcept { return putDefault(YM_NEWTOP, type); }
 
         inline bool call(const Type& fn, YmUInt16 argsN, YmLocal returnTo) noexcept {
             return ymCtx_Call(get(), fn.get(), argsN, returnTo) == YM_TRUE;
