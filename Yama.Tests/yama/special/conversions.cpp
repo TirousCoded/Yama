@@ -12,6 +12,8 @@
 
 // NOTE: Yama defines explicit and implicit conversions, the ladder called 'coercions'.
 
+// NOTE: For more type specific tests, and for exec behaviour tests, see type-characteristics.cpp.
+
 
 static void conv(YmType* from, YmType* to, bool succeedIfExplicit, bool succeedIfImplicit, int line) {
     EXPECT_EQ(ymType_Converts(from, to, false) == YM_TRUE, succeedIfExplicit)

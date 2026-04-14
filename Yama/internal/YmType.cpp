@@ -8,6 +8,10 @@
 
 #define _DUMP_CONFORMS_LOG 0
 
+#if _DUMP_CONFORMS_LOG
+#include "../yama++/print.h"
+#endif
+
 
 const _ym::Spec& YmType::path() const noexcept {
     return parcel->path;
@@ -165,6 +169,28 @@ YmType* YmType::paramType(YmParamIndex param) const {
         fullname(),
         param);
     return nullptr;
+}
+
+bool YmType::hasSelfParam() const noexcept {
+    return params() >= 1 && paramType(0) == owner();
+}
+
+bool YmType::isTypeMethod() const noexcept {
+    return owner() && !hasSelfParam();
+}
+
+bool YmType::isObjMethod() const noexcept {
+    return owner() && hasSelfParam();
+}
+
+bool YmType::isCallable() const noexcept {
+    return
+        ymKind_IsCallable(kind()) == YM_TRUE &&
+        (isMethodReq() ? isObjMethod() : true);
+}
+
+bool YmType::isMethodReq() const noexcept {
+    return info->isMethodReq();
 }
 
 YmType* YmType::ref(YmRef reference) const noexcept {

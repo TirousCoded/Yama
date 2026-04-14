@@ -45,6 +45,10 @@ bool _ym::checkNonMember(const TypeInfo& type, std::string_view msg) {
     return result;
 }
 
+void _ym::methodReqCallBhvr(YmCtx* ctx, void* user) {
+    YM_DEADEND;
+}
+
 bool _ym::TypeInfo::returnTypeIsSelf() const noexcept {
     return
         returnType
@@ -106,6 +110,10 @@ const _ym::ParamInfo* _ym::TypeInfo::queryParam(const std::string& localName) co
         if (param.name == localName) return &param;
     }
     return nullptr;
+}
+
+bool _ym::TypeInfo::isMethodReq() const noexcept {
+    return callBehaviour && callBehaviour->fn == methodReqCallBhvr;
 }
 
 YmMembers _ym::TypeInfo::memberCount() const noexcept {

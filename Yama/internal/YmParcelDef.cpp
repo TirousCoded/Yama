@@ -51,11 +51,18 @@ std::optional<YmTypeIndex> YmParcelDef::addMethodReq(
     YmTypeIndex owner,
     const std::string& name,
     std::string returnTypeSymbol) {
+    auto index = uintptr_t(-1);
+    if (auto ownerType = info->type(owner)) {
+        index = ownerType->memberCount();
+    }
     return addMethod(
         owner,
         name,
         std::move(returnTypeSymbol),
-        _ym::CallBhvrCallbackInfo::mk(_ym::methodReqCallBhvr, (void*)std::uintptr_t(-1)));
+        _ym::CallBhvrCallbackInfo::mk(
+            _ym::methodReqCallBhvr,
+            // Give the method its member index.
+            (void*)index));
 }
 
 std::optional<YmTypeParamIndex> YmParcelDef::addTypeParam(

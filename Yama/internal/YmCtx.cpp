@@ -65,6 +65,7 @@ YmRefCount YmCtx::secure(YmObj& obj) {
 YmRefCount YmCtx::release(YmObj& obj) {
     auto old = obj.refs.drop();
     if (old == 1) {
+        obj.cleanup(); // Can't forget!
         _objects.erase(&obj);
         auto al = mas.allocator<int>();
         _ym::ObjHAL::destroy(obj, al);
@@ -196,10 +197,18 @@ YmLocals YmCtx::locals() const noexcept {
 }
 
 YmObj* YmCtx::arg(YmUInt16 which, YmRefPolicy returnPolicy) {
+    auto& cf = _callStk.back();
     auto result =
         which < args()
-        ? _globalObjStk[_callStk.back().argsOffset + which].get()
+        ? _globalObjStk[cf.argsOffset + which].get()
         : nullptr;
+    // If current call is one forwarded from protocol method call, then that means that
+    // the first arg is the call object, which'll be a boxed value. In this circumstance,
+    // we specially need to return the unboxed call object, as that's the object the
+    // forwarded-to method call actually expects to be its call object.
+    if (result && which == 0 && cf.fwdFromProto) {
+        result = result->boxed();
+    }
     if (result && returnPolicy == YM_TAKE) {
         secure(*result);
     }
@@ -274,8 +283,7 @@ bool YmCtx::put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy) {
 
 bool YmCtx::call(YmType& fn, YmUInt16 argsN, YmLocal returnTo) {
     if (_beginCall(fn, argsN, returnTo)) {
-        auto& callBhvrInfo = fn.info->callBehaviour.value();
-        callBhvrInfo.fn(this, callBhvrInfo.user);
+        _dispatchCall(fn);
         return _endCall();
     }
     return false;
@@ -322,22 +330,65 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
             type.fullname());
         return false;
     }
-    // TODO: Right now, only identity conversions are legal, w/ us specially
-    //       forbidding protocol stuff until we're ready to impl those.
-    if (input.type->kind() == YmKind_Protocol || type.kind() == YmKind_Protocol) {
-        _ym::Global::raiseErr(
-            YmErrCode_InternalError,
-            "Conversion failed; conversions to/from/between protocols not legal yet!",
-            input.type->fullname(),
-            type.fullname());
-        return false;
-    }
+    auto inIsP = input.type->kind() == YmKind_Protocol;
+    auto outIsP = type.kind() == YmKind_Protocol;
     if (input.type == &type) {
-        return ymCtx_Put(this, returnTo, pop(), YM_TAKE) == YM_TRUE;
+        return put(returnTo, ym::deref(pop()), YM_TAKE);
     }
     else if (&type == ymCtx_LdNone(this)) {
         popN(1);
         return ymCtx_PutNone(this, returnTo) == YM_TRUE;
+    }
+    else if (!inIsP && outIsP) { // Box T -> P
+        if (auto ptable = _ptables.load(type, *input.type)) {
+            auto protoVal = ym::Safe(create(type));
+            // Transfer object into box (ie. moving ownership of it.)
+            protoVal->box(ym::Safe(pop()), *ptable);
+            return put(returnTo, *protoVal, YM_TAKE);
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalConversion,
+                "Conversion failed; {} -> {} is illegal!",
+                input.type->fullname(),
+                type.fullname());
+            return false;
+        }
+    }
+    else if (inIsP && !outIsP) { // Unbox P -> T
+        if (input.boxed()->type != type) {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalConversion,
+                "Conversion failed; {} (boxed as {}) cannot be unboxed as {}!",
+                input.boxed()->type->fullname(),
+                input.type->fullname(),
+                type.fullname());
+            return false;
+        }
+        auto old = ym::bindScoped(ym::Safe(pop())); // RAII
+        // The old protocol value might be referenced elsewhere, so it's ref can't
+        // be stolen from it, so we pass YM_BORROW to copy the ref.
+        return put(returnTo, *old->boxed(), YM_BORROW);
+    }
+    else if (inIsP && outIsP) { // P -> P
+        if (auto ptable = _ptables.load(type, *input.boxed()->type)) {
+            auto old = ym::bindScoped(ym::Safe(pop())); // RAII
+            auto protoVal = ym::Safe(create(type));
+            // The old protocol value might be referenced elsewhere, so it's ref can't
+            // be stolen from it, so we add an incr for the new protocol value to own.
+            secure(*old->boxed());
+            protoVal->box(ym::Safe(old->boxed()), *ptable);
+            return put(returnTo, *protoVal, YM_TAKE);
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalConversion,
+                "Conversion failed; {} (boxed as {}) -> {} is illegal!",
+                input.boxed()->type->fullname(),
+                input.type->fullname(),
+                type.fullname());
+            return false;
+        }
     }
     else if (auto v = input.toInt()) {
         if (&type == ymCtx_LdUInt(this)) {
@@ -441,7 +492,7 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
             returnTo);
         return false;
     }
-    if (!ymKind_IsCallable(fn.kind())) {
+    if (!fn.isCallable()) {
         _ym::Global::raiseErr(
             YmErrCode_NonCallableType,
             "Call to {} failed; {} is non-callable!",
@@ -528,6 +579,20 @@ bool YmCtx::_endCall() noexcept {
         popN(cf.args);
         return put(cf.returnTo, *cf.returnValue);
     }
+}
+
+void YmCtx::_dispatchCall(YmType& fn) {
+    auto& cf = _callStk.back();
+    if (fn.isMethodReq()) { // Protocol Method Dispatch
+        // NOTE: Prior to changing fwdFromProto, arg(0) shouldn't see through boxing.
+        auto callobj = arg(0);
+        auto ptableInd = (uintptr_t)fn.info->callBehaviour.value().user;
+        auto forwardedTo = callobj->ptable()[ptableInd];
+        cf.fn = forwardedTo;
+        cf.fwdFromProto = true;
+    }
+    auto& callBhvrInfo = cf.fn->info->callBehaviour.value();
+    callBhvrInfo.fn(this, callBhvrInfo.user);
 }
 
 YmRune YmCtx::_uint2rune(YmUInt x) noexcept {

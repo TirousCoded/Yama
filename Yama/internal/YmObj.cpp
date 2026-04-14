@@ -9,12 +9,22 @@ YmObj::YmObj(YmCtx& ctx, YmType& type) :
 	type(type) {
 }
 
+void YmObj::cleanup() noexcept {
+	if (isProtocol()) {
+		ctx->release(ym::deref(boxed())); // Can't forget!
+	}
+}
+
 YmObj::Slot& YmObj::slot(size_t index) noexcept {
 	return _ym::ObjHAL::element(*this, index);
 }
 
 const YmObj::Slot& YmObj::slot(size_t index) const noexcept {
 	return _ym::ObjHAL::element(*this, index);
+}
+
+bool YmObj::isProtocol() const noexcept {
+	return type->kind() == YmKind_Protocol;
 }
 
 bool YmObj::isNone() const noexcept {
@@ -67,5 +77,26 @@ std::optional<YmRune> YmObj::toRune() const noexcept {
 
 YmType* YmObj::toType() const noexcept {
 	return isType() ? slot(0).type : nullptr;
+}
+
+void YmObj::box(ym::Safe<YmObj> value, const ym::Safe<YmType>* ptable) noexcept {
+	if (isProtocol()) {
+		slot(0) = Slot{ .ref = value }; // We don't incr refs, instead stealing one.
+		slot(1) = Slot{ .ptable = ptable };
+	}
+}
+
+YmObj* YmObj::boxed() const noexcept {
+	return
+		isProtocol()
+		? slot(0).ref
+		: nullptr;
+}
+
+const ym::Safe<YmType>* YmObj::ptable() const noexcept {
+	return
+		isProtocol()
+		? slot(1).ptable
+		: nullptr;
 }
 

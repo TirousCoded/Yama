@@ -96,7 +96,7 @@ namespace {
 
 			ym::println("example object");
 
-			ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
 			err.reset();
 
@@ -133,7 +133,7 @@ namespace {
 			ASSERT_EQ(ymType_Converts(objType, target, YM_FALSE), YM_TRUE);
 			ASSERT_EQ(ymType_Converts(objType, target, YM_TRUE), coercion ? YM_TRUE : YM_FALSE);
 
-			ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
 			err.reset();
 
@@ -199,12 +199,12 @@ namespace {
 			ASSERT_EQ(ymType_Members(type), members);
 			ASSERT_EQ(ymType_TypeParams(type), typeParams);
 
-			ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
 			err.reset();
 			testPutDefault(Safe(type));
 
-			ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
 			err.reset();
 			testCall(Safe(type));
@@ -755,14 +755,15 @@ TEST(TypeCharacteristics, YamaAny) {
 		YmKind_Protocol,
 		0,
 		0,
-		[&ctx](Safe<YmType> type) {
-			ADD_FAILURE(); // TODO
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
-	ADD_FAILURE(); // TODO: Write 'object' and 'conversion' calls when we have a way to conv to Any.
+	// TODO: Maybe add some 'unit.object' and 'unit.conversion' stuff.
 }
 
 TEST(TypeCharacteristics, Structs) {
@@ -876,11 +877,71 @@ TEST(TypeCharacteristics, GenericStructs) {
 }
 
 TEST(TypeCharacteristics, Protocols) {
-	ADD_FAILURE();
+	// NOTE: See protocol-values.cpp for test coverage of protocol value behaviour.
+
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ymParcelDef_AddProtocol(p_def, "P");
+	ymDm_BindParcelDef(dm, "p", p_def);
+	Unit unit(
+		dm, ctx, err,
+		"p:P",
+		"p:P",
+		YmKind_Protocol,
+		0,
+		0,
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		});
 }
 
 TEST(TypeCharacteristics, GenericProtocols) {
-	ADD_FAILURE();
+	// NOTE: See protocol-values.cpp for test coverage of protocol value behaviour.
+
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
+	ymParcelDef_AddTypeParam(p_def, P_ind, "T", "yama:Any");
+	ymDm_BindParcelDef(dm, "p", p_def);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:P[yama:Int]",
+			"p:P[yama:Int]",
+			YmKind_Protocol,
+			0,
+			1,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:P[yama:Float]",
+			"p:P[yama:Float]",
+			YmKind_Protocol,
+			0,
+			1,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			});
+	}
 }
 
 TEST(TypeCharacteristics, Fns) {
@@ -975,6 +1036,9 @@ TEST(TypeCharacteristics, GenericFns) {
 	}
 }
 
+// NOTE: Methods of protocol types, and their special dispatch behaviour, are
+//		 tested elsewhere in protocol-values.cpp.
+
 TEST(TypeCharacteristics, Methods) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
@@ -1012,7 +1076,7 @@ TEST(TypeCharacteristics, Methods) {
 		});
 }
 
-TEST(TypeCharacteristics, MethodsOfGenericTypes) {
+TEST(TypeCharacteristics, GenericTypeMethods) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
 	auto A_ind = ymParcelDef_AddStruct(p_def, "A");
@@ -1070,13 +1134,5 @@ TEST(TypeCharacteristics, MethodsOfGenericTypes) {
 				}
 			});
 	}
-}
-
-TEST(TypeCharacteristics, MethodsOfProtocolTypes) {
-	ADD_FAILURE();
-}
-
-TEST(TypeCharacteristics, MethodsOfGenericProtocolTypes) {
-	ADD_FAILURE();
 }
 

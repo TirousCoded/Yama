@@ -30,8 +30,7 @@ namespace _ym {
     bool checkCallable(const TypeInfo& type, std::string_view msg);
     bool checkNonMember(const TypeInfo& type, std::string_view msg);
 
-    inline void methodReqCallBhvr(YmCtx* ctx, void* user) {
-    }
+    void methodReqCallBhvr(YmCtx* ctx, void* user);
 
 
     struct TypeParamInfo final {
@@ -83,6 +82,7 @@ namespace _ym {
         const TypeParamInfo* queryTypeParam(const std::string& name) const noexcept;
         const ParamInfo* queryParam(YmParamIndex index) const noexcept;
         const ParamInfo* queryParam(const std::string& localName) const noexcept;
+        bool isMethodReq() const noexcept;
 
         YmMembers memberCount() const noexcept;
         YmTypeParams typeParamCount() const noexcept;

@@ -110,6 +110,13 @@ public:
     const YmChar* paramName(YmParamIndex param) const;
     YmType* paramType(YmParamIndex param) const;
 
+    bool hasSelfParam() const noexcept;
+    bool isTypeMethod() const noexcept;
+    bool isObjMethod() const noexcept;
+
+    bool isCallable() const noexcept;
+    bool isMethodReq() const noexcept;
+
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;
 

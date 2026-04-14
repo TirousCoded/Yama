@@ -252,6 +252,10 @@ YmObj* ymCtx_Pop(YmCtx* ctx) {
     return Safe(ctx)->pop();
 }
 
+void ymCtx_PopAll(YmCtx* ctx) {
+    ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+}
+
 YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {
     return Safe(ctx)->put(where, deref(what), whatPolicy);
 }
@@ -488,7 +492,14 @@ YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
     //       the moving of this fn over to ymCtx_*** fns to let it use ymCtx_Ld***.
     auto& fromFln = _from->fullname();
     auto& toFln = _to->fullname();
-    if (toFln == "yama:None" && !coercion) {
+    bool fromIsP = fromK == YmKind_Protocol;
+    bool toIsP = toK == YmKind_Protocol;
+    if (fromIsP || toIsP) {
+        if (fromIsP && toIsP)                               return YM_TRUE;
+        else if (!fromIsP && toIsP && _from->conforms(_to)) return YM_TRUE;
+        else if (fromIsP && !toIsP && _to->conforms(_from)) return (YmBool)!coercion;
+    }
+    else if (toFln == "yama:None" && !coercion) {
         return YM_TRUE;
     }
     else if (fromFln == "yama:Int" && !coercion) {
@@ -519,13 +530,6 @@ YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
         return YmBool(
             toFln == "yama:Int" ||
             toFln == "yama:UInt");
-    }
-    else {
-        bool fromIsP = fromK == YmKind_Protocol;
-        bool toIsP = toK == YmKind_Protocol;
-        if (fromIsP && toIsP)                               return YM_TRUE;
-        else if (!fromIsP && toIsP && _from->conforms(_to)) return YM_TRUE;
-        else if (fromIsP && !toIsP && _to->conforms(_from)) return (YmBool)!coercion;
     }
     return YM_FALSE;
 }

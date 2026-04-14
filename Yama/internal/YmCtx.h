@@ -14,6 +14,7 @@
 #include "../yama++/Safe.h"
 #include "Loader.h"
 #include "MAS.h"
+#include "PTableManager.h"
 #include "RefCounter.h"
 #include "YmDm.h"
 
@@ -76,6 +77,10 @@ private:
 		YmLocal argsOffset; // Where in _globalObjStk this call frame's passed args are located.
 		YmLocal localsOffset; // Where in _globalObjStk this call frame's local object stack begins.
 		YmObj* returnValue = nullptr;
+		// When protocol methods are called, they never appear on call stack, instead forwarding
+		// directly to the method gotten from their ptable. This flag indicates if this call frame
+		// is for one of these forwarded calls.
+		bool fwdFromProto = false;
 	};
 
 	// TODO: This field is used to ensure all objects are released upon deinit, and
@@ -89,10 +94,13 @@ private:
 	// The call stack.
 	std::vector<_CallFrame> _callStk;
 
+	_ym::PTableManager _ptables;
+
 
 	void _beginUserPseudoCall();
 	bool _beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo);
 	bool _endCall() noexcept;
+	void _dispatchCall(YmType& fn);
 
 	static YmRune _uint2rune(YmUInt x) noexcept;
 };

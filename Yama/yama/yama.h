@@ -842,6 +842,14 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     struct YmObj* ymCtx_Pop(struct YmCtx* ctx);
 
+    /* TODO: ymCtx_PopAll has not been unit tested.
+    */
+
+    /* Pops all objects from the local object stack. */
+    /* Behaviour is undefined if ctx is invalid. */
+    void ymCtx_PopAll(struct YmCtx* ctx);
+
+
     /* TODO: At some point we'll need a max limit on object stack (either limit per-call frame,
     *        or of the global stack all call frame object stacks are allocated w/.)
     * 

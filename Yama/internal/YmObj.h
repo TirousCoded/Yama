@@ -28,6 +28,7 @@ public:
             YmRune r;
             YmType* type;
             YmObj* ref;
+            const ym::Safe<YmType>* ptable;
         };
     };
 
@@ -49,14 +50,26 @@ public:
     YmObj(YmCtx& ctx, YmType& type);
 
 
+    // Governs object cleanup behaviour.
+    void cleanup() noexcept;
+
+
     // Returns the number of slots this object has.
-    constexpr size_t size() const noexcept {
-        // TODO: I think we're incorrectly giving regular structs 1 slot.
-        return isNone() ? 0 : 1;
+    inline size_t size() const noexcept {
+        if (type->kind() == YmKind_Protocol) {
+            return 2; // Slot #1 is boxed value, slot #2 is ptable ptr.
+        }
+        // TODO: Doesn't this part seem a bit costly? So many checks...
+        else if (isInt() || isUInt() || isFloat() || isBool() || isRune() || isType()) {
+            return 1;
+        }
+        else return 0;
     }
 
     Slot& slot(size_t index) noexcept;
     const Slot& slot(size_t index) const noexcept;
+
+    bool isProtocol() const noexcept;
 
     // NOTE: Certain internal code expects is*** and to*** methods to operate
     //       such that they require the object's type to be SPECIFICALLY the
@@ -81,6 +94,21 @@ public:
     std::optional<YmBool> toBool() const noexcept;
     std::optional<YmRune> toRune() const noexcept;
     YmType* toType() const noexcept;
+
+
+    // Sets up a boxed value.
+    // Does not do anything to ref count of value.
+    // A ref count incr of value is stolen by the protocol value.
+    // Notice that ptable != nullptr is a valid ptable ptr in this context (ie. for yama:Any.)
+    void box(ym::Safe<YmObj> value, const ym::Safe<YmType>* ptable) noexcept;
+
+    // Queries the boxed value if this is a protocol value.
+    // Does not do anything to ref count of boxed value.
+    YmObj* boxed() const noexcept;
+
+    // Queries the ptable if this is a protocol value.
+    // Notice that nullptr is a valid ptable ptr in this context (ie. for yama:Any.)
+    const ym::Safe<YmType>* ptable() const noexcept;
 };
 
 namespace _ym {
