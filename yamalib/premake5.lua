@@ -2,7 +2,7 @@
 
 project "YamaLib"
 	
-	kind "StaticLib"
+	kind "None" --"StaticLib"
 	targetname "yamalib"
 	
 	files

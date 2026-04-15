@@ -244,16 +244,16 @@ YmObj* ymCtx_Local(YmCtx* ctx, YmLocal where, YmRefPolicy returnPolicy) {
     return Safe(ctx)->local(where, returnPolicy);
 }
 
-void ymCtx_PopN(YmCtx* ctx, YmLocals n) {
-    Safe(ctx)->popN(n);
-}
-
-YmObj* ymCtx_Pop(YmCtx* ctx) {
-    return Safe(ctx)->pop();
+void ymCtx_Pop(YmCtx* ctx, YmLocals n) {
+    Safe(ctx)->pop(n);
 }
 
 void ymCtx_PopAll(YmCtx* ctx) {
-    ymCtx_PopN(ctx, ymCtx_Locals(ctx));
+    Safe(ctx)->pop(Safe(ctx)->locals());
+}
+
+YmObj* ymCtx_Pull(YmCtx* ctx) {
+    return Safe(ctx)->pull();
 }
 
 YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {

@@ -20,7 +20,7 @@ namespace ym {
             Domain(Safe(ymDm_Create()), false) {
         }
         // Increments resource's ref count if secure == true.
-        inline explicit Domain(Safe<YmDm> resource, bool secure) noexcept :
+        inline Domain(Safe<YmDm> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
 

@@ -394,7 +394,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 		ASSERT_EQ(ymCtx_Call(ctx.get(), P_m, 2, YM_NEWTOP), YM_TRUE);
 
 		ASSERT_EQ(ymCtx_Locals(ctx.get()), 1);
-		auto result = Safe(ymCtx_Pop(ctx.get()));
+		auto result = Safe(ymCtx_Pull(ctx.get()));
 
 		EXPECT_EQ(ymObj_Type(result), ymCtx_LdInt(ctx.get()));
 		EXPECT_EQ(ymObj_ToInt(result, nullptr), x * 2); // A::m should double x.
@@ -419,7 +419,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 		ASSERT_EQ(ymCtx_Call(ctx.get(), P_m, 2, YM_NEWTOP), YM_TRUE);
 
 		ASSERT_EQ(ymCtx_Locals(ctx.get()), 1);
-		auto result = Safe(ymCtx_Pop(ctx.get()));
+		auto result = Safe(ymCtx_Pull(ctx.get()));
 
 		EXPECT_EQ(ymObj_Type(result), ymCtx_LdInt(ctx.get()));
 		EXPECT_EQ(ymObj_ToInt(result, nullptr), -x); // B::m should negate x.

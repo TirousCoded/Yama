@@ -2,7 +2,7 @@
 
 project "Tests"
 	
-	kind "ConsoleApp"
+	kind "None" --"ConsoleApp"
 	targetname "tests"
 	
 	files

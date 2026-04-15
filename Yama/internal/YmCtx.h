@@ -61,8 +61,8 @@ public:
 	YmType* ref(YmRef reference);
 	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
 
-	YmObj* pop() noexcept; // Returns taken ref.
-	void popN(YmLocals n);
+	YmObj* pull() noexcept; // Returns taken ref.
+	void pop(YmLocals n);
 	bool put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool call(YmType& fn, YmUInt16 argsN, YmLocal returnTo);
 	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);

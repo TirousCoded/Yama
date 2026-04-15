@@ -2,7 +2,7 @@
 
 project "Sandbox"
 	
-	kind "ConsoleApp"
+	kind "None" --"ConsoleApp"
 	targetname "sandbox"
 	
 	files

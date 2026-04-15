@@ -836,18 +836,15 @@ extern "C" {
     /* Pops the top n objects from the current local object stack. */
     /* Stops prematurely if the stack is emptied. */
     /* Behaviour is undefined if ctx is invalid. */
-    void ymCtx_PopN(struct YmCtx* ctx, YmLocals n);
+    void ymCtx_Pop(struct YmCtx* ctx, YmLocals n);
     
-    /* Pops the top object from the local object stack, returning it, or YM_NIL on failure. */
-    /* Behaviour is undefined if ctx is invalid. */
-    struct YmObj* ymCtx_Pop(struct YmCtx* ctx);
-
-    /* TODO: ymCtx_PopAll has not been unit tested.
-    */
-
     /* Pops all objects from the local object stack. */
     /* Behaviour is undefined if ctx is invalid. */
     void ymCtx_PopAll(struct YmCtx* ctx);
+
+    /* Pulls the top object from the top of the local object stack, returning it, or YM_NIL on failure. */
+    /* Behaviour is undefined if ctx is invalid. */
+    struct YmObj* ymCtx_Pull(struct YmCtx* ctx);
 
 
     /* TODO: At some point we'll need a max limit on object stack (either limit per-call frame,
@@ -1127,6 +1124,9 @@ extern "C" {
     YmFullname ymType_Fullname(struct YmType* type);
 
     /* TODO: Maybe add a YmKind_Unknown, and have that be return value if type == YM_NIL.
+    * 
+    *        This is useful in situations where ymType_Kind arg is gotten from another API
+    *        fn, which may return nullptr, which in turn would otherwise result in UB.
     */
     
     /* Returns the kind of type. */

@@ -793,7 +793,7 @@ TEST(TypeCharacteristics, Structs) {
 		[&ctx](Safe<YmType> type) -> YmObj* {
 		return
 			ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
-			? ymCtx_Pop(ctx)
+			? ymCtx_Pull(ctx)
 			: nullptr;
 		};
 	unit.object(mkObject, Extracts{});
@@ -833,7 +833,7 @@ TEST(TypeCharacteristics, GenericStructs) {
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
 				ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
-				? ymCtx_Pop(ctx)
+				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
 		unit.object(mkObject, Extracts{});
@@ -865,7 +865,7 @@ TEST(TypeCharacteristics, GenericStructs) {
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
 				ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
-				? ymCtx_Pop(ctx)
+				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
 		unit.object(mkObject, Extracts{});

@@ -54,11 +54,11 @@ namespace ym {
         };
 
 
-        inline Context(std::convertible_to<Safe<YmDm>> auto const& dm) :
+        inline explicit Context(std::convertible_to<Safe<YmDm>> auto const& dm) :
             Context(Safe(ymCtx_Create(Safe<YmDm>(dm))), false) {
         }
         // Increments resource's ref count if secure == true.
-        inline explicit Context(Safe<YmCtx> resource, bool secure) noexcept :
+        inline Context(Safe<YmCtx> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
 
@@ -132,9 +132,11 @@ namespace ym {
                 : std::nullopt;
         }
 
-        inline void popN(YmLocals n) noexcept { ymCtx_PopN(get(), n); }
-        inline std::optional<Object> pop() noexcept {
-            auto temp = ymCtx_Pop(get());
+        inline void pop(YmLocals n = 1) noexcept { ymCtx_Pop(get(), n); }
+        inline void popAll() noexcept { ymCtx_PopAll(get()); }
+
+        inline std::optional<Object> pull() noexcept {
+            auto temp = ymCtx_Pull(get());
             return
                 temp
                 ? std::make_optional(Object(*temp, false))

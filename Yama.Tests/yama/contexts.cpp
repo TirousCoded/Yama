@@ -405,7 +405,7 @@ TEST(Contexts, Local_Borrow) {
         });
 }
 
-TEST(Contexts, PopN) {
+TEST(Contexts, Pop) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         auto aa = ymCtx_NewInt(ctx, 50);
 
@@ -419,13 +419,13 @@ TEST(Contexts, PopN) {
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
         EXPECT_EQ(ymObj_RefCount(aa), 2); // Before pop.
 
-        ymCtx_PopN(ctx, 3);
+        ymCtx_Pop(ctx, 3);
 
         EXPECT_EQ(ymCtx_Locals(ctx), 2);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
         EXPECT_EQ(ymObj_RefCount(aa), 2); // Before pop.
 
-        ymCtx_PopN(ctx, 4); // Should stop prematurely.
+        ymCtx_Pop(ctx, 4); // Should stop prematurely.
 
         EXPECT_EQ(ymCtx_Locals(ctx), 0);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), nullptr);
@@ -435,7 +435,31 @@ TEST(Contexts, PopN) {
         });
 }
 
-TEST(Contexts, Pop) {
+TEST(Contexts, PopAll) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        auto aa = ymCtx_NewInt(ctx, 50);
+
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+
+        EXPECT_EQ(ymCtx_Locals(ctx), 5);
+        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+        EXPECT_EQ(ymObj_RefCount(aa), 3); // Before pop.
+
+        ymCtx_PopAll(ctx);
+
+        EXPECT_EQ(ymCtx_Locals(ctx), 0);
+        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), nullptr);
+        EXPECT_EQ(ymObj_RefCount(aa), 1); // After pop.
+
+        EXPECT_EQ(ymObj_Release(aa), 1);
+        });
+}
+
+TEST(Contexts, Pull) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         auto aa = ymCtx_NewInt(ctx, 50);
         auto bb = ymCtx_NewInt(ctx, 100);
@@ -453,7 +477,7 @@ TEST(Contexts, Pop) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
 
-        if (auto x = ymCtx_Pop(ctx)) {
+        if (auto x = ymCtx_Pull(ctx)) {
             EXPECT_EQ(x, cc);
             ymObj_Release(x);
         }
@@ -467,7 +491,7 @@ TEST(Contexts, Pop) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 1);
 
-        if (auto x = ymCtx_Pop(ctx)) {
+        if (auto x = ymCtx_Pull(ctx)) {
             EXPECT_EQ(x, bb);
             ymObj_Release(x);
         }
@@ -481,7 +505,7 @@ TEST(Contexts, Pop) {
         EXPECT_EQ(ymObj_RefCount(bb), 1);
         EXPECT_EQ(ymObj_RefCount(cc), 1);
 
-        if (auto x = ymCtx_Pop(ctx)) {
+        if (auto x = ymCtx_Pull(ctx)) {
             EXPECT_EQ(x, aa);
             ymObj_Release(x);
         }
@@ -495,7 +519,7 @@ TEST(Contexts, Pop) {
         EXPECT_EQ(ymObj_RefCount(bb), 1);
         EXPECT_EQ(ymObj_RefCount(cc), 1);
 
-        EXPECT_EQ(ymCtx_Pop(ctx), nullptr);
+        EXPECT_EQ(ymCtx_Pull(ctx), nullptr);
 
         EXPECT_EQ(ymObj_Release(aa), 1);
         EXPECT_EQ(ymObj_Release(bb), 1);
@@ -528,7 +552,7 @@ TEST(Contexts, Put_Borrow) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
 
-        ymCtx_PopN(ctx, 3);
+        ymCtx_Pop(ctx, 3);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         // Putting
@@ -551,7 +575,7 @@ TEST(Contexts, Put_Borrow) {
         EXPECT_EQ(ymObj_RefCount(cc), 2);
         EXPECT_EQ(ymObj_RefCount(dd), 1);
 
-        ymCtx_PopN(ctx, 3);
+        ymCtx_Pop(ctx, 3);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         EXPECT_EQ(ymObj_RefCount(aa), 1);
@@ -593,7 +617,7 @@ TEST(Contexts, Put_Take) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
 
-        ymCtx_PopN(ctx, 3);
+        ymCtx_Pop(ctx, 3);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         // Putting
@@ -619,7 +643,7 @@ TEST(Contexts, Put_Take) {
         EXPECT_EQ(ymObj_RefCount(cc), 2);
         EXPECT_EQ(ymObj_RefCount(dd), 1);
 
-        ymCtx_PopN(ctx, 3);
+        ymCtx_Pop(ctx, 3);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         // Add ref count incr that the YM_DISCARD put is to consume.

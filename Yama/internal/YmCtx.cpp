@@ -233,7 +233,7 @@ YmObj* YmCtx::local(YmLocal where, YmRefPolicy returnPolicy) {
     return result;
 }
 
-YmObj* YmCtx::pop() noexcept {
+YmObj* YmCtx::pull() noexcept {
     if (auto result = local(locals() - 1)) {
         _globalObjStk.pop_back();
         return result;
@@ -243,12 +243,12 @@ YmObj* YmCtx::pop() noexcept {
     }
 }
 
-void YmCtx::popN(YmLocals n) {
+void YmCtx::pop(YmLocals n) {
     if (n > locals()) {
         n = locals();
     }
     for (YmUInt16 i = 0; i < n; i++) {
-        release(ym::deref(pop()));
+        release(ym::deref(pull()));
     }
 }
 
@@ -333,17 +333,17 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
     auto inIsP = input.type->kind() == YmKind_Protocol;
     auto outIsP = type.kind() == YmKind_Protocol;
     if (input.type == &type) {
-        return put(returnTo, ym::deref(pop()), YM_TAKE);
+        return put(returnTo, ym::deref(pull()), YM_TAKE);
     }
     else if (&type == ymCtx_LdNone(this)) {
-        popN(1);
+        pop(1);
         return ymCtx_PutNone(this, returnTo) == YM_TRUE;
     }
     else if (!inIsP && outIsP) { // Box T -> P
         if (auto ptable = _ptables.load(type, *input.type)) {
             auto protoVal = ym::Safe(create(type));
             // Transfer object into box (ie. moving ownership of it.)
-            protoVal->box(ym::Safe(pop()), *ptable);
+            protoVal->box(ym::Safe(pull()), *ptable);
             return put(returnTo, *protoVal, YM_TAKE);
         }
         else {
@@ -365,14 +365,14 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
                 type.fullname());
             return false;
         }
-        auto old = ym::bindScoped(ym::Safe(pop())); // RAII
+        auto old = ym::bindScoped(ym::Safe(pull())); // RAII
         // The old protocol value might be referenced elsewhere, so it's ref can't
         // be stolen from it, so we pass YM_BORROW to copy the ref.
         return put(returnTo, *old->boxed(), YM_BORROW);
     }
     else if (inIsP && outIsP) { // P -> P
         if (auto ptable = _ptables.load(type, *input.boxed()->type)) {
-            auto old = ym::bindScoped(ym::Safe(pop())); // RAII
+            auto old = ym::bindScoped(ym::Safe(pull())); // RAII
             auto protoVal = ym::Safe(create(type));
             // The old protocol value might be referenced elsewhere, so it's ref can't
             // be stolen from it, so we add an incr for the new protocol value to own.
@@ -392,71 +392,71 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
     }
     else if (auto v = input.toInt()) {
         if (&type == ymCtx_LdUInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdFloat(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutFloat(this, returnTo, (YmFloat)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdRune(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
     else if (auto v = input.toUInt()) {
         if (&type == ymCtx_LdInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdFloat(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutFloat(this, returnTo, (YmFloat)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdRune(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
     else if (auto v = input.toFloat()) {
         if (&type == ymCtx_LdInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdUInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdRune(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
     else if (auto v = input.toBool()) {
         if (&type == ymCtx_LdInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutInt(this, returnTo, v == YM_TRUE ? 1 : 0) == YM_TRUE;
         }
         else if (&type == ymCtx_LdUInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutUInt(this, returnTo, v == YM_TRUE ? 1 : 0) == YM_TRUE;
         }
         else if (&type == ymCtx_LdFloat(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutFloat(this, returnTo, v == YM_TRUE ? 1.0 : 0.0) == YM_TRUE;
         }
         else return false;
     }
     else if (auto v = input.toRune()) {
         if (&type == ymCtx_LdInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutInt(this, returnTo, (YmInt)*v) == YM_TRUE;
         }
         else if (&type == ymCtx_LdUInt(this)) {
-            popN(1);
+            pop(1);
             return ymCtx_PutUInt(this, returnTo, (YmUInt)*v) == YM_TRUE;
         }
         else return false;
@@ -552,7 +552,7 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
 bool YmCtx::_endCall() noexcept {
     ymAssert(!_callStk.empty());
     _CallFrame cf = _callStk.back();
-    popN(locals());
+    pop(locals());
     _callStk.pop_back();
     if (!cf.fn) {
         // This is user pseudo-call.
@@ -576,7 +576,7 @@ bool YmCtx::_endCall() noexcept {
         return false;
     }
     else {
-        popN(cf.args);
+        pop(cf.args);
         return put(cf.returnTo, *cf.returnValue);
     }
 }
