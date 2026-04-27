@@ -28,6 +28,8 @@ extern "C" {
         YmErrCode_TypeCannotHaveMembers,    /* Type cannot have members. */
         YmErrCode_ProtocolType,             /* Type is a protocol. */
         YmErrCode_NonProtocolType,          /* Type is a non-protocol. */
+        YmErrCode_ProtocolMemberType,       /* Type is member of protocol type. */
+        YmErrCode_ArgNotFound,              /* Arg object index out-of-bounds. */
         YmErrCode_LocalNotFound,            /* Local object stack index out-of-bounds. */
         YmErrCode_CallProcedureError,       /* Call procedure error. */
         YmErrCode_CallStackOverflow,        /* Call stack overflow. */

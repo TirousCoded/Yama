@@ -51,18 +51,18 @@ TEST(Conversions, Identity_IncludeGenerics) {
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
     auto B_ind = ymParcelDef_AddStruct(p_def, "B");
     auto C_ind = ymParcelDef_AddStruct(p_def, "C");
-    ymParcelDef_AddTypeParam(p_def, C_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, "C", "T", "p:Any");
     
     auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
     auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
-    ymParcelDef_AddTypeParam(p_def, Q_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, "Q", "T", "p:Any");
     
     auto f_ind = ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     auto g_ind = ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddTypeParam(p_def, g_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, "g", "T", "p:Any");
     
-    auto A_m_ind = ymParcelDef_AddMethod(p_def, A_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
-    auto C_m_ind = ymParcelDef_AddMethod(p_def, C_ind, "m", "p:A", ymInertCallBhvrFn, nullptr);
+    auto A_m_ind = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    auto C_m_ind = ymParcelDef_AddMethod(p_def, "C", "m", "p:A", ymInertCallBhvrFn, nullptr);
     
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -111,17 +111,17 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
     auto B_ind = ymParcelDef_AddStruct(p_def, "B");
     auto C_ind = ymParcelDef_AddStruct(p_def, "C");
-    ymParcelDef_AddTypeParam(p_def, C_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, "C", "T", "p:Any");
 
     ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
     auto h_ind = ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddTypeParam(p_def, h_ind, "T", "p:Any");
+    ymParcelDef_AddTypeParam(p_def, "h", "T", "p:Any");
 
-    ymParcelDef_AddMethod(p_def, A_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, A_ind, "m2", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, B_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, C_ind, "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "B", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "C", "m1", "p:A", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -160,23 +160,23 @@ TEST(Conversions, NonProtocolToProtocol) {
     ymParcelDef_AddProtocol(p_def, "Any");
 
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
-    ymParcelDef_AddMethod(p_def, A_ind, "mA", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, A_ind, "mB", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "mA", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "mB", "p:A", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddStruct(p_def, "B");
     
     auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
-    ymParcelDef_AddMethodReq(p_def, P1_ind, "mA", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P1", "mA", "p:A");
     
     auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
-    ymParcelDef_AddMethodReq(p_def, P2_ind, "mB", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P2", "mB", "p:A");
 
     auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
-    ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P3", "mC", "p:A");
 
     auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
-    ymParcelDef_AddTypeParam(p_def, P4_ind, "T", "p:Any");
-    ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
+    ymParcelDef_AddTypeParam(p_def, "P4", "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, "P4", "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -208,23 +208,23 @@ TEST(Conversions, ProtocolToNonProtocol) {
     ymParcelDef_AddProtocol(p_def, "Any");
 
     auto A_ind = ymParcelDef_AddStruct(p_def, "A");
-    ymParcelDef_AddMethod(p_def, A_ind, "mA", "p:A", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddMethod(p_def, A_ind, "mB", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "mA", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "mB", "p:A", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddStruct(p_def, "B");
 
     auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
-    ymParcelDef_AddMethodReq(p_def, P1_ind, "mA", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P1", "mA", "p:A");
     
     auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
-    ymParcelDef_AddMethodReq(p_def, P2_ind, "mB", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P2", "mB", "p:A");
     
     auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
-    ymParcelDef_AddMethodReq(p_def, P3_ind, "mC", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P3", "mC", "p:A");
 
     auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
-    ymParcelDef_AddTypeParam(p_def, P4_ind, "T", "p:Any");
-    ymParcelDef_AddMethodReq(p_def, P4_ind, "mA", "$T");
+    ymParcelDef_AddTypeParam(p_def, "P4", "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, "P4", "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -260,14 +260,14 @@ TEST(Conversions, ProtocolToProtocol) {
     ymParcelDef_AddStruct(p_def, "B");
 
     auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
-    ymParcelDef_AddMethodReq(p_def, P_ind, "mA", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "P", "mA", "p:A");
     
     auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
-    ymParcelDef_AddMethodReq(p_def, Q_ind, "mB", "p:A");
+    ymParcelDef_AddMethodReq(p_def, "Q", "mB", "p:A");
     
     auto R_ind = ymParcelDef_AddProtocol(p_def, "R");
-    ymParcelDef_AddTypeParam(p_def, R_ind, "T", "p:Any");
-    ymParcelDef_AddMethodReq(p_def, R_ind, "mA", "$T");
+    ymParcelDef_AddTypeParam(p_def, "R", "T", "p:Any");
+    ymParcelDef_AddMethodReq(p_def, "R", "mA", "$T");
     
     ymDm_BindParcelDef(dm, "p", p_def);
     

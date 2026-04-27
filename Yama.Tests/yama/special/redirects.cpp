@@ -134,9 +134,9 @@ TEST(Redirects, SubjectPrefixPathsSegregateRedirects) {
 TEST(Redirects, BeforePrefixPathsCoverAllPathsContainingThem) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto p_f_ind = ymParcelDef_AddFn(p_def, "f", "alt/a:A", ymInertCallBhvrFn, nullptr);
-	ymParcelDef_AddParam(p_def, p_f_ind, "b", "alt/b:A");
-	ymParcelDef_AddParam(p_def, p_f_ind, "c", "alt/c:A");
+	ymParcelDef_AddFn(p_def, "f", "alt/a:A", ymInertCallBhvrFn, nullptr);
+	ymParcelDef_AddParam(p_def, "f", "b", "alt/b:A");
+	ymParcelDef_AddParam(p_def, "f", "c", "alt/c:A");
 	SETUP_PARCELDEF(q_a_def);
 	ymParcelDef_AddStruct(q_a_def, "A");
 	SETUP_PARCELDEF(q_b_def);
@@ -160,9 +160,9 @@ TEST(Redirects, BeforePrefixPathsCoverAllPathsContainingThem) {
 TEST(Redirects, BeforePrefixPathsShadowRedirectsWithLessSpecificOnes) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto p_f_ind = ymParcelDef_AddFn(p_def, "f", "alt/a:A", ymInertCallBhvrFn, nullptr);
-	ymParcelDef_AddParam(p_def, p_f_ind, "b", "alt/b:A");
-	ymParcelDef_AddParam(p_def, p_f_ind, "c", "alt/c:A");
+	ymParcelDef_AddFn(p_def, "f", "alt/a:A", ymInertCallBhvrFn, nullptr);
+	ymParcelDef_AddParam(p_def, "f", "b", "alt/b:A");
+	ymParcelDef_AddParam(p_def, "f", "c", "alt/c:A");
 	SETUP_PARCELDEF(q_a_def);
 	ymParcelDef_AddStruct(q_a_def, "A");
 	SETUP_PARCELDEF(q_b_def);
@@ -195,9 +195,9 @@ TEST(Redirects, WorksInTypeArgsAndCallSuffParamAndReturnTypes) {
 	SETUP_PARCELDEF(p_def);
 	ymParcelDef_AddFn(p_def, "f", "alt1:g[alt2:Int](alt2:Int) -> alt2:Int", ymInertCallBhvrFn, nullptr);
 	SETUP_PARCELDEF(q_def);
-	auto q_g_ind = ymParcelDef_AddFn(q_def, "g", "$T", ymInertCallBhvrFn, nullptr);
-	ymParcelDef_AddTypeParam(q_def, q_g_ind, "T", "yama:Any");
-	ymParcelDef_AddParam(q_def, q_g_ind, "a", "$T");
+	ymParcelDef_AddFn(q_def, "g", "$T", ymInertCallBhvrFn, nullptr);
+	ymParcelDef_AddTypeParam(q_def, "g", "T", "yama:Any");
+	ymParcelDef_AddParam(q_def, "g", "a", "$T");
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ymDm_BindParcelDef(dm, "q", q_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt1", "q"));
@@ -210,8 +210,8 @@ TEST(Redirects, WorksInTypeArgsAndCallSuffParamAndReturnTypes) {
 TEST(Redirects, OriginalPathCanStillBeUsedIfItIsntShadowedByAnotherRedirect) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto p_f_ind = ymParcelDef_AddFn(p_def, "f", "yama:Int", ymInertCallBhvrFn, nullptr);
-	ymParcelDef_AddParam(p_def, p_f_ind, "a", "alt:Int");
+	ymParcelDef_AddFn(p_def, "f", "yama:Int", ymInertCallBhvrFn, nullptr);
+	ymParcelDef_AddParam(p_def, "f", "a", "alt:Int");
 	ymDm_BindParcelDef(dm, "p", p_def);
 	ASSERT_TRUE(ymDm_AddRedirect(dm, "p", "alt", "yama"));
 	YmType* Int = load(ctx, "yama:Int");

@@ -31,7 +31,7 @@ std::optional<std::string> YmType::callsuff() const {
     }
     std::string result{};
     result += "(";
-    for (YmParams i = 0; i < params(); i++) {
+    for (YmParams i = 0; i < positionalParamCount(); i++) {
         if (i >= 1) {
             result += ", ";
         }
@@ -140,6 +140,26 @@ YmType* YmType::typeParamConstraint(const std::string& name) const noexcept {
     return nullptr;
 }
 
+YmParams YmType::paramCount() const noexcept {
+    return info->paramCount();
+}
+
+YmParams YmType::positionalParamCount() const noexcept {
+    return info->positionalParamCount();
+}
+
+YmParams YmType::namedParamCount() const noexcept {
+    return info->namedParamCount();
+}
+
+bool YmType::isPositionalParam(YmParamIndex index) const noexcept {
+    return info->isPositionalParam(index);
+}
+
+bool YmType::isNamedParam(YmParamIndex index) const noexcept {
+    return info->isNamedParam(index);
+}
+
 YmType* YmType::returnType() const noexcept {
     return
         info->returnType
@@ -147,32 +167,50 @@ YmType* YmType::returnType() const noexcept {
         : nullptr;
 }
 
-const YmChar* YmType::paramName(YmParamIndex param) const {
-    if (auto p = info->queryParam(param)) {
+const YmChar* YmType::paramName(YmParamIndex index) const {
+    if (auto p = info->queryParam(index)) {
         return p->name.c_str();
     }
     _ym::Global::raiseErr(
         YmErrCode_ParamNotFound,
         "Cannot query parameter name; type {}; no parameter found at index {}!",
         fullname(),
-        param);
+        index);
     return nullptr;
 }
 
-YmType* YmType::paramType(YmParamIndex param) const {
-    if (auto p = info->queryParam(param)) {
+YmType* YmType::paramType(YmParamIndex index) const {
+    if (auto p = info->queryParam(index)) {
         return constAs<_ym::ConstType::Ref>(p->type);
     }
     _ym::Global::raiseErr(
         YmErrCode_ParamNotFound,
         "Cannot query parameter type; type {}; no parameter found at index {}!",
         fullname(),
-        param);
+        index);
     return nullptr;
 }
 
+std::optional<YmParamCategory> YmType::paramCategory(YmParamIndex index) const noexcept {
+    if (isPositionalParam(index))   return YmParamCategory_Positional;
+    else if (isNamedParam(index))   return YmParamCategory_Named;
+    _ym::Global::raiseErr(
+        YmErrCode_ParamNotFound,
+        "Cannot query parameter category; type {}; no parameter found at index {}!",
+        fullname(),
+        index);
+    return std::nullopt;
+}
+
+std::optional<YmParamIndex> YmType::paramIndex(const std::string& name) const noexcept {
+    if (auto p = info->queryParam(name)) {
+        return p->index;
+    }
+    return std::nullopt;
+}
+
 bool YmType::hasSelfParam() const noexcept {
-    return params() >= 1 && paramType(0) == owner();
+    return paramCount() >= 1 && paramType(0) == owner();
 }
 
 bool YmType::isTypeMethod() const noexcept {
@@ -261,15 +299,15 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
                 return false;
             }
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmType::conforms: Param Count: {} vs. {}", match->params(), pMemb.params());
-            ym::println("YmType::conforms: Params:");
+            ym::println("YmType::conforms: Positional Param Count: {} vs. {}", match->params(), pMemb.params());
+            ym::println("YmType::conforms: Positional Params:");
 #endif
-            // Check param counts.
-            if (pMemb.params() != match->params()) {
+            // Check positional param counts.
+            if (pMemb.positionalParamCount() != match->positionalParamCount()) {
                 return false;
             }
-            for (YmParamIndex j = 0; j < match->params(); j++) {
-                // Check param types.
+            for (YmParamIndex j = 0; j < match->positionalParamCount(); j++) {
+                // Check positional param types.
                 if (!compare(pMemb, pMemb.info->params[j].type, *match, ym::deref(match->paramType(j)))) {
                     return false;
                 }

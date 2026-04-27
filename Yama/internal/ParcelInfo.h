@@ -29,6 +29,7 @@ namespace _ym {
     std::optional<Spec> normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver = {});
     bool checkCallable(const TypeInfo& type, std::string_view msg);
     bool checkNonMember(const TypeInfo& type, std::string_view msg);
+    bool checkNonProtocolMember(const TypeInfo& type, std::string_view msg);
 
     void methodReqCallBhvr(YmCtx* ctx, void* user);
 
@@ -52,6 +53,8 @@ namespace _ym {
         // TODO: TypeInfo is rather *fat*, w/ types carrying a LOT of data, much of which many
         //       don't even need to define themselves. To this end, look into a 'descriptor' setup,
         //       like in our old impl, to reduce per-type memory consumption.
+        //          * Lol, sizeof(TypeInfo) is around 0.5KB now, so ya, we'd be best to try and reduce
+        //            this at some point in the future.
 
         // TODO: When we impl descriptors, be sure to also reorganize TypeInfo owner/member relationships
         //       so that member TypeInfo have DIRECT access to the type param data of their owner, as
@@ -65,8 +68,14 @@ namespace _ym {
         std::unordered_map<std::string, ConstIndex> membersByName;
         std::optional<ConstIndex> returnType;
         std::vector<ParamInfo> params;
+        YmParams positionalParams = 0;
         ConstTableInfo consts;
         std::vector<ConstIndex> refs;
+
+        // TODO: usesNamedParams is only here for ymParcelDef_*** API, so later try to find a way
+        //       to move this out of here.
+
+        bool usesNamedParams = false;
 
 
         bool returnTypeIsSelf() const noexcept;
@@ -84,12 +93,19 @@ namespace _ym {
         const ParamInfo* queryParam(const std::string& localName) const noexcept;
         bool isMethodReq() const noexcept;
 
+        YmParams paramCount() const noexcept;
+        YmParams positionalParamCount() const noexcept;
+        YmParams namedParamCount() const noexcept;
+        bool isPositionalParam(YmParamIndex index) const noexcept;
+        bool isNamedParam(YmParamIndex index) const noexcept;
+
         YmMembers memberCount() const noexcept;
         YmTypeParams typeParamCount() const noexcept;
         bool isParameterized() const noexcept;
 
         std::optional<YmTypeParamIndex> addTypeParam(std::string name, std::string constraintTypeSymbol);
         std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol);
+        void beginNamedParams();
         std::optional<YmRef> addRef(std::string symbol);
 
         void attemptSetupAsMember(ParcelInfo& parcel);
@@ -120,22 +136,24 @@ namespace _ym {
         // Fails if name conflict arises.
         // Invalidates type pointers.
         std::optional<YmTypeIndex> addType(
-            YmTypeIndex owner,
+            std::string ownerName,
             std::string memberName,
             YmKind kind,
             std::optional<std::string> returnTypeSymbol = std::nullopt,
             std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt);
 
         std::optional<YmTypeParamIndex> addTypeParam(
-            YmTypeIndex type,
+            std::string typeName,
             std::string name,
             std::string constraintTypeSymbol);
         std::optional<YmParamIndex> addParam(
-            YmTypeIndex type,
+            std::string typeName,
             std::string name,
             std::string paramTypeSymbol);
+        void beginNamedParams(
+            const std::string& typeName);
         std::optional<YmRef> addRef(
-            YmTypeIndex type,
+            std::string typeName,
             std::string symbol);
 
 
@@ -144,7 +162,7 @@ namespace _ym {
         std::unordered_map<std::string, YmTypeIndex> _lookup;
 
 
-        _ym::TypeInfo* _expectType(YmTypeIndex index, std::string_view msg);
+        _ym::TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
     };
 }

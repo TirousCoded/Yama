@@ -33,8 +33,8 @@ TEST(Loading, WorksWithAllTypeKinds) {
     YmTypeIndex A_index = setup_struct(p_def, "A", {});
     YmTypeIndex B_index = setup_protocol(p_def, "B", {});
     YmTypeIndex C_index = setup_fn(p_def, "C", "p:Int", {});
-    YmTypeIndex A_m_index = setup_method(p_def, A_index, "m", "p:Int", {});
-    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
+    YmTypeIndex A_m_index = setup_method(p_def, "A", "m", "p:Int", {});
+    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -86,8 +86,8 @@ TEST(Loading, WorksWithAllTypeKinds_Generics) {
     YmTypeIndex A_index = setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
     YmTypeIndex B_index = setup_protocol(p_def, "B", {}, { { "X", "p:Any" } });
     YmTypeIndex C_index = setup_fn(p_def, "C", "p:Int", {}, { { "X", "p:Any" } });
-    YmTypeIndex A_m_index = setup_method(p_def, A_index, "m", "p:Int", {});
-    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, B_index, "m", "p:Int");
+    YmTypeIndex A_m_index = setup_method(p_def, "A", "m", "p:Int", {});
+    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -349,8 +349,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
     SETUP_PARCELDEF(p_def);
 
     YmTypeIndex p_A_index = setup_struct(p_def, "A", { "p:A::m1", "p:A::m2" });
-    YmTypeIndex p_A_m1_index = setup_method(p_def, p_A_index, "m1", "p:B", { "p:A", "p:B" });
-    YmTypeIndex p_A_m2_index = setup_method(p_def, p_A_index, "m2", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "p:A", "p:B" });
     YmTypeIndex p_B_index = setup_struct(p_def, "B", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -394,8 +394,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     SETUP_PARCELDEF(p_def);
 
     YmTypeIndex p_A_index = setup_struct(p_def, "A", { "p:A::m1", "p:A::m2" });
-    YmTypeIndex p_A_m1_index = setup_method(p_def, p_A_index, "m1", "p:B", { "p:A", "p:B" });
-    YmTypeIndex p_A_m2_index = setup_method(p_def, p_A_index, "m2", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "p:A", "p:B" });
     YmTypeIndex p_B_index = setup_struct(p_def, "B", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -453,8 +453,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
     auto Any_index = setup_protocol(p_def, "Any", {});
 
     auto T_index = setup_struct(p_def, "T", { "p:T[$X]::m1", "p:T[$X]::m2" }, { { "X", "p:Any" } });
-    auto T_m1_index = setup_method(p_def, T_index, "m1", "$X", { "$X" });
-    auto T_m2_index = setup_method(p_def, T_index, "m2", "p:Int", { "$X", "p:Int" });
+    auto T_m1_index = setup_method(p_def, "T", "m1", "$X", { "$X" });
+    auto T_m2_index = setup_method(p_def, "T", "m2", "p:Int", { "$X", "p:Int" });
 
     auto A_index = setup_struct(p_def, "A", {});
 
@@ -492,20 +492,20 @@ TEST(Loading, SelfRef_IncludingRefsWithinMembers) {
     // NOTE: Here, struct is for testing non-protocol types generally.
 
     auto STRUCT_index = setup_struct(p_def, "STRUCT", {});
-    auto STRUCT_ref = ymParcelDef_AddRef(p_def, STRUCT_index, "$Self");
-    auto STRUCT_m_index = setup_method(p_def, STRUCT_index, "m", "$Self", {}); // Covers method kind.
-    ymParcelDef_AddParam(p_def, STRUCT_m_index, "a", "$Self");
-    auto STRUCT_m_ref = ymParcelDef_AddRef(p_def, STRUCT_m_index, "$Self");
+    auto STRUCT_ref = ymParcelDef_AddRef(p_def, "STRUCT", "$Self");
+    auto STRUCT_m_index = setup_method(p_def, "STRUCT", "m", "$Self", {}); // Covers method kind.
+    ymParcelDef_AddParam(p_def, "STRUCT::m", "a", "$Self");
+    auto STRUCT_m_ref = ymParcelDef_AddRef(p_def, "STRUCT::m", "$Self");
 
     auto PROTOCOL_index = setup_protocol(p_def, "PROTOCOL", {});
-    auto PROTOCOL_ref = ymParcelDef_AddRef(p_def, PROTOCOL_index, "$Self");
-    auto PROTOCOL_m_index = ymParcelDef_AddMethodReq(p_def, PROTOCOL_index, "m", "$Self");
-    ymParcelDef_AddParam(p_def, PROTOCOL_m_index, "a", "$Self");
-    auto PROTOCOL_m_ref = ymParcelDef_AddRef(p_def, PROTOCOL_m_index, "$Self");
+    auto PROTOCOL_ref = ymParcelDef_AddRef(p_def, "PROTOCOL", "$Self");
+    auto PROTOCOL_m_index = ymParcelDef_AddMethodReq(p_def, "PROTOCOL", "m", "$Self");
+    ymParcelDef_AddParam(p_def, "PROTOCOL::m", "a", "$Self");
+    auto PROTOCOL_m_ref = ymParcelDef_AddRef(p_def, "PROTOCOL::m", "$Self");
 
     auto FN_index = setup_fn(p_def, "FN", "$Self", {});
-    ymParcelDef_AddParam(p_def, FN_index, "a", "$Self");
-    auto FN_ref = ymParcelDef_AddRef(p_def, FN_index, "$Self");
+    ymParcelDef_AddParam(p_def, "FN", "a", "$Self");
+    auto FN_ref = ymParcelDef_AddRef(p_def, "FN", "$Self");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -519,9 +519,9 @@ TEST(Loading, SelfRef_IncludingRefsWithinMembers) {
     EXPECT_EQ(ymType_ReturnType(PROTOCOL_m), PROTOCOL);
     EXPECT_EQ(ymType_ReturnType(FN), FN);
 
-    ASSERT_EQ(ymType_Params(STRUCT_m), 1);
-    ASSERT_EQ(ymType_Params(PROTOCOL_m), 1);
-    ASSERT_EQ(ymType_Params(FN), 1);
+    ASSERT_EQ(ymType_Params(STRUCT_m, YM_FALSE), 1);
+    ASSERT_EQ(ymType_Params(PROTOCOL_m, YM_FALSE), 1);
+    ASSERT_EQ(ymType_Params(FN, YM_FALSE), 1);
 
     EXPECT_EQ(ymType_ParamType(STRUCT_m, 0), STRUCT);
     EXPECT_EQ(ymType_ParamType(PROTOCOL_m, 0), PROTOCOL);
@@ -565,7 +565,7 @@ TEST(Loading, TypeArgRef_IncludingRefsWithinMembers) {
     // NOTE: All the '$X' below are the type arg refs under test.
 
     auto T_index = setup_struct(p_def, "T", { "p:U[p:U[$X]]" }, { { "X", "p:Any" } });
-    auto T_m_index = setup_method(p_def, T_index, "m", "$X", { "p:U[$X]" });
+    auto T_m_index = setup_method(p_def, "T", "m", "$X", { "p:U[$X]" });
 
     auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
 
@@ -599,7 +599,7 @@ TEST(Loading, Here) {
 
     auto A_index = setup_struct(p_def, "A", {});
     auto B_index = setup_struct(p_def, "B", {});
-    auto B_ref = ymParcelDef_AddRef(p_def, B_index, "%here:A"); // Reference symbol under test.
+    auto B_ref = ymParcelDef_AddRef(p_def, "B", "%here:A"); // Reference symbol under test.
     ASSERT_NE(B_ref, YM_NO_REF);
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -651,28 +651,28 @@ TEST(Loading, TypeParams_IncludingForMemberTypes) {
     auto Int_index = setup_struct(p_def, "Int", {});
 
     auto P_index = setup_protocol(p_def, "P", {});
-    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
-    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, "P", "m", "p:Int");
+    ymParcelDef_AddParam(p_def, "P::m", "x", "p:Int");
 
     auto Q_index = setup_protocol(p_def, "Q", {});
-    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:Int");
+    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, "Q", "m", "p:Int");
 
     auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P" }, { "Y", "p:Q" } });
-    ymParcelDef_AddMethod(p_def, T_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "T", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     auto A_index = setup_struct(p_def, "A", {});
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, "A::m", "x", "p:Int");
 
     auto B_index = setup_struct(p_def, "B", {});
-    auto B_m_index = ymParcelDef_AddMethod(p_def, B_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    auto B_m_index = ymParcelDef_AddMethod(p_def, "B", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     auto C_index = setup_struct(p_def, "C", {});
-    auto C_m_index = ymParcelDef_AddMethod(p_def, C_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddParam(p_def, C_m_index, "x", "p:Int");
+    auto C_m_index = ymParcelDef_AddMethod(p_def, "C", "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, "C::m", "x", "p:Int");
 
     auto D_index = setup_struct(p_def, "D", {});
-    auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    auto D_m_index = ymParcelDef_AddMethod(p_def, "D", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -720,7 +720,7 @@ TEST(Loading, TypeParams_ParamsInterReferenceOneAnother) {
     auto Any_index = setup_protocol(p_def, "Any", {});
 
     auto P_index = setup_protocol(p_def, "P", {}, { { "X", "p:Any" } });
-    ymParcelDef_AddMethodReq(p_def, P_index, "m", "$X");
+    ymParcelDef_AddMethodReq(p_def, "P", "m", "$X");
 
     auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
 
@@ -729,7 +729,7 @@ TEST(Loading, TypeParams_ParamsInterReferenceOneAnother) {
     auto A_index = setup_struct(p_def, "A", {});
 
     auto B_index = setup_struct(p_def, "B", {});
-    ymParcelDef_AddMethod(p_def, B_index, "m", "p:U[p:A]", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "B", "m", "p:U[p:A]", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -761,14 +761,14 @@ TEST(Loading, TypeParams_ParamsReferenceSelf) {
     auto Any_index = setup_protocol(p_def, "Any", {});
 
     auto P_index = setup_protocol(p_def, "P", {}, { { "X", "p:Any" } });
-    ymParcelDef_AddMethodReq(p_def, P_index, "m", "$X");
+    ymParcelDef_AddMethodReq(p_def, "P", "m", "$X");
 
     auto U_index = setup_struct(p_def, "U", {}, { { "X", "p:Any" } });
 
     auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P[p:U[$Self]]" } });
 
     auto A_index = setup_struct(p_def, "A", {});
-    ymParcelDef_AddMethod(p_def, A_index, "m", "p:U[p:T[p:A]]", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:U[p:T[p:A]]", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -798,30 +798,30 @@ TEST(Loading, TypeParams_IndirectLoad) {
     auto Int_index = setup_struct(p_def, "Int", {});
 
     auto P_index = setup_protocol(p_def, "P", {});
-    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
-    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, "P", "m", "p:Int");
+    ymParcelDef_AddParam(p_def, "P::m", "x", "p:Int");
 
     auto Q_index = setup_protocol(p_def, "Q", {});
-    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:Int");
+    auto Q_m_index = ymParcelDef_AddMethodReq(p_def, "Q", "m", "p:Int");
 
     auto H_index = setup_struct(p_def, "H", { "p:T[p:A, p:B]", "p:T[p:C, p:D]", "p:T[p:C, p:T[p:A, p:B]]" });
 
     auto T_index = setup_struct(p_def, "T", {}, { { "X", "p:P" }, { "Y", "p:Q" } });
-    auto T_m_index = ymParcelDef_AddMethod(p_def, T_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    auto T_m_index = ymParcelDef_AddMethod(p_def, "T", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     auto A_index = setup_struct(p_def, "A", {});
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, "A::m", "x", "p:Int");
 
     auto B_index = setup_struct(p_def, "B", {});
-    auto B_m_index = ymParcelDef_AddMethod(p_def, B_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    auto B_m_index = ymParcelDef_AddMethod(p_def, "B", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     auto C_index = setup_struct(p_def, "C", {});
-    auto C_m_index = ymParcelDef_AddMethod(p_def, C_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    ymParcelDef_AddParam(p_def, C_m_index, "x", "p:Int");
+    auto C_m_index = ymParcelDef_AddMethod(p_def, "C", "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddParam(p_def, "C::m", "x", "p:Int");
 
     auto D_index = setup_struct(p_def, "D", {});
-    auto D_m_index = ymParcelDef_AddMethod(p_def, D_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    auto D_m_index = ymParcelDef_AddMethod(p_def, "D", "m", "p:Int", ymInertCallBhvrFn, nullptr);
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -863,16 +863,16 @@ TEST(Loading, TypeParams_RecursiveConstraint_ForGenericProtocol) {
 
     // A conforms to P and Q.
     auto A_index = setup_struct(p_def, "A", {});
-    ymParcelDef_AddMethod(p_def, A_index, "m", "p:None", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:None", ymInertCallBhvrFn, nullptr);
 
     // B doesn't conform to P and Q.
     auto B_index = setup_struct(p_def, "B", {});
 
     auto P_index = setup_protocol(p_def, "P", {}, { { "T", "$Self" } });
-    ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:None");
+    ymParcelDef_AddMethodReq(p_def, "P", "m", "p:None");
 
     auto Q_index = setup_protocol(p_def, "Q", {}, { { "T", "p:Q[$T]" } });
-    ymParcelDef_AddMethodReq(p_def, Q_index, "m", "p:None");
+    ymParcelDef_AddMethodReq(p_def, "Q", "m", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -926,12 +926,12 @@ TEST(Loading, MemberAccess) {
     setup_protocol(p_def, "Any", {});
 
     auto A_index = setup_struct(p_def, "A", {}, {});
-    setup_method(p_def, A_index, "m", "p:A", {});
-    auto A_m_ref = ymParcelDef_AddRef(p_def, A_index, "p:A::m");
-    auto B_A_m_ref = ymParcelDef_AddRef(p_def, A_index, "p:B[p:A]::m");
+    setup_method(p_def, "A", "m", "p:A", {});
+    auto A_m_ref = ymParcelDef_AddRef(p_def, "A", "p:A::m");
+    auto B_A_m_ref = ymParcelDef_AddRef(p_def, "A", "p:B[p:A]::m");
 
     auto B_index = setup_struct(p_def, "B", {}, { { "T", "p:Any" } });
-    setup_method(p_def, B_index, "m", "p:A", {});
+    setup_method(p_def, "B", "m", "p:A", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -950,12 +950,12 @@ TEST(Loading, MemberAccess_SelfAndTypeParamRefs) {
     setup_protocol(p_def, "Any", {});
 
     auto A_index = setup_struct(p_def, "A", {}, { { "T", "p:Any" } });
-    setup_method(p_def, A_index, "m1", "p:B", {});
-    auto A_m1_ref = ymParcelDef_AddRef(p_def, A_index, "$Self::m1");
-    auto B_m2_ref = ymParcelDef_AddRef(p_def, A_index, "$T::m2");
+    setup_method(p_def, "A", "m1", "p:B", {});
+    auto A_m1_ref = ymParcelDef_AddRef(p_def, "A", "$Self::m1");
+    auto B_m2_ref = ymParcelDef_AddRef(p_def, "A", "$T::m2");
 
     auto B_index = setup_struct(p_def, "B", {});
-    setup_method(p_def, B_index, "m2", "p:B", {});
+    setup_method(p_def, "B", "m2", "p:B", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -980,10 +980,10 @@ TEST(Loading, CallSigs_DirectLoad) {
     setup_struct(p_def, "B", {});
     
     auto f_ind = setup_fn(p_def, "f", "p:A", {});
-    ymParcelDef_AddParam(p_def, f_ind, "a", "p:A");
+    ymParcelDef_AddParam(p_def, "f", "a", "p:A");
     
     auto g_ind = setup_fn(p_def, "g", "$U", {}, { { "T", "p:Any" }, { "U", "p:Any" } });
-    ymParcelDef_AddParam(p_def, g_ind, "a", "$T");
+    ymParcelDef_AddParam(p_def, "g", "a", "$T");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -1037,16 +1037,16 @@ TEST(Loading, CallSigs_IndirectLoad) {
     setup_struct(p_def, "B", {});
 
     auto f_ind = setup_fn(p_def, "f", "p:A", {});
-    ymParcelDef_AddParam(p_def, f_ind, "a", "p:A");
+    ymParcelDef_AddParam(p_def, "f", "a", "p:A");
 
     auto g_ind = setup_fn(p_def, "g", "$U", {}, { { "T", "p:Any" }, { "U", "p:Any" } });
-    ymParcelDef_AddParam(p_def, g_ind, "a", "$T");
+    ymParcelDef_AddParam(p_def, "g", "a", "$T");
 
     auto SUCC_ind = setup_struct(p_def, "SUCC", {});
-    auto SUCC_ref1 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:f(p:A) -> p:A");
-    auto SUCC_ref2 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:A, p:A](p:A) -> p:A");
-    auto SUCC_ref3 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:B, p:A](p:B) -> p:A");
-    auto SUCC_ref4 = ymParcelDef_AddRef(p_def, SUCC_ind, "p:g[p:A, p:B](p:A) -> p:B");
+    auto SUCC_ref1 = ymParcelDef_AddRef(p_def, "SUCC", "p:f(p:A) -> p:A");
+    auto SUCC_ref2 = ymParcelDef_AddRef(p_def, "SUCC", "p:g[p:A, p:A](p:A) -> p:A");
+    auto SUCC_ref3 = ymParcelDef_AddRef(p_def, "SUCC", "p:g[p:B, p:A](p:B) -> p:A");
+    auto SUCC_ref4 = ymParcelDef_AddRef(p_def, "SUCC", "p:g[p:A, p:B](p:A) -> p:B");
 
     // TODO: Currently, as shown below, our failure tests for indirect loads via callsig only
     //       really tests on case, and *presumes* that the more thorough failure testing of
@@ -1180,7 +1180,7 @@ TEST(Loading, Fail_GenericType_ArgPackMissing_AndAttemptedMemberAccess) {
     setup_protocol(p_def, "Any", {});
 
     auto A_index = setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
-    setup_method(p_def, A_index, "m", "p:Int", {});
+    setup_method(p_def, "A", "m", "p:Int", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -1205,14 +1205,14 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint) {
     auto Int_index = setup_struct(p_def, "Int", {});
 
     auto P_index = setup_protocol(p_def, "P", {});
-    auto P_m_index = ymParcelDef_AddMethodReq(p_def, P_index, "m", "p:Int");
-    ymParcelDef_AddParam(p_def, P_m_index, "x", "p:Int");
+    auto P_m_index = ymParcelDef_AddMethodReq(p_def, "P", "m", "p:Int");
+    ymParcelDef_AddParam(p_def, "P::m", "x", "p:Int");
 
     setup_struct(p_def, "T", {}, { { "X", "p:P" } });
 
     auto A_index = setup_struct(p_def, "A", {});
-    auto A_m_index = ymParcelDef_AddMethod(p_def, A_index, "m", "p:Int", ymInertCallBhvrFn, nullptr);
-    //ymParcelDef_AddParam(p_def, A_m_index, "x", "p:Int");
+    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:Int", ymInertCallBhvrFn, nullptr);
+    //ymParcelDef_AddParam(p_def, "A::m", "x", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -1226,11 +1226,9 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnAndMethodTypesCa
     SETUP_PARCELDEF(p_def);
 
     setup_fn(p_def, "f", "yama:None", {});
-
-    auto A_ind = setup_struct(p_def, "A", {});
-    setup_method(p_def, A_ind, "m", "yama:None", {});
-
-    auto B_ind = setup_struct(p_def, "B", {}, { { "T", "yama:Any" } });
+    setup_struct(p_def, "A", {});
+    setup_method(p_def, "A", "m", "yama:None", {});
+    setup_struct(p_def, "B", {}, { { "T", "yama:Any" } });
 
     ymDm_BindParcelDef(dm, "p", p_def);
 

@@ -45,6 +45,19 @@ bool _ym::checkNonMember(const TypeInfo& type, std::string_view msg) {
     return result;
 }
 
+bool _ym::checkNonProtocolMember(const TypeInfo& type, std::string_view msg) {
+    bool result = !type.isMethodReq();
+    if (!result) {
+        Global::raiseErr(
+            YmErrCode_ProtocolMemberType,
+            "{}; type {} (index {}) is a protocol member type!",
+            (std::string)msg,
+            type.localName,
+            type.index);
+    }
+    return result;
+}
+
 void _ym::methodReqCallBhvr(YmCtx* ctx, void* user) {
     YM_DEADEND;
 }
@@ -114,6 +127,26 @@ const _ym::ParamInfo* _ym::TypeInfo::queryParam(const std::string& localName) co
 
 bool _ym::TypeInfo::isMethodReq() const noexcept {
     return callBehaviour && callBehaviour->fn == methodReqCallBhvr;
+}
+
+YmParams _ym::TypeInfo::paramCount() const noexcept {
+    return (YmParams)params.size();
+}
+
+YmParams _ym::TypeInfo::positionalParamCount() const noexcept {
+    return positionalParams;
+}
+
+YmParams _ym::TypeInfo::namedParamCount() const noexcept {
+    return paramCount() - positionalParamCount();
+}
+
+bool _ym::TypeInfo::isPositionalParam(YmParamIndex index) const noexcept {
+    return index < positionalParamCount();
+}
+
+bool _ym::TypeInfo::isNamedParam(YmParamIndex index) const noexcept {
+    return !isPositionalParam(index) && index < paramCount();
 }
 
 YmMembers _ym::TypeInfo::memberCount() const noexcept {
@@ -190,19 +223,43 @@ std::optional<YmParamIndex> _ym::TypeInfo::addParam(std::string name, std::strin
             name);
         return std::nullopt;
     }
-    if (params.size() >= size_t(YM_MAX_PARAMS)) {
-        Global::raiseErr(
-            YmErrCode_LimitReached,
-            "Cannot add parameter; would exceed {} limit!",
-            YM_MAX_PARAMS);
-        return std::nullopt;
+    if (!usesNamedParams) {
+        if (positionalParamCount() >= YM_MAX_POSITIONAL_PARAMS) {
+            Global::raiseErr(
+                YmErrCode_LimitReached,
+                "Cannot add parameter; positional params would exceed {} limit!",
+                YM_MAX_POSITIONAL_PARAMS);
+            return std::nullopt;
+        }
+    }
+    else {
+        if (namedParamCount() >= YM_MAX_NAMED_PARAMS) {
+            Global::raiseErr(
+                YmErrCode_LimitReached,
+                "Cannot add parameters; named params would exceed {} limit!",
+                YM_MAX_NAMED_PARAMS);
+            return std::nullopt;
+        }
     }
     params.push_back(ParamInfo{
         .index = YmParamIndex(params.size()),
         .name = std::move(name),
         .type = consts.pullRef(std::move(normalizedParamTypeSym.value())).value(),
         });
+    if (!usesNamedParams) {
+        positionalParams++;
+    }
     return params.back().index;
+}
+
+void _ym::TypeInfo::beginNamedParams() {
+    if (!checkCallable(*this, "Cannot begin named params")) {
+        return;
+    }
+    if (!checkNonProtocolMember(*this, "Cannot begin named params")) {
+        return;
+    }
+    usesNamedParams = true;
 }
 
 std::optional<YmRef> _ym::TypeInfo::addRef(std::string symbol) {
@@ -321,18 +378,17 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
 }
 
 std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
-    YmTypeIndex owner,
+    std::string ownerName,
     std::string memberName,
     YmKind kind,
     std::optional<std::string> returnTypeSymbol,
     std::optional<CallBhvrCallbackInfo> callBehaviour) {
-    auto ownerTypePtr = type(owner);
+    auto ownerTypePtr = type(ownerName);
     if (!ownerTypePtr) {
-        // TODO: Maybe look into adding more context to this error msg.
         Global::raiseErr(
             YmErrCode_TypeNotFound,
-            "Cannot add type; no owner type found at index {}!",
-            owner);
+            "Cannot add type; owner {} not found!",
+            ownerName);
         return std::nullopt;
     }
     auto& ownerType = ym::deref(ownerTypePtr);
@@ -375,8 +431,11 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
         callBehaviour);
 }
 
-std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(YmTypeIndex type, std::string name, std::string constraintTypeSymbol) {
-    if (auto info = _expectType(type, "Cannot add type parameter")) {
+std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(
+    std::string typeName,
+    std::string name,
+    std::string constraintTypeSymbol) {
+    if (auto info = _expectType(typeName, "Cannot add type parameter")) {
         if (!_checkNoMemberLevelNameConflict(*info, name, "Cannot add type parameter")) {
             return std::nullopt;
         }
@@ -385,35 +444,52 @@ std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(YmTypeIndex type, 
     else return std::nullopt;
 }
 
-std::optional<YmParamIndex> _ym::ParcelInfo::addParam(YmTypeIndex type, std::string name, std::string paramTypeSymbol) {
-    auto info = _expectType(type, "Cannot add parameter");
+std::optional<YmParamIndex> _ym::ParcelInfo::addParam(
+    std::string typeName,
+    std::string name,
+    std::string paramTypeSymbol) {
+    auto info = _expectType(typeName, "Cannot add parameter");
     return
         info
         ? info->addParam(std::move(name), std::move(paramTypeSymbol))
         : std::nullopt;
 }
 
-std::optional<YmRef> _ym::ParcelInfo::addRef(YmTypeIndex type, std::string symbol) {
-    auto info = _expectType(type, "Cannot add reference");
+void _ym::ParcelInfo::beginNamedParams(
+    const std::string& typeName) {
+    if (auto info = _expectType(typeName, "Cannot begin named params")) {
+        info->beginNamedParams();
+    }
+}
+
+std::optional<YmRef> _ym::ParcelInfo::addRef(
+    std::string typeName,
+    std::string symbol) {
+    auto info = _expectType(typeName, "Cannot add reference");
     return
         info
         ? info->addRef(std::move(symbol))
         : std::nullopt;
 }
 
-_ym::TypeInfo* _ym::ParcelInfo::_expectType(YmTypeIndex index, std::string_view msg) {
-    if (_ym::TypeInfo* result = type(index)) {
+_ym::TypeInfo* _ym::ParcelInfo::_expectType(
+    const std::string& typeName,
+    std::string_view msg) {
+    if (_ym::TypeInfo* result = type(typeName)) {
         return result;
     }
     _ym::Global::raiseErr(
         YmErrCode_TypeNotFound,
-        "{}; no type found at index {}!",
+        "{}; type {} not found!",
         (std::string)msg,
-        index);
+        typeName);
     return nullptr;
 }
 
-bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg) {
+bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(
+    const TypeInfo& owner,
+    const std::string& name,
+    std::string_view msg) {
     if (name == "Self") {
         Global::raiseErr(
             YmErrCode_NameConflict,

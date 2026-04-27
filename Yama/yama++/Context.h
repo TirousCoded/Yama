@@ -165,8 +165,10 @@ namespace ym {
         inline bool pushType(const Type& v) noexcept { return putType(YM_NEWTOP, v); }
         inline bool pushDefault(const Type& type) noexcept { return putDefault(YM_NEWTOP, type); }
 
+        // TODO: Add named param support to below methods.
+
         inline bool call(const Type& fn, YmUInt16 argsN, YmLocal returnTo) noexcept {
-            return ymCtx_Call(get(), fn.get(), argsN, returnTo) == YM_TRUE;
+            return ymCtx_Call(get(), fn.get(), argsN, "", returnTo) == YM_TRUE;
         }
         // Pushes return value.
         inline bool callp(const Type& fn, YmUInt16 argsN) noexcept { return call(fn, argsN, YM_NEWTOP); }

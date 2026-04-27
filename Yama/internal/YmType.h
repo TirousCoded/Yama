@@ -88,6 +88,9 @@ public:
 
     inline bool sameAs(YmType& other) const noexcept { return this == &other; }
 
+    // TODO: We should look into how we may need to update callsigs and callsuffs
+    //       to account for named params properly.
+
     bool checkCallSuff(std::string_view callsuff) const;
     // Succeeds by default if callsuff is empty.
     bool checkCallSuff(std::optional<std::string_view> callsuff) const;
@@ -105,10 +108,16 @@ public:
     YmType* typeParamConstraint(YmTypeParamIndex index) const noexcept;
     YmType* typeParamConstraint(const std::string& name) const noexcept;
 
+    YmParams paramCount() const noexcept;
+    YmParams positionalParamCount() const noexcept;
+    YmParams namedParamCount() const noexcept;
+    bool isPositionalParam(YmParamIndex index) const noexcept;
+    bool isNamedParam(YmParamIndex index) const noexcept;
     YmType* returnType() const noexcept;
-    inline YmParams params() const noexcept { return YmParams(info->params.size()); }
-    const YmChar* paramName(YmParamIndex param) const;
-    YmType* paramType(YmParamIndex param) const;
+    const YmChar* paramName(YmParamIndex index) const;
+    YmType* paramType(YmParamIndex index) const;
+    std::optional<YmParamCategory> paramCategory(YmParamIndex index) const noexcept;
+    std::optional<YmParamIndex> paramIndex(const std::string& name) const noexcept;
 
     bool hasSelfParam() const noexcept;
     bool isTypeMethod() const noexcept;

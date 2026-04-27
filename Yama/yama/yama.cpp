@@ -232,6 +232,10 @@ YmObj* ymCtx_Arg(YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy) {
     return Safe(ctx)->arg(which, returnPolicy);
 }
 
+YmBool ymCtx_SetArg(YmCtx* ctx, YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy) {
+    return Safe(ctx)->setArg(which, deref(newArg), newArgPolicy);
+}
+
 YmType* ymCtx_Ref(YmCtx* ctx, YmRef reference) {
     return Safe(ctx)->ref(reference);
 }
@@ -261,42 +265,50 @@ YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy)
 }
 
 YmBool ymCtx_PutNone(YmCtx* ctx, YmLocal where) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewNone(ctx), YM_TAKE);
 }
 
 YmBool ymCtx_PutInt(YmCtx* ctx, YmLocal where, YmInt v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewInt(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutUInt(YmCtx* ctx, YmLocal where, YmUInt v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewUInt(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutFloat(YmCtx* ctx, YmLocal where, YmFloat v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewFloat(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutBool(YmCtx* ctx, YmLocal where, YmBool v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewBool(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutRune(YmCtx* ctx, YmLocal where, YmRune v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewRune(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
+    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutDefault(YmCtx* ctx, YmLocal where, YmType* type) {
     if (auto obj = Safe(ctx)->newDefault(deref(type))) {
+        // TODO: I think this leaks the object if ymCtx_Put fails.
         return ymCtx_Put(ctx, where, obj, YM_TAKE);
     }
     return YM_FALSE;
 }
 
-YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, YmLocal returnTo) {
-    return Safe(ctx)->call(deref(fn), argsN, returnTo);
+YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo) {
+    return Safe(ctx)->call(deref(fn), argsN, std::string_view(Safe(argNames)), returnTo);
 }
 
 void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
@@ -337,7 +349,9 @@ YmTypeIndex ymParcelDef_AddStruct(
         .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmTypeIndex ymParcelDef_AddProtocol(YmParcelDef* parceldef, const YmChar* name) {
+YmTypeIndex ymParcelDef_AddProtocol(
+    YmParcelDef* parceldef,
+    const YmChar* name) {
     return Safe(parceldef)->addProtocol(
         std::string(Safe(name)))
         .value_or(YM_NO_TYPE_INDEX);
@@ -358,30 +372,38 @@ YmTypeIndex ymParcelDef_AddFn(
 
 YmTypeIndex ymParcelDef_AddMethod(
     YmParcelDef* parceldef,
-    YmTypeIndex owner,
+    const YmChar* ownerName,
     const YmChar* name,
     YmRefSym returnType,
     YmCallBhvrCallbackFn callBehaviour,
     void* callBehaviourData) {
     return Safe(parceldef)->addMethod(
-        owner,
+        std::string(Safe(ownerName)),
         std::string(Safe(name)),
         std::string(Safe(returnType)),
         _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData))
         .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmTypeIndex ymParcelDef_AddMethodReq(YmParcelDef* parceldef, YmTypeIndex owner, const YmChar* name, YmRefSym returnType) {
+YmTypeIndex ymParcelDef_AddMethodReq(
+    YmParcelDef* parceldef,
+    const YmChar* ownerName,
+    const YmChar* name,
+    YmRefSym returnType) {
     return Safe(parceldef)->addMethodReq(
-        owner,
+        std::string(Safe(ownerName)),
         std::string(Safe(name)),
         std::string(Safe(returnType)))
         .value_or(YM_NO_TYPE_INDEX);
 }
 
-YmTypeParamIndex ymParcelDef_AddTypeParam(YmParcelDef* parceldef, YmTypeIndex type, const YmChar* name, YmRefSym constraintType) {
+YmTypeParamIndex ymParcelDef_AddTypeParam(
+    YmParcelDef* parceldef,
+    const YmChar* typeName,
+    const YmChar* name,
+    YmRefSym constraintType) {
     return Safe(parceldef)->addTypeParam(
-        type,
+        std::string(Safe(typeName)),
         std::string(Safe(name)),
         std::string(Safe(constraintType)))
         .value_or(YM_NO_TYPE_PARAM_INDEX);
@@ -389,22 +411,29 @@ YmTypeParamIndex ymParcelDef_AddTypeParam(YmParcelDef* parceldef, YmTypeIndex ty
 
 YmParamIndex ymParcelDef_AddParam(
     YmParcelDef* parceldef,
-    YmTypeIndex type,
+    const YmChar* typeName,
     const YmChar* name,
     YmRefSym paramType) {
     return Safe(parceldef)->addParam(
-        type,
+        std::string(Safe(typeName)),
         std::string(Safe(name)),
         std::string(Safe(paramType)))
         .value_or(YM_NO_PARAM_INDEX);
 }
 
+void ymParcelDef_BeginNamedParams(
+    YmParcelDef* parceldef,
+    const YmChar* typeName) {
+    Safe(parceldef)->beginNamedParams(
+        std::string(Safe(typeName)));
+}
+
 YmRef ymParcelDef_AddRef(
     YmParcelDef* parceldef,
-    YmTypeIndex type,
+    const YmChar* typeName,
     YmRefSym symbol) {
     return Safe(parceldef)->addRef(
-        type,
+        std::string(Safe(typeName)),
         std::string(Safe(symbol)))
         .value_or(YM_NO_REF);
 }
@@ -457,8 +486,11 @@ YmType* ymType_ReturnType(YmType* type) {
     return Safe(type)->returnType();
 }
 
-YmParams ymType_Params(YmType* type) {
-    return Safe(type)->params();
+YmParams ymType_Params(YmType* type, YmBool includeNamed) {
+    return
+        includeNamed
+        ? Safe(type)->paramCount()
+        : Safe(type)->positionalParamCount();
 }
 
 const YmChar* ymType_ParamName(YmType* type, YmParamIndex param) {
@@ -467,6 +499,10 @@ const YmChar* ymType_ParamName(YmType* type, YmParamIndex param) {
 
 YmType* ymType_ParamType(YmType* type, YmParamIndex param) {
     return Safe(type)->paramType(param);
+}
+
+YmParamCategory ymType_ParamCategory(YmType* type, YmParamIndex param) {
+    return Safe(type)->paramCategory(param).value_or(YmParamCategory_Positional);
 }
 
 YmType* ymType_Ref(YmType* type, YmRef reference) {

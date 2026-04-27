@@ -42,25 +42,27 @@ public:
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
     std::optional<YmTypeIndex> addMethod(
-        YmTypeIndex owner,
+        const std::string& ownerName,
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
     std::optional<YmTypeIndex> addMethodReq(
-        YmTypeIndex owner,
+        const std::string& ownerName,
         const std::string& name,
         std::string returnTypeSymbol);
 
     std::optional<YmTypeParamIndex> addTypeParam(
-        YmTypeIndex type,
+        std::string typeName,
         std::string name,
         std::string constraintTypeSymbol);
     std::optional<YmParamIndex> addParam(
-        YmTypeIndex type,
+        std::string typeName,
         std::string name,
         std::string paramTypeSymbol);
+    void beginNamedParams(
+        const std::string& typeName);
     std::optional<YmRef> addRef(
-        YmTypeIndex type,
+        std::string typeName,
         std::string symbol);
 };
 

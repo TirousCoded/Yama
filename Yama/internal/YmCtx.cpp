@@ -2,6 +2,8 @@
 
 #include "YmCtx.h"
 
+#include <ranges>
+
 #include "general.h"
 #include "SpecSolver.h"
 #include "YmObj.h"
@@ -188,7 +190,7 @@ bool YmCtx::isUser() const noexcept {
 
 YmUInt16 YmCtx::args() const noexcept {
     ymAssert(!_callStk.empty());
-    return _callStk.back().args;
+    return _callStk.back().args();
 }
 
 YmLocals YmCtx::locals() const noexcept {
@@ -200,7 +202,7 @@ YmObj* YmCtx::arg(YmUInt16 which, YmRefPolicy returnPolicy) {
     auto& cf = _callStk.back();
     auto result =
         which < args()
-        ? _globalObjStk[cf.argsOffset + which].get()
+        ? _globalObjStk[cf.argOffset(which).value()].get()
         : nullptr;
     // If current call is one forwarded from protocol method call, then that means that
     // the first arg is the call object, which'll be a boxed value. In this circumstance,
@@ -215,17 +217,42 @@ YmObj* YmCtx::arg(YmUInt16 which, YmRefPolicy returnPolicy) {
     return result;
 }
 
+bool YmCtx::setArg(YmUInt16 which, YmObj& newArg, YmRefPolicy newArgPolicy) {
+    if (isUser()) {
+        return false;
+    }
+    if (which >= args()) {
+        _ym::Global::raiseErr(
+            YmErrCode_ArgNotFound,
+            "Set arg failed; arg index {} out-of-bounds!",
+            which);
+        return false;
+    }
+    auto& cf = _callStk.back();
+    auto& target = _globalObjStk[cf.argOffset(which).value()];
+    // NOTE: It's theoretically possible that target == newArg. In that case, it's
+    //       important to incr newArg's ref count BEFORE releasing target's incr.
+    if (newArgPolicy == YM_BORROW) {
+        secure(newArg);
+    }
+    release(*target);
+    target = newArg;
+    return true;
+}
+
 YmType* YmCtx::ref(YmRef reference) {
+    auto& cf = _callStk.back();
     return
-        _callStk.back().fn
-        ? _callStk.back().fn->ref(reference)
+        cf.fn
+        ? cf.fn->ref(reference)
         : nullptr;
 }
 
 YmObj* YmCtx::local(YmLocal where, YmRefPolicy returnPolicy) {
+    auto& cf = _callStk.back();
     auto result =
         where < locals()
-        ? _globalObjStk[_callStk.back().localsOffset + where].get()
+        ? _globalObjStk[cf.localOffset(where)].get()
         : nullptr;
     if (result && returnPolicy == YM_TAKE) {
         secure(*result);
@@ -274,15 +301,32 @@ bool YmCtx::put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy) {
         return false;
     }
     release(ym::deref(local(where)));
-    _globalObjStk[_callStk.back().localsOffset + where] = what;
+    auto& cf = _callStk.back();
+    _globalObjStk[cf.localOffset(where)] = what;
     if (whatPolicy == YM_BORROW) {
         secure(what);
     }
     return true;
 }
 
-bool YmCtx::call(YmType& fn, YmUInt16 argsN, YmLocal returnTo) {
-    if (_beginCall(fn, argsN, returnTo)) {
+bool YmCtx::swap(YmLocal a, YmLocal b) {
+    if (a >= locals()) {
+        // TODO: Maybe error msg?
+        return false;
+    }
+    if (b >= locals()) {
+        // TODO: Maybe error msg?
+        return false;
+    }
+    auto& cf = _callStk.back();
+    std::swap(
+        _globalObjStk[cf.localOffset(a)],
+        _globalObjStk[cf.localOffset(b)]);
+    return true;
+}
+
+bool YmCtx::call(YmType& fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo) {
+    if (_beginCall(fn, argsN, argNames, returnTo)) {
         _dispatchCall(fn);
         return _endCall();
     }
@@ -475,23 +519,13 @@ void YmCtx::_beginUserPseudoCall() {
     ymAssert(_callStk.empty());
     _callStk.push_back(_CallFrame{
         .fn = nullptr,
-        .args = 0,
         .returnTo = YmLocal{},
-        .argsOffset = 0,
         .localsOffset = 0,
         });
 }
 
-bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
+bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo) {
     ymAssert(!_callStk.empty());
-    if (returnTo != YM_NEWTOP && returnTo != YM_DISCARD && returnTo >= locals()) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Call to {} failed; local object index {} out-of-bounds!",
-            fn.fullname(),
-            returnTo);
-        return false;
-    }
     if (!fn.isCallable()) {
         _ym::Global::raiseErr(
             YmErrCode_NonCallableType,
@@ -500,13 +534,12 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
             fn.fullname());
         return false;
     }
-    if (args != fn.params()) {
+    if (!_localInBoundsForWrite(returnTo)) {
         _ym::Global::raiseErr(
-            YmErrCode_CallProcedureError,
-            "Call to {} failed; {} args provided, but fn takes {} params!",
+            YmErrCode_LocalNotFound,
+            "Call to {} failed; local object index {} out-of-bounds!",
             fn.fullname(),
-            args,
-            fn.params());
+            returnTo);
         return false;
     }
     if (YmLocals(args) > locals()) {
@@ -518,20 +551,6 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
             locals());
         return false;
     }
-    for (YmParamIndex i = 0; i < fn.params(); i++) {
-        auto t = ym::deref(local(locals() - args + i)).type;
-        if (t != fn.paramType(i)) {
-            _ym::Global::raiseErr(
-                YmErrCode_CallProcedureError,
-                "Call to {} failed; arg #{} (for param {}) is {}, but expected {}!",
-                fn.fullname(),
-                i + 1,
-                fn.paramName(i),
-                t->fullname(),
-                fn.paramType(i)->fullname());
-            return false;
-        }
-    }
     if (callStkHeight() == YM_MAX_CALL_STACK_HEIGHT) {
         _ym::Global::raiseErr(
             YmErrCode_CallStackOverflow,
@@ -539,11 +558,75 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo) {
             fn.fullname());
         return false;
     }
+    _ym::CallArgPack argPack(fn);
+    for (const auto& it : argNames | std::views::split(',')) {
+        std::string_view argName(it.begin(), it.end());
+        // TODO: Optimize out this std::string heap alloc.
+        if (auto paramInd = fn.paramIndex((std::string)argName)) {
+            if (fn.isPositionalParam(*paramInd)) {
+                _ym::Global::raiseErr(
+                    YmErrCode_CallProcedureError,
+                    "Call to {} failed; {} is a positional param, not a named one!",
+                    fn.fullname(),
+                    fn.paramName(*paramInd));
+                return false;
+            }
+            if (!argPack.specifyNextNamedArg(*paramInd)) {
+                _ym::Global::raiseErr(
+                    YmErrCode_CallProcedureError,
+                    "Call to {} failed; named param {} specified multiple times!",
+                    fn.fullname(),
+                    fn.paramName(*paramInd));
+                return false;
+            }
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_CallProcedureError,
+                "Call to {} failed; unknown named param \"{}\"!",
+                fn.fullname(),
+                (std::string)argName);
+            return false;
+        }
+    }
+    argPack.done(); // Don't forget!
+    if (args != argPack.specifiedArgs()) {
+        _ym::Global::raiseErr(
+            YmErrCode_CallProcedureError,
+            "Call to {} failed; {} args provided, but expected {}! ({} positional + {} named)",
+            fn.fullname(),
+            args,
+            argPack.specifiedArgs(),
+            argPack.positionalArgs(),
+            argPack.namedArgs());
+        return false;
+    }
+    for (YmParamIndex param = 0; param < argPack.paramCount(); param++) {
+        // Quietly skip unspecified named args.
+        if (auto argOffset = argPack.argOffset(param, true)) {
+            auto t = ym::deref(local(locals() - args + *argOffset)).type;
+            if (t != fn.paramType(param)) {
+                _ym::Global::raiseErr(
+                    YmErrCode_CallProcedureError,
+                    "Call to {} failed; arg #{} (for {} param {}) is {}, but expected {}!",
+                    fn.fullname(),
+                    *argOffset + 1,
+                    fn.isPositionalParam(param) ? "positional" : "named",
+                    fn.paramName(param),
+                    t->fullname(),
+                    fn.paramType(param)->fullname());
+                return false;
+            }
+        }
+    }
+    // Append arg pack w/ dummy objects, then push call frame, and return.
+    for (YmParams i = 0; i < argPack.dummies(); i++) {
+        ymCtx_PutNone(this, YM_NEWTOP);
+    }
     _callStk.push_back(_CallFrame{
         .fn = &fn,
-        .args = args,
+        .argPack = std::move(argPack),
         .returnTo = returnTo,
-        .argsOffset = YmLocal(_globalObjStk.size()) - YmLocal(args),
         .localsOffset = YmLocal(_globalObjStk.size()),
         });
     return true;
@@ -563,6 +646,7 @@ bool YmCtx::_endCall() noexcept {
             YmErrCode_CallProcedureError,
             "Call to {} failed; didn't bind a return value!",
             cf.fn->fullname());
+        pop(cf.dummies());
         return false;
     }
     else if (cf.returnValue->type != cf.fn->returnType()) {
@@ -572,11 +656,12 @@ bool YmCtx::_endCall() noexcept {
             cf.fn->fullname(),
             cf.returnValue->type->fullname(),
             cf.fn->returnType()->fullname());
+        pop(cf.dummies());
         release(*cf.returnValue);
         return false;
     }
     else {
-        pop(cf.args);
+        pop(cf.args());
         return put(cf.returnTo, *cf.returnValue);
     }
 }
@@ -590,9 +675,25 @@ void YmCtx::_dispatchCall(YmType& fn) {
         auto forwardedTo = callobj->ptable()[ptableInd];
         cf.fn = forwardedTo;
         cf.fwdFromProto = true;
+        // If indirectly called method has named params, we gotta add proper number
+        // of dummies to cf.argPack, and we gotta push dummy objects for each.
+        if (auto named = forwardedTo->namedParamCount(); named >= 1) {
+            for (YmParams i = 0; i < named; i++) {
+                ymCtx_PutNone(this, YM_NEWTOP);
+            }
+            cf.argPack.addDummies(named);
+            cf.localsOffset += named;
+        }
     }
     auto& callBhvrInfo = cf.fn->info->callBehaviour.value();
     callBhvrInfo.fn(this, callBhvrInfo.user);
+}
+
+bool YmCtx::_localInBoundsForWrite(YmLocal where) const noexcept {
+    return
+        where == YM_NEWTOP ||
+        where == YM_DISCARD ||
+        where < locals();
 }
 
 YmRune YmCtx::_uint2rune(YmUInt x) noexcept {

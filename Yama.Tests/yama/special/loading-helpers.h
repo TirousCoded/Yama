@@ -16,6 +16,7 @@
 
 inline YmTypeIndex setup_helper(
     YmParcelDef* def,
+    const std::string& localName,
     std::function<YmTypeIndex()> builder,
     std::initializer_list<std::string> refs,
     std::initializer_list<std::pair<std::string, std::string>> typeParams) {
@@ -25,10 +26,10 @@ inline YmTypeIndex setup_helper(
     }
     YmTypeIndex result = builder();
     for (const auto& refconst : refs) {
-        ymParcelDef_AddRef(def, result, refconst.c_str());
+        ymParcelDef_AddRef(def, localName.c_str(), refconst.c_str());
     }
     for (const auto& [name, constraint] : typeParams) {
-        ymParcelDef_AddTypeParam(def, result, name.c_str(), constraint.c_str());
+        ymParcelDef_AddTypeParam(def, localName.c_str(), name.c_str(), constraint.c_str());
     }
     if (result == YM_NO_TYPE_INDEX) {
         ADD_FAILURE();
@@ -42,6 +43,7 @@ inline YmTypeIndex setup_struct(
     std::initializer_list<std::pair<std::string, std::string>> typeParams = {}) {
     return setup_helper(
         def,
+        localName,
         [def, localName]() -> YmTypeIndex {
             return ymParcelDef_AddStruct(def, localName.c_str());
         },
@@ -55,6 +57,7 @@ inline YmTypeIndex setup_protocol(
     std::initializer_list<std::pair<std::string, std::string>> typeParams = {}) {
     return setup_helper(
         def,
+        localName,
         [def, localName]() -> YmTypeIndex {
             return ymParcelDef_AddProtocol(def, localName.c_str());
         },
@@ -69,6 +72,7 @@ inline YmTypeIndex setup_fn(
     std::initializer_list<std::pair<std::string, std::string>> typeParams = {}) {
     return setup_helper(
         def,
+        localName,
         [def, localName, returnTypeSymbol]() -> YmTypeIndex {
             return ymParcelDef_AddFn(def, localName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
         },
@@ -77,14 +81,15 @@ inline YmTypeIndex setup_fn(
 }
 inline YmTypeIndex setup_method(
     YmParcelDef* def,
-    YmTypeIndex owner,
-    const std::string& localName,
+    const std::string& ownerName,
+    const std::string& memberName,
     const std::string& returnTypeSymbol,
     std::initializer_list<std::string> refs) {
     return setup_helper(
         def,
-        [def, owner, localName, returnTypeSymbol]() -> YmTypeIndex {
-            return ymParcelDef_AddMethod(def, owner, localName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
+        std::format("{}::{}", ownerName, memberName),
+        [def, ownerName, memberName, returnTypeSymbol]() -> YmTypeIndex {
+            return ymParcelDef_AddMethod(def, ownerName.c_str(), memberName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
         },
         refs,
         {});

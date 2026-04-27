@@ -232,7 +232,7 @@ TEST(TypeCharacteristics, YamaNone) {
 			testExtracts(result, Extracts{});
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -270,7 +270,7 @@ TEST(TypeCharacteristics, YamaInt) {
 			testExtracts(result, Extracts{ .i = 0 });
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -376,7 +376,7 @@ TEST(TypeCharacteristics, YamaUInt) {
 			testExtracts(result, Extracts{ .ui = 0 });
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -462,7 +462,7 @@ TEST(TypeCharacteristics, YamaFloat) {
 			testExtracts(result, Extracts{ .f = 0 });
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -584,7 +584,7 @@ TEST(TypeCharacteristics, YamaBool) {
 			testExtracts(result, Extracts{ .b = YM_FALSE });
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -641,7 +641,7 @@ TEST(TypeCharacteristics, YamaRune) {
 			testExtracts(result, Extracts{ .r = U'\0'});
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -724,7 +724,7 @@ TEST(TypeCharacteristics, YamaType) {
 			testExtracts(result, Extracts{ .t = ymCtx_LdNone(ctx) });
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -760,7 +760,7 @@ TEST(TypeCharacteristics, YamaAny) {
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	// TODO: Maybe add some 'unit.object' and 'unit.conversion' stuff.
@@ -786,7 +786,7 @@ TEST(TypeCharacteristics, Structs) {
 			testExtracts(result, Extracts{});
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 	auto mkObject =
@@ -806,9 +806,8 @@ TEST(TypeCharacteristics, Structs) {
 TEST(TypeCharacteristics, GenericStructs) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto emptyStruct_ind = ymParcelDef_AddStruct(p_def, "EmptyStruct");
-	ASSERT_NE(emptyStruct_ind, YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, emptyStruct_ind, "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "EmptyStruct"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "EmptyStruct", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	{
 		Unit unit(
@@ -826,7 +825,7 @@ TEST(TypeCharacteristics, GenericStructs) {
 				testExtracts(result, Extracts{});
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 			});
 		auto mkObject =
@@ -858,7 +857,7 @@ TEST(TypeCharacteristics, GenericStructs) {
 				testExtracts(result, Extracts{});
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 			});
 		auto mkObject =
@@ -895,7 +894,7 @@ TEST(TypeCharacteristics, Protocols) {
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 		});
 }
@@ -905,8 +904,8 @@ TEST(TypeCharacteristics, GenericProtocols) {
 
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
-	ymParcelDef_AddTypeParam(p_def, P_ind, "T", "yama:Any");
+	ymParcelDef_AddProtocol(p_def, "P");
+	ymParcelDef_AddTypeParam(p_def, "P", "T", "yama:Any");
 	ymDm_BindParcelDef(dm, "p", p_def);
 	{
 		Unit unit(
@@ -921,7 +920,7 @@ TEST(TypeCharacteristics, GenericProtocols) {
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 			});
 	}
@@ -938,7 +937,7 @@ TEST(TypeCharacteristics, GenericProtocols) {
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_Call(ctx, type, 0, YM_DISCARD), YM_FALSE);
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
 			});
 	}
@@ -947,15 +946,14 @@ TEST(TypeCharacteristics, GenericProtocols) {
 TEST(TypeCharacteristics, Fns) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto identity_ind = ymParcelDef_AddFn(p_def,
+	ymParcelDef_AddFn(p_def,
 		"identity",
 		"yama:Int",
 		[](YmCtx* ctx, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
-	ASSERT_NE(identity_ind, YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddParam(p_def, identity_ind, "x", "yama:Int"), YM_NO_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddParam(p_def, "identity", "x", "yama:Int"), YM_NO_PARAM_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	Unit unit(
 		dm, ctx, err,
@@ -970,7 +968,7 @@ TEST(TypeCharacteristics, Fns) {
 		},
 		[&ctx](Safe<YmType> type) {
 			ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
-			ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+			ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 			if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 				EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
@@ -981,16 +979,15 @@ TEST(TypeCharacteristics, Fns) {
 TEST(TypeCharacteristics, GenericFns) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto identity_ind = ymParcelDef_AddFn(p_def,
+	ymParcelDef_AddFn(p_def,
 		"identity",
 		"$T",
 		[](YmCtx* ctx, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
-	ASSERT_NE(identity_ind, YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, identity_ind, "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
-	ASSERT_NE(ymParcelDef_AddParam(p_def, identity_ind, "x", "$T"), YM_NO_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "identity", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddParam(p_def, "identity", "x", "$T"), YM_NO_PARAM_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	{
 		Unit unit(
@@ -1006,7 +1003,7 @@ TEST(TypeCharacteristics, GenericFns) {
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
-				ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
@@ -1027,7 +1024,7 @@ TEST(TypeCharacteristics, GenericFns) {
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
-				ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdFloat(ctx));
 					EXPECT_DOUBLE_EQ(ymObj_ToFloat(top, nullptr), 3.14159);
@@ -1042,18 +1039,16 @@ TEST(TypeCharacteristics, GenericFns) {
 TEST(TypeCharacteristics, Methods) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
-	auto A_ind = ymParcelDef_AddStruct(p_def, "A");
-	ASSERT_NE(A_ind, YM_NO_TYPE_INDEX);
-	auto A_m_ind = ymParcelDef_AddMethod(p_def,
-		A_ind,
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+	ymParcelDef_AddMethod(p_def,
+		"A",
 		"m",
 		"yama:Int",
 		[](YmCtx* ctx, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
-	ASSERT_NE(A_m_ind, YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddParam(p_def, A_m_ind, "x", "yama:Int"), YM_NO_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddParam(p_def, "A::m", "x", "yama:Int"), YM_NO_PARAM_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	Unit unit(
 		dm, ctx, err,
@@ -1068,7 +1063,7 @@ TEST(TypeCharacteristics, Methods) {
 		},
 		[&ctx](Safe<YmType> type) {
 			ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
-			ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+			ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 			if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 				EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
@@ -1081,16 +1076,16 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 	SETUP_PARCELDEF(p_def);
 	auto A_ind = ymParcelDef_AddStruct(p_def, "A");
 	ASSERT_NE(A_ind, YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, A_ind, "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
-	auto A_m_ind = ymParcelDef_AddMethod(p_def,
-		A_ind,
+	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ymParcelDef_AddMethod(p_def,
+		"A",
 		"m",
 		"$T",
 		[](YmCtx* ctx, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
-	ASSERT_NE(ymParcelDef_AddParam(p_def, A_m_ind, "x", "$T"), YM_NO_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddParam(p_def, "A::m", "x", "$T"), YM_NO_PARAM_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	{
 		Unit unit(
@@ -1106,7 +1101,7 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
-				ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
@@ -1127,7 +1122,7 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
-				ASSERT_EQ(ymCtx_Call(ctx, type, 1, YM_NEWTOP), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdFloat(ctx));
 					EXPECT_DOUBLE_EQ(ymObj_ToFloat(top, nullptr), 3.14159);

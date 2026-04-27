@@ -35,12 +35,12 @@ std::optional<YmTypeIndex> YmParcelDef::addFn(
 }
 
 std::optional<YmTypeIndex> YmParcelDef::addMethod(
-    YmTypeIndex owner,
+    const std::string& ownerName,
     const std::string& name,
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
     return info->addType(
-        owner,
+        ownerName,
         name,
         YmKind_Method,
         std::make_optional(std::move(returnTypeSymbol)),
@@ -48,15 +48,15 @@ std::optional<YmTypeIndex> YmParcelDef::addMethod(
 }
 
 std::optional<YmTypeIndex> YmParcelDef::addMethodReq(
-    YmTypeIndex owner,
+    const std::string& ownerName,
     const std::string& name,
     std::string returnTypeSymbol) {
     auto index = uintptr_t(-1);
-    if (auto ownerType = info->type(owner)) {
+    if (auto ownerType = info->type(ownerName)) {
         index = ownerType->memberCount();
     }
     return addMethod(
-        owner,
+        ownerName,
         name,
         std::move(returnTypeSymbol),
         _ym::CallBhvrCallbackInfo::mk(
@@ -66,30 +66,35 @@ std::optional<YmTypeIndex> YmParcelDef::addMethodReq(
 }
 
 std::optional<YmTypeParamIndex> YmParcelDef::addTypeParam(
-    YmTypeIndex type,
+    std::string typeName,
     std::string name,
     std::string constraintTypeSymbol) {
     return info->addTypeParam(
-        type,
+        std::move(typeName),
         std::move(name),
         std::move(constraintTypeSymbol));
 }
 
 std::optional<YmParamIndex> YmParcelDef::addParam(
-    YmTypeIndex type,
+    std::string typeName,
     std::string name,
     std::string paramTypeSymbol) {
     return info->addParam(
-        type,
+        std::move(typeName),
         std::move(name),
         std::move(paramTypeSymbol));
 }
 
+void YmParcelDef::beginNamedParams(
+    const std::string& typeName) {
+    info->beginNamedParams(typeName);
+}
+
 std::optional<YmRef> YmParcelDef::addRef(
-    YmTypeIndex type,
+    std::string typeName,
     std::string symbol) {
     return info->addRef(
-        type,
+        std::move(typeName),
         std::move(symbol));
 }
 

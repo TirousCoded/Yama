@@ -12,6 +12,7 @@
 
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
+#include "CallArgPack.h"
 #include "Loader.h"
 #include "MAS.h"
 #include "PTableManager.h"
@@ -58,29 +59,48 @@ public:
 	YmUInt16 args() const noexcept;
 	YmLocals locals() const noexcept;
 	YmObj* arg(YmUInt16 which, YmRefPolicy returnPolicy = YM_BORROW);
+	bool setArg(YmUInt16 which, YmObj& newArg, YmRefPolicy newArgPolicy = YM_TAKE);
 	YmType* ref(YmRef reference);
 	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
 
 	YmObj* pull() noexcept; // Returns taken ref.
 	void pop(YmLocals n);
 	bool put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy = YM_TAKE);
-	bool call(YmType& fn, YmUInt16 argsN, YmLocal returnTo);
+	bool swap(YmLocal a, YmLocal b);
+	bool call(YmType& fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
 	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool convert(YmType& type, YmLocal returnTo);
 
 
 private:
 	struct _CallFrame final {
-		YmType* fn; // Fn being called (or nullptr for user call frame.)
-		YmUInt16 args; // Number of passed args.
-		YmLocal returnTo; // Where to put return value.
-		YmLocal argsOffset; // Where in _globalObjStk this call frame's passed args are located.
-		YmLocal localsOffset; // Where in _globalObjStk this call frame's local object stack begins.
-		YmObj* returnValue = nullptr;
+		// Fn being called (or nullptr for user call frame.)
+		YmType* fn;
+		_ym::CallArgPack argPack;
+		// Where to put return value.
+		YmLocal returnTo;
+		// Where in _globalObjStk this call frame's local object stack begins (and below that are its args.)
+		YmUInt32 localsOffset;
 		// When protocol methods are called, they never appear on call stack, instead forwarding
 		// directly to the method gotten from their ptable. This flag indicates if this call frame
 		// is for one of these forwarded calls.
 		bool fwdFromProto = false;
+		// The bound return value object.
+		YmObj* returnValue = nullptr;
+
+
+		inline YmParams args() const noexcept { return argPack.args(); }
+		inline YmParams positionalArgs() const noexcept { return argPack.positionalArgs(); }
+		inline YmParams namedArgs() const noexcept { return argPack.namedArgs(); }
+		inline YmParams dummies() const noexcept { return argPack.dummies(); }
+		inline YmUInt32 localOffset(YmLocal where) const noexcept { return localsOffset + where; }
+		inline std::optional<YmUInt32> argOffset(YmUInt16 which) const noexcept {
+			ymAssert(which == YmUInt8(which));
+			if (auto offset = argPack.argOffset(YmUInt8(which))) {
+				return localsOffset - args() + *offset;
+			}
+			return std::nullopt;
+		}
 	};
 
 	// TODO: This field is used to ensure all objects are released upon deinit, and
@@ -98,9 +118,11 @@ private:
 
 
 	void _beginUserPseudoCall();
-	bool _beginCall(YmType& fn, YmUInt16 args, YmLocal returnTo);
+	bool _beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo);
 	bool _endCall() noexcept;
 	void _dispatchCall(YmType& fn);
+
+	bool _localInBoundsForWrite(YmLocal where) const noexcept;
 
 	static YmRune _uint2rune(YmUInt x) noexcept;
 };

@@ -469,8 +469,18 @@ extern "C" {
     /* Sentinel index for no parameter. */
 #define YM_NO_PARAM_INDEX (YmParamIndex(-1))
 
-    /* Max number of parameters a callable type may have. */
-#define YM_MAX_PARAMS (YmParams(24))
+    /* Max number of positional parameters a callable type may have. */
+#define YM_MAX_POSITIONAL_PARAMS (YmParams(24))
+
+    /* Max number of named parameters a callable type may have. */
+#define YM_MAX_NAMED_PARAMS (YmParams(16))
+
+
+    /* YmParamCategory specifies if a parameter is positional or named. */
+    typedef enum : YmUInt8 {
+        YmParamCategory_Positional,
+        YmParamCategory_Named,
+    } YmParamCategory;
 
 
     /* NOTE: At the base of the call stack is a special 'user' call frame.
@@ -513,7 +523,7 @@ extern "C" {
         struct YmCtx* ctx,
         void* user);
 
-    /* No-op YmCallBhvrCallbackFn. */
+    /* No-Op */
     void ymInertCallBhvrFn(struct YmCtx*, void*);
 
 
@@ -535,6 +545,12 @@ extern "C" {
     /* Returns the ref count of domain dm. */
     /* Behaviour is undefined if dm is invalid. */
     YmRefCount ymDm_RefCount(struct YmDm* dm);
+
+    /* TODO: I REALLY don't think our impl current prevents end-user from ammending parcel defs AFTER
+    *        binding them to the domain. This'll need to be fixed, obviously.
+    * 
+    *        Specifically, I'd like it demanded by our unit tests.
+    */
 
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
     /* Fails if path specified is illegal. */
@@ -808,6 +824,17 @@ extern "C" {
     /* Behaviour is undefined if ctx is invalid. */
     const YmChar* ymCtx_FmtCallStack(struct YmCtx* ctx, YmCallStackHeight skip);
 
+    /* NOTE: Within a Yama fn call, the index of any particular named arg is the number of positional
+    *        params, plus the index of the named param in the named param list, ordered how they
+    *        were when originally defined.
+    * 
+    *        Furthermore, special yama:None 'dummy' arg objects will be bound to any named param
+    *        not provided an arg explicitly.
+    * 
+    *        This means that the order in which named args are passed to a fn call does not affect
+    *        how the fn call environment sees them.
+    */
+
     /* Returns the number of arguments passed to the current call. */
     /* Behaviour is undefined if ctx is invalid. */
     YmUInt16 ymCtx_Args(struct YmCtx* ctx);
@@ -817,6 +844,14 @@ extern "C" {
     /* Fails quietly if which is out-of-bounds. */
     /* Behaviour is undefined if ctx is invalid. */
     struct YmObj* ymCtx_Arg(struct YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy);
+
+    /* Replaces arg at which with newArg, returning if successful. */
+    /* newArgPolicy dictates if newArg ref is borrowed or taken from end-user. */
+    /* Fails quietly if in the user call frame. */
+    /* Fails if which is out-of-bounds. */
+    /* Behaviour is undefined if ctx is invalid. */
+    /* Behaviour is undefined if newArg is invalid. */
+    YmBool ymCtx_SetArg(struct YmCtx* ctx, YmUInt16 which, struct YmObj* newArg, YmRefPolicy newArgPolicy);
 
     /* Returns the type at reference in the type reference array of the current call, or YM_NIL on failure. */
     /* Fails quietly if reference is out-of-bounds. */
@@ -890,25 +925,48 @@ extern "C" {
     /* Behaviour is undefined if type is invalid. */
     YmBool ymCtx_PutDefault(struct YmCtx* ctx, YmLocal where, struct YmType* type);
 
+    /* NOTE: ymCtx_Call is passed positional args and named args together. The positional ones
+    *        always come first, and any after that are named param ones.
+    * 
+    *        argNames specifies which named param each named arg corresponds to. It's a
+    *        comma-seperated list of named param identifiers, w/ no whitespace, nor duplicate
+    *        identifiers.
+    * 
+    *        Any character in argNames which isn't a comma is treated as part of a name in
+    *        its list. A pair of commas w/ nothing between them is interpreted as containing
+    *        an empty string as an identifier.
+    * 
+    *        Calls w/out named args should have argNames == "".
+    */
+
+    /* TODO: Our unit tests currently don't really cover the nuances above regarding argNames
+    *        formatting rules.
+    */
+
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
 
     /* Performs a call to fn, passing top argsN stack objects as args, writing return value to returnTo, returning if successful. */
+    /* argNames is a comma-seperated string detailing the which named params the args after the positional ones correspond to. */
     /* The passed arg objects are consumed from the stack after the call (and before writing to returnTo.) */
     /* The passed arg objects are not consumed on failure. */
     /* Pushes to the stack if returnTo == YM_NEWTOP. */
     /* Discards result of call, writing nothing, if returnTo == YM_DISCARD. */
     /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
     /* Fails if fn is not a callable type. */
-    /* Fails if argsN is the wrong number of args. */
     /* Fails if argsN exceeds the height of the local object stack. */
-    /* Fails if arg objects are the wrong types. */
+    /* Fails if wrong number of positional args are provided. */
+    /* Fails if argNames specifies an identifier multiple times. */
+    /* Fails if argNames specifies an unknown identifier. */
+    /* Fails if argNames specifies a positional param identifier. */
+    /* Fails if positional/named arg objects are the wrong types. */
     /* Fails if no return value object bound (by call behaviour.) */
     /* Fails if return value object is the wrong type. */
     /* Fails if call stack overflow. */
     /* Behaviour is undefined if ctx is invalid. */
     /* Behaviour is undefined if fn is invalid. */
-    YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, YmLocal returnTo);
+    /* Behaviour is undefined if argNames (as a pointer) is invalid. */
+    YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo);
 
     /* Binds what as the return value of the current call, overwriting existing bindings. */
     /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
@@ -1006,19 +1064,20 @@ extern "C" {
     *        in which case the description for below will need to be updated.
     */
 
-    /* Adds a new method to parceldef, owned by owner, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new method to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
     /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if owner is not a valid type index. */
-    /* Fails if owner is not allowed to have members. */
-    /* Fails if owner is a protocol. */
+    /* Fails if no type under ownerName. */
+    /* Fails if ownerName is not allowed to have members. */
+    /* Fails if ownerName is a protocol. */
     /* Fails if returnType is illegal. */
     /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if ownerName (as a pointer) is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
     /* Behaviour is undefined if callBehaviour is invalid. */
     YmTypeIndex ymParcelDef_AddMethod(
         struct YmParcelDef* parceldef,
-        YmTypeIndex owner,
+        const YmChar* ownerName,
         const YmChar* name,
         YmRefSym returnType,
         YmCallBhvrCallbackFn callBehaviour,
@@ -1030,18 +1089,19 @@ extern "C" {
     *        These behave otherwise like regular methods, but have this special additional role.
     */
 
-    /* Adds a new method req. to parceldef, owned by owner, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new method req. to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
     /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if owner is not a valid type index. */
-    /* Fails if owner is not a protocol. */
+    /* Fails if no type under ownerName. */
+    /* Fails if ownerName is not allowed to have members. */
+    /* Fails if ownerName is not a protocol. */
     /* Fails if returnType is illegal. */
     /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if ownerName (as a pointer) is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    /* Behaviour is undefined if callBehaviour is invalid. */
     YmTypeIndex ymParcelDef_AddMethodReq(
         struct YmParcelDef* parceldef,
-        YmTypeIndex owner,
+        const YmChar* ownerName,
         const YmChar* name,
         YmRefSym returnType);
 
@@ -1058,45 +1118,59 @@ extern "C" {
     /* Adds a new type parameter to the specified type, returning its index, or YM_NO_TYPE_PARAM_INDEX on failure. */
     /* type will not be able to load if constraintType doesn't specify a protocol. */
     /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if type is not the index of a type in parceldef. */
-    /* Fails if type is a member. */
+    /* Fails if no type under typeName. */
+    /* Fails if typeName is a member. */
     /* Fails if constraintType is illegal. */
     /* Fails if adding new type parameter would exceed YM_MAX_TYPE_PARAMS. */
     /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if constraintType (as a pointer) is invalid. */
     YmTypeParamIndex ymParcelDef_AddTypeParam(
         struct YmParcelDef* parceldef,
-        YmTypeIndex type,
+        const YmChar* typeName,
         const YmChar* name,
         YmRefSym constraintType);
 
-    /* Adds a new parameter to the specified type, returning its index, or YM_NO_PARAM_INDEX on failure. */
-    /* Fails if type is not the index of a type in parceldef. */
-    /* Fails if type is not callable. */
+    /* Adds a new positional/named parameter to the specified type, returning its index, or YM_NO_PARAM_INDEX on failure. */
+    /* Fails if no type under typeName. */
+    /* Fails if typeName is not callable. */
     /* Fails if name conflicts with an existing parameter. */
     /* Fails if paramType is illegal. */
-    /* Fails if adding new parameter would exceed YM_MAX_PARAMS. */
+    /* Fails if adding new positional parameter would exceed YM_MAX_POSITIONAL_PARAMS. */
+    /* Fails if adding new named parameter would exceed YM_MAX_NAMED_PARAMS. */
     /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
     /* Behaviour is undefined if name (as a pointer) is invalid. */
     /* Behaviour is undefined if paramType (as a pointer) is invalid. */
     YmParamIndex ymParcelDef_AddParam(
         struct YmParcelDef* parceldef,
-        YmTypeIndex type,
+        const YmChar* typeName,
         const YmChar* name,
         YmRefSym paramType);
 
+    /* Makes it so parameters added to the specified type will hereafter be named parameters, not positional ones. */
+    /* Fails if no type under typeName. */
+    /* Fails if typeName is not callable. */
+    /* Fails if typeName is a protocol member type. */
+    /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
+    void ymParcelDef_BeginNamedParams(
+        struct YmParcelDef* parceldef,
+        const YmChar* typeName);
+
     /* Adds to a type in parceldef a reference to the type specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
-    /* These references' IDs are sequential, incrementing from 0. */
+    /* Reference IDs are sequential, incrementing from 0. */
     /* Each reference gets a unique ID increment, even if two reference share the same symbol. */
-    /* Fails if type is not the index of a type in parceldef. */
+    /* Fails if no type under typeName. */
     /* Fails if symbol is illegal. */
     /* Fails if Yama API internals are unable to allocate a reference ID. */
     /* Behaviour is undefined if parceldef is invalid. */
+    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
     /* Behaviour is undefined if symbol (as a pointer) is invalid. */
     YmRef ymParcelDef_AddRef(
         struct YmParcelDef* parceldef,
-        YmTypeIndex type,
+        const YmChar* typeName,
         YmRefSym symbol);
 
 
@@ -1168,8 +1242,9 @@ extern "C" {
     YmType* ymType_ReturnType(struct YmType* type);
 
     /* Returns the number of parameters the type has, if any. */
+    /* Named parameters are only included if includeNamed == YM_TRUE. */
     /* Behaviour is undefined if type is invalid. */
-    YmParams ymType_Params(struct YmType* type);
+    YmParams ymType_Params(struct YmType* type, YmBool includeNamed);
 
     /* Returns the name of param in type, or YM_NIL on failure. */
     /* This string's memory is managed internally. */
@@ -1179,6 +1254,10 @@ extern "C" {
     /* Returns the type of param in type, or YM_NIL on failure. */
     /* Behaviour is undefined if type is invalid. */
     YmType* ymType_ParamType(struct YmType* type, YmParamIndex param);
+
+    /* Returns the category of param in type, or (dummy value) YmParamCategory_Positional on failure. */
+    /* Behaviour is undefined if type is invalid. */
+    YmParamCategory ymType_ParamCategory(struct YmType* type, YmParamIndex param);
 
     /* Returns the type referenced under reference, or YM_NIL on failure. */
     /* Behaviour is undefined if type is invalid. */

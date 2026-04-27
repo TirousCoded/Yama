@@ -14,14 +14,14 @@ int32_t main(int32_t argc, char** argv) {
     auto ctx = ym::Context(dm);
 
     ym::ParcelDef p_def{};
-    auto identity_ind = p_def.addFn(
+    (void)p_def.addFn(
         "identity",
         "$T",
         { { "v", "$T" } },
         {},
-        ymInertCallBhvrFn
-    ).value();
-    (void)p_def.addTypeParam(identity_ind, "T", "yama:Any").value();
+        ymInertCallBhvrFn)
+        .value();
+    (void)p_def.addTypeParam("identity", "T", "yama:Any").value();
     (void)p_def.addFn(
         "recurse",
         "yama:None",
@@ -56,15 +56,15 @@ int32_t main(int32_t argc, char** argv) {
             else if (T == ctx.ldType())     ym::println("yama:Type {}", x.toType().value());
             else                            ym::println("{} n/a", (std::string)T.fullname());
         }).value();
-    (void)p_def.addTypeParam(printT_ind, "T", "yama:Any").value();
+    (void)p_def.addTypeParam("printT", "T", "yama:Any").value();
 
     ym::ParcelDef a_def{};
-    auto A_ind = a_def.addStruct("A").value();
-    (void)a_def.addMethod(A_ind, "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
-    auto B_ind = a_def.addStruct("B").value();
-    (void)a_def.addMethod(B_ind, "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
-    auto Hash_ind = a_def.addProtocol("Hash").value();
-    (void)a_def.addMethodReq(Hash_ind, "hash", "yama:UInt", {}).value();
+    (void)a_def.addStruct("A").value();
+    (void)a_def.addMethod("A", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
+    (void)a_def.addStruct("B").value();
+    (void)a_def.addMethod("B", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
+    (void)a_def.addProtocol("Hash").value();
+    (void)a_def.addMethodReq("Hash", "hash", "yama:UInt", {}).value();
 
     dm.bind("p", p_def);
     dm.bind("a", a_def);

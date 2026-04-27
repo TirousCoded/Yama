@@ -101,7 +101,13 @@ namespace ym {
             return std::nullopt;
         }
         inline YmParams params() const noexcept {
-            return ymType_Params(get());
+            return ymType_Params(get(), YM_TRUE);
+        }
+        inline YmParams positionalParams() const noexcept {
+            return ymType_Params(get(), YM_FALSE);
+        }
+        inline YmParams namedParams() const noexcept {
+            return params() - positionalParams();
         }
         inline std::optional<Param> param(YmParamIndex index) const noexcept {
             return
