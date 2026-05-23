@@ -10,7 +10,13 @@ YmObj::YmObj(YmCtx& ctx, YmType& type) :
 }
 
 void YmObj::cleanup() noexcept {
-	if (isProtocol()) {
+	if (isRegularStruct()) {
+		// Cleanup each stored property subobject.
+		for (size_t i = 0; i < type->info->slots; i++) {
+			ctx->release(ym::deref(slot(i).ref)); // Can't forget!
+		}
+	}
+	else if (isProtocol()) {
 		ctx->release(ym::deref(boxed())); // Can't forget!
 	}
 }
@@ -21,6 +27,18 @@ YmObj::Slot& YmObj::slot(size_t index) noexcept {
 
 const YmObj::Slot& YmObj::slot(size_t index) const noexcept {
 	return _ym::ObjHAL::element(*this, index);
+}
+
+bool YmObj::isPrimitive() const noexcept {
+	return isNone() || isInt() || isUInt() || isFloat() || isBool() || isRune() || isType();
+}
+
+bool YmObj::isStruct() const noexcept {
+	return type->kind() == YmKind_Struct;
+}
+
+bool YmObj::isRegularStruct() const noexcept {
+	return isStruct() && !isPrimitive();
 }
 
 bool YmObj::isProtocol() const noexcept {

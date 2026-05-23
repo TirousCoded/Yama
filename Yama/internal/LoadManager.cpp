@@ -114,6 +114,7 @@ ym::Safe<YmType> _ym::LoadManager::_genNonMemberTypeData(
         _scheduleLateResolve(*newType.type);
         _genTypeDataForMembers(parcel, info, newType.type);
         _earlyResolveType(*newType.type, newType.type);
+        _earlyResolveMembers(*newType.type, newType.type);
     }
     return newType.type;
 }
@@ -135,7 +136,6 @@ void _ym::LoadManager::_genMemberTypeData(
     ymAssert(!info->isOwner());
     if (auto newType = _genTypeData(parcel, info, self); newType.original) {
         _scheduleLateResolve(*newType.type);
-        _earlyResolveType(*newType.type, self);
     }
 }
 
@@ -161,6 +161,16 @@ bool _ym::LoadManager::_isEarlyResolveConst(const ConstInfo& constInfo) const {
         : std::regex_match(constInfo.as<RefInfo>().sym.string(), earlyResolvedRefSymPattern);
 }
 
+void _ym::LoadManager::_earlyResolveMembers(YmType& x, ym::Safe<YmType> self) {
+#if _DUMP_LOG
+    ym::println("LoadManager: Early resolving {} members.", x.fullname());
+#endif
+    ymAssert(!x.owner());
+    for (YmMemberIndex i = 0; i < x.members(); i++) {
+        _earlyResolveType(ym::deref(x.member(i)), self);
+    }
+}
+
 void _ym::LoadManager::_earlyResolveType(YmType& x, ym::Safe<YmType> self) {
 #if _DUMP_LOG
     ym::println("LoadManager: Early resolving {} consts.", x.fullname());
@@ -183,8 +193,18 @@ void _ym::LoadManager::_earlyResolveConsts(YmType& x, ym::Safe<YmType> self) {
             }
             else {
                 // NOTE: Important we use 'self->fullname()' here.
-                auto memberName = std::format("{}::{}", self->fullname(), consts[i].as<RefInfo>().sym.string().substr(strlen("$Self::")));
-                x.putRefConst(i, ym::Safe(staging->types.fetch(Spec::typeFast(memberName)).get()));
+                auto ownerName = self->fullname();
+                auto memberName = std::format("{}::{}", ownerName, consts[i].as<RefInfo>().sym.string().substr(strlen("$Self::")));
+                if (auto memberType = staging->types.fetch(Spec::typeFast(memberName))) {
+                    x.putRefConst(i, memberType.get());
+                }
+                else {
+                    _err(
+                        YmErrCode_TypeNotFound,
+                        "{} has no member \"{}\"!",
+                        ownerName,
+                        memberName);
+                }
             }
         }
     }

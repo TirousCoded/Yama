@@ -11,6 +11,18 @@
 extern "C" {
 
 
+    /* TODO: Maybe replace later w/ a string-based system, instead of using an enum.
+    * 
+    *        This has a number of advantages:
+    *           - We needn't suffer a large recompile since we can avoid needing to update
+    *             this frontend header file.
+    *           - It'll probably be easier to push error code to backend if need-be.
+    *           - We can segregate errors w/ otherwise similar names by prefixing them,
+    *             for example w/ names like 'Compile.OutOfBounds'.
+    *           - We could allow end-user to enable/disable error msgs for specific errors
+    *             via specifying string prefixes (eg. 'Compile' to enable/disable above.)
+    */
+
     typedef enum : YmUInt16 {
         YmErrCode_IllegalSpecifier = 0,     /* Illegal specifier (in some import/load context.) */
         YmErrCode_IllegalConstraint,        /* Illegal type parameter constraint. */
@@ -19,16 +31,24 @@ extern "C" {
         YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
         YmErrCode_TypeNotFound,             /* Couldn't find a specific type. */
         YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
+        YmErrCode_IllegalName,              /* Illegal name. */
         YmErrCode_NameConflict,             /* Name conflict detected. */
         YmErrCode_LimitReached,             /* Known limit reached. */
+        YmErrCode_TypeMismatch,             /* Type not expected. */
+        YmErrCode_IllegalNameList,          /* Illegal named arg list. */
         YmErrCode_ConcreteType,             /* Type is concrete (ie. not generic.) */
         YmErrCode_GenericType,              /* Type is generic (ie. not concrete.) */
         YmErrCode_MemberType,               /* Type is a member. */
         YmErrCode_NonCallableType,          /* Type is non-callable. */
         YmErrCode_TypeCannotHaveMembers,    /* Type cannot have members. */
+        YmErrCode_NonStructType,            /* Type is a non-struct. */
         YmErrCode_ProtocolType,             /* Type is a protocol. */
         YmErrCode_NonProtocolType,          /* Type is a non-protocol. */
         YmErrCode_ProtocolMemberType,       /* Type is member of protocol type. */
+        YmErrCode_ReadOnlyPropertyType,     /* Type is a read-only property. */
+        YmErrCode_PropertyType,             /* Type is a property. */
+        YmErrCode_NonPropertyType,          /* Type is a non-property. */
+        YmErrCode_PropertyAssignerType,     /* Type is a property assigner. */
         YmErrCode_ArgNotFound,              /* Arg object index out-of-bounds. */
         YmErrCode_LocalNotFound,            /* Local object stack index out-of-bounds. */
         YmErrCode_CallProcedureError,       /* Call procedure error. */

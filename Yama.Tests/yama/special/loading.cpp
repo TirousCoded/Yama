@@ -14,27 +14,32 @@
 
 
 TEST(Loading, WorksWithAllTypeKinds) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     // Dep Graph:
-    //      p:A                     (Struct)
-    //      p:B                     (Protocol)
-    //      p:C     -> p:Int        (Function)
-    //      p:A::m  -> p:A          (Method)
-    //              -> p:Int
-    //      p:B::m  -> p:B          (Method Req.)
-    //              -> p:Int
+    //      p:A                                 (Struct)
+    //      p:B                                 (Protocol)
+    //      p:C                 -> p:Int        (Function)
+    //      p:A::m              -> p:A          (Method)
+    //                          -> p:Int
+    //      p:A::x              -> p:A          (Property)
+    //                          -> p:Int
+    //      p:A::x$assigner     -> p:A          (Property Assigner)
+    //                          -> p:Int
+    //      p:B::m              -> p:B          (Method Req.)
+    //                          -> p:Int
     //
     //      p:Int
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    YmTypeIndex Int_index = setup_struct(p_def, "Int", {});
+    setup_struct(p_def, "Int", {});
 
-    YmTypeIndex A_index = setup_struct(p_def, "A", {});
-    YmTypeIndex B_index = setup_protocol(p_def, "B", {});
-    YmTypeIndex C_index = setup_fn(p_def, "C", "p:Int", {});
-    YmTypeIndex A_m_index = setup_method(p_def, "A", "m", "p:Int", {});
-    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
+    setup_struct(p_def, "A", {});
+    setup_protocol(p_def, "B", {});
+    setup_fn(p_def, "C", "p:Int", {});
+    setup_method(p_def, "A", "m", "p:Int", {});
+    setup_property_and_assigner(p_def, "A", "x", "p:Int", {});
+    ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -42,6 +47,8 @@ TEST(Loading, WorksWithAllTypeKinds) {
     YmType* B = load(ctx, "p:B");
     YmType* C = load(ctx, "p:C");
     YmType* A_m = load(ctx, "p:A::m");
+    YmType* A_x = load(ctx, "p:A::x");
+    YmType* A_x_assigner = load(ctx, "p:A::x$assigner");
     YmType* B_m = load(ctx, "p:B::m");
     YmType* Int = load(ctx, "p:Int");
 
@@ -49,45 +56,58 @@ TEST(Loading, WorksWithAllTypeKinds) {
     test_protocol(B, "p:B", { B_m });
     test_fn(C, "p:C", { Int });
     test_method(A_m, "p:A::m", { A, Int });
+    test_property(A_x, "p:A::x", { A, Int });
+    test_property_assigner(A_x_assigner, "p:A::x$assigner", { A, Int });
     test_method(B_m, "p:B::m", { B, Int });
 }
 
 TEST(Loading, WorksWithAllTypeKinds_Generics) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     // Generics:
     //      A[X: Any]
     //      B[X: Any]
     //      C[X: Any]() -> X
     //      A[X: Any]::m() -> X
+    //      A[X: Any]::x($Self) -> X
+    //      A[X: Any]::x$assigner($Self, X) -> yama:None
     //      B[X: Any]::m() -> X
     // 
     // Dep Graph:
-    //      p:A[X]          -> X            (Struct)
-    //      p:B[X]          -> X            (Protocol)
-    //      p:C[X]          -> X            (Function)
-    //      p:A[X]::m       -> p:A[X]       (Method)
-    //                      -> X
-    //      p:B[X]::m       -> p:B[X]       (Method Req.)
-    //                      -> X
-    //
-    //      p:A[p:Int]      -> p:Int
-    //      p:B[p:Int]      -> p:Int
-    //      p:C[p:Int]      -> p:Int
-    //      p:A[p:Int]::m   -> p:A[p:Int]
-    //                      -> p:Int
-    //      p:B[p:Int]::m   -> p:B[p:Int]
-    //                      -> p:Int
+    //      p:A[X]                  -> X            (Struct)
+    //      p:B[X]                  -> X            (Protocol)
+    //      p:C[X]                  -> X            (Function)
+    //      p:A[X]::m               -> p:A[X]       (Method)
+    //                              -> X
+    //      p:A[X]::x               -> p:A[X]       (Property)
+    //                              -> X
+    //      p:A[X]::x$assigner      -> p:A[X]       (Property Assigner)
+    //                              -> X
+    //      p:B[X]::m               -> p:B[X]       (Method Req.)
+    //                              -> X
+    //                              
+    //      p:A[p:Int]              -> p:Int
+    //      p:B[p:Int]              -> p:Int
+    //      p:C[p:Int]              -> p:Int
+    //      p:A[p:Int]::m           -> p:A[p:Int]
+    //                              -> p:Int
+    //      p:A[p:Int]::x           -> p:A[p:Int]
+    //                              -> p:Int
+    //      p:A[p:Int]::x$assigner  -> p:A[p:Int]
+    //                              -> p:Int
+    //      p:B[p:Int]::m           -> p:B[p:Int]
+    //                              -> p:Int
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    YmTypeIndex Any_index = setup_protocol(p_def, "Any", {});
-    YmTypeIndex Int_index = setup_struct(p_def, "Int", {});
+    setup_protocol(p_def, "Any", {});
+    setup_struct(p_def, "Int", {});
 
-    YmTypeIndex A_index = setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
-    YmTypeIndex B_index = setup_protocol(p_def, "B", {}, { { "X", "p:Any" } });
-    YmTypeIndex C_index = setup_fn(p_def, "C", "p:Int", {}, { { "X", "p:Any" } });
-    YmTypeIndex A_m_index = setup_method(p_def, "A", "m", "p:Int", {});
-    YmTypeIndex B_m_index = ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
+    setup_struct(p_def, "A", {}, { { "X", "p:Any" } });
+    setup_protocol(p_def, "B", {}, { { "X", "p:Any" } });
+    setup_fn(p_def, "C", "p:Int", {}, { { "X", "p:Any" } });
+    setup_method(p_def, "A", "m", "p:Int", {});
+    setup_property_and_assigner(p_def, "A", "x", "p:Int", {});
+    ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -95,6 +115,8 @@ TEST(Loading, WorksWithAllTypeKinds_Generics) {
     YmType* B_Int = load(ctx, "p:B[p:Int]");
     YmType* C_Int = load(ctx, "p:C[p:Int]");
     YmType* A_Int_m = load(ctx, "p:A[p:Int]::m");
+    YmType* A_Int_x = load(ctx, "p:A[p:Int]::x");
+    YmType* A_Int_x_assigner = load(ctx, "p:A[p:Int]::x$assigner");
     YmType* B_Int_m = load(ctx, "p:B[p:Int]::m");
     YmType* Int = load(ctx, "p:Int");
 
@@ -102,6 +124,8 @@ TEST(Loading, WorksWithAllTypeKinds_Generics) {
     test_protocol(B_Int, "p:B[p:Int]", {}, { Int });
     test_fn(C_Int, "p:C[p:Int]", {}, { Int });
     test_method(A_Int_m, "p:A[p:Int]::m", { A_Int }, { Int });
+    test_property(A_Int_x, "p:A[p:Int]::x", { A_Int }, { Int });
+    test_property_assigner(A_Int_x_assigner, "p:A[p:Int]::x$assigner", { A_Int }, { Int });
     test_method(B_Int_m, "p:B[p:Int]::m", { B_Int }, { Int });
 }
 
@@ -334,13 +358,23 @@ TEST(Loading, IndirectLoadsAutoImportParcels) {
 }
 
 TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
+    // NOTE: Super important that, below, we use '$Self::' in place of 'p:A' for symbols,
+    //       as we specifically want to test that early resolution is working correctly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
+    // NOTE: Gotta have p:A::m1 and p:A::m2 mutually have refs to one another so that we
+    //       test that impl can handle this properly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
     // Dep Graph:
-    //      p:A     -> p:A::m1      (Member)
-    //              -> p:A::m2      (Member)
-    //      p:A::m1 -> p:A          (Owner)
+    //      p:A     -> $Self::m1    (Member)
+    //              -> $Self::m2    (Member)
+    //      p:A::m1 -> $Self        (Owner)
     //              -> p:B          (Return Type)
-    //      p:A::m2 -> p:A          (Owner)
+    //              -> $Self::m2
+    //      p:A::m2 -> $Self        (Owner)
     //              -> p:B          (Return Type)
+    //              -> $Self::m1
     //      p:B                     (This is just for m1/m2 return types.)
 
     // NOTE: Don't call ymCtx_Load for any type before the initial p:A load, so that
@@ -348,9 +382,9 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    YmTypeIndex p_A_index = setup_struct(p_def, "A", { "p:A::m1", "p:A::m2" });
-    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "p:A", "p:B" });
-    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_index = setup_struct(p_def, "A", { "$Self::m1", "$Self::m2" });
+    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "$Self", "p:B", "$Self::m2" });
+    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "$Self", "p:B", "$Self::m1" });
     YmTypeIndex p_B_index = setup_struct(p_def, "B", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -362,8 +396,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
     YmType* p_B = load(ctx, "p:B");
 
     test_struct(p_A, "p:A", { p_A_m1, p_A_m2 });
-    test_method(p_A_m1, "p:A::m1", { p_A, p_B });
-    test_method(p_A_m2, "p:A::m2", { p_A, p_B });
+    test_method(p_A_m1, "p:A::m1", { p_A, p_B, p_A_m2 });
+    test_method(p_A_m2, "p:A::m2", { p_A, p_B, p_A_m1 });
     test_struct(p_B, "p:B", {});
 
     EXPECT_EQ(ymType_Owner(p_A), nullptr);
@@ -379,13 +413,23 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadOwner) {
 }
 
 TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
+    // NOTE: Super important that, below, we use '$Self::' in place of 'p:A' for symbols,
+    //       as we specifically want to test that early resolution is working correctly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
+    // NOTE: Gotta have p:A::m1 and p:A::m2 mutually have refs to one another so that we
+    //       test that impl can handle this properly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
     // Dep Graph:
-    //      p:A     -> p:A::m1      (Member)
-    //              -> p:A::m2      (Member)
-    //      p:A::m1 -> p:A          (Owner)
+    //      p:A     -> $Self::m1    (Member)
+    //              -> $Self::m2    (Member)
+    //      p:A::m1 -> $Self        (Owner)
     //              -> p:B          (Return Type)
+    //              -> $Self::m2
     //      p:A::m2 -> p:A          (Owner)
     //              -> p:B          (Return Type)
+    //              -> $Self::m1
     //      p:B                     (This is just for m1/m2 return types.)
 
     // NOTE: Don't call ymCtx_Load for any type before the initial p:A::m1 load, so that
@@ -393,9 +437,9 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    YmTypeIndex p_A_index = setup_struct(p_def, "A", { "p:A::m1", "p:A::m2" });
-    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "p:A", "p:B" });
-    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "p:A", "p:B" });
+    YmTypeIndex p_A_index = setup_struct(p_def, "A", { "$Self::m1", "$Self::m2" });
+    YmTypeIndex p_A_m1_index = setup_method(p_def, "A", "m1", "p:B", { "$Self", "p:B", "$Self::m2" });
+    YmTypeIndex p_A_m2_index = setup_method(p_def, "A", "m2", "p:B", { "$Self", "p:B", "$Self::m1" });
     YmTypeIndex p_B_index = setup_struct(p_def, "B", {});
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -407,8 +451,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
     YmType* p_B = load(ctx, "p:B");
 
     test_struct(p_A, "p:A", { p_A_m1, p_A_m2 });
-    test_method(p_A_m1, "p:A::m1", { p_A, p_B });
-    test_method(p_A_m2, "p:A::m2", { p_A, p_B });
+    test_method(p_A_m1, "p:A::m1", { p_A, p_B, p_A_m2 });
+    test_method(p_A_m2, "p:A::m2", { p_A, p_B, p_A_m1 });
     test_struct(p_B, "p:B", {});
 
     EXPECT_EQ(ymType_Owner(p_A), nullptr);
@@ -424,6 +468,14 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_DirectlyLoadMember) {
 }
 
 TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
+    // NOTE: Super important that, below, we use '$Self::' in place of 'p:T[$X]' for symbols,
+    //       as we specifically want to test that early resolution is working correctly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
+    // NOTE: Gotta have p:T[X]::m1 and p:T[X]::m2 mutually have refs to one another so that we
+    //       test that impl can handle this properly.
+    //          * TODO: Maybe seperate this out into its own test(s)?
+
     // Generics:
     //      T[X: Any]
     //      T[X: Any]::m1() -> X
@@ -431,18 +483,22 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
     // 
     // Dep Graph:
     //      p:T[X]      -> X
-    //                  -> p:T[X]::m1   -> p:T[X]
+    //                  -> p:T[X]::m1   -> $Self
     //                                  -> X
-    //                  -> p:T[X]::m2   -> p:T[X]
+    //                                  -> $Self::m2
+    //                  -> p:T[X]::m2   -> $Self
     //                                  -> X
     //                                  -> p:Int
+    //                                  -> $Self::m1
     // 
     //      p:T[p:A]    -> p:A
-    //                  -> p:T[p:A]::m1 -> p:T[p:A]
+    //                  -> p:T[p:A]::m1 -> $Self
     //                                  -> p:A
-    //                  -> p:T[p:A]::m2 -> p:T[p:A]
+    //                                  -> $Self::m2
+    //                  -> p:T[p:A]::m2 -> $Self
     //                                  -> p:A
     //                                  -> p:Int
+    //                                  -> $Self::m1
 
     // NOTE: Don't call ymCtx_Load for any type before the initial p:T[~] load, so that
     //       it's recursive loading of others is properly tested.
@@ -452,9 +508,9 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
     auto Int_index = setup_struct(p_def, "Int", {});
     auto Any_index = setup_protocol(p_def, "Any", {});
 
-    auto T_index = setup_struct(p_def, "T", { "p:T[$X]::m1", "p:T[$X]::m2" }, { { "X", "p:Any" } });
-    auto T_m1_index = setup_method(p_def, "T", "m1", "$X", { "$X" });
-    auto T_m2_index = setup_method(p_def, "T", "m2", "p:Int", { "$X", "p:Int" });
+    auto T_index = setup_struct(p_def, "T", { "$Self::m1", "$Self::m2" }, { { "X", "p:Any" } });
+    auto T_m1_index = setup_method(p_def, "T", "m1", "$X", { "$X", "$Self::m2" });
+    auto T_m2_index = setup_method(p_def, "T", "m2", "p:Int", { "$X", "p:Int", "$Self::m1" });
 
     auto A_index = setup_struct(p_def, "A", {});
 
@@ -468,8 +524,8 @@ TEST(Loading, OwnersAndTheirMembersAreLoadedTogether_Generics) {
     YmType* Int = load(ctx, "p:Int");
 
     test_struct(T_A, "p:T[p:A]", { T_A_m1, T_A_m2 }, { A });
-    test_method(T_A_m1, "p:T[p:A]::m1", {}, { A });
-    test_method(T_A_m2, "p:T[p:A]::m2", { Int }, { A });
+    test_method(T_A_m1, "p:T[p:A]::m1", { T_A_m2 }, { A });
+    test_method(T_A_m2, "p:T[p:A]::m2", { Int, T_A_m1 }, { A });
 
     EXPECT_EQ(ymType_Owner(T_A), nullptr);
     EXPECT_EQ(ymType_Owner(T_A_m1), T_A);
@@ -1143,6 +1199,25 @@ TEST(Loading, Fail_TypeNotFound_IndirectLoad) {
     EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
+TEST(Loading, Fail_TypeNotFound_IndirectLoad_MemberOfSelf) {
+    // NOTE: This unit test covers an edge case that wasn't originally.
+    
+    // Dep Graph:
+    //      p:A -> $Self::m         (p:A does exist, but $Self::m doesn't.)
+
+    // NOTE: Don't call ymCtx_Load for any type before the initial p:A load, so that
+    //       it's recursive loading of others is properly tested.
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    setup_struct(p_def, "A", { "$Self::m" });
+    
+    ymDm_BindParcelDef(dm, "p", p_def);
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:A"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
+}
+
 TEST(Loading, Fail_ConcreteType_ArgPackOnConcreteType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -1220,14 +1295,15 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint) {
     EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
 }
 
-TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnAndMethodTypesCannotConformToConstraints) {
-    static_assert(YmKind_Num == 4);
+TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnLikeCallableTypesCannotConformToConstraints) {
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     setup_fn(p_def, "f", "yama:None", {});
     setup_struct(p_def, "A", {});
     setup_method(p_def, "A", "m", "yama:None", {});
+    setup_property_and_assigner(p_def, "A", "x", "yama:None", {});
     setup_struct(p_def, "B", {}, { { "T", "yama:Any" } });
 
     ymDm_BindParcelDef(dm, "p", p_def);
@@ -1238,6 +1314,16 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnAndMethodTypesCa
     err.reset();
 
     EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:A::m]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:A::x]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:A::x$assigner]"), nullptr);
     EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
 }
 

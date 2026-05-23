@@ -94,6 +94,21 @@ inline YmTypeIndex setup_method(
         refs,
         {});
 }
+inline YmTypeIndex setup_property_and_assigner(
+    YmParcelDef* def,
+    const std::string& ownerName,
+    const std::string& memberName,
+    const std::string& typeSymbol,
+    std::initializer_list<std::string> refs) {
+    return setup_helper(
+        def,
+        std::format("{}::{}", ownerName, memberName),
+        [def, ownerName, memberName, typeSymbol]() -> YmTypeIndex {
+            return ymParcelDef_AddStoredProperty(def, ownerName.c_str(), memberName.c_str(), typeSymbol.c_str());
+        },
+        refs,
+        {});
+}
 
 inline void test_type_basics(
     YmType* type,
@@ -151,5 +166,23 @@ inline void test_method(
     ym::println("-- testing {}", fullname);
     ASSERT_NE(type, nullptr);
     test_type_basics(type, fullname, YmKind_Method, refs, typeArgs);
+}
+inline void test_property(
+    YmType* type,
+    const std::string& fullname,
+    std::initializer_list<YmType*> refs,
+    std::initializer_list<YmType*> typeArgs = {}) {
+    ym::println("-- testing {}", fullname);
+    ASSERT_NE(type, nullptr);
+    test_type_basics(type, fullname, YmKind_Property, refs, typeArgs);
+}
+inline void test_property_assigner(
+    YmType* type,
+    const std::string& fullname,
+    std::initializer_list<YmType*> refs,
+    std::initializer_list<YmType*> typeArgs = {}) {
+    ym::println("-- testing {}", fullname);
+    ASSERT_NE(type, nullptr);
+    test_type_basics(type, fullname, YmKind_PropertyAssigner, refs, typeArgs);
 }
 

@@ -2,9 +2,13 @@
 
 #include "ParcelInfo.h"
 
+#include <taul/unicode.h>
+
 #include "general.h"
 #include "SpecSolver.h"
 #include "../yama++/general.h"
+
+#include "YmObj.h" // <- Needed for YmCtx impl.
 
 
 std::optional<_ym::Spec> _ym::normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver) {
@@ -60,6 +64,25 @@ bool _ym::checkNonProtocolMember(const TypeInfo& type, std::string_view msg) {
 
 void _ym::methodReqCallBhvr(YmCtx* ctx, void* user) {
     YM_DEADEND;
+}
+
+void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, void* user) {
+    // TODO: This code semi-duplicates code in YmCtx::getProperty.
+    auto slotInd = (uintptr_t)user;
+    auto& subject = ym::deref(ctx->arg(0));
+    ctx->ret(subject.slot(slotInd).ref, YM_BORROW);
+}
+
+void _ym::storedPropertySetCallBhvr(YmCtx* ctx, void* user) {
+    // TODO: This code semi-duplicates code in YmCtx::setProperty.
+    auto slotInd = (uintptr_t)user;
+    auto& subject = ym::deref(ctx->arg(0));
+    auto& value = ym::deref(ctx->arg(1));
+    auto& target = subject.slot(slotInd).ref;
+    ctx->release(ym::deref(target));
+    target = &value;
+    ctx->secure(value);
+    ctx->ret(ctx->newNone());
 }
 
 bool _ym::TypeInfo::returnTypeIsSelf() const noexcept {
@@ -126,7 +149,31 @@ const _ym::ParamInfo* _ym::TypeInfo::queryParam(const std::string& localName) co
 }
 
 bool _ym::TypeInfo::isMethodReq() const noexcept {
-    return callBehaviour && callBehaviour->fn == methodReqCallBhvr;
+    return
+        kind == YmKind_Method &&
+        callBehaviour &&
+        callBehaviour->fn == methodReqCallBhvr;
+}
+
+bool _ym::TypeInfo::isStoredPropertyGet() const noexcept {
+    return
+        kind == YmKind_Property &&
+        callBehaviour &&
+        callBehaviour->fn == storedPropertyGetCallBhvr;
+}
+
+bool _ym::TypeInfo::isStoredPropertySet() const noexcept {
+    return
+        kind == YmKind_PropertyAssigner &&
+        callBehaviour &&
+        callBehaviour->fn == storedPropertySetCallBhvr;
+}
+
+std::optional<YmUInt16> _ym::TypeInfo::storedPropertyIndex() const noexcept {
+    return
+        (callBehaviour && (isStoredPropertyGet() || isStoredPropertySet()))
+        ? std::make_optional((YmUInt16)(std::uintptr_t)callBehaviour->user)
+        : std::nullopt;
 }
 
 YmParams _ym::TypeInfo::paramCount() const noexcept {
@@ -159,6 +206,26 @@ YmTypeParams _ym::TypeInfo::typeParamCount() const noexcept {
 
 bool _ym::TypeInfo::isParameterized() const noexcept {
     return typeParamCount() >= 1;
+}
+
+bool _ym::TypeInfo::hasDefaultValue() const noexcept {
+    // TODO: This logic will work for both primitive types (None, Int, UInt, Type, etc.) and
+    //       for structs w/out any stored properties.
+    //       HOWEVER, this logic is also QUITE HACKY, and so we'd be best to try and replace
+    //       it in the future when possible.
+    return
+        kind == YmKind_Struct &&
+        slots == 0;
+}
+
+uint16_t _ym::TypeInfo::nextSlot() noexcept {
+    ymAssert(slots < decltype(slots)(-1));
+    slots++;
+    return slots - 1;
+}
+
+void _ym::TypeInfo::unwindSlots(uint16_t n) noexcept {
+    slots -= (n <= slots) ? n : slots;
 }
 
 std::optional<YmTypeParamIndex> _ym::TypeInfo::addTypeParam(std::string name, std::string constraintTypeSymbol) {
@@ -208,12 +275,12 @@ std::optional<YmTypeParamIndex> _ym::TypeInfo::addTypeParam(std::string name, st
     return typeParams.back()->index;
 }
 
-std::optional<YmParamIndex> _ym::TypeInfo::addParam(std::string name, std::string paramTypeSymbol) {
+std::optional<YmParamIndex> _ym::TypeInfo::addParam(std::string name, std::string paramTypeSymbol, bool skipCallabilityCheck) {
     auto normalizedParamTypeSym = normalizeRefSym(paramTypeSymbol, "Cannot add parameter");
     if (!normalizedParamTypeSym) {
         return std::nullopt;
     }
-    if (!checkCallable(*this, "Cannot add parameter")) {
+    if (!skipCallabilityCheck && !checkCallable(*this, "Cannot add parameter")) {
         return std::nullopt;
     }
     if (queryParam(name)) {
@@ -346,7 +413,12 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
     std::string localName,
     YmKind kind,
     std::optional<std::string> returnTypeSymbol,
-    std::optional<CallBhvrCallbackInfo> callBehaviour) {
+    std::optional<std::string> assignerTypeSymbol,
+    std::optional<CallBhvrCallbackInfo> callBehaviour,
+    bool skipLocalNameLegalityCheck) {
+    if (!skipLocalNameLegalityCheck && !_checkNameLegality(localName, "Cannot add type")) {
+        return std::nullopt;
+    }
     if (type(localName)) {
         Global::raiseErr(
             YmErrCode_NameConflict,
@@ -361,11 +433,22 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
     };
     if (returnTypeSymbol) {
         ymAssert(ymKind_IsCallable(newType.kind));
-        // TODO: This error msg is *clunky*, improve it.
-        if (auto normalizedReturnTypeSym = normalizeRefSym(*returnTypeSymbol, "Cannot add type; invalid return type symbol")) {
+        if (auto normalizedReturnTypeSym = normalizeRefSym(*returnTypeSymbol,
+            // TODO: Update this check later when we add parcel-level variables.
+            kind == YmKind_Property
+            // TODO: These error msgs are *clunky*, improve them.
+            ? "Cannot add type; invalid var type symbol"
+            : "Cannot add type; invalid return type symbol")) {
             newType.returnType = newType.consts.pullRef(std::move(*normalizedReturnTypeSym));
         }
         else return std::nullopt;
+    }
+    if (assignerTypeSymbol) {
+        // Fail quietly if normalization fails, as that should mean that the issue
+        // is the getter's fullname, from which the assigner was derived.
+        if (auto normalizedAssignerTypeSym = Spec::type(*assignerTypeSymbol)) {
+            newType.assigner = newType.consts.pullRef(std::move(*normalizedAssignerTypeSym));
+        }
     }
     newType.callBehaviour = callBehaviour;
     // NOTE: Make sure error checks stay ABOVE mutations of *this.
@@ -382,7 +465,14 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
     std::string memberName,
     YmKind kind,
     std::optional<std::string> returnTypeSymbol,
-    std::optional<CallBhvrCallbackInfo> callBehaviour) {
+    std::optional<std::string> assignerTypeSymbol,
+    std::optional<CallBhvrCallbackInfo> callBehaviour,
+    bool skipLocalNameLegalityCheck) {
+    // TODO: This _checkNameLegality's error msgs will only detail the memberName, rather
+    //       than the whole local name, which is somewhat suboptimal.
+    if (!skipLocalNameLegalityCheck && !_checkNameLegality(memberName, "Cannot add type")) {
+        return std::nullopt;
+    }
     auto ownerTypePtr = type(ownerName);
     if (!ownerTypePtr) {
         Global::raiseErr(
@@ -403,10 +493,10 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
             ymKind_Fmt(ownerType.kind));
         return std::nullopt;
     }
+    bool ownerIsProtocol = ownerType.kind == YmKind_Protocol;
     if (kind == YmKind_Method) {
         ymAssert(callBehaviour.has_value());
         bool isMethodReq = callBehaviour.value().fn == methodReqCallBhvr;
-        bool ownerIsProtocol = ownerType.kind == YmKind_Protocol;
         if (!isMethodReq && ownerIsProtocol) {
             Global::raiseErr(
                 YmErrCode_ProtocolType,
@@ -424,11 +514,23 @@ std::optional<YmTypeIndex> _ym::ParcelInfo::addType(
             return std::nullopt;
         }
     }
+    if (kind == YmKind_Property) {
+        if (ownerIsProtocol) {
+            Global::raiseErr(
+                YmErrCode_ProtocolType,
+                "Cannot add regular property to {} type {}!",
+                ymKind_Fmt(ownerType.kind),
+                ownerType.localName);
+            return std::nullopt;
+        }
+    }
     return addType(
         std::format("{}::{}", ownerType.localName, memberName),
         kind,
         std::move(returnTypeSymbol),
-        callBehaviour);
+        std::move(assignerTypeSymbol),
+        callBehaviour,
+        true);
 }
 
 std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(
@@ -436,28 +538,40 @@ std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(
     std::string name,
     std::string constraintTypeSymbol) {
     if (auto info = _expectType(typeName, "Cannot add type parameter")) {
+        if (!_checkNameLegality(name, "Cannot add type parameter")) {
+            return std::nullopt;
+        }
         if (!_checkNoMemberLevelNameConflict(*info, name, "Cannot add type parameter")) {
             return std::nullopt;
         }
         return info->addTypeParam(std::move(name), std::move(constraintTypeSymbol));
     }
-    else return std::nullopt;
+    return std::nullopt;
 }
 
 std::optional<YmParamIndex> _ym::ParcelInfo::addParam(
     std::string typeName,
     std::string name,
-    std::string paramTypeSymbol) {
-    auto info = _expectType(typeName, "Cannot add parameter");
-    return
-        info
-        ? info->addParam(std::move(name), std::move(paramTypeSymbol))
-        : std::nullopt;
+    std::string paramTypeSymbol,
+    bool skipCallabilityAndOtherRelatedCheck) {
+    if (auto info = _expectType(typeName, "Cannot add parameter")) {
+        if (!_checkNameLegality(name, "Cannot add parameter")) {
+            return std::nullopt;
+        }
+        if (!skipCallabilityAndOtherRelatedCheck && !_checkIsntPropertyOrAssigner(*info, "Cannot add parameter")) {
+            return std::nullopt;
+        }
+        return info->addParam(std::move(name), std::move(paramTypeSymbol), skipCallabilityAndOtherRelatedCheck);
+    }
+    return std::nullopt;
 }
 
 void _ym::ParcelInfo::beginNamedParams(
     const std::string& typeName) {
     if (auto info = _expectType(typeName, "Cannot begin named params")) {
+        if (!_checkIsntPropertyOrAssigner(*info, "Cannot begin named params")) {
+            return;
+        }
         info->beginNamedParams();
     }
 }
@@ -484,6 +598,49 @@ _ym::TypeInfo* _ym::ParcelInfo::_expectType(
         (std::string)msg,
         typeName);
     return nullptr;
+}
+
+bool _ym::ParcelInfo::_checkNameLegality(
+    const std::string& name,
+    std::string_view msg) {
+    auto err = [&]() {
+        Global::raiseErr(
+            YmErrCode_IllegalName,
+            "{}; name \"{}\" is illegal!",
+            (std::string)msg,
+            name);
+        };
+    if (name.empty()) {
+        err();
+        return false;
+    }
+    bool first = true; // If we're at first char (ie. it cannot be a digit.)
+    for (taul::decoder<char> d(taul::utf8, name); !d.done();) {
+        if (auto dr = d.next()) {
+            if (!taul::is_unicode(dr->cp)) {
+                err();
+                return false;
+            }
+            if (!taul::in_codepoint_range(dr->cp, U'a', U'z') &&
+                !taul::in_codepoint_range(dr->cp, U'A', U'Z') &&
+                !taul::in_codepoint_range(dr->cp, U'0', U'9') &&
+                dr->cp != U'_' &&
+                taul::is_ascii(dr->cp)) {
+                err();
+                return false;
+            }
+            if (first && taul::in_codepoint_range(dr->cp, U'0', U'9')) {
+                err();
+                return false;
+            }
+        }
+        else {
+            err();
+            return false;
+        }
+        first = false;
+    }
+    return true;
 }
 
 bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(
@@ -514,5 +671,25 @@ bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(
         return false;
     }
     else return true;
+}
+
+bool _ym::ParcelInfo::_checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg) {
+    if (t.kind == YmKind_Property) {
+        Global::raiseErr(
+            YmErrCode_PropertyType,
+            "{}; {} is a property type!",
+            (std::string)msg,
+            t.localName);
+        return false;
+    }
+    if (t.kind == YmKind_PropertyAssigner) {
+        Global::raiseErr(
+            YmErrCode_PropertyAssignerType,
+            "{}; {} is a property assigner type!",
+            (std::string)msg,
+            t.localName);
+        return false;
+    }
+    return true;
 }
 

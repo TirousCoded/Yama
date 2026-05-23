@@ -42,27 +42,30 @@ static std::optional<std::vector<YmType*>> mkTypesVec(YmCtx* ctx, std::vector<st
 
 
 TEST(Conversions, Identity_IncludeGenerics) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     ymParcelDef_AddProtocol(p_def, "Any");
 
-    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
-    auto B_ind = ymParcelDef_AddStruct(p_def, "B");
-    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
     ymParcelDef_AddTypeParam(p_def, "C", "T", "p:Any");
     
-    auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
-    auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
+    ymParcelDef_AddProtocol(p_def, "P");
+    ymParcelDef_AddProtocol(p_def, "Q");
     ymParcelDef_AddTypeParam(p_def, "Q", "T", "p:Any");
     
-    auto f_ind = ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
-    auto g_ind = ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddTypeParam(p_def, "g", "T", "p:Any");
     
-    auto A_m_ind = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
-    auto C_m_ind = ymParcelDef_AddMethod(p_def, "C", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredProperty(p_def, "A", "abc", "yama:Int");
+
+    ymParcelDef_AddMethod(p_def, "C", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredProperty(p_def, "C", "abc", "yama:Int");
     
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -80,6 +83,12 @@ TEST(Conversions, Identity_IncludeGenerics) {
         "p:A::m",
         "p:C[p:A]::m",
         "p:C[p:B]::m",
+        "p:A::abc",
+        "p:C[p:A]::abc",
+        "p:C[p:B]::abc",
+        "p:A::abc$assigner",
+        "p:C[p:A]::abc$assigner",
+        "p:C[p:B]::abc$assigner",
         })
         .value();
 
@@ -102,26 +111,31 @@ TEST(Conversions, Identity_IncludeGenerics) {
 // TODO: Maybe we exclude protocols, but what about their methods?
 
 TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     ymParcelDef_AddProtocol(p_def, "Any");
 
-    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
-    auto B_ind = ymParcelDef_AddStruct(p_def, "B");
-    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
     ymParcelDef_AddTypeParam(p_def, "C", "T", "p:Any");
 
     ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
-    auto h_ind = ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddTypeParam(p_def, "h", "T", "p:Any");
 
     ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "B", "m1", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "C", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+
+    ymParcelDef_AddStoredProperty(p_def, "A", "abc", "p:A");
+    ymParcelDef_AddStoredProperty(p_def, "A", "def", "p:A");
+    ymParcelDef_AddStoredProperty(p_def, "B", "abc", "p:A");
+    ymParcelDef_AddStoredProperty(p_def, "C", "abc", "p:A");
 
     ymDm_BindParcelDef(dm, "p", p_def);
 
@@ -139,6 +153,16 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
         "p:B::m1",
         "p:C[p:A]::m1",
         "p:C[p:B]::m1",
+        "p:A::abc",
+        "p:A::def",
+        "p:B::abc",
+        "p:C[p:A]::abc",
+        "p:C[p:B]::abc",
+        "p:A::abc$assigner",
+        "p:A::def$assigner",
+        "p:B::abc$assigner",
+        "p:C[p:A]::abc$assigner",
+        "p:C[p:B]::abc$assigner",
         })
         .value();
 
@@ -153,28 +177,28 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
 // TODO: Add tests for the nuances of when a type conforms to a protocol.
 
 TEST(Conversions, NonProtocolToProtocol) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     
     ymParcelDef_AddProtocol(p_def, "Any");
 
-    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddMethod(p_def, "A", "mA", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "A", "mB", "p:A", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddStruct(p_def, "B");
     
-    auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
+    ymParcelDef_AddProtocol(p_def, "P1");
     ymParcelDef_AddMethodReq(p_def, "P1", "mA", "p:A");
     
-    auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
+    ymParcelDef_AddProtocol(p_def, "P2");
     ymParcelDef_AddMethodReq(p_def, "P2", "mB", "p:A");
 
-    auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
+    ymParcelDef_AddProtocol(p_def, "P3");
     ymParcelDef_AddMethodReq(p_def, "P3", "mC", "p:A");
 
-    auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
+    ymParcelDef_AddProtocol(p_def, "P4");
     ymParcelDef_AddTypeParam(p_def, "P4", "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, "P4", "mA", "$T");
     
@@ -201,28 +225,28 @@ TEST(Conversions, NonProtocolToProtocol) {
 // to P, the conversion is illegal (as no value of P could be a legal A.)
 
 TEST(Conversions, ProtocolToNonProtocol) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     ymParcelDef_AddProtocol(p_def, "Any");
 
-    auto A_ind = ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddMethod(p_def, "A", "mA", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "A", "mB", "p:A", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddStruct(p_def, "B");
 
-    auto P1_ind = ymParcelDef_AddProtocol(p_def, "P1");
+    ymParcelDef_AddProtocol(p_def, "P1");
     ymParcelDef_AddMethodReq(p_def, "P1", "mA", "p:A");
     
-    auto P2_ind = ymParcelDef_AddProtocol(p_def, "P2");
+    ymParcelDef_AddProtocol(p_def, "P2");
     ymParcelDef_AddMethodReq(p_def, "P2", "mB", "p:A");
     
-    auto P3_ind = ymParcelDef_AddProtocol(p_def, "P3");
+    ymParcelDef_AddProtocol(p_def, "P3");
     ymParcelDef_AddMethodReq(p_def, "P3", "mC", "p:A");
 
-    auto P4_ind = ymParcelDef_AddProtocol(p_def, "P4");
+    ymParcelDef_AddProtocol(p_def, "P4");
     ymParcelDef_AddTypeParam(p_def, "P4", "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, "P4", "mA", "$T");
     
@@ -251,7 +275,7 @@ TEST(Conversions, ProtocolToNonProtocol) {
 // could conform to both P and Q.)
 
 TEST(Conversions, ProtocolToProtocol) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -259,13 +283,13 @@ TEST(Conversions, ProtocolToProtocol) {
     ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddStruct(p_def, "B");
 
-    auto P_ind = ymParcelDef_AddProtocol(p_def, "P");
+    ymParcelDef_AddProtocol(p_def, "P");
     ymParcelDef_AddMethodReq(p_def, "P", "mA", "p:A");
     
-    auto Q_ind = ymParcelDef_AddProtocol(p_def, "Q");
+    ymParcelDef_AddProtocol(p_def, "Q");
     ymParcelDef_AddMethodReq(p_def, "Q", "mB", "p:A");
     
-    auto R_ind = ymParcelDef_AddProtocol(p_def, "R");
+    ymParcelDef_AddProtocol(p_def, "R");
     ymParcelDef_AddTypeParam(p_def, "R", "T", "p:Any");
     ymParcelDef_AddMethodReq(p_def, "R", "mA", "$T");
     

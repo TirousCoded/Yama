@@ -172,3 +172,7 @@ YmObj* name = (expr); \
 ASSERT_TRUE(name); \
 auto name ## _ = ym::bindScoped(ym::Safe(name))
 
+#define SETUP_OBJ_REF_COPY(name, objref) \
+auto name ## _ = ym::bindScoped(ym::Safe(objref)); \
+ymObj_Secure(objref)
+

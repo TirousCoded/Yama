@@ -13,36 +13,50 @@
 namespace _ym {
 
 
+	// NOTE: While originally just for calls w/ named args, ArgPackInfo has since been
+	//		 generalized to also be used for things w/ explicit inits, in which case
+	//		 the descriptions below don't 100% line up w/ the actual use case.
+	//
+	//		 To this end, ArgPackInfo has also been made a template so as to allow for
+	//		 certain aspects of it to be parameterized.
+
 	// Input arg packs specify positional args, followed by named args, the ladder of which
 	// is arbitrary in terms of what named args are specified, and in what order.
+	// 
 	// Within the call itself however, the call behaviour expects positional args and named
 	// args to ALL be specified, and w/ named args being in a specific order.
+	// 
 	// This class encapsulates input arg pack info, and also a mapping between the param layout
 	// expected by the call behaviour, and the input arg pack.
+	// 
 	// As part of this mapping, 'dummy' args are implicitly bound to all named params not
 	// otherwise specified.
+	// 
 	// These dummy args correspond to special dummy arg objects which get appended to the
 	// original input arg pack before the call begins to provide bindings for unspecified
 	// named params.
-	class CallArgPack final {
+	template<
+		YmParams MAX_POSITIONAL = YM_MAX_POSITIONAL_PARAMS,
+		YmParams MAX_NAMED = YM_MAX_NAMED_PARAMS>
+	class ArgPackInfo final {
 	public:
-		inline CallArgPack(YmParams positionalParams, YmParams namedParams) :
+		inline ArgPackInfo(YmParams positionalParams, YmParams namedParams) :
 			_positionalArgs(positionalParams),
 			_dummies(namedParams) {
 			_namedParamBindsMap.fill(_unbound);
 		}
-		inline CallArgPack(YmType& fn) :
-			CallArgPack(fn.positionalParamCount(), fn.namedParamCount()) {
+		inline ArgPackInfo(YmType& fn) :
+			ArgPackInfo(fn.positionalParamCount(), fn.namedParamCount()) {
 		}
 		// Inits w/ 0 positional, named and dummy args.
-		inline CallArgPack() {
+		inline ArgPackInfo() {
 			_namedParamBindsMap.fill(_unbound);
 		}
-		~CallArgPack() noexcept = default;
-		CallArgPack(const CallArgPack&) = default;
-		CallArgPack(CallArgPack&&) noexcept = default;
-		CallArgPack& operator=(const CallArgPack&) = default;
-		CallArgPack& operator=(CallArgPack&&) noexcept = default;
+		~ArgPackInfo() noexcept = default;
+		ArgPackInfo(const ArgPackInfo&) = default;
+		ArgPackInfo(ArgPackInfo&&) noexcept = default;
+		ArgPackInfo& operator=(const ArgPackInfo&) = default;
+		ArgPackInfo& operator=(ArgPackInfo&&) noexcept = default;
 
 
 		inline YmParams positionalArgs() const noexcept { return _positionalArgs; }
@@ -72,10 +86,10 @@ namespace _ym {
 		// Returns if successful, failing if which already has an arg bound to it.
 		inline bool specifyNextNamedArg(YmParamIndex which) noexcept {
 			ymAssert(isNamedParam(which));
-			ymAssert(_dummies >= 1);
 			if (isSpecified(which)) {
 				return false;
 			}
+			ymAssert(_dummies >= 1);
 			_binding(which) = specifiedArgs();
 			_namedArgs++;
 			_dummies--;
@@ -91,7 +105,7 @@ namespace _ym {
 		// dummy arg bindings being resolved for them.
 		// This should only be used after done has been called.
 		inline void addDummies(YmParams newDummies) noexcept {
-			ymAssert(YM_MAX_POSITIONAL_PARAMS + YM_MAX_NAMED_PARAMS - paramCount() >= newDummies);
+			ymAssert(MAX_POSITIONAL + MAX_NAMED - paramCount() >= newDummies);
 			_dummies += newDummies;
 			_genDummyBinds(paramCount() - newDummies, _dummies - newDummies);
 		}
@@ -106,7 +120,7 @@ namespace _ym {
 		YmParams _dummies = 0;
 		// Maps named param indices to corresponding args in arg pack + dummies.
 		// _unbound is set for params w/out an associated binding.
-		std::array<YmParamIndex, YM_MAX_NAMED_PARAMS> _namedParamBindsMap = {};
+		std::array<YmParamIndex, MAX_NAMED> _namedParamBindsMap = {};
 
 
 		inline YmParamIndex& _binding(YmParamIndex which) noexcept {

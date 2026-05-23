@@ -165,6 +165,23 @@ static void setup_for_type_params_tests(YmDm* dm, YmParcelDef* p_def) {
     ymDm_BindParcelDef(dm, "p", p_def);
 }
 
+TEST(Types, Type_Property) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "yama:Int");
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A_p = ymCtx_Load(ctx, "p:A::p");
+    ASSERT_TRUE(A_p);
+    EXPECT_EQ(ymType_Type(A_p), ymCtx_LdInt(ctx));
+}
+
+TEST(Types, Type_NonProperty) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    EXPECT_EQ(ymType_Type(ymCtx_LdInt(ctx)), nullptr);
+}
+
 TEST(Types, TypeParams_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);

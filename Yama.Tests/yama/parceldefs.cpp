@@ -1,12 +1,60 @@
 ﻿
 
+#include <format>
+
 #include <gtest/gtest.h>
 #include <taul/strings.h>
+#include <taul/encoding.h>
 #include <yama/yama.h>
 #include <yama++/print.h>
 
 #include "../utils/utils.h"
 
+
+void testNameLegalityHelper(
+    std::function<void(std::string name)> success,
+    std::function<void(std::string name)> failure
+) {
+    // Skip '\0', as that'll just add null terminator.
+    for (YmRune c = U'\0' + 1; c < U'\x80'; c++) {
+        if ((c >= U'a' && c <= U'z') || (c >= U'A' && c <= U'Z') || c == U'_') {
+            success(std::format("{}abc", (YmChar)c));
+        }
+        else {
+            failure(std::format("{}abc", (YmChar)c));
+        }
+    }
+    // Digits are okay, just not at start.
+    success("a0123456789");
+    // Non-ASCII Unicode is okay.
+    success(taul::utf8_s(u8"Σ"));
+    success(taul::utf8_s(u8"魂"));
+    success(taul::utf8_s(u8"💩"));
+    // Empty name is illegal.
+    failure("");
+}
+
+void testNameLegality(
+    // Returns expected fullname.
+    std::function<std::string(std::string name, YmParcelDef* parceldef, bool shouldSucceed)> testfn
+) {
+    testNameLegalityHelper(
+        [&testfn](std::string name) {
+            SETUP_ALL(ctx);
+            SETUP_PARCELDEF(p_def);
+            auto fln = testfn(name, p_def, true);
+            ymDm_BindParcelDef(dm, "p", p_def);
+            auto t = ymCtx_Load(ctx, fln.c_str());
+            ASSERT_TRUE(t);
+            EXPECT_STREQ(ymType_Fullname(t), fln.c_str());
+        },
+        [&testfn](std::string name) {
+            SETUP_ERRCOUNTER;
+            SETUP_PARCELDEF(p_def);
+            (void)testfn(name, p_def, false);
+            EXPECT_EQ(err[YmErrCode_IllegalName], 1);
+        });
+}
 
 TEST(ParcelDefs, CreateAndDestroy) {
     SETUP_ERRCOUNTER;
@@ -73,6 +121,21 @@ TEST(ParcelDefs, AddStruct_NameConflict) {
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
 }
 
+TEST(ParcelDefs, AddStruct_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, name.c_str()), YM_NO_TYPE_INDEX)
+                    << "name==\"" << name << "\"";
+            }
+            else {
+                EXPECT_EQ(ymParcelDef_AddStruct(parceldef, name.c_str()), YM_NO_TYPE_INDEX)
+                    << "name==\"" << name << "\"";
+            }
+            return std::format("p:{}", name);
+        });
+}
+
 TEST(ParcelDefs, AddProtocol) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -115,6 +178,19 @@ TEST(ParcelDefs, AddProtocol_NameConflict) {
     ASSERT_NE(ymParcelDef_AddStruct(p_def, "foo"), YM_NO_TYPE_INDEX);
     ASSERT_EQ(ymParcelDef_AddProtocol(p_def, "foo"), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddProtocol_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddProtocol(parceldef, name.c_str()), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_EQ(ymParcelDef_AddProtocol(parceldef, name.c_str()), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:{}", name);
+        });
 }
 
 TEST(ParcelDefs, AddFn) {
@@ -195,6 +271,19 @@ TEST(ParcelDefs, AddFn_NameConflict) {
     ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
     ASSERT_EQ(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddFn_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddFn(parceldef, name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_EQ(ymParcelDef_AddFn(parceldef, name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:{}", name);
+        });
 }
 
 TEST(ParcelDefs, AddFn_IllegalSpecifier_InvalidReturnTypeSymbol) {
@@ -329,6 +418,21 @@ TEST(ParcelDefs, AddMethod_ProtocolType) {
     EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
 }
 
+TEST(ParcelDefs, AddMethod_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddMethod(parceldef, "A", name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddMethod(parceldef, "A", name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
 TEST(ParcelDefs, AddMethod_IllegalSpecifier_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
@@ -457,12 +561,624 @@ TEST(ParcelDefs, AddMethodReq_NonProtocolType) {
     EXPECT_EQ(err[YmErrCode_NonProtocolType], 1);
 }
 
+TEST(ParcelDefs, AddMethodReq_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddProtocol(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddMethodReq(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddProtocol(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddMethodReq(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
 TEST(ParcelDefs, AddMethodReq_IllegalSpecifier_InvalidReturnTypeSymbol) {
     SETUP_ERRCOUNTER;
     SETUP_PARCELDEF(p_def);
     auto A_index = ymParcelDef_AddProtocol(p_def, "A");
     ASSERT_NE(A_index, YM_NO_TYPE_INDEX);
     ASSERT_EQ(ymParcelDef_AddMethodReq(p_def, "A", "m", "/"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:A::ab魂💩cd"); // Ensure can handle UTF-8.
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
+
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "foo", "p:B");
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", nonASCIIName.c_str(), "p:C");
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto A_foo = ymCtx_Load(ctx, "p:A::foo");
+    auto A_other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(A_foo);
+    ASSERT_TRUE(A_other);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Property);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_Type(A_foo), B);
+    EXPECT_EQ(ymType_Type(A_other), C);
+    EXPECT_EQ(ymType_ReturnType(A_foo), B);
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_Params(A_foo, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_other, YM_FALSE), 1);
+    EXPECT_EQ(ymType_ParamType(A_foo, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other, 0), A);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "  p  : \n\n A  ");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_p = ymCtx_Load(ctx, "p:A::p");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_p);
+
+    ASSERT_EQ(ymType_Type(A_p), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_Type(A_p)), "p:A");
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_NameConflict_Type) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_NameConflict_TypeParam) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", "p", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_NameConflict_Self) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "Self", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_TypeNotFound_InvalidOwnerName) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "missing", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_TypeCannotHaveMembers) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveMembers], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_ProtocolType) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddProtocol(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredProperty_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "/"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:A::ab魂💩cd"); // Ensure can handle UTF-8.
+    auto nonASCIIFullname_assigner = nonASCIIFullname + "$assigner";
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+
+    auto A_foo_ind = ymParcelDef_AddStoredProperty(p_def, "A", "foo", "p:B");
+    auto A_other_ind = ymParcelDef_AddStoredProperty(p_def, "A", nonASCIIName.c_str(), "p:C");
+    // Need this to check assigner.
+    auto D_ind = ymParcelDef_AddStruct(p_def, "D");
+
+    // Indices are as expected.
+    EXPECT_EQ(A_foo_ind, C_ind + 1);
+    EXPECT_EQ(A_other_ind, C_ind + 3);
+    EXPECT_EQ(D_ind, C_ind + 5);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto A_foo = ymCtx_Load(ctx, "p:A::foo");
+    auto A_foo_assigner = ymCtx_Load(ctx, "p:A::foo$assigner");
+    auto A_other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    auto A_other_assigner = ymCtx_Load(ctx, nonASCIIFullname_assigner.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(A_foo);
+    ASSERT_TRUE(A_foo_assigner);
+    ASSERT_TRUE(A_other);
+    ASSERT_TRUE(A_other_assigner);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_foo_assigner), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other_assigner), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_foo_assigner), "p:A::foo$assigner");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_STREQ(ymType_Fullname(A_other_assigner), nonASCIIFullname_assigner.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_foo_assigner), YmKind_PropertyAssigner);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_other_assigner), YmKind_PropertyAssigner);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_foo_assigner), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_Owner(A_other_assigner), A);
+    EXPECT_EQ(ymType_Type(A_foo), B);
+    EXPECT_EQ(ymType_Type(A_foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(A_other), C);
+    EXPECT_EQ(ymType_Type(A_other_assigner), nullptr);
+    EXPECT_EQ(ymType_ReturnType(A_foo), B);
+    EXPECT_EQ(ymType_ReturnType(A_foo_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_ReturnType(A_other_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_Params(A_foo, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_foo_assigner, YM_FALSE), 2);
+    EXPECT_EQ(ymType_Params(A_other, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_other_assigner, YM_FALSE), 2);
+    EXPECT_EQ(ymType_ParamType(A_foo, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_foo_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_foo_assigner, 1), B);
+    EXPECT_EQ(ymType_ParamType(A_other, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other_assigner, 1), C);
+}
+
+TEST(ParcelDefs, AddStoredProperty_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStoredProperty(p_def, "A", "p", "  p  : \n\n A  ");
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_p = ymCtx_Load(ctx, "p:A::p");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_p);
+
+    ASSERT_EQ(ymType_Type(A_p), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_Type(A_p)), "p:A");
+}
+
+TEST(ParcelDefs, AddStoredProperty_NameConflict_Type) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_NameConflict_TypeParam) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", "p", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_NameConflict_Self) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "Self", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_TypeNotFound_InvalidOwnerName) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "missing", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_TypeCannotHaveMembers) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveMembers], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_ProtocolType) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddProtocol(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "p:B"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddStoredProperty(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddStoredProperty(parceldef, "A", name.c_str(), "yama:None"), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddStoredProperty_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "/"), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:A::ab魂💩cd"); // Ensure can handle UTF-8.
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    ymParcelDef_AddStruct(p_def, "C");
+
+    ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "foo", "p:B", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", nonASCIIName.c_str(), "p:C", ymInertCallBhvrFn, nullptr);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto A_foo = ymCtx_Load(ctx, "p:A::foo");
+    auto A_other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(A_foo);
+    ASSERT_TRUE(A_other);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Property);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_Type(A_foo), B);
+    EXPECT_EQ(ymType_Type(A_other), C);
+    EXPECT_EQ(ymType_ReturnType(A_foo), B);
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_Params(A_foo, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_other, YM_FALSE), 1);
+    EXPECT_EQ(ymType_ParamType(A_foo, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other, 0), A);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "  p  : \n\n A  ", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_p = ymCtx_Load(ctx, "p:A::p");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_p);
+
+    ASSERT_EQ(ymType_Type(A_p), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_Type(A_p)), "p:A");
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_NameConflict_Type) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_NameConflict_TypeParam) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", "p", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_NameConflict_Self) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "Self", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_TypeNotFound_InvalidOwnerName) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "missing", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_TypeCannotHaveMembers) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveMembers], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_ProtocolType) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddProtocol(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddReadOnlyComputedProperty(parceldef, "A", name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddReadOnlyComputedProperty(parceldef, "A", name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedProperty_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "p", "/", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:A::ab魂💩cd"); // Ensure can handle UTF-8.
+    auto nonASCIIFullname_assigner = nonASCIIFullname + "$assigner";
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStruct(p_def, "B");
+    auto C_ind = ymParcelDef_AddStruct(p_def, "C");
+
+    auto A_foo_ind = ymParcelDef_AddComputedProperty(p_def, "A", "foo", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+    auto A_other_ind = ymParcelDef_AddComputedProperty(p_def, "A", nonASCIIName.c_str(), "p:C",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+    // Need this to check assigner.
+    auto D_ind = ymParcelDef_AddStruct(p_def, "D");
+
+    // Indices are as expected.
+    EXPECT_EQ(A_foo_ind, C_ind + 1);
+    EXPECT_EQ(A_other_ind, C_ind + 3);
+    EXPECT_EQ(D_ind, C_ind + 5);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    auto C = ymCtx_Load(ctx, "p:C");
+    auto A_foo = ymCtx_Load(ctx, "p:A::foo");
+    auto A_foo_assigner = ymCtx_Load(ctx, "p:A::foo$assigner");
+    auto A_other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    auto A_other_assigner = ymCtx_Load(ctx, nonASCIIFullname_assigner.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+    ASSERT_TRUE(C);
+    ASSERT_TRUE(A_foo);
+    ASSERT_TRUE(A_foo_assigner);
+    ASSERT_TRUE(A_other);
+    ASSERT_TRUE(A_other_assigner);
+    EXPECT_EQ(ymType_Parcel(A_foo), parcel);
+    EXPECT_EQ(ymType_Parcel(A_foo_assigner), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other), parcel);
+    EXPECT_EQ(ymType_Parcel(A_other_assigner), parcel);
+    EXPECT_STREQ(ymType_Fullname(A_foo), "p:A::foo");
+    EXPECT_STREQ(ymType_Fullname(A_foo_assigner), "p:A::foo$assigner");
+    EXPECT_STREQ(ymType_Fullname(A_other), nonASCIIFullname.c_str());
+    EXPECT_STREQ(ymType_Fullname(A_other_assigner), nonASCIIFullname_assigner.c_str());
+    EXPECT_EQ(ymType_Kind(A_foo), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_foo_assigner), YmKind_PropertyAssigner);
+    EXPECT_EQ(ymType_Kind(A_other), YmKind_Property);
+    EXPECT_EQ(ymType_Kind(A_other_assigner), YmKind_PropertyAssigner);
+    EXPECT_EQ(ymType_Owner(A_foo), A);
+    EXPECT_EQ(ymType_Owner(A_foo_assigner), A);
+    EXPECT_EQ(ymType_Owner(A_other), A);
+    EXPECT_EQ(ymType_Owner(A_other_assigner), A);
+    EXPECT_EQ(ymType_Type(A_foo), B);
+    EXPECT_EQ(ymType_Type(A_foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(A_other), C);
+    EXPECT_EQ(ymType_Type(A_other_assigner), nullptr);
+    EXPECT_EQ(ymType_ReturnType(A_foo), B);
+    EXPECT_EQ(ymType_ReturnType(A_foo_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_ReturnType(A_other), C);
+    EXPECT_EQ(ymType_ReturnType(A_other_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_Params(A_foo, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_foo_assigner, YM_FALSE), 2);
+    EXPECT_EQ(ymType_Params(A_other, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(A_other_assigner, YM_FALSE), 2);
+    EXPECT_EQ(ymType_ParamType(A_foo, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_foo_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_foo_assigner, 1), B);
+    EXPECT_EQ(ymType_ParamType(A_other, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(A_other_assigner, 1), C);
+}
+
+TEST(ParcelDefs, AddComputedProperty_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddComputedProperty(p_def, "A", "p", "  p  : \n\n A  ",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto A_p = ymCtx_Load(ctx, "p:A::p");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(A_p);
+
+    ASSERT_EQ(ymType_Type(A_p), A);
+    EXPECT_STREQ(ymType_Fullname(ymType_Type(A_p)), "p:A");
+}
+
+TEST(ParcelDefs, AddComputedProperty_NameConflict_Type) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "A", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_NameConflict_TypeParam) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddProtocol(p_def, "Any");
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", "p", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_NameConflict_Self) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "Self", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_TypeNotFound_InvalidOwnerName) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "missing", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_TypeCannotHaveMembers) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveMembers], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_ProtocolType) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddProtocol(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "p", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+    EXPECT_EQ(err[YmErrCode_ProtocolType], 1);
+}
+
+TEST(ParcelDefs, AddComputedProperty_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            if (shouldSucceed) {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_NE(ymParcelDef_AddComputedProperty(parceldef, "A", name.c_str(), "yama:None",
+                    ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            else {
+                EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+                EXPECT_EQ(ymParcelDef_AddComputedProperty(parceldef, "A", name.c_str(), "yama:None",
+                    ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            }
+            return std::format("p:A::{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddComputedProperty_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+    ASSERT_EQ(ymParcelDef_AddComputedProperty(p_def, "A", "p", "/",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
@@ -582,6 +1298,27 @@ TEST(ParcelDefs, AddTypeParam_NameConflict_Self) {
     ymParcelDef_AddStruct(p_def, "A");
     EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, "A", "Self", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddTypeParam_IllegalName) {
+    testNameLegalityHelper(
+        [](std::string name) {
+            SETUP_ALL(ctx);
+            SETUP_PARCELDEF(p_def);
+            ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+            ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "A", name.c_str(), "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+            ymDm_BindParcelDef(dm, "p", p_def);
+            auto t = ymCtx_Load(ctx, "p:A[yama:Int]");
+            ASSERT_TRUE(t);
+            EXPECT_EQ(ymType_TypeParamByIndex(t, 0), ymCtx_LdInt(ctx));
+        },
+        [](std::string name) {
+            SETUP_ERRCOUNTER;
+            SETUP_PARCELDEF(p_def);
+            ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+            ASSERT_EQ(ymParcelDef_AddTypeParam(p_def, "A", name.c_str(), "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+            EXPECT_EQ(err[YmErrCode_IllegalName], 1);
+        });
 }
 
 TEST(ParcelDefs, AddTypeParam_IllegalSpecifier_InvalidConstraint) {
@@ -761,6 +1498,24 @@ TEST(ParcelDefs, AddParam_NonCallableType) {
     EXPECT_EQ(err[YmErrCode_NonCallableType], 1);
 }
 
+TEST(ParcelDefs, AddParam_PropertyType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "yama:Int");
+    EXPECT_EQ(ymParcelDef_AddParam(p_def, "A::p", "x", "p:B"), YM_NO_PARAM_INDEX);
+    EXPECT_EQ(err[YmErrCode_PropertyType], 1);
+}
+
+TEST(ParcelDefs, AddParam_PropertyAssignerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStoredProperty(p_def, "A", "p", "yama:Int");
+    EXPECT_EQ(ymParcelDef_AddParam(p_def, "A::p$assigner", "x", "p:B"), YM_NO_PARAM_INDEX);
+    EXPECT_EQ(err[YmErrCode_PropertyAssignerType], 1);
+}
+
 TEST(ParcelDefs, AddParam_NameConflict_BetweenParams) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -768,6 +1523,29 @@ TEST(ParcelDefs, AddParam_NameConflict_BetweenParams) {
     EXPECT_EQ(ymParcelDef_AddParam(p_def, "A", "x", "p:B"), 0);
     EXPECT_EQ(ymParcelDef_AddParam(p_def, "A", "x", "p:C"), YM_NO_PARAM_INDEX);
     EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddParam_IllegalName) {
+    testNameLegalityHelper(
+        [](std::string name) {
+            SETUP_ALL(ctx);
+            SETUP_PARCELDEF(p_def);
+            ASSERT_NE(ymParcelDef_AddFn(p_def, "f", "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            ASSERT_NE(ymParcelDef_AddParam(p_def, "f", name.c_str(), "yama:Int"), YM_NO_PARAM_INDEX)
+                << "name==\"" << name << "\"";
+            ymDm_BindParcelDef(dm, "p", p_def);
+            auto t = ymCtx_Load(ctx, "p:f");
+            ASSERT_TRUE(t);
+            EXPECT_STREQ(ymType_ParamName(t, 0), name.c_str());
+        },
+        [](std::string name) {
+            SETUP_ERRCOUNTER;
+            SETUP_PARCELDEF(p_def);
+            ASSERT_NE(ymParcelDef_AddFn(p_def, "f", "yama:None", ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+            ASSERT_EQ(ymParcelDef_AddParam(p_def, "f", name.c_str(), "yama:Int"), YM_NO_PARAM_INDEX)
+                << "name==\"" << name << "\"";
+            EXPECT_EQ(err[YmErrCode_IllegalName], 1);
+        });
 }
 
 TEST(ParcelDefs, AddParam_IllegalSpecifier) {
@@ -866,6 +1644,26 @@ TEST(ParcelDefs, BeginNamedParams_NonCallableType) {
     ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_BeginNamedParams(p_def, "A");
     EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+}
+
+TEST(ParcelDefs, BeginNamedParams_PropertyType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "yama:Int");
+    ymParcelDef_BeginNamedParams(p_def, "A::p");
+    EXPECT_GE(err[YmErrCode_PropertyType], 1);
+}
+
+TEST(ParcelDefs, BeginNamedParams_PropertyAssignerType) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStoredProperty(p_def, "A", "p", "yama:Int");
+    ymParcelDef_BeginNamedParams(p_def, "A::p$assigner");
+    EXPECT_GE(err[YmErrCode_PropertyAssignerType], 1);
 }
 
 TEST(ParcelDefs, BeginNamedParams_ProtocolMemberType) {

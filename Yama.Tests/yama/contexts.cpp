@@ -51,6 +51,13 @@ TEST(Contexts, Dm_Take) {
     EXPECT_EQ(ymDm_Release(dm), 2);
 }
 
+TEST(Contexts, Dm_TakeIfOk) {
+    SETUP_ALL(ctx);
+    EXPECT_EQ(ymCtx_Dm(ctx, YM_TAKE_IF_OK), dm);
+    EXPECT_EQ(ymDm_RefCount(dm), 2); // Changed
+    EXPECT_EQ(ymDm_Release(dm), 2);
+}
+
 // NOTE: See special/importing.cpp for unit tests covering importing semantics.
 
 TEST(Contexts, Import) {
@@ -281,6 +288,30 @@ TEST(Contexts, Args) {
         });
 }
 
+TEST(Contexts, Arg_Borrow) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (called_in_fn_body) {
+            if (auto x = ymCtx_Arg(ctx, 0, YM_BORROW)) {
+                EXPECT_EQ(ymObj_RefCount(x), 1);
+                EXPECT_EQ(ymObj_Type(x), ymCtx_LdInt(ctx));
+                EXPECT_EQ(ymObj_ToInt(x, nullptr), 10);
+            }
+            else ADD_FAILURE();
+            if (auto y = ymCtx_Arg(ctx, 1, YM_BORROW)) {
+                EXPECT_EQ(ymObj_RefCount(y), 1);
+                EXPECT_EQ(ymObj_Type(y), ymCtx_LdFloat(ctx));
+                EXPECT_DOUBLE_EQ(ymObj_ToFloat(y, nullptr), 3.14159);
+            }
+            else ADD_FAILURE();
+
+            EXPECT_FALSE(ymCtx_Arg(ctx, 2, YM_BORROW));
+        }
+        else {
+            EXPECT_FALSE(ymCtx_Arg(ctx, 0, YM_BORROW));
+        }
+        });
+}
+
 TEST(Contexts, Arg_Take) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         if (called_in_fn_body) {
@@ -307,27 +338,54 @@ TEST(Contexts, Arg_Take) {
         });
 }
 
-TEST(Contexts, Arg_Borrow) {
+TEST(Contexts, Arg_TakeIfOk) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         if (called_in_fn_body) {
-            if (auto x = ymCtx_Arg(ctx, 0, YM_BORROW)) {
-                EXPECT_EQ(ymObj_RefCount(x), 1);
+            if (auto x = ymCtx_Arg(ctx, 0, YM_TAKE_IF_OK)) {
+                EXPECT_EQ(ymObj_RefCount(x), 2);
                 EXPECT_EQ(ymObj_Type(x), ymCtx_LdInt(ctx));
                 EXPECT_EQ(ymObj_ToInt(x, nullptr), 10);
+                ymObj_Release(x);
             }
             else ADD_FAILURE();
-            if (auto y = ymCtx_Arg(ctx, 1, YM_BORROW)) {
-                EXPECT_EQ(ymObj_RefCount(y), 1);
+            if (auto y = ymCtx_Arg(ctx, 1, YM_TAKE_IF_OK)) {
+                EXPECT_EQ(ymObj_RefCount(y), 2);
                 EXPECT_EQ(ymObj_Type(y), ymCtx_LdFloat(ctx));
                 EXPECT_DOUBLE_EQ(ymObj_ToFloat(y, nullptr), 3.14159);
+                ymObj_Release(y);
             }
             else ADD_FAILURE();
 
-            EXPECT_FALSE(ymCtx_Arg(ctx, 2, YM_BORROW));
+            EXPECT_FALSE(ymCtx_Arg(ctx, 2, YM_TAKE_IF_OK));
         }
         else {
-            EXPECT_FALSE(ymCtx_Arg(ctx, 0, YM_BORROW));
+            EXPECT_FALSE(ymCtx_Arg(ctx, 0, YM_TAKE_IF_OK));
         }
+        });
+}
+
+TEST(Contexts, SetArg_Borrow) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (!called_in_fn_body) {
+            return;
+        }
+        SETUP_OBJ(x, ymCtx_Arg(ctx, 0, YM_TAKE));
+        SETUP_OBJ(y, ymCtx_Arg(ctx, 1, YM_TAKE));
+        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+
+        EXPECT_EQ(ymCtx_SetArg(ctx, 1, newArg, YM_BORROW), YM_TRUE);
+
+        EXPECT_EQ(ymCtx_Args(ctx), 2);
+        EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), x);
+        EXPECT_EQ(ymCtx_Arg(ctx, 1, YM_BORROW), newArg);
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 1);
+        EXPECT_EQ(ymObj_RefCount(newArg), 2);
         });
 }
 
@@ -357,20 +415,21 @@ TEST(Contexts, SetArg_Take) {
         });
 }
 
-TEST(Contexts, SetArg_Borrow) {
+TEST(Contexts, SetArg_TakeIfOk) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         if (!called_in_fn_body) {
             return;
         }
         SETUP_OBJ(x, ymCtx_Arg(ctx, 0, YM_TAKE));
         SETUP_OBJ(y, ymCtx_Arg(ctx, 1, YM_TAKE));
-        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+        auto newArg = ymCtx_NewRune(ctx, U'y');
+        ASSERT_TRUE(newArg);
 
         EXPECT_EQ(ymObj_RefCount(x), 2);
         EXPECT_EQ(ymObj_RefCount(y), 2);
         EXPECT_EQ(ymObj_RefCount(newArg), 1);
 
-        EXPECT_EQ(ymCtx_SetArg(ctx, 1, newArg, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_SetArg(ctx, 1, newArg, YM_TAKE_IF_OK), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Args(ctx), 2);
         EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), x);
@@ -378,7 +437,7 @@ TEST(Contexts, SetArg_Borrow) {
 
         EXPECT_EQ(ymObj_RefCount(x), 2);
         EXPECT_EQ(ymObj_RefCount(y), 1);
-        EXPECT_EQ(ymObj_RefCount(newArg), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
         });
 }
 
@@ -395,11 +454,55 @@ TEST(Contexts, SetArg_ArgNotFound) {
         EXPECT_EQ(ymObj_RefCount(y), 2);
         EXPECT_EQ(ymObj_RefCount(newArg), 1);
 
+        EXPECT_EQ(ymCtx_SetArg(ctx, 10'000, newArg, YM_BORROW), YM_FALSE);
+        EXPECT_GE(getErr()[YmErrCode_ArgNotFound], 1);
+
+        EXPECT_EQ(ymCtx_Args(ctx), 2);
+        EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), x);
+        EXPECT_EQ(ymCtx_Arg(ctx, 1, YM_BORROW), y);
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (!called_in_fn_body) {
+            return;
+        }
+        SETUP_OBJ(x, ymCtx_Arg(ctx, 0, YM_TAKE));
+        SETUP_OBJ(y, ymCtx_Arg(ctx, 1, YM_TAKE));
+        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+        SETUP_OBJ_REF_COPY(nameArg2, newArg);
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 2);
+
         EXPECT_EQ(ymCtx_SetArg(ctx, 10'000, newArg, YM_TAKE), YM_FALSE);
         EXPECT_GE(getErr()[YmErrCode_ArgNotFound], 1);
 
-        EXPECT_EQ(ymCtx_SetArg(ctx, 10'000, newArg, YM_BORROW), YM_FALSE);
-        EXPECT_GE(getErr()[YmErrCode_ArgNotFound], 2);
+        EXPECT_EQ(ymCtx_Args(ctx), 2);
+        EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), x);
+        EXPECT_EQ(ymCtx_Arg(ctx, 1, YM_BORROW), y);
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 1); // API took ref anyway.
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (!called_in_fn_body) {
+            return;
+        }
+        SETUP_OBJ(x, ymCtx_Arg(ctx, 0, YM_TAKE));
+        SETUP_OBJ(y, ymCtx_Arg(ctx, 1, YM_TAKE));
+        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+
+        EXPECT_EQ(ymObj_RefCount(x), 2);
+        EXPECT_EQ(ymObj_RefCount(y), 2);
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+
+        EXPECT_EQ(ymCtx_SetArg(ctx, 10'000, newArg, YM_TAKE_IF_OK), YM_FALSE);
+        EXPECT_GE(getErr()[YmErrCode_ArgNotFound], 1);
 
         EXPECT_EQ(ymCtx_Args(ctx), 2);
         EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), x);
@@ -420,8 +523,32 @@ TEST(Contexts, SetArg_FailsQuietly_InUserCallFrame) {
 
         EXPECT_EQ(ymObj_RefCount(newArg), 1);
 
-        EXPECT_EQ(ymCtx_SetArg(ctx, 0, newArg, YM_TAKE), YM_FALSE); // Quiet
         EXPECT_EQ(ymCtx_SetArg(ctx, 0, newArg, YM_BORROW), YM_FALSE); // Quiet
+
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (called_in_fn_body) {
+            return;
+        }
+        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+        SETUP_OBJ_REF_COPY(nameArg2, newArg);
+
+        EXPECT_EQ(ymObj_RefCount(newArg), 2);
+
+        EXPECT_EQ(ymCtx_SetArg(ctx, 0, newArg, YM_TAKE), YM_FALSE); // Quiet
+
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        if (called_in_fn_body) {
+            return;
+        }
+        SETUP_OBJ(newArg, ymCtx_NewRune(ctx, U'y'));
+
+        EXPECT_EQ(ymObj_RefCount(newArg), 1);
+
+        EXPECT_EQ(ymCtx_SetArg(ctx, 0, newArg, YM_TAKE_IF_OK), YM_FALSE); // Quiet
 
         EXPECT_EQ(ymObj_RefCount(newArg), 1);
         });
@@ -459,6 +586,26 @@ TEST(Contexts, Locals) {
         });
 }
 
+TEST(Contexts, Local_Borrow) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
+
+        if (auto a = ymCtx_Local(ctx, 0, YM_BORROW)) {
+            EXPECT_EQ(ymObj_RefCount(a), 1);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdInt(ctx));
+            EXPECT_EQ(ymObj_ToInt(a, nullptr), 10);
+        }
+        if (auto a = ymCtx_Local(ctx, 1, YM_BORROW)) {
+            EXPECT_EQ(ymObj_RefCount(a), 1);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdFloat(ctx));
+            EXPECT_DOUBLE_EQ(ymObj_ToFloat(a, nullptr), 3.14159);
+        }
+
+        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), nullptr);
+        });
+}
+
 TEST(Contexts, Local_Take) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
@@ -481,23 +628,25 @@ TEST(Contexts, Local_Take) {
         });
 }
 
-TEST(Contexts, Local_Borrow) {
+TEST(Contexts, Local_TakeIfOk) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
         EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
 
-        if (auto a = ymCtx_Local(ctx, 0, YM_BORROW)) {
-            EXPECT_EQ(ymObj_RefCount(a), 1);
+        if (auto a = ymCtx_Local(ctx, 0, YM_TAKE_IF_OK)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
             EXPECT_EQ(ymObj_Type(a), ymCtx_LdInt(ctx));
             EXPECT_EQ(ymObj_ToInt(a, nullptr), 10);
+            ymObj_Release(a);
         }
-        if (auto a = ymCtx_Local(ctx, 1, YM_BORROW)) {
-            EXPECT_EQ(ymObj_RefCount(a), 1);
+        if (auto a = ymCtx_Local(ctx, 1, YM_TAKE_IF_OK)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
             EXPECT_EQ(ymObj_Type(a), ymCtx_LdFloat(ctx));
             EXPECT_DOUBLE_EQ(ymObj_ToFloat(a, nullptr), 3.14159);
+            ymObj_Release(a);
         }
 
-        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), nullptr);
+        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_TAKE_IF_OK), nullptr);
         });
 }
 
@@ -754,6 +903,75 @@ TEST(Contexts, Put_Take) {
         });
 }
 
+TEST(Contexts, Put_TakeIfOk) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        auto aa = ymCtx_NewInt(ctx, 50);
+        auto bb = ymCtx_NewInt(ctx, 100);
+        auto cc = ymCtx_NewInt(ctx, 150);
+        auto dd = ymCtx_NewInt(ctx, 200);
+
+        // Pushing
+
+        ymObj_Secure(aa);
+        ymObj_Secure(bb);
+        ymObj_Secure(cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+
+        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_TAKE_IF_OK), YM_TRUE);
+
+        EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
+        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
+        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), cc);
+
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+
+        ymCtx_Pop(ctx, 3);
+        ASSERT_EQ(ymCtx_Locals(ctx), 0);
+
+        // Putting
+
+        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+
+        ymObj_Secure(aa);
+        ymObj_Secure(bb);
+        ymObj_Secure(cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+        EXPECT_EQ(ymObj_RefCount(dd), 4);
+
+        EXPECT_EQ(ymCtx_Put(ctx, 0, aa, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, 1, bb, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, 2, cc, YM_TAKE_IF_OK), YM_TRUE);
+
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+        EXPECT_EQ(ymObj_RefCount(dd), 1);
+
+        ymCtx_Pop(ctx, 3);
+        ASSERT_EQ(ymCtx_Locals(ctx), 0);
+
+        // Add ref count incr that the YM_DISCARD put is to consume.
+        EXPECT_EQ(ymObj_Secure(aa), 1);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_DISCARD, aa, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymObj_RefCount(aa), 1);
+
+        EXPECT_EQ(ymObj_Release(aa), 1);
+        EXPECT_EQ(ymObj_Release(bb), 1);
+        EXPECT_EQ(ymObj_Release(cc), 1);
+        EXPECT_EQ(ymObj_Release(dd), 1);
+        });
+}
+
 TEST(Contexts, Put_Fail_LocalNotFound) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
@@ -761,8 +979,22 @@ TEST(Contexts, Put_Fail_LocalNotFound) {
         EXPECT_EQ(ymCtx_Put(ctx, 0, a, YM_BORROW), YM_FALSE);
         EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
+        EXPECT_EQ(ymObj_RefCount(a), 1);
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
+        SETUP_OBJ_REF_COPY(a2, a);
+
         EXPECT_EQ(ymCtx_Put(ctx, 0, a, YM_TAKE), YM_FALSE);
-        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 2);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+        EXPECT_EQ(ymObj_RefCount(a), 1); // API took ref anyway.
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
+
+        EXPECT_EQ(ymCtx_Put(ctx, 0, a, YM_TAKE_IF_OK), YM_FALSE);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
         EXPECT_EQ(ymObj_RefCount(a), 1);
         });
@@ -870,8 +1102,8 @@ TEST(Contexts, PutXXXX_Fail_LocalNotFound) {
         });
 }
 
-TEST(Contexts, PutDefault) {
-    // NOTE: Don't forget to update PutDefault_Fail_NoDefaultValue too.
+TEST(Contexts, DefaultInit) {
+    // NOTE: Don't forget to update DefaultInit_Fail_NoDefaultValue too.
     // NOTE: Also, update the YM_DISCARD tests too.
     auto setupfn =
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
@@ -905,14 +1137,14 @@ TEST(Contexts, PutDefault) {
             ASSERT_TRUE(Struct0);
 
             // Test w/ pushing.
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdNone(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdUInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdFloat(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdBool(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdRune(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, ymCtx_LdType(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, Struct0), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdNone(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdUInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdFloat(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdBool(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdRune(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdType(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, Struct0), YM_TRUE);
 
             auto num = ymCtx_Locals(ctx);
 
@@ -927,14 +1159,14 @@ TEST(Contexts, PutDefault) {
             EXPECT_EQ(ymObj_RefCount(temp), num + 1);
 
             // Perform putting.
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 0, ymCtx_LdNone(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 1, ymCtx_LdInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 2, ymCtx_LdUInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 3, ymCtx_LdFloat(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 4, ymCtx_LdBool(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 5, ymCtx_LdRune(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 6, ymCtx_LdType(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, num + 7, Struct0), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 0, ymCtx_LdNone(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 1, ymCtx_LdInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 2, ymCtx_LdUInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 3, ymCtx_LdFloat(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 4, ymCtx_LdBool(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 5, ymCtx_LdRune(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 6, ymCtx_LdType(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 7, Struct0), YM_TRUE);
 
             // After puts overwrite temp locals.
             EXPECT_EQ(ymObj_RefCount(temp), 1);
@@ -988,37 +1220,34 @@ TEST(Contexts, PutDefault) {
             auto Struct0 = ymCtx_Load(ctx, "p:Struct0");
             ASSERT_TRUE(Struct0);
 
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdNone(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdUInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdFloat(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdBool(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdRune(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, ymCtx_LdType(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, Struct0), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdNone(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdUInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdFloat(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdBool(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdRune(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, ymCtx_LdType(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, Struct0), YM_TRUE);
 
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
         });
 }
 
-TEST(Contexts, PutDefault_Fail_LocalNotFound) {
+TEST(Contexts, DefaultInit_Fail_LocalNotFound) {
     objsys_test(
         [](YmCtx* ctx, bool called_in_fn_body) {
-            EXPECT_EQ(ymCtx_PutDefault(ctx, 0, ymCtx_LdInt(ctx)), YM_FALSE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, 0, ymCtx_LdInt(ctx)), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
         });
 }
 
-TEST(Contexts, PutDefault_Fail_NoDefaultValue) {
+TEST(Contexts, DefaultInit_Fail_NoDefaultValue) {
     auto setupfn =
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
         // Empty Struct
-        auto Struct0_ind = ymParcelDef_AddStruct(parceldef,
-            "Struct0"
-        );
-        EXPECT_NE(Struct0_ind, YM_NO_TYPE_INDEX);
+        EXPECT_NE(ymParcelDef_AddStruct(parceldef, "Struct0"), YM_NO_TYPE_INDEX);
 
         // Method (of Struct0)
         EXPECT_NE(ymParcelDef_AddMethod(parceldef,
@@ -1027,6 +1256,13 @@ TEST(Contexts, PutDefault_Fail_NoDefaultValue) {
             "yama:None",
             ymInertCallBhvrFn,
             nullptr
+        ), YM_NO_TYPE_INDEX);
+
+        // Property (& Assigner) (of Struct0)
+        EXPECT_NE(ymParcelDef_AddStoredProperty(parceldef,
+            "Struct0",
+            "abc",
+            "yama:None"
         ), YM_NO_TYPE_INDEX);
 
         // Empty Protocol
@@ -1052,11 +1288,458 @@ TEST(Contexts, PutDefault_Fail_NoDefaultValue) {
             ASSERT_TRUE(Protocol0);
             ASSERT_TRUE(Fn0);
 
-            static_assert(YmKind_Num == 4);
+            static_assert(YmKind_Num == 6);
 
             // Protocols
-            EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, Protocol0), YM_FALSE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, Protocol0), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_NoDefaultValue], 1);
+        });
+}
+
+TEST(Contexts, ExplicitInit_EmptyStruct) {
+    auto setup =
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+            ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            // test w/ regular index
+
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, 0, A, ""), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            EXPECT_EQ(ymObj_RefCount(x), 1);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            // test w/ newtop
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            // test w/ discard
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, A, ""), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 0);
+        });
+}
+
+TEST(Contexts, ExplicitInit_NonEmptyStruct) {
+    auto setup =
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+            ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ regular index
+
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, 0, A, "c,a,b"), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), cc);
+
+            EXPECT_EQ(ymObj_RefCount(x), 1);
+            EXPECT_EQ(ymObj_RefCount(aa), 3);
+            EXPECT_EQ(ymObj_RefCount(bb), 3);
+            EXPECT_EQ(ymObj_RefCount(cc), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ newtop
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), cc);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 3);
+            EXPECT_EQ(ymObj_RefCount(bb), 3);
+            EXPECT_EQ(ymObj_RefCount(cc), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ discard
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, A, "c,a,b"), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 0);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 1);
+            EXPECT_EQ(ymObj_RefCount(bb), 1);
+            EXPECT_EQ(ymObj_RefCount(cc), 1);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, 10'000, A, "c,a,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_NonStructType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddFn(parceldef, "g", "yama:None", ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, g, ""), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_NonStructType], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 0);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_IllegalNameList_DoesntSpecifyEveryStoredPropertyOfType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            //SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            //ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
+
+            //EXPECT_EQ(ymObj_RefCount(aa), 1);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesAPropertyMoreThanOnce) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 3);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAStoredProperty) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,missing,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAStoredProperty_NamesComputedProperty) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,abc,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_LocalNotFound_ArgObjsNeededExceedsObjStkHeight) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            //ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 1);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+TEST(Contexts, ExplicitInit_Fail_TypeMismatch_ArgObjsAreTheWrongTypes) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewBool(ctx, false)); // Wrong type for bb.
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
         });
 }
 
@@ -1738,7 +2421,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs_DueToNamedArgs)
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ArgNameIdentifierMultipleTimes) {
+TEST(Contexts, Call_Fail_IllegalNameList_ArgNameIdentifierMultipleTimes) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
             ymParcelDef_AddFn(
@@ -1769,7 +2452,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNameIdentifierMultipleTimes) {
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 4, "b,b", YM_NEWTOP), YM_FALSE);
-            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+            EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
@@ -1783,7 +2466,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNameIdentifierMultipleTimes) {
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ArgNameUnknownIdentifier) {
+TEST(Contexts, Call_Fail_IllegalNameList_ArgNameUnknownIdentifier) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
             ymParcelDef_AddFn(
@@ -1814,7 +2497,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNameUnknownIdentifier) {
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 4, "missing,b", YM_NEWTOP), YM_FALSE);
-            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+            EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
@@ -1828,7 +2511,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNameUnknownIdentifier) {
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ArgNamePositionalParamIdentifier) {
+TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
             ymParcelDef_AddFn(
@@ -1859,7 +2542,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNamePositionalParamIdentifier) {
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 4, "x,b", YM_NEWTOP), YM_FALSE);
-            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+            EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
@@ -1873,7 +2556,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgNamePositionalParamIdentifier) {
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ArgsAreWrongTypes) {
+TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
             ymParcelDef_AddFn(
@@ -1898,7 +2581,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgsAreWrongTypes) {
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_FALSE);
-            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+            EXPECT_EQ(getErr()[YmErrCode_TypeMismatch], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
@@ -1909,7 +2592,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgsAreWrongTypes) {
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ArgsAreWrongTypes_DueToNamedArgs) {
+TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
             ymParcelDef_AddFn(
@@ -1935,7 +2618,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ArgsAreWrongTypes_DueToNamedArgs) {
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 2, "x,y", YM_NEWTOP), YM_FALSE);
-            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+            EXPECT_EQ(getErr()[YmErrCode_TypeMismatch], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
@@ -2121,6 +2804,36 @@ TEST(Contexts, Ret_Take) {
         });
 }
 
+TEST(Contexts, Ret_TakeIfOk) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddFn(
+                parceldef,
+                "g",
+                "yama:Int",
+                [](YmCtx* ctx, void*) {
+                    auto x = ymCtx_NewInt(ctx, 100);
+
+                    // The full call procedure is tested in ymCtx_Call tests, w/ us
+                    // here only caring about ymCtx_Ret's immediate behaviour.
+                    ymCtx_Ret(ctx, x, YM_TAKE_IF_OK);
+
+                    // x's single ref is owned by API internals.
+                    EXPECT_EQ(ymObj_RefCount(x), 1);
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            if (!called_in_fn_body) {
+                return;
+            }
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+
+            EXPECT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+        });
+}
+
 TEST(Contexts, Ret_Overwrite) {
     objsys_test(
         [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
@@ -2173,8 +2886,26 @@ TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
 
             ymCtx_Ret(ctx, a, YM_BORROW);
             EXPECT_EQ(ymObj_RefCount(a), 1);
+        });
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            if (called_in_fn_body) {
+                return;
+            }
+            SETUP_OBJ(a, ymCtx_NewInt(ctx, 10));
+            ymObj_Secure(a); // Ref will be consumed by API.
 
             ymCtx_Ret(ctx, a, YM_TAKE);
+            EXPECT_EQ(ymObj_RefCount(a), 1);
+        });
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            if (called_in_fn_body) {
+                return;
+            }
+            SETUP_OBJ(a, ymCtx_NewInt(ctx, 10));
+
+            ymCtx_Ret(ctx, a, YM_TAKE_IF_OK);
             EXPECT_EQ(ymObj_RefCount(a), 1);
         });
 }
@@ -2189,6 +2920,7 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
                 [](YmCtx* ctx, void*) {
                     ymCtx_Ret(ctx, YM_NIL, YM_BORROW);
                     ymCtx_Ret(ctx, YM_NIL, YM_TAKE);
+                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE_IF_OK);
                 },
                 nullptr);
         },
@@ -2217,6 +2949,7 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
                     // Test that impl can handle w/ already existing binding.
                     ymCtx_Ret(ctx, YM_NIL, YM_BORROW);
                     ymCtx_Ret(ctx, YM_NIL, YM_TAKE);
+                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE_IF_OK);
 
                     EXPECT_EQ(ymObj_RefCount(x), 2);
                 },
@@ -2230,6 +2963,874 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
             ASSERT_TRUE(g);
 
             EXPECT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+        });
+}
+
+TEST(Contexts, GetProperty_StoredProperty) {
+    auto setup = [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ regular index
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_PutNone(ctx, YM_NEWTOP);
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, 1), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+
+            ymCtx_PutNone(ctx, YM_NEWTOP);
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, 2), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+
+            ymCtx_PutNone(ctx, YM_NEWTOP);
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, 3), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+
+            auto a = ymCtx_Local(ctx, 1, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 2, YM_BORROW);
+            auto c = ymCtx_Local(ctx, 3, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+            ASSERT_EQ(c, cc);
+
+            EXPECT_EQ(ymObj_RefCount(a), 3);
+            EXPECT_EQ(ymObj_RefCount(b), 3);
+            EXPECT_EQ(ymObj_RefCount(c), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ newtop
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+
+            auto a = ymCtx_Local(ctx, 1, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 2, YM_BORROW);
+            auto c = ymCtx_Local(ctx, 3, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+            ASSERT_EQ(c, cc);
+
+            EXPECT_EQ(ymObj_RefCount(a), 3);
+            EXPECT_EQ(ymObj_RefCount(b), 3);
+            EXPECT_EQ(ymObj_RefCount(c), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ discard
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_DISCARD), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_DISCARD), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_DISCARD), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+namespace {
+    inline YmObj* compProp_A_a_obj = nullptr, * compProp_A_b_obj = nullptr;
+}
+
+TEST(Contexts, GetProperty_ComputedProperty) {
+    auto setup = [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddReadOnlyComputedProperty(parceldef, "A", "a", "yama:Int",
+            [](YmCtx* ctx, void*) {
+                observedCalls++;
+                ymCtx_Ret(ctx, compProp_A_a_obj, YM_BORROW);
+            },
+            nullptr);
+        ymParcelDef_AddComputedProperty(parceldef, "A", "b", "yama:Rune",
+            [](YmCtx* ctx, void*) {
+                observedCalls++;
+                ymCtx_Ret(ctx, compProp_A_b_obj, YM_BORROW);
+            },
+            nullptr,
+            [](YmCtx* ctx, void*) {
+                //
+            },
+            nullptr);
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+
+            // test w/ regular index
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewRune(ctx, U'y'));
+
+            compProp_A_a_obj = aa;
+            compProp_A_b_obj = bb;
+
+            ymCtx_PutNone(ctx, YM_NEWTOP);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, 0), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            EXPECT_EQ(observedCalls, 1);
+
+            ymCtx_PutNone(ctx, YM_NEWTOP);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, 1), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(observedCalls, 2);
+
+            auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 1, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_RefCount(b), 2);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+
+            // test w/ newtop
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewRune(ctx, U'y'));
+
+            compProp_A_a_obj = aa;
+            compProp_A_b_obj = bb;
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            EXPECT_EQ(observedCalls, 1);
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(observedCalls, 2);
+
+            auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 1, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_RefCount(b), 2);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+
+            // test w/ discard
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewRune(ctx, U'y'));
+
+            compProp_A_a_obj = aa;
+            compProp_A_b_obj = bb;
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_DISCARD), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 0);
+            EXPECT_EQ(observedCalls, 1);
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_DISCARD), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 0);
+            EXPECT_EQ(observedCalls, 2);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 1);
+            EXPECT_EQ(ymObj_RefCount(bb), 1);
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_LocalNotFound_WhereIsOutOfBounds) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_NEWTOP, -4);
+            ymCtx_PutFloat(ctx, YM_NEWTOP, 10.41);
+            ymCtx_PutRune(ctx, YM_NEWTOP, U'y');
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c");
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, 10'000), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_NonPropertyType) {
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            EXPECT_EQ(ymCtx_GetProperty(ctx, ymCtx_LdInt(ctx), YM_NEWTOP), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_NonPropertyType], 1);
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_LocalNotFound_ObjStkIsEmpty) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A_a);
+
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_NEWTOP, -4);
+            auto Int_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(Int_obj);
+
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddReadOnlyComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void* user) {
+                    observedCalls++;
+                    // No return value bound.
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(a);
+
+            ymCtx_Put(ctx, YM_NEWTOP, a, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+
+            // Take note that, for this error, call behaviour occurs (ie. that's what resulted
+            // in the error) but otherwise the usual non-consuming of passed arg objects is still
+            // respected.
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), a);
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(observedCalls, 1);
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddReadOnlyComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void* user) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewFloat(ctx, 3.14159), YM_TAKE);
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(a);
+
+            ymCtx_Put(ctx, YM_NEWTOP, a, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+
+            // Take note that, for this error, call behaviour occurs (ie. that's what resulted
+            // in the error) but otherwise the usual non-consuming of passed arg objects is still
+            // respected.
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), a);
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(observedCalls, 1);
+        });
+}
+
+TEST(Contexts, GetProperty_Fail_CallStackOverflow_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddReadOnlyComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void* user) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewInt(ctx, -4), YM_TAKE);
+                },
+                nullptr);
+            ymParcelDef_AddFn(
+                parceldef,
+                "g",
+                "yama:None",
+                [](YmCtx* ctx, void* user) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    auto g = ymCtx_Ref(ctx, 0);
+                    auto A = ymCtx_Ref(ctx, 1);
+                    auto A_a = ymCtx_Ref(ctx, 2);
+                    ASSERT_TRUE(g);
+                    ASSERT_TRUE(A);
+                    ASSERT_TRUE(A_a);
+                    if (ymCtx_CallStackHeight(ctx) < YM_MAX_CALL_STACK_HEIGHT) {
+                        ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+                    }
+                    else {
+                        ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+                        auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+                        ASSERT_TRUE(a);
+                        auto observedCallsN = observedCalls;
+
+                        ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_DISCARD), YM_FALSE);
+                        ASSERT_EQ(getErr()[YmErrCode_CallStackOverflow], 1);
+
+                        EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), a);
+                        EXPECT_EQ(ymObj_RefCount(a), 1);
+                        EXPECT_EQ(observedCalls, observedCallsN);
+                    }
+                },
+                nullptr);
+            ymParcelDef_AddRef(parceldef, "g", "p:g");
+            ymParcelDef_AddRef(parceldef, "g", "p:A");
+            ymParcelDef_AddRef(parceldef, "g", "p:A::a");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+            if (called_in_fn_body) {
+                EXPECT_EQ(observedCalls, YM_MAX_CALL_STACK_HEIGHT - 2);
+            }
+            else {
+                EXPECT_EQ(observedCalls, YM_MAX_CALL_STACK_HEIGHT - 1);
+            }
+        });
+}
+
+TEST(Contexts, SetProperty_StoredProperty) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "b", "yama:Float");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_b);
+
+            SETUP_OBJ(xx, ymCtx_NewFloat(ctx, -0.031));
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ASSERT_EQ(ymCtx_SetProperty(ctx, A_b), YM_TRUE);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), xx);
+
+            EXPECT_EQ(ymObj_RefCount(xx), 3);
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 1);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+}
+
+namespace {
+    inline YmObj* compProp_expected_by_setter = nullptr;
+}
+
+TEST(Contexts, SetProperty_ComputedProperty) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddComputedProperty(parceldef, "A", "a", "yama:Int",
+                [](YmCtx* ctx, void*) {
+                    //
+                },
+                nullptr,
+                [](YmCtx* ctx, void*) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    EXPECT_EQ(ymCtx_Arg(ctx, 1, YM_BORROW), compProp_expected_by_setter);
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            SETUP_OBJ(xx, ymCtx_NewInt(ctx, -31));
+            compProp_expected_by_setter = xx;
+
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_TRUE);
+            EXPECT_EQ(ymCtx_Locals(ctx), 0);
+
+            EXPECT_EQ(ymObj_RefCount(xx), 1);
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_NonPropertyType) {
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            EXPECT_EQ(ymCtx_SetProperty(ctx, ymCtx_LdInt(ctx)), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_NonPropertyType], 1);
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_ReadOnlyPropertyType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "a", "yama:Int");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
+
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a");
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_ReadOnlyPropertyType], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), xx);
+
+            EXPECT_EQ(ymObj_RefCount(A_obj), 2);
+            EXPECT_EQ(ymObj_RefCount(xx), 3);
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_LocalNotFound_ObjStkHasFewerThanTwoObjs) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_NEWTOP, 14); // Wrong subject type!
+            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongType) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_PutFloat(ctx, YM_NEWTOP, 1.041); // Wrong value type!
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
+
+            // TODO: What about post-conditions?
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void*) {
+                    //
+                },
+                nullptr,
+                [](YmCtx* ctx, void*) {
+                    observedCalls++;
+                    // No return value bound.
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
+
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+
+            // Take note that, for this error, call behaviour occurs (ie. that's what resulted
+            // in the error) but otherwise the usual non-consuming of passed arg objects is still
+            // respected.
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), xx);
+            EXPECT_EQ(ymObj_RefCount(A_obj), 2);
+            EXPECT_EQ(ymObj_RefCount(xx), 2);
+            EXPECT_EQ(observedCalls, 1);
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void*) {
+                    //
+                },
+                nullptr,
+                [](YmCtx* ctx, void*) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewFloat(ctx, 3.14159), YM_TAKE);
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
+
+            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+
+            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
+
+            // Take note that, for this error, call behaviour occurs (ie. that's what resulted
+            // in the error) but otherwise the usual non-consuming of passed arg objects is still
+            // respected.
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), A_obj);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), xx);
+            EXPECT_EQ(ymObj_RefCount(A_obj), 2);
+            EXPECT_EQ(ymObj_RefCount(xx), 2);
+            EXPECT_EQ(observedCalls, 1);
+        });
+}
+
+TEST(Contexts, SetProperty_Fail_CallStackOverflow_ForComputedProperties) {
+    objsys_test(
+        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+            ymParcelDef_AddStruct(parceldef, "A");
+            ymParcelDef_AddComputedProperty(
+                parceldef,
+                "A",
+                "a",
+                "yama:Int",
+                [](YmCtx* ctx, void*) {
+                    //
+                },
+                nullptr,
+                [](YmCtx* ctx, void*) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                },
+                nullptr);
+            ymParcelDef_AddFn(
+                parceldef,
+                "g",
+                "yama:None",
+                [](YmCtx* ctx, void* user) {
+                    observedCalls++;
+                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    auto g = ymCtx_Ref(ctx, 0);
+                    auto A = ymCtx_Ref(ctx, 1);
+                    auto A_a = ymCtx_Ref(ctx, 2);
+                    ASSERT_TRUE(g);
+                    ASSERT_TRUE(A);
+                    ASSERT_TRUE(A_a);
+                    if (ymCtx_CallStackHeight(ctx) < YM_MAX_CALL_STACK_HEIGHT) {
+                        ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+                    }
+                    else {
+                        SETUP_OBJ(xx, ymCtx_NewInt(ctx, 4));
+
+                        ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+                        auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+                        ASSERT_TRUE(A_obj);
+                        auto observedCallsN = observedCalls;
+
+                        ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+                        ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+                        ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
+                        ASSERT_EQ(getErr()[YmErrCode_CallStackOverflow], 1);
+
+                        EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), A_obj);
+                        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), A_obj);
+                        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), xx);
+                        EXPECT_EQ(ymObj_RefCount(A_obj), 2);
+                        EXPECT_EQ(ymObj_RefCount(xx), 2);
+                        EXPECT_EQ(observedCalls, observedCallsN);
+                    }
+                },
+                nullptr);
+            ymParcelDef_AddRef(parceldef, "g", "p:g");
+            ymParcelDef_AddRef(parceldef, "g", "p:A");
+            ymParcelDef_AddRef(parceldef, "g", "p:A::a");
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
+            if (called_in_fn_body) {
+                EXPECT_EQ(observedCalls, YM_MAX_CALL_STACK_HEIGHT - 2);
+            }
+            else {
+                EXPECT_EQ(observedCalls, YM_MAX_CALL_STACK_HEIGHT - 1);
+            }
         });
 }
 

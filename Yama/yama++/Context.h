@@ -153,7 +153,7 @@ namespace ym {
         inline bool putBool(YmLocal where, bool v) noexcept { return ymCtx_PutBool(get(), where, YmBool(v)) == YM_TRUE; }
         inline bool putRune(YmLocal where, YmRune v) noexcept { return ymCtx_PutRune(get(), where, v) == YM_TRUE; }
         inline bool putType(YmLocal where, const Type& v) noexcept { return ymCtx_PutType(get(), where, v.get()) == YM_TRUE; }
-        inline bool putDefault(YmLocal where, const Type& type) noexcept { return ymCtx_PutDefault(get(), where, type.get()) == YM_TRUE; }
+        inline bool putDefault(YmLocal where, const Type& type) noexcept { return ymCtx_DefaultInit(get(), where, type.get()) == YM_TRUE; }
 
         inline bool push(const Object& what) noexcept { return put(YM_NEWTOP, what); }
         inline bool pushNone() noexcept { return putNone(YM_NEWTOP); }

@@ -50,6 +50,25 @@ public:
         const std::string& ownerName,
         const std::string& name,
         std::string returnTypeSymbol);
+    std::optional<YmTypeIndex> addReadOnlyStoredProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol);
+    std::optional<YmTypeIndex> addStoredProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol);
+    std::optional<YmTypeIndex> addReadOnlyComputedProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getCallBehaviour);
+    std::optional<YmTypeIndex> addComputedProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getCallBehaviour,
+        _ym::CallBhvrCallbackInfo setCallBehaviour);
 
     std::optional<YmTypeParamIndex> addTypeParam(
         std::string typeName,
@@ -64,5 +83,19 @@ public:
     std::optional<YmRef> addRef(
         std::string typeName,
         std::string symbol);
+
+
+private:
+    std::optional<YmTypeIndex> _addReadOnlyProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getCallBehaviour);
+    std::optional<YmTypeIndex> _addProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getCallBehaviour,
+        _ym::CallBhvrCallbackInfo setCallBehaviour);
 };
 

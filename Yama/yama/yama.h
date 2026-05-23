@@ -320,6 +320,8 @@ extern "C" {
         YmKind_Protocol,
         YmKind_Fn,
         YmKind_Method,
+        YmKind_Property,
+        YmKind_PropertyAssigner,
 
         YmKind_Num, /* Enum size. Not a valid type kind. */
     } YmKind;
@@ -335,21 +337,24 @@ extern "C" {
     */
 
     /* Returns if kind x is for callable types. */
-    /* Behaviour is undefined if x is invalid. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
     YmBool ymKind_IsCallable(YmKind x);
 
     /* TODO: ymKind_IsMember hasn't been unit tested.
     */
 
     /* Returns if kind x is for member types. */
-    /* Behaviour is undefined if x is invalid. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
     YmBool ymKind_IsMember(YmKind x);
 
     /* TODO: ymKind_HasMembers hasn't been unit tested.
     */
 
     /* Returns if kind x is types which can have members. */
-    /* Behaviour is undefined if x is invalid. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
     YmBool ymKind_HasMembers(YmKind x);
 
 
@@ -383,16 +388,23 @@ extern "C" {
     /* TODO: For 'take', maybe mention that if receiver is end-user, the Yama API impl may choose to give them
     *        a copy of a ref, rather than actually losing ownership.
     */
+    /* TODO: Also, mention how 'take' always takes from end-user even on fail, while 'take-if-ok' only does so
+    *        if the fn does not fail.
+    *        Also, explain that 'take-if-ok' acts the same as 'take' for policies for API sending data back to
+    *        the end-user.
+    */
 
     /* YmRefPolicy specifies how ref ownership does/doesn't change for refs passed-to/received-from Yama API call */
     /* via arguments/return values. */
     typedef enum : YmUInt8 {
         YmRefPolicy_Borrow,
         YmRefPolicy_Take,
+        YmRefPolicy_TakeIfOk,
     } YmRefPolicy;
 
 #define YM_BORROW (YmRefPolicy_Borrow)
 #define YM_TAKE (YmRefPolicy_Take)
+#define YM_TAKE_IF_OK (YmRefPolicy_TakeIfOk)
 
 
     /* TODO: Maybe do this aliasing for ALL (more or less) of our C-strings.
@@ -534,16 +546,19 @@ extern "C" {
 
     /* Increments the ref count of domain dm. */
     /* Returns old ref count value of dm. */
-    /* Behaviour is undefined if dm is invalid. */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
     YmRefCount ymDm_Secure(struct YmDm* dm);
 
     /* Decrements the ref count of domain dm, destroying dm if it reaches 0. */
     /* Returns old ref count value of dm. */
-    /* Behaviour is undefined if dm is invalid. */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
     YmRefCount ymDm_Release(struct YmDm* dm);
 
     /* Returns the ref count of domain dm. */
-    /* Behaviour is undefined if dm is invalid. */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
     YmRefCount ymDm_RefCount(struct YmDm* dm);
 
     /* TODO: I REALLY don't think our impl current prevents end-user from ammending parcel defs AFTER
@@ -553,11 +568,13 @@ extern "C" {
     */
 
     /* Binds a parcel (defined by parceldef) to path, replacing any existing binding, returning if successful. */
-    /* Fails if path specified is illegal. */
-    /* Fails if parceldef fails verification. */
-    /* Behaviour is undefined if dm is invalid. */
-    /* Behaviour is undefined if path (as a pointer) is invalid. */
-    /* Behaviour is undefined if parceldef is invalid. */
+    /* Failure: */
+    /*   - path specified is illegal. */
+    /*   - parceldef fails verification. */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
+    /*   - path (pointer) is invalid. */
+    /*   - parceldef is invalid. */
     YmBool ymDm_BindParcelDef(struct YmDm* dm, YmPath path, struct YmParcelDef* parceldef);
 
     /* NOTE: Imported parcels have a set of import paths depended-upon by its types. However, these paths
@@ -614,13 +631,15 @@ extern "C" {
     /* subject defines the path prefix of parcels subject to the redirect. */
     /* before defines the path prefix being redirected. */
     /* after defines the path prefix before is substituted with. */
-    /* Fails if subject specified is illegal. */
-    /* Fails if before specified is illegal. */
-    /* Fails if after specified is illegal. */
-    /* Behaviour is undefined if dm is invalid. */
-    /* Behaviour is undefined if subject (as a pointer) is invalid. */
-    /* Behaviour is undefined if before (as a pointer) is invalid. */
-    /* Behaviour is undefined if after (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - subject specified is illegal. */
+    /*   - before specified is illegal. */
+    /*   - after specified is illegal. */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
+    /*   - subject (pointer) is invalid. */
+    /*   - before (pointer) is invalid. */
+    /*   - after (pointer) is invalid. */
     YmBool ymDm_AddRedirect(struct YmDm* dm, YmPath subject, YmPath before, YmPath after);
 
     /* A callback function for use with ymDm_ForEachParcel. */
@@ -640,8 +659,9 @@ extern "C" {
     */
 
     /* Iterates over all imported parcels, calling callback on each one, returning the number of parcels iterated over. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if callback is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - callback is invalid. */
     size_t ymDm_ForEachParcel(struct YmDm* dm, YmForEachParcelCallbackFn callback, void* user);
 
 
@@ -649,66 +669,81 @@ extern "C" {
 
     /* Creates a new Yama context, returning a pointer to it. */
     /* domain is the Yama domain the context is to be associated with. */
-    /* Behaviour is undefined if domain is invalid. */
+    /* Undefined Behaviour: */
+    /*   - domain is invalid. */
     struct YmCtx* ymCtx_Create(struct YmDm* dm);
 
     /* Increments the ref count of context ctx. */
     /* Returns old ref count value of ctx. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     YmRefCount ymCtx_Secure(struct YmCtx* ctx);
 
     /* Decrements the ref count of context ctx, destroying ctx if it reaches 0. */
     /* Returns old ref count value of ctx. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     YmRefCount ymCtx_Release(struct YmCtx* ctx);
 
     /* Returns the ref count of context ctx. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     YmRefCount ymCtx_RefCount(struct YmCtx* ctx);
 
     /* Returns the domain associated with ctx. */
     /* returnPolicy dictates if a borrowed or taken ref is returned. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmDm* ymCtx_Dm(struct YmCtx* ctx, YmRefPolicy returnPolicy);
 
     /* Imports the parcel at path, returning a pointer to it, or YM_NIL on failure. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if path (as a pointer) is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - path (pointer) is invalid. */
     struct YmParcel* ymCtx_Import(struct YmCtx* ctx, YmPath path);
 
     /* Loads the type with fullname, returning a pointer to it, or YM_NIL on failure. */
-    /* Fails if fullname does not describe a loadable type. */
     /* Loading may involve the importing of parcels or the loading of other types. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if fullname (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - fullname does not describe a loadable type. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - fullname (pointer) is invalid. */
     struct YmType* ymCtx_Load(struct YmCtx* ctx, YmFullname fullname);
 
     /* Quickly loads yama:None. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdNone(struct YmCtx* ctx);
 
     /* Quickly loads yama:Int. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdInt(struct YmCtx* ctx);
 
     /* Quickly loads yama:UInt. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdUInt(struct YmCtx* ctx);
 
     /* Quickly loads yama:Float. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdFloat(struct YmCtx* ctx);
 
     /* Quickly loads yama:Bool. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdBool(struct YmCtx* ctx);
 
     /* Quickly loads yama:Rune. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdRune(struct YmCtx* ctx);
 
     /* Quickly loads yama:Type. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_LdType(struct YmCtx* ctx);
 
     /* TODO: Better explain the specifics of why naturalization is needed.
@@ -721,13 +756,15 @@ extern "C" {
     */
 
     /* Makes it legal to use parcel with ctx, if it wasn't already. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if parcel is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - parcel is invalid. */
     void ymCtx_NaturalizeParcel(struct YmCtx* ctx, struct YmParcel* parcel);
 
     /* Makes it legal to use parcel with ctx, if it wasn't already. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - type is invalid. */
     void ymCtx_NaturalizeType(struct YmCtx* ctx, struct YmType* type);
 
     /* TODO: When we add finalizers, we'll need to account for the fact that they can arise from, for
@@ -776,36 +813,43 @@ extern "C" {
     */
 
     /* Instantiates a new yama:None. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewNone(struct YmCtx* ctx);
 
     /* Instantiates a new yama:Int. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewInt(struct YmCtx* ctx, YmInt v);
 
     /* Instantiates a new yama:UInt. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewUInt(struct YmCtx* ctx, YmUInt v);
 
     /* Instantiates a new yama:Float. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewFloat(struct YmCtx* ctx, YmFloat v);
 
     /* Instantiates a new yama:Bool. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewBool(struct YmCtx* ctx, YmBool v);
 
     /* Instantiates a new yama:Rune. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_NewRune(struct YmCtx* ctx, YmRune v);
 
     /* Instantiates a new yama:Type. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if v is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - v is invalid. */
     struct YmObj* ymCtx_NewType(struct YmCtx* ctx, struct YmType* v);
 
     /* Returns the height of the call stack. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /*   - ctx is invalid. */
     YmCallStackHeight ymCtx_CallStackHeight(struct YmCtx* ctx);
 
     /* TODO: When we add this, take advantage of how (mutually) recursive fn calls vary often
@@ -821,7 +865,8 @@ extern "C" {
     /* Returns a formatted string representation of the call stack. */
     /* skip specifies how many of the top call frames of the call stack should be ignored. */
     /* The returned string memory must be cleaned up by the end-user via free. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     const YmChar* ymCtx_FmtCallStack(struct YmCtx* ctx, YmCallStackHeight skip);
 
     /* NOTE: Within a Yama fn call, the index of any particular named arg is the number of positional
@@ -836,65 +881,103 @@ extern "C" {
     */
 
     /* Returns the number of arguments passed to the current call. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     YmUInt16 ymCtx_Args(struct YmCtx* ctx);
 
     /* Returns a reference to the object at which in the argument array, or YM_NIL on failure. */
     /* returnPolicy dictates if a borrowed or taken ref is returned. */
-    /* Fails quietly if which is out-of-bounds. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Failure: */
+    /*   - which is out-of-bounds. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_Arg(struct YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy);
 
     /* Replaces arg at which with newArg, returning if successful. */
     /* newArgPolicy dictates if newArg ref is borrowed or taken from end-user. */
-    /* Fails quietly if in the user call frame. */
-    /* Fails if which is out-of-bounds. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if newArg is invalid. */
+    /* Failure: */
+    /*   - In the user call frame. (Quiet) */
+    /*   - which is out-of-bounds. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - newArg is invalid. */
     YmBool ymCtx_SetArg(struct YmCtx* ctx, YmUInt16 which, struct YmObj* newArg, YmRefPolicy newArgPolicy);
 
     /* Returns the type at reference in the type reference array of the current call, or YM_NIL on failure. */
-    /* Fails quietly if reference is out-of-bounds. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Failure: */
+    /*   - reference is out-of-bounds. (Quiet) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmType* ymCtx_Ref(struct YmCtx* ctx, YmRef reference);
 
     /* Returns the height of the current object stack. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     YmLocals ymCtx_Locals(struct YmCtx* ctx);
     
     /* Returns a reference to the object at where in the current object stack, or YM_NIL on failure. */
     /* returnPolicy dictates if a borrowed or taken ref is returned. */
-    /* Fails quietly if where is out-of-bounds. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Failure: */
+    /*   - where is out-of-bounds. (Quiet) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_Local(struct YmCtx* ctx, YmLocal where, YmRefPolicy returnPolicy);
 
-    /* Pops the top n objects from the current local object stack. */
+
+    /* NOTE: Certain API fns use 'stack effect' syntax to express the inputs/outputs of said
+    *        fns upon the object stack.
+    * 
+    *        The inputs/outputs are expressed as arrays of 'terms'.
+    * 
+    *        These take the form '<inputs> -- <outputs>', w/ <inputs> being the objects
+    *        consumed, and <outputs> being the objects that replace them.
+    * 
+    *        Terms describing variable numbers of objects are prefixed w/ '...'.
+    *           * Given a term '...x', 'size(x)' describes the size of x.
+    * 
+    *        For outputs where the output location is explicitly specified as either a stack
+    *        index, or YM_NEWTOP, or YM_DISCARD, the output term takes the form '<what>-><where>',
+    *        w/ <what> being the object, and <where> being the var specifying where to write it.
+    *           * This syntax also implies YM_[NEWTOP|DISCARD] can be used.
+    */
+
+    /* NOTE: API fns w/ stack effects by default do NOT modify the stack, at all, in the event
+    *        of the API fn failing.
+    */
+
+    /* StkFx: ...topN -- */
+    /* Pops the top n objects. */
     /* Stops prematurely if the stack is emptied. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     void ymCtx_Pop(struct YmCtx* ctx, YmLocals n);
     
+    /* StkFx: ...all -- */
     /* Pops all objects from the local object stack. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     void ymCtx_PopAll(struct YmCtx* ctx);
 
-    /* Pulls the top object from the top of the local object stack, returning it, or YM_NIL on failure. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* StkFx: top -- */
+    /* Pulls the top object, returning it, or YM_NIL on failure. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     struct YmObj* ymCtx_Pull(struct YmCtx* ctx);
-
 
     /* TODO: At some point we'll need a max limit on object stack (either limit per-call frame,
     *        or of the global stack all call frame object stacks are allocated w/.)
     * 
     *        To this end, we'll need ymCtx_Put and other fns to have checks for this stuff.
+    *        (eg. ymCtx_ExplicitInit w/ empty argNames param will need to check.)
     */
 
-    /* Loads what into the current local object stack object at where, returning if successful. */
-    /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
-    /* Pushes to the stack if where == YM_NEWTOP. */
-    /* Does nothing to the stack if where == YM_DISCARD. */
-    /* Fails if where is out-of-bounds (ie. where == YM_[NEWTOP|DISCARD] notwithstanding.) */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if what is invalid. */
+    /* StkFx: -- what->where */
+    /* Loads what into where, returning if successful. */
+    /* Failure: */
+    /*   - where is out-of-bounds. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - what is invalid. */
     YmBool ymCtx_Put(struct YmCtx* ctx, YmLocal where, struct YmObj* what, YmRefPolicy whatPolicy);
 
     YmBool ymCtx_PutNone(struct YmCtx* ctx, YmLocal where);
@@ -913,17 +996,36 @@ extern "C" {
     /* TODO: Later, we'll need to account for types w/out default init ctor fns.
     */
     /* TODO: Later, when we add 'yama:Fn#' types, we'll need to add semantics where fn/method/etc.
-    *        types, w/ ymCtx_PutDefault, init to 'yama:FnValue#' values.
+    *        types, w/ ymCtx_DefaultInit, init to 'yama:FnValue#' values.
     */
 
-    /* Loads default value object of type into the current local object stack object at where, returning if successful. */
-    /* Pushes to the stack if where == YM_NEWTOP. */
-    /* Does nothing to the stack if where == YM_DISCARD. */
-    /* Fails if where is out-of-bounds (ie. where == YM_[NEWTOP|DISCARD] notwithstanding.) */
-    /* Fails if type has no default value. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if type is invalid. */
-    YmBool ymCtx_PutDefault(struct YmCtx* ctx, YmLocal where, struct YmType* type);
+    /* StkFx: -- result->where */
+    /* Loads default value of type into where, returning if successful. */
+    /* Failure: */
+    /*   - where is out-of-bounds. */
+    /*   - type has no default value. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - type is invalid. */
+    YmBool ymCtx_DefaultInit(struct YmCtx* ctx, YmLocal where, struct YmType* type);
+
+    /* StkFx: ...storedPropertyVals -- result->where */
+    /* Loads explicitly init object of type into where, returning if successful. */
+    /* storedPropertyVals are used to init each stored property of type. */
+    /* argNames is a comma-seperated string specifying which property each object in storedPropertyVals inits. */
+    /* Failure: */
+    /*   - where is out-of-bounds. */
+    /*   - type is not a struct type. */
+    /*   - argNames doesn't specify every stored property of type. */
+    /*   - argNames specifies a property more than once. */
+    /*   - argNames specifies a name which doesn't name a stored property. */
+    /*   - Arg objects needed exceeds object stack height. */
+    /*   - Arg objects are the wrong types. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - type is invalid. */
+    /*   - argNames (pointer) is invalid. */
+    YmBool ymCtx_ExplicitInit(struct YmCtx* ctx, YmLocal where, struct YmType* type, const YmChar* argNames);
 
     /* NOTE: ymCtx_Call is passed positional args and named args together. The positional ones
     *        always come first, and any after that are named param ones.
@@ -946,49 +1048,82 @@ extern "C" {
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
 
-    /* Performs a call to fn, passing top argsN stack objects as args, writing return value to returnTo, returning if successful. */
-    /* argNames is a comma-seperated string detailing the which named params the args after the positional ones correspond to. */
-    /* The passed arg objects are consumed from the stack after the call (and before writing to returnTo.) */
-    /* The passed arg objects are not consumed on failure. */
-    /* Pushes to the stack if returnTo == YM_NEWTOP. */
-    /* Discards result of call, writing nothing, if returnTo == YM_DISCARD. */
-    /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
-    /* Fails if fn is not a callable type. */
-    /* Fails if argsN exceeds the height of the local object stack. */
-    /* Fails if wrong number of positional args are provided. */
-    /* Fails if argNames specifies an identifier multiple times. */
-    /* Fails if argNames specifies an unknown identifier. */
-    /* Fails if argNames specifies a positional param identifier. */
-    /* Fails if positional/named arg objects are the wrong types. */
-    /* Fails if no return value object bound (by call behaviour.) */
-    /* Fails if return value object is the wrong type. */
-    /* Fails if call stack overflow. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if fn is invalid. */
-    /* Behaviour is undefined if argNames (as a pointer) is invalid. */
+    /* StkFx: ...positionalArgs ...namedArgs -- result->returnTo */
+    /* Calls fn, loading result into returnTo, returning if successful. */
+    /* argsN specifies size(positionalArgs) + size(namedArgs). */
+    /* argNames is a comma-seperated string specifying the size(namedArgs), and which named param each specifies. */
+    /* Failure: */
+    /*   - returnTo is out-of-bounds. */
+    /*   - fn is not a callable type. */
+    /*   - argsN exceeds the height of the local object stack. */
+    /*   - Wrong number of positional args are provided. */
+    /*   - argNames specifies an identifier multiple times. */
+    /*   - argNames specifies an unknown identifier. */
+    /*   - argNames specifies a positional param identifier. */
+    /*   - positionalArgs are the wrong types. */
+    /*   - namedArgs are the wrong types. */
+    /*   - No return value object bound (by call behaviour.) */
+    /*   - Return value object is the wrong type. */
+    /*   - Call stack overflow. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - fn is invalid. */
+    /*   - argNames (pointer) is invalid. */
     YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo);
 
     /* Binds what as the return value of the current call, overwriting existing bindings. */
     /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
-    /* Fails quietly if in the user call frame. */
-    /* Fails quietly if what == YM_NIL. */
-    /* Behaviour is undefined if ctx is invalid. */
+    /* Failure: */
+    /*   - In the user call frame. (Quiet) */
+    /*   - what == YM_NIL. (Quiet) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
     void ymCtx_Ret(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
+
+    /* StkFx: subject -- result->where */
+    /* Loads propertyType in subject into where, returning if successful. */
+    /* Failure: */
+    /*   - where is out-of-bounds. */
+    /*   - propertyType is not a property type. */
+    /*   - Object stack is empty. */
+    /*   - subject object is the wrong type. */
+    /*   - No return value object bound (by call behaviour, for computed properties.) */
+    /*   - Return value object is the wrong type (for computed properties.) */
+    /*   - Call stack overflow (for computed properties.) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - propertyType is invalid. */
+    YmBool ymCtx_GetProperty(struct YmCtx* ctx, struct YmType* propertyType, YmLocal where);
+
+    /* StkFx: subject value -- */
+    /* Stores value into propertyType in subject, returning if successful. */
+    /* Failure: */
+    /*   - propertyType is not a property type. */
+    /*   - propertyType is read-only. */
+    /*   - Object stack height is less than two. */
+    /*   - subject object is the wrong type. */
+    /*   - value object is the wrong type. */
+    /*   - No return value object bound (by call behaviour, for computed properties.) */
+    /*   - Return value object is the wrong type (for computed properties.) */
+    /*   - Call stack overflow (for computed properties.) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - propertyType is invalid. */
+    YmBool ymCtx_SetProperty(struct YmCtx* ctx, struct YmType* propertyType);
 
     /* NOTE: Due to coercions only really being important to Yama during compilation, I've excluded the
     *        distinction from ymCtx_Convert, which thus always explicitly converts.
     */
 
-    /* Creates a new object by converting the top local object to type, writing return value to returnTo, returning if successful. */
-    /* The top local is consumed from the stack after the conversion (and before writing to returnTo.) */
-    /* The top local is not consumed on failure. */
-    /* Pushes to the stack if returnTo == YM_NEWTOP. */
-    /* Discards result of call, writing nothing, if returnTo == YM_DISCARD. */
-    /* Fails if returnTo is out-of-bounds (ie. returnTo == YM_[NEWTOP|DISCARD] notwithstanding.) */
-    /* Fails if local object stack is empty. */
-    /* Fails if the conversion is illegal. */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if type is invalid. */
+    /* StkFx: top -- result */
+    /* Converts top object to type, returning if successful. */
+    /* Failure: */
+    /*   - returnTo is out-of-bounds. */
+    /*   - Object stack is empty. */
+    /*   - The conversion is illegal. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - type is invalid. */
     YmBool ymCtx_Convert(struct YmCtx* ctx, struct YmType* type, YmLocal returnTo);
 
 
@@ -1003,34 +1138,47 @@ extern "C" {
 
     /* Increments the ref count of parcel def. parceldef. */
     /* Returns old ref count value of parceldef. */
-    /* Behaviour is undefined if parceldef is invalid. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
     YmRefCount ymParcelDef_Secure(struct YmParcelDef* parceldef);
 
     /* Decrements the ref count of parcel def. parceldef, destroying parceldef if it reaches 0. */
     /* Returns old ref count value of parceldef. */
-    /* Behaviour is undefined if parceldef is invalid. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
     YmRefCount ymParcelDef_Release(struct YmParcelDef* parceldef);
 
     /* Returns the ref count of parcel def. parceldef. */
-    /* Behaviour is undefined if parceldef is invalid. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
     YmRefCount ymParcelDef_RefCount(struct YmParcelDef* parceldef);
 
 #if __cplusplus
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
 #endif
 
+    /* NOTE: Currently, 'legal names' below are names w/ only alphanumeric ASCII chars, and
+    *        '_' ASCII chars, and may not start w/ a digit.
+    */
+
     /* Adds a new struct to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
-    /* Fails if new type's fullname conflicts with an existing declaration. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
     YmTypeIndex ymParcelDef_AddStruct(
         struct YmParcelDef* parceldef,
         const YmChar* name);
 
     /* Adds a new protocol to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
-    /* Fails if new type's fullname conflicts with an existing declaration. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
     YmTypeIndex ymParcelDef_AddProtocol(
         struct YmParcelDef* parceldef,
         const YmChar* name);
@@ -1047,12 +1195,15 @@ extern "C" {
     */
 
     /* Adds a new function to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
-    /* Fails if new type's fullname conflicts with an existing declaration. */
-    /* Fails if returnType is illegal. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
-    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    /* Behaviour is undefined if callBehaviour is invalid. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /*   - returnType is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - returnType (pointer) is invalid. */
+    /*   - callBehaviour is invalid. */
     YmTypeIndex ymParcelDef_AddFn(
         struct YmParcelDef* parceldef,
         const YmChar* name,
@@ -1065,16 +1216,19 @@ extern "C" {
     */
 
     /* Adds a new method to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
-    /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if no type under ownerName. */
-    /* Fails if ownerName is not allowed to have members. */
-    /* Fails if ownerName is a protocol. */
-    /* Fails if returnType is illegal. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if ownerName (as a pointer) is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
-    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
-    /* Behaviour is undefined if callBehaviour is invalid. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is a protocol. */
+    /*   - name is illegal. */
+    /*   - returnType is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - returnType (pointer) is invalid. */
+    /*   - callBehaviour is invalid. */
     YmTypeIndex ymParcelDef_AddMethod(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
@@ -1090,20 +1244,110 @@ extern "C" {
     */
 
     /* Adds a new method req. to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
-    /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if no type under ownerName. */
-    /* Fails if ownerName is not allowed to have members. */
-    /* Fails if ownerName is not a protocol. */
-    /* Fails if returnType is illegal. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if ownerName (as a pointer) is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
-    /* Behaviour is undefined if returnType (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is not a protocol. */
+    /*   - name is illegal. */
+    /*   - returnType is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - returnType (pointer) is invalid. */
     YmTypeIndex ymParcelDef_AddMethodReq(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym returnType);
+
+    /* Adds a new read-only stored property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is a protocol. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    YmTypeIndex ymParcelDef_AddReadOnlyStoredProperty(
+        struct YmParcelDef* parceldef,
+        const YmChar* ownerName,
+        const YmChar* name,
+        YmRefSym type);
+
+    /* Adds a new stored property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* A corresponding property assigner type is added immediately after the property type. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is a protocol. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    YmTypeIndex ymParcelDef_AddStoredProperty(
+        struct YmParcelDef* parceldef,
+        const YmChar* ownerName,
+        const YmChar* name,
+        YmRefSym type);
+
+    /* Adds a new read-only computed property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is a protocol. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - getCallBehaviour (pointer) is invalid. */
+    YmTypeIndex ymParcelDef_AddReadOnlyComputedProperty(
+        struct YmParcelDef* parceldef,
+        const YmChar* ownerName,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn getCallBehaviour,
+        void* getCallBehaviourData);
+
+    /* Adds a new computed property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* A corresponding property assigner type is added immediately after the property type. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under ownerName. */
+    /*   - ownerName is not allowed to have members. */
+    /*   - ownerName is a protocol. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - ownerName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - getCallBehaviour (pointer) is invalid. */
+    /*   - setCallBehaviour (pointer) is invalid. */
+    YmTypeIndex ymParcelDef_AddComputedProperty(
+        struct YmParcelDef* parceldef,
+        const YmChar* ownerName,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn getCallBehaviour,
+        void* getCallBehaviourData,
+        YmCallBhvrCallbackFn setCallBehaviour,
+        void* setCallBehaviourData);
 
     /* NOTE: Right now type params are treated as pseudo-types, w/ them having certain characteristics
     *        of types (ie. they can have name conflicts w/ them,) while not having others (ie. they're
@@ -1117,15 +1361,18 @@ extern "C" {
 
     /* Adds a new type parameter to the specified type, returning its index, or YM_NO_TYPE_PARAM_INDEX on failure. */
     /* type will not be able to load if constraintType doesn't specify a protocol. */
-    /* Fails if new type has a name conflict with an existing type, type parameter, or 'Self'. */
-    /* Fails if no type under typeName. */
-    /* Fails if typeName is a member. */
-    /* Fails if constraintType is illegal. */
-    /* Fails if adding new type parameter would exceed YM_MAX_TYPE_PARAMS. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
-    /* Behaviour is undefined if constraintType (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
+    /*   - No type under typeName. */
+    /*   - typeName is a member. */
+    /*   - name is illegal. */
+    /*   - constraintType is illegal. */
+    /*   - Adding new type parameter would exceed YM_MAX_TYPE_PARAMS. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - typeName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - constraintType (pointer) is invalid. */
     YmTypeParamIndex ymParcelDef_AddTypeParam(
         struct YmParcelDef* parceldef,
         const YmChar* typeName,
@@ -1133,16 +1380,20 @@ extern "C" {
         YmRefSym constraintType);
 
     /* Adds a new positional/named parameter to the specified type, returning its index, or YM_NO_PARAM_INDEX on failure. */
-    /* Fails if no type under typeName. */
-    /* Fails if typeName is not callable. */
-    /* Fails if name conflicts with an existing parameter. */
-    /* Fails if paramType is illegal. */
-    /* Fails if adding new positional parameter would exceed YM_MAX_POSITIONAL_PARAMS. */
-    /* Fails if adding new named parameter would exceed YM_MAX_NAMED_PARAMS. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
-    /* Behaviour is undefined if paramType (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - No type under typeName. */
+    /*   - typeName is not callable. */
+    /*   - typeName is a property. */
+    /*   - name conflicts with an existing parameter. */
+    /*   - name is illegal. */
+    /*   - paramType is illegal. */
+    /*   - Adding new positional parameter would exceed YM_MAX_POSITIONAL_PARAMS. */
+    /*   - Adding new named parameter would exceed YM_MAX_NAMED_PARAMS. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - typeName (pointer) is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - paramType (pointer) is invalid. */
     YmParamIndex ymParcelDef_AddParam(
         struct YmParcelDef* parceldef,
         const YmChar* typeName,
@@ -1150,11 +1401,14 @@ extern "C" {
         YmRefSym paramType);
 
     /* Makes it so parameters added to the specified type will hereafter be named parameters, not positional ones. */
-    /* Fails if no type under typeName. */
-    /* Fails if typeName is not callable. */
-    /* Fails if typeName is a protocol member type. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - No type under typeName. */
+    /*   - typeName is not callable. */
+    /*   - typeName is a property. */
+    /*   - typeName is a protocol member type. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - typeName (pointer) is invalid. */
     void ymParcelDef_BeginNamedParams(
         struct YmParcelDef* parceldef,
         const YmChar* typeName);
@@ -1162,12 +1416,14 @@ extern "C" {
     /* Adds to a type in parceldef a reference to the type specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
     /* Reference IDs are sequential, incrementing from 0. */
     /* Each reference gets a unique ID increment, even if two reference share the same symbol. */
-    /* Fails if no type under typeName. */
-    /* Fails if symbol is illegal. */
-    /* Fails if Yama API internals are unable to allocate a reference ID. */
-    /* Behaviour is undefined if parceldef is invalid. */
-    /* Behaviour is undefined if typeName (as a pointer) is invalid. */
-    /* Behaviour is undefined if symbol (as a pointer) is invalid. */
+    /* Failure: */
+    /*   - No type under typeName. */
+    /*   - symbol is illegal. */
+    /*   - Yama API internals are unable to allocate a reference ID. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - typeName (pointer) is invalid. */
+    /*   - symbol (pointer) is invalid. */
     YmRef ymParcelDef_AddRef(
         struct YmParcelDef* parceldef,
         const YmChar* typeName,
@@ -1178,7 +1434,8 @@ extern "C" {
 
     /* Returns the path parcel was imported under. */
     /* This string's memory is managed internally. */
-    /* Behaviour is undefined if parcel is invalid. */
+    /* Undefined Behaviour: */
+    /*   - parcel is invalid. */
     YmPath ymParcel_Path(struct YmParcel* parcel);
 
 
@@ -1189,12 +1446,14 @@ extern "C" {
     */
 
     /* Returns the parcel the type belongs to. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmParcel* ymType_Parcel(struct YmType* type);
 
     /* Returns the fullname of type. */
     /* This string's memory is managed internally. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmFullname ymType_Fullname(struct YmType* type);
 
     /* TODO: Maybe add a YmKind_Unknown, and have that be return value if type == YM_NIL.
@@ -1204,75 +1463,96 @@ extern "C" {
     */
     
     /* Returns the kind of type. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmKind ymType_Kind(struct YmType* type);
 
     /* Returns the owner of type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_Owner(struct YmType* type);
 
     /* Returns the number of members type has, if any. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmMembers ymType_Members(struct YmType* type);
 
     /* Returns the member at member in type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_MemberByIndex(struct YmType* type, YmMemberIndex member);
 
     /* Returns the member under name in type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
+    /*   - name (pointer) is invalid. */
     YmType* ymType_MemberByName(struct YmType* type, const YmChar* name);
 
+    /* Returns the type of this variable/property, if any. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
+    YmType* ymType_Type(struct YmType* type);
+
     /* Returns the number of type parameters the type has, if any. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmTypeParams ymType_TypeParams(struct YmType* type);
 
     /* Returns the type parameter at typeParam in type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_TypeParamByIndex(struct YmType* type, YmTypeParamIndex typeParam);
 
     /* Returns the type parameter under name in type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
-    /* Behaviour is undefined if name (as a pointer) is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
+    /*   - name (pointer) is invalid. */
     YmType* ymType_TypeParamByName(struct YmType* type, const YmChar* name);
 
     /* Returns the return type of the type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_ReturnType(struct YmType* type);
 
     /* Returns the number of parameters the type has, if any. */
     /* Named parameters are only included if includeNamed == YM_TRUE. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmParams ymType_Params(struct YmType* type, YmBool includeNamed);
 
     /* Returns the name of param in type, or YM_NIL on failure. */
     /* This string's memory is managed internally. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     const YmChar* ymType_ParamName(struct YmType* type, YmParamIndex param);
 
     /* Returns the type of param in type, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_ParamType(struct YmType* type, YmParamIndex param);
 
     /* Returns the category of param in type, or (dummy value) YmParamCategory_Positional on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmParamCategory ymType_ParamCategory(struct YmType* type, YmParamIndex param);
 
     /* Returns the type referenced under reference, or YM_NIL on failure. */
-    /* Behaviour is undefined if type is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
     YmType* ymType_Ref(struct YmType* type, YmRef reference);
 
     /* Returns if type depends upon type other to be able to load/function properly. */
-    /* Behaviour is undefined if type is invalid. */
-    /* Behaviour is undefined if other is invalid. */
+    /* Undefined Behaviour: */
+    /*   - type is invalid. */
+    /*   - other is invalid. */
     YmBool ymType_Depends(struct YmType* type, struct YmType* other);
 
     /* Returns if the conversion 'from -> to' is legal. */
     /* coercion specifies if 'from -> to' is a legal coercion (aka. implicit conversion.) */
-    /* Behaviour is undefined if ctx is invalid. */
-    /* Behaviour is undefined if from is invalid. */
-    /* Behaviour is undefined if to is invalid. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - from is invalid. */
+    /*   - to is invalid. */
     YmBool ymType_Converts(struct YmType* from, struct YmType* to, YmBool coercion);
 
 
@@ -1284,20 +1564,24 @@ extern "C" {
 
     /* Increments the ref count of object obj. */
     /* Returns old ref count value of obj. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmRefCount ymObj_Secure(struct YmObj* obj);
 
     /* Decrements the ref count of object obj, destroying obj if it reaches 0. */
     /* Returns old ref count value of obj. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmRefCount ymObj_Release(struct YmObj* obj);
 
     /* Returns the ref count of object obj. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmRefCount ymObj_RefCount(struct YmObj* obj);
 
     /* Returns the type of object obj. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmType* ymObj_Type(struct YmObj* obj);
 
     /* TODO: We want to add user defined fmt fns in Yama code later, but this restricts
@@ -1312,7 +1596,8 @@ extern "C" {
 
     /* Returns a formatted string representation of obj. */
     /* The returned string memory must be cleaned up by the end-user via free. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     const YmChar* ymObj_Fmt(struct YmObj* obj);
 
     /* TODO: Right now, things like int extraction requires the object to be a
@@ -1322,32 +1607,38 @@ extern "C" {
 
     /* Extracts an int value from object obj, or 0 on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmInt ymObj_ToInt(struct YmObj* obj, YmBool* succeeded);
 
     /* Extracts an uint value from object obj, or 0 on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmUInt ymObj_ToUInt(struct YmObj* obj, YmBool* succeeded);
 
     /* Extracts an float value from object obj, or 0.0 on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmFloat ymObj_ToFloat(struct YmObj* obj, YmBool* succeeded);
 
     /* Extracts an bool value from object obj, or YM_FALSE on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmBool ymObj_ToBool(struct YmObj* obj, YmBool* succeeded);
 
     /* Extracts an rune value from object obj, or U'\0' on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     YmRune ymObj_ToRune(struct YmObj* obj, YmBool* succeeded);
 
     /* Extracts a type value from object obj, or YM_NIL on failure. */
     /* If succeeded != YM_NIL, *succeeded will be set to whether extraction succeeded. */
-    /* Behaviour is undefined if obj is invalid. */
+    /* Undefined Behaviour: */
+    /*   - obj is invalid. */
     struct YmType* ymObj_ToType(struct YmObj* obj, YmBool* succeeded);
 
 

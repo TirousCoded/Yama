@@ -64,6 +64,8 @@ namespace {
 		ErrCounter& err;
 		YmType* type = nullptr, *objType = nullptr;
 
+		// TODO: How do we go about testing fns like ymCtx_[Get|Set]Property?
+
 		Unit(
 			YmDm* dm,
 			YmCtx* ctx,
@@ -75,7 +77,8 @@ namespace {
 			YmKind kind,
 			YmMembers members,
 			YmTypeParams typeParams,
-			std::function<void(Safe<YmType> type)> testPutDefault,
+			std::function<void(Safe<YmType> type)> testDefaultInit,
+			std::function<void(Safe<YmType> type)> testExplicitInit,
 			// Test calling w/ ymCtx_Call.
 			std::function<void(Safe<YmType> type)> testCall) :
 			dm(dm),
@@ -85,7 +88,9 @@ namespace {
 				dm, ctx, err,
 				fullname, objectTypeFln,
 				kind, members, typeParams,
-				testPutDefault, testCall);
+				testDefaultInit,
+				testExplicitInit,
+				testCall);
 		}
 
 		void object(
@@ -179,7 +184,8 @@ namespace {
 			YmKind kind,
 			YmMembers members,
 			YmTypeParams typeParams,
-			std::function<void(Safe<YmType> type)> testPutDefault,
+			std::function<void(Safe<YmType> type)> testDefaultInit,
+			std::function<void(Safe<YmType> type)> testExplicitInit,
 			std::function<void(Safe<YmType> type)> testCall) {
 			ym::println("testing {}", fullname);
 
@@ -202,7 +208,12 @@ namespace {
 			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
 			err.reset();
-			testPutDefault(Safe(type));
+			testDefaultInit(Safe(type));
+
+			ymCtx_PopAll(ctx);
+			ASSERT_EQ(ymCtx_Locals(ctx), 0);
+			err.reset();
+			testExplicitInit(Safe(type));
 
 			ymCtx_PopAll(ctx);
 			ASSERT_EQ(ymCtx_Locals(ctx), 0);
@@ -225,7 +236,14 @@ TEST(TypeCharacteristics, YamaNone) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{});
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -263,7 +281,14 @@ TEST(TypeCharacteristics, YamaInt) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .i = 0 });
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -369,7 +394,14 @@ TEST(TypeCharacteristics, YamaUInt) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .ui = 0 });
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -455,7 +487,14 @@ TEST(TypeCharacteristics, YamaFloat) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .f = 0 });
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -577,7 +616,14 @@ TEST(TypeCharacteristics, YamaBool) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .b = YM_FALSE });
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -634,7 +680,14 @@ TEST(TypeCharacteristics, YamaRune) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .r = U'\0'});
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -717,7 +770,14 @@ TEST(TypeCharacteristics, YamaType) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+			ASSERT_TRUE(result);
+			EXPECT_EQ(ymObj_Type(result), type);
+			testExtracts(result, Extracts{ .t = ymCtx_LdNone(ctx) });
+		},
+		[&ctx](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -756,8 +816,12 @@ TEST(TypeCharacteristics, YamaAny) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
@@ -770,55 +834,32 @@ TEST(TypeCharacteristics, Structs) {
 	SETUP_ALL(ctx);
 	SETUP_PARCELDEF(p_def);
 	ASSERT_NE(ymParcelDef_AddStruct(p_def, "EmptyStruct"), YM_NO_TYPE_INDEX);
-	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
-	Unit unit(
-		dm, ctx, err,
-		"p:EmptyStruct",
-		"p:EmptyStruct",
-		YmKind_Struct,
-		0,
-		0,
-		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
-			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
-			ASSERT_TRUE(result);
-			EXPECT_EQ(ymObj_Type(result), type);
-			testExtracts(result, Extracts{});
-		},
-		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
-			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
-		});
-	auto mkObject =
-		[&ctx](Safe<YmType> type) -> YmObj* {
-		return
-			ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
-			? ymCtx_Pull(ctx)
-			: nullptr;
-		};
-	unit.object(mkObject, Extracts{});
-	unit.conversion("p:EmptyStruct", true, mkObject, Extracts{});
-	unit.conversion("yama:Any", true, mkObject, Extracts{});
-
-	unit.conversion("yama:None", false, mkObject, Extracts{});
-}
-
-TEST(TypeCharacteristics, GenericStructs) {
-	SETUP_ALL(ctx);
-	SETUP_PARCELDEF(p_def);
-	ASSERT_NE(ymParcelDef_AddStruct(p_def, "EmptyStruct"), YM_NO_TYPE_INDEX);
-	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "EmptyStruct", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "EmptyStruct", "computed", "yama:Int",
+		ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "NonEmptyStruct"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "x", "yama:Int"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "y", "yama:Int"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "z", "yama:Int"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "NonEmptyStruct", "computed", "yama:Int",
+		ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
 	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
 	{
 		Unit unit(
 			dm, ctx, err,
-			"p:EmptyStruct[yama:Int]",
-			"p:EmptyStruct[yama:Int]",
+			"p:EmptyStruct",
+			"p:EmptyStruct",
 			YmKind_Struct,
+			2,
 			0,
-			1,
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
@@ -831,7 +872,116 @@ TEST(TypeCharacteristics, GenericStructs) {
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
-				ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
+				ymCtx_DefaultInit(ctx, YM_NEWTOP, type) == YM_TRUE
+				? ymCtx_Pull(ctx)
+				: nullptr;
+			};
+		unit.object(mkObject, Extracts{});
+		unit.conversion("p:EmptyStruct", true, mkObject, Extracts{});
+		unit.conversion("yama:Any", true, mkObject, Extracts{});
+
+		unit.conversion("yama:None", false, mkObject, Extracts{});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:NonEmptyStruct",
+			"p:NonEmptyStruct",
+			YmKind_Struct,
+			8,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ymCtx_PutInt(ctx, YM_NEWTOP, 10);
+				ymCtx_PutInt(ctx, YM_NEWTOP, 11);
+				ymCtx_PutInt(ctx, YM_NEWTOP, 12);
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, "x,y,z"), YM_TRUE);
+				ASSERT_EQ(ymCtx_Locals(ctx), 1);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "x"), YM_NEWTOP);
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "y"), YM_NEWTOP);
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "z"), YM_NEWTOP);
+				ASSERT_EQ(ymCtx_Locals(ctx), 4);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 1, YM_BORROW), nullptr), 10);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 2, YM_BORROW), nullptr), 11);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 3, YM_BORROW), nullptr), 12);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			});
+		auto mkObject =
+			[&ctx](Safe<YmType> type) -> YmObj* {
+			return
+				ymCtx_PutInt(ctx, YM_NEWTOP, 3) &&
+				ymCtx_PutInt(ctx, YM_NEWTOP, 1) &&
+				ymCtx_PutInt(ctx, YM_NEWTOP, 2) &&
+				ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, "x,y,z")
+				? ymCtx_Pull(ctx)
+				: nullptr;
+			};
+		unit.object(mkObject, Extracts{});
+		unit.conversion("p:NonEmptyStruct", true, mkObject, Extracts{});
+		unit.conversion("yama:Any", true, mkObject, Extracts{});
+		
+		unit.conversion("yama:None", false, mkObject, Extracts{});
+	}
+}
+
+TEST(TypeCharacteristics, GenericStructs) {
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "EmptyStruct"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "EmptyStruct", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "EmptyStruct", "computed", "yama:Int",
+		ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "NonEmptyStruct"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddTypeParam(p_def, "NonEmptyStruct", "T", "yama:Any"), YM_NO_TYPE_PARAM_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "x", "$T"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "y", "$T"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "NonEmptyStruct", "z", "$T"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "NonEmptyStruct", "computed", "$T",
+		ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_NO_TYPE_INDEX);
+	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:EmptyStruct[yama:Int]",
+			"p:EmptyStruct[yama:Int]",
+			YmKind_Struct,
+			2,
+			1,
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			});
+		auto mkObject =
+			[&ctx](Safe<YmType> type) -> YmObj* {
+			return
+				ymCtx_DefaultInit(ctx, YM_NEWTOP, type) == YM_TRUE
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -847,10 +997,17 @@ TEST(TypeCharacteristics, GenericStructs) {
 			"p:EmptyStruct[p:EmptyStruct[yama:Int]]",
 			"p:EmptyStruct[p:EmptyStruct[yama:Int]]",
 			YmKind_Struct,
-			0,
+			2,
 			1,
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_NEWTOP, type), YM_TRUE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, type), YM_TRUE);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, ""), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
@@ -863,12 +1020,65 @@ TEST(TypeCharacteristics, GenericStructs) {
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
-				ymCtx_PutDefault(ctx, YM_NEWTOP, type) == YM_TRUE
+				ymCtx_DefaultInit(ctx, YM_NEWTOP, type) == YM_TRUE
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
 		unit.object(mkObject, Extracts{});
 		unit.conversion("p:EmptyStruct[p:EmptyStruct[yama:Int]]", true, mkObject, Extracts{});
+		unit.conversion("yama:Any", true, mkObject, Extracts{});
+
+		unit.conversion("yama:None", false, mkObject, Extracts{});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:NonEmptyStruct[yama:Int]",
+			"p:NonEmptyStruct[yama:Int]",
+			YmKind_Struct,
+			8,
+			1,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ymCtx_PutInt(ctx, YM_NEWTOP, 10);
+				ymCtx_PutInt(ctx, YM_NEWTOP, 11);
+				ymCtx_PutInt(ctx, YM_NEWTOP, 12);
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, "x,y,z"), YM_TRUE);
+				ASSERT_EQ(ymCtx_Locals(ctx), 1);
+				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+				ASSERT_TRUE(result);
+				EXPECT_EQ(ymObj_Type(result), type);
+				testExtracts(result, Extracts{});
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "x"), YM_NEWTOP);
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "y"), YM_NEWTOP);
+				ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW);
+				ymCtx_GetProperty(ctx, ymType_MemberByName(type, "z"), YM_NEWTOP);
+				ASSERT_EQ(ymCtx_Locals(ctx), 4);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 1, YM_BORROW), nullptr), 10);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 2, YM_BORROW), nullptr), 11);
+				ASSERT_EQ(ymObj_ToInt(ymCtx_Local(ctx, 3, YM_BORROW), nullptr), 12);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			});
+		auto mkObject =
+			[&ctx](Safe<YmType> type) -> YmObj* {
+			return
+				ymCtx_PutInt(ctx, YM_NEWTOP, 3) &&
+				ymCtx_PutInt(ctx, YM_NEWTOP, 1) &&
+				ymCtx_PutInt(ctx, YM_NEWTOP, 2) &&
+				ymCtx_ExplicitInit(ctx, YM_NEWTOP, type, "x,y,z")
+				? ymCtx_Pull(ctx)
+				: nullptr;
+			};
+		unit.object(mkObject, Extracts{});
+		unit.conversion("p:NonEmptyStruct[yama:Int]", true, mkObject, Extracts{});
 		unit.conversion("yama:Any", true, mkObject, Extracts{});
 
 		unit.conversion("yama:None", false, mkObject, Extracts{});
@@ -890,8 +1100,12 @@ TEST(TypeCharacteristics, Protocols) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
@@ -916,8 +1130,12 @@ TEST(TypeCharacteristics, GenericProtocols) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
@@ -933,8 +1151,12 @@ TEST(TypeCharacteristics, GenericProtocols) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
@@ -963,8 +1185,12 @@ TEST(TypeCharacteristics, Fns) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx](Safe<YmType> type) {
 			ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
@@ -998,8 +1224,12 @@ TEST(TypeCharacteristics, GenericFns) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
@@ -1019,8 +1249,12 @@ TEST(TypeCharacteristics, GenericFns) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
@@ -1058,8 +1292,12 @@ TEST(TypeCharacteristics, Methods) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx](Safe<YmType> type) {
 			ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
@@ -1096,8 +1334,12 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 101), YM_TRUE);
@@ -1117,8 +1359,12 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_PutDefault(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
@@ -1126,6 +1372,215 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdFloat(ctx));
 					EXPECT_DOUBLE_EQ(ymObj_ToFloat(top, nullptr), 3.14159);
+				}
+			});
+	}
+}
+
+// TODO: Didn't bother w/ tests w/ generic types w/ properties.
+
+TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddStoredProperty(p_def, "A", "a", "yama:Int"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "b", "yama:Int"), YM_NO_TYPE_INDEX);
+	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::a",
+			std::nullopt,
+			YmKind_Property,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 11), YM_TRUE);
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), "a,b"), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 10);
+				}
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::a$assigner",
+			std::nullopt,
+			YmKind_PropertyAssigner,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				auto A_a = ymCtx_Load(ctx, "p:A::a");
+				ASSERT_TRUE(A_a);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 11), YM_TRUE);
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), "a,b"), YM_TRUE);
+				ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 22), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 2, "", YM_DISCARD), YM_TRUE);
+				ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 1, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 22);
+				}
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::b",
+			std::nullopt,
+			YmKind_Property,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 11), YM_TRUE);
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), "a,b"), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 1, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 11);
+				}
+			});
+	}
+}
+
+static size_t computedPropertyCalls = 0;
+
+TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) {
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ASSERT_NE(ymParcelDef_AddStruct(p_def, "A"), YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddComputedProperty(p_def, "A", "a", "yama:Int",
+		[](YmCtx* ctx, void*) {
+			computedPropertyCalls++;
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+		},
+		nullptr,
+		[](YmCtx* ctx, void*) {
+			computedPropertyCalls++;
+			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+			if (auto top = ymCtx_Arg(ctx, 1, YM_BORROW)) {
+				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+				EXPECT_EQ(ymObj_ToInt(top, nullptr), 22);
+			}
+		},
+		nullptr),
+		YM_NO_TYPE_INDEX);
+	ASSERT_NE(ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "b", "yama:Int",
+		[](YmCtx* ctx, void*) {
+			computedPropertyCalls++;
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
+		},
+		nullptr),
+		YM_NO_TYPE_INDEX);
+	ASSERT_EQ(ymDm_BindParcelDef(dm, "p", p_def), YM_TRUE);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::a",
+			std::nullopt,
+			YmKind_Property,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), ""), YM_TRUE);
+				computedPropertyCalls = 0;
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
+				EXPECT_EQ(computedPropertyCalls, 1);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::a$assigner",
+			std::nullopt,
+			YmKind_PropertyAssigner,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 22), YM_TRUE);
+				computedPropertyCalls = 0;
+				ASSERT_EQ(ymCtx_Call(ctx, type, 2, "", YM_DISCARD), YM_TRUE);
+				EXPECT_EQ(computedPropertyCalls, 1);
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:A::b",
+			std::nullopt,
+			YmKind_Property,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, ymType_Owner(type), ""), YM_TRUE);
+				computedPropertyCalls = 0;
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_NEWTOP), YM_TRUE);
+				EXPECT_EQ(computedPropertyCalls, 1);
+				if (auto top = ymCtx_Local(ctx, 1, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 202);
 				}
 			});
 	}

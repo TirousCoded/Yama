@@ -14,11 +14,14 @@ using namespace _ym;
 
 
 const YmChar* ymKind_Fmt(YmKind x) {
+    static_assert(YmKind_Num == 6);
     static constexpr std::array<const YmChar*, YmKind_Num> names{
         "Struct",
         "Protocol",
         "Fn",
         "Method",
+        "Property",
+        "PropertyAssigner",
     };
     return
         x < YmKind_Num
@@ -28,9 +31,12 @@ const YmChar* ymKind_Fmt(YmKind x) {
 
 YmBool ymKind_IsCallable(YmKind x) {
     ymAssert(x < YmKind_Num);
+    static_assert(YmKind_Num == 6);
     static constexpr std::array<bool, YmKind_Num> values{
         false,
         false,
+        true,
+        true,
         true,
         true,
     };
@@ -39,10 +45,13 @@ YmBool ymKind_IsCallable(YmKind x) {
 
 YmBool ymKind_IsMember(YmKind x) {
     ymAssert(x < YmKind_Num);
+    static_assert(YmKind_Num == 6);
     static constexpr std::array<bool, YmKind_Num> values{
         false,
         false,
         false,
+        true,
+        true,
         true,
     };
     return values[size_t(x)];
@@ -50,9 +59,12 @@ YmBool ymKind_IsMember(YmKind x) {
 
 YmBool ymKind_HasMembers(YmKind x) {
     ymAssert(x < YmKind_Num);
+    static_assert(YmKind_Num == 6);
     static constexpr std::array<bool, YmKind_Num> values{
         true,
         true,
+        false,
+        false,
         false,
         false,
     };
@@ -121,7 +133,7 @@ YmRefCount ymCtx_RefCount(YmCtx* ctx) {
 }
 
 YmDm* ymCtx_Dm(YmCtx* ctx, YmRefPolicy returnPolicy) {
-    if (returnPolicy == YM_TAKE) {
+    if (returnPolicy != YM_BORROW) {
         ymDm_Secure(Safe(ctx)->domain);
     }
     return Safe(ctx)->domain;
@@ -265,46 +277,42 @@ YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy)
 }
 
 YmBool ymCtx_PutNone(YmCtx* ctx, YmLocal where) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewNone(ctx), YM_TAKE);
 }
 
 YmBool ymCtx_PutInt(YmCtx* ctx, YmLocal where, YmInt v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewInt(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutUInt(YmCtx* ctx, YmLocal where, YmUInt v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewUInt(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutFloat(YmCtx* ctx, YmLocal where, YmFloat v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewFloat(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutBool(YmCtx* ctx, YmLocal where, YmBool v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewBool(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutRune(YmCtx* ctx, YmLocal where, YmRune v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewRune(ctx, v), YM_TAKE);
 }
 
 YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
-    // TODO: I think this leaks the ymCtx_New*** object if ymCtx_Put fails.
     return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
 }
 
-YmBool ymCtx_PutDefault(YmCtx* ctx, YmLocal where, YmType* type) {
+YmBool ymCtx_DefaultInit(YmCtx* ctx, YmLocal where, YmType* type) {
     if (auto obj = Safe(ctx)->newDefault(deref(type))) {
-        // TODO: I think this leaks the object if ymCtx_Put fails.
         return ymCtx_Put(ctx, where, obj, YM_TAKE);
     }
     return YM_FALSE;
+}
+
+YmBool ymCtx_ExplicitInit(YmCtx* ctx, YmLocal where, YmType* type, const YmChar* argNames) {
+    return Safe(ctx)->explicitInit(where, deref(type), std::string_view(Safe(argNames)));
 }
 
 YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo) {
@@ -313,6 +321,14 @@ YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames
 
 void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
     Safe(ctx)->ret(what, whatPolicy);
+}
+
+YmBool ymCtx_GetProperty(YmCtx* ctx, YmType* property, YmLocal where) {
+    return Safe(ctx)->getProperty(deref(property), where);
+}
+
+YmBool ymCtx_SetProperty(YmCtx* ctx, YmType* property) {
+    return Safe(ctx)->setProperty(deref(property));
 }
 
 YmBool ymCtx_Convert(YmCtx* ctx, YmType* type, YmLocal returnTo) {
@@ -397,6 +413,63 @@ YmTypeIndex ymParcelDef_AddMethodReq(
         .value_or(YM_NO_TYPE_INDEX);
 }
 
+YmTypeIndex ymParcelDef_AddReadOnlyStoredProperty(
+    YmParcelDef* parceldef,
+    const YmChar* ownerName,
+    const YmChar* name,
+    YmRefSym type) {
+    return Safe(parceldef)->addReadOnlyStoredProperty(
+        std::string(Safe(ownerName)),
+        std::string(Safe(name)),
+        std::string(Safe(type)))
+        .value_or(YM_NO_TYPE_INDEX);
+}
+
+YmTypeIndex ymParcelDef_AddStoredProperty(
+    YmParcelDef* parceldef,
+    const YmChar* ownerName,
+    const YmChar* name,
+    YmRefSym type) {
+    return Safe(parceldef)->addStoredProperty(
+        std::string(Safe(ownerName)),
+        std::string(Safe(name)),
+        std::string(Safe(type)))
+        .value_or(YM_NO_TYPE_INDEX);
+}
+
+YmTypeIndex ymParcelDef_AddReadOnlyComputedProperty(
+    YmParcelDef* parceldef,
+    const YmChar* ownerName,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn getCallBehaviour,
+    void* getCallBehaviourData) {
+    return Safe(parceldef)->addReadOnlyComputedProperty(
+        std::string(Safe(ownerName)),
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(getCallBehaviour, getCallBehaviourData))
+        .value_or(YM_NO_TYPE_INDEX);
+}
+
+YmTypeIndex ymParcelDef_AddComputedProperty(
+    YmParcelDef* parceldef,
+    const YmChar* ownerName,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn getCallBehaviour,
+    void* getCallBehaviourData,
+    YmCallBhvrCallbackFn setCallBehaviour,
+    void* setCallBehaviourData) {
+    return Safe(parceldef)->addComputedProperty(
+        std::string(Safe(ownerName)),
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(getCallBehaviour, getCallBehaviourData),
+        _ym::CallBhvrCallbackInfo::mk(setCallBehaviour, setCallBehaviourData))
+        .value_or(YM_NO_TYPE_INDEX);
+}
+
 YmTypeParamIndex ymParcelDef_AddTypeParam(
     YmParcelDef* parceldef,
     const YmChar* typeName,
@@ -468,6 +541,13 @@ YmType* ymType_MemberByIndex(YmType* type, YmMemberIndex member) {
 
 YmType* ymType_MemberByName(YmType* type, const YmChar* name) {
     return Safe(type)->member(std::string(Safe(name)));
+}
+
+YmType* ymType_Type(YmType* type) {
+    return
+        Safe(type)->kind() == YmKind_Property
+        ? Safe(type)->returnType()
+        : nullptr;
 }
 
 YmTypeParams ymType_TypeParams(YmType* type) {

@@ -13,7 +13,7 @@ namespace _ym {
 
 
     // NOTE: Loading occurs via the following:
-    //          1) An input specifier is provided by end-user w/ which to load/import an type/parcel,
+    //          1) An input specifier is provided by end-user w/ which to load/import a type/parcel,
     //             recursively (though not processed immediately) loading dependencies if the former.
     //          2) The input specifier is parsed and is then interpreted.
     //          3) A stack machine of 'terms' is used during interpretation to compute terms encapsulating
@@ -113,6 +113,7 @@ namespace _ym {
             ym::Safe<YmParcel> parcel,
             ym::Safe<const _ym::TypeInfo> info,
             ym::Safe<YmType> self);
+        // This importantly does NOT invoke early resolution, _genNonMemberTypeData does that.
         void _genMemberTypeData(
             ym::Safe<YmParcel> parcel,
             ym::Safe<const _ym::TypeInfo> info,
@@ -127,6 +128,7 @@ namespace _ym {
             const std::string& memberName);
 
         bool _isEarlyResolveConst(const ConstInfo& constInfo) const;
+        void _earlyResolveMembers(YmType& x, ym::Safe<YmType> self);
         void _earlyResolveType(YmType& x, ym::Safe<YmType> self);
         void _earlyResolveConsts(YmType& x, ym::Safe<YmType> self);
         void _scheduleLateResolve(YmType& x);

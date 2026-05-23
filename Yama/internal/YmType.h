@@ -119,12 +119,16 @@ public:
     std::optional<YmParamCategory> paramCategory(YmParamIndex index) const noexcept;
     std::optional<YmParamIndex> paramIndex(const std::string& name) const noexcept;
 
+    YmType* assigner() const noexcept;
+
     bool hasSelfParam() const noexcept;
     bool isTypeMethod() const noexcept;
     bool isObjMethod() const noexcept;
 
     bool isCallable() const noexcept;
     bool isMethodReq() const noexcept;
+
+    bool hasDefaultValue() const noexcept;
 
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;

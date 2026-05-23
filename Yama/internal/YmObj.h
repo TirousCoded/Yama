@@ -56,12 +56,14 @@ public:
 
     // Returns the number of slots this object has.
     inline size_t size() const noexcept {
-        if (type->kind() == YmKind_Protocol) {
-            return 2; // Slot #1 is boxed value, slot #2 is ptable ptr.
+        if (isPrimitive()) {
+            return isNone() ? 0 : 1;
         }
-        // TODO: Doesn't this part seem a bit costly? So many checks...
-        else if (isInt() || isUInt() || isFloat() || isBool() || isRune() || isType()) {
-            return 1;
+        else if (isStruct()) {
+            return type->info->slots; // One slot per stored property.
+        }
+        else if (isProtocol()) {
+            return 2; // Slot #1 is boxed value, slot #2 is ptable ptr.
         }
         else return 0;
     }
@@ -69,16 +71,19 @@ public:
     Slot& slot(size_t index) noexcept;
     const Slot& slot(size_t index) const noexcept;
 
+    bool isPrimitive() const noexcept;
+    bool isStruct() const noexcept;
+    bool isRegularStruct() const noexcept;
     bool isProtocol() const noexcept;
 
     // NOTE: Certain internal code expects is*** and to*** methods to operate
     //       such that they require the object's type to be SPECIFICALLY the
-    //       primitive type in question.
+    //       primitive type in question (ie. no conversion should be required.)
     //
     //       To this end, when we add in things like frontend being able to
-    //       marshal an object into a primitive as part of querying its value
-    //       as a specific primitive type, the below methods should NOT be
-    //       where we impl this.
+    //       implicit convert an object into a primitive as part of querying
+    //       its value as a specific primitive type, the below methods should
+    //       NOT be where we impl this.
 
     bool isNone() const noexcept;
     bool isInt() const noexcept;

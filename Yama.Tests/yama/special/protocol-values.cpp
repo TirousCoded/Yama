@@ -76,7 +76,7 @@ TEST_F(ProtocolValues, BoxingAndUnboxing) {
 		ASSERT_TRUE(Proto);
 
 		// Push T value, then sample unboxed0.
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, T), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, T), YM_TRUE);
 		SETUP_OBJ(unboxed0, ymCtx_Local(ctx.get(), 0, YM_TAKE));
 
 		// Convert T value to Proto value (ie. boxing), then sample boxed.
@@ -109,7 +109,7 @@ TEST_F(ProtocolValues, BoxingAndUnboxing) {
 		ASSERT_TRUE(Proto);
 
 		// T can't be boxed as Proto.
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, T), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, T), YM_TRUE);
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), Proto, YM_NEWTOP), YM_FALSE);
 		EXPECT_GE(err[YmErrCode_IllegalConversion], 1);
 		};
@@ -158,7 +158,7 @@ TEST_F(ProtocolValues, CannotUnboxWithWrongType_EvenIfUnboxingTypeConformsToProt
 	ASSERT_TRUE(A);
 	ASSERT_TRUE(B);
 
-	ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, A), YM_TRUE);
+	ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, A), YM_TRUE);
 	ASSERT_EQ(ymCtx_Convert(ctx.get(), P, YM_NEWTOP), YM_TRUE); // Box A -> P.
 	ASSERT_EQ(ymCtx_Convert(ctx.get(), B, YM_NEWTOP), YM_FALSE); // Unbox P -> B (should fail.)
 	EXPECT_GE(err[YmErrCode_IllegalConversion], 1);
@@ -215,7 +215,7 @@ TEST_F(ProtocolValues, ConversionBetweenProtocolTypes) {
 		ASSERT_TRUE(Proto1);
 		ASSERT_TRUE(Proto2);
 
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, T), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, T), YM_TRUE);
 		SETUP_OBJ(unboxed0, ymCtx_Local(ctx.get(), 0, YM_TAKE));
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), Proto1, YM_NEWTOP), YM_TRUE); // Box
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), Proto2, YM_NEWTOP), YM_TRUE);
@@ -238,7 +238,7 @@ TEST_F(ProtocolValues, ConversionBetweenProtocolTypes) {
 		ASSERT_TRUE(Proto2);
 
 		// T can't be boxed as Proto.
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, T), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, T), YM_TRUE);
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), Proto1, YM_NEWTOP), YM_TRUE);
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), Proto2, YM_NEWTOP), YM_FALSE);
 		EXPECT_GE(err[YmErrCode_IllegalConversion], 1);
@@ -387,7 +387,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 		ASSERT_TRUE(P_m);
 		ASSERT_TRUE(A);
 
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, A), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, A), YM_TRUE);
 		selfExpected = ymCtx_Local(ctx.get(), 0, YM_BORROW); // Should see 'self' as unboxed value.
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), P, YM_NEWTOP), YM_TRUE);
 		ASSERT_EQ(ymCtx_PutInt(ctx.get(), YM_NEWTOP, x), YM_TRUE);
@@ -412,7 +412,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 		ASSERT_TRUE(P_m);
 		ASSERT_TRUE(B);
 
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, B), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, B), YM_TRUE);
 		selfExpected = ymCtx_Local(ctx.get(), 0, YM_BORROW); // Should see 'self' as unboxed value.
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), P, YM_NEWTOP), YM_TRUE);
 		ASSERT_EQ(ymCtx_PutInt(ctx.get(), YM_NEWTOP, x), YM_TRUE);
@@ -524,7 +524,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndCanProperlyDispatc
 		ASSERT_TRUE(P_m);
 		ASSERT_TRUE(A);
 
-		ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, A), YM_TRUE);
+		ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, A), YM_TRUE);
 		selfExpected = ymCtx_Local(ctx.get(), 0, YM_BORROW); // Should see 'self' as unboxed value.
 		ASSERT_EQ(ymCtx_Convert(ctx.get(), P, YM_NEWTOP), YM_TRUE);
 		ASSERT_EQ(ymCtx_PutInt(ctx.get(), YM_NEWTOP, x), YM_TRUE);
@@ -584,7 +584,7 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsFailCorrectly_LeavingLocalObjStkA
 	ASSERT_TRUE(P_m);
 	ASSERT_TRUE(A);
 
-	ASSERT_EQ(ymCtx_PutDefault(ctx.get(), YM_NEWTOP, A), YM_TRUE);
+	ASSERT_EQ(ymCtx_DefaultInit(ctx.get(), YM_NEWTOP, A), YM_TRUE);
 	ASSERT_EQ(ymCtx_Convert(ctx.get(), P, YM_NEWTOP), YM_TRUE);
 	auto obj0 = ymCtx_Local(ctx.get(), 0, YM_BORROW);
 	ASSERT_EQ(ymCtx_PutInt(ctx.get(), YM_NEWTOP, -14), YM_TRUE);

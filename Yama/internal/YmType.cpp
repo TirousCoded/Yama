@@ -209,6 +209,13 @@ std::optional<YmParamIndex> YmType::paramIndex(const std::string& name) const no
     return std::nullopt;
 }
 
+YmType* YmType::assigner() const noexcept {
+    return
+        info->assigner
+        ? constAsRef(*info->assigner).get()
+        : nullptr;
+}
+
 bool YmType::hasSelfParam() const noexcept {
     return paramCount() >= 1 && paramType(0) == owner();
 }
@@ -229,6 +236,10 @@ bool YmType::isCallable() const noexcept {
 
 bool YmType::isMethodReq() const noexcept {
     return info->isMethodReq();
+}
+
+bool YmType::hasDefaultValue() const noexcept {
+    return info->hasDefaultValue();
 }
 
 YmType* YmType::ref(YmRef reference) const noexcept {

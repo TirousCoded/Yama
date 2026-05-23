@@ -9,7 +9,11 @@ lexer section:
     #       excluding the surrogate pair range U+d800-U+dfff.
     # NOTE: Including LITERALLY ALL legal Unicode codepoint may not be 100% correct to do.
 
-    IDENTIFIER                      : [%$]? [a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff] [0-9a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff]* ;
+    # TODO: The below defining of IDENTIFIER as allowing for '$assigner' on the end feels SUPER
+    #       HACKY, and I REALLY want to find a better way of dealing w/ it.
+    IDENTIFIER                      : [%$]? [a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff] [0-9a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff]*
+                                      '$assigner'?
+                                    ;
 
     R_ARROW                         : '->' ;
 

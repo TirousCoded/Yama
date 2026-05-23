@@ -12,7 +12,7 @@
 
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
-#include "CallArgPack.h"
+#include "ArgPackInfo.h"
 #include "Loader.h"
 #include "MAS.h"
 #include "PTableManager.h"
@@ -36,6 +36,14 @@ public:
 
     std::shared_ptr<YmParcel> import(const std::string& path);
     std::shared_ptr<YmType> load(const std::string& fullname);
+
+	YmType& ldNone() const noexcept;
+	YmType& ldInt() const noexcept;
+	YmType& ldUInt() const noexcept;
+	YmType& ldFloat() const noexcept;
+	YmType& ldBool() const noexcept;
+	YmType& ldRune() const noexcept;
+	YmType& ldType() const noexcept;
 
 	// Creates an uninitialized object of type.
 	YmObj* create(YmType& type);
@@ -64,11 +72,16 @@ public:
 	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
 
 	YmObj* pull() noexcept; // Returns taken ref.
-	void pop(YmLocals n);
+	// releaseObjs == false when we want to *steal* ownership from the object stack.
+	void pop(YmLocals n, bool releaseObjs = true);
 	bool put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool swap(YmLocal a, YmLocal b);
+	bool defaultInit(YmLocal where, YmType& type);
+	bool explicitInit(YmLocal where, YmType& type, std::string_view argNames);
 	bool call(YmType& fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
 	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
+	bool getProperty(YmType& propertyType, YmLocal where);
+	bool setProperty(YmType& propertyType);
 	bool convert(YmType& type, YmLocal returnTo);
 
 
@@ -76,7 +89,7 @@ private:
 	struct _CallFrame final {
 		// Fn being called (or nullptr for user call frame.)
 		YmType* fn;
-		_ym::CallArgPack argPack;
+		_ym::ArgPackInfo<> argPack;
 		// Where to put return value.
 		YmLocal returnTo;
 		// Where in _globalObjStk this call frame's local object stack begins (and below that are its args.)
@@ -102,6 +115,7 @@ private:
 			return std::nullopt;
 		}
 	};
+
 
 	// TODO: This field is used to ensure all objects are released upon deinit, and
 	//		 should be removed later when a more appropriate way to guarantee this.

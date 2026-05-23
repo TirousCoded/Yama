@@ -32,6 +32,8 @@ namespace _ym {
     bool checkNonProtocolMember(const TypeInfo& type, std::string_view msg);
 
     void methodReqCallBhvr(YmCtx* ctx, void* user);
+    void storedPropertyGetCallBhvr(YmCtx* ctx, void* user);
+    void storedPropertySetCallBhvr(YmCtx* ctx, void* user);
 
 
     struct TypeParamInfo final {
@@ -60,6 +62,7 @@ namespace _ym {
         //       so that member TypeInfo have DIRECT access to the type param data of their owner, as
         //       right now the lack of this ability is a MAJOR flaw of our currennt impl.
 
+        uint16_t slots = 0;
         std::optional<CallBhvrCallbackInfo> callBehaviour;
         std::optional<ConstIndex> owner;
         std::vector<std::shared_ptr<TypeParamInfo>> typeParams;
@@ -69,6 +72,7 @@ namespace _ym {
         std::optional<ConstIndex> returnType;
         std::vector<ParamInfo> params;
         YmParams positionalParams = 0;
+        std::optional<ConstIndex> assigner;
         ConstTableInfo consts;
         std::vector<ConstIndex> refs;
 
@@ -93,6 +97,10 @@ namespace _ym {
         const ParamInfo* queryParam(const std::string& localName) const noexcept;
         bool isMethodReq() const noexcept;
 
+        bool isStoredPropertyGet() const noexcept;
+        bool isStoredPropertySet() const noexcept;
+        std::optional<YmUInt16> storedPropertyIndex() const noexcept;
+
         YmParams paramCount() const noexcept;
         YmParams positionalParamCount() const noexcept;
         YmParams namedParamCount() const noexcept;
@@ -103,8 +111,14 @@ namespace _ym {
         YmTypeParams typeParamCount() const noexcept;
         bool isParameterized() const noexcept;
 
+        bool hasDefaultValue() const noexcept;
+
+        uint16_t nextSlot() noexcept;
+        // Unwinds nextSlot incrs.
+        void unwindSlots(uint16_t n = 1) noexcept;
+
         std::optional<YmTypeParamIndex> addTypeParam(std::string name, std::string constraintTypeSymbol);
-        std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol);
+        std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol, bool skipCallabilityCheck = false);
         void beginNamedParams();
         std::optional<YmRef> addRef(std::string symbol);
 
@@ -132,7 +146,9 @@ namespace _ym {
             std::string localName,
             YmKind kind,
             std::optional<std::string> returnTypeSymbol = std::nullopt,
-            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt);
+            std::optional<std::string> assignerTypeSymbol = std::nullopt,
+            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt,
+            bool skipLocalNameLegalityCheck = false);
         // Fails if name conflict arises.
         // Invalidates type pointers.
         std::optional<YmTypeIndex> addType(
@@ -140,7 +156,9 @@ namespace _ym {
             std::string memberName,
             YmKind kind,
             std::optional<std::string> returnTypeSymbol = std::nullopt,
-            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt);
+            std::optional<std::string> assignerTypeSymbol = std::nullopt,
+            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt,
+            bool skipLocalNameLegalityCheck = false);
 
         std::optional<YmTypeParamIndex> addTypeParam(
             std::string typeName,
@@ -149,7 +167,8 @@ namespace _ym {
         std::optional<YmParamIndex> addParam(
             std::string typeName,
             std::string name,
-            std::string paramTypeSymbol);
+            std::string paramTypeSymbol,
+            bool skipCallabilityAndOtherRelatedCheck = false);
         void beginNamedParams(
             const std::string& typeName);
         std::optional<YmRef> addRef(
@@ -163,7 +182,9 @@ namespace _ym {
 
 
         _ym::TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
+        bool _checkNameLegality(const std::string& name, std::string_view msg);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
+        bool _checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg);
     };
 }
 

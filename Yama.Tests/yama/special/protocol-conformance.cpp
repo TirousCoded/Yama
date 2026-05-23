@@ -15,20 +15,21 @@
 
 
 TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
-    auto STRUCT1_index = ymParcelDef_AddStruct(p_def, "STRUCT1");
-    auto STRUCT2_index = ymParcelDef_AddStruct(p_def, "STRUCT2");
+    ymParcelDef_AddStruct(p_def, "STRUCT1");
+    ymParcelDef_AddStruct(p_def, "STRUCT2");
     
-    auto FN1_index = ymParcelDef_AddFn(p_def, "FN1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
-    auto FN2_index = ymParcelDef_AddFn(p_def, "FN2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "FN1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "FN2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddParam(p_def, "FN2", "param", "p:STRUCT1");
 
-    auto METHOD1_index = ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
-    auto METHOD2_index = ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddParam(p_def, "METHOD2", "param", "p:STRUCT1");
+    ymParcelDef_AddStoredProperty(p_def, "STRUCT1", "PROPERTY1", "p:STRUCT1");
 
     ymParcelDef_AddProtocol(p_def, "Any"); // Our empty protocol top type.
     
@@ -39,6 +40,8 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     auto FN2 = load(ctx, "p:FN2");
     auto METHOD1 = load(ctx, "p:STRUCT1::METHOD1");
     auto METHOD2 = load(ctx, "p:STRUCT1::METHOD2");
+    auto PROPERTY1 = load(ctx, "p:STRUCT1::PROPERTY1");
+    auto PROPERTY1_assigner = load(ctx, "p:STRUCT1::PROPERTY1$assigner");
     auto Any = load(ctx, "p:Any");
 
     success(STRUCT1, Any);
@@ -47,6 +50,8 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     failure(FN2, Any);
     failure(METHOD1, Any);
     failure(METHOD2, Any);
+    failure(PROPERTY1, Any);
+    failure(PROPERTY1_assigner, Any);
 }
 
 TEST(ProtocolConformance, NonEmptyProtocol) {
@@ -96,28 +101,31 @@ TEST(ProtocolConformance, NonEmptyProtocol) {
 //       correctly for ALL kinds.
 
 TEST(ProtocolConformance, AllKindsGenerallyFailAsExpected) {
-    static_assert(YmKind_Num == 4);
+    static_assert(YmKind_Num == 6);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     ymParcelDef_AddStruct(p_def, "None");
 
-    auto STRUCT_index = ymParcelDef_AddStruct(p_def, "STRUCT");
-    auto FN_index = ymParcelDef_AddFn(p_def, "FN", "p:STRUCT", ymInertCallBhvrFn, nullptr);
-    auto METHOD_index = ymParcelDef_AddMethod(p_def, "STRUCT", "METHOD", "p:STRUCT", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "STRUCT");
+    ymParcelDef_AddFn(p_def, "FN", "p:STRUCT", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "STRUCT", "METHOD", "p:STRUCT", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredProperty(p_def, "STRUCT", "PROPERTY", "p:STRUCT");
 
-    auto P_index = ymParcelDef_AddProtocol(p_def, "P"); // The above should all fail to conform to P.
+    ymParcelDef_AddProtocol(p_def, "P"); // The above should all fail to conform to P.
     ymParcelDef_AddMethodReq(p_def, "P", "m", "p:None");
 
     ymDm_BindParcelDef(dm, "p", p_def);
     auto STRUCT = load(ctx, "p:STRUCT");
     auto FN = load(ctx, "p:FN");
     auto METHOD = load(ctx, "p:STRUCT::METHOD");
+    auto PROPERTY = load(ctx, "p:STRUCT::PROPERTY");
     auto P = load(ctx, "p:P");
 
     failure(STRUCT, P);
     failure(FN, P);
     failure(METHOD, P);
+    failure(PROPERTY, P);
 }
 
 TEST(ProtocolConformance, MustHaveAllMethodsNamed) {
