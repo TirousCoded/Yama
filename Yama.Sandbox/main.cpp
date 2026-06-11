@@ -14,15 +14,14 @@ int32_t main(int32_t argc, char** argv) {
     auto ctx = ym::Context(dm);
 
     ym::ParcelDef p_def{};
-    (void)p_def.addFn(
+    p_def.addFn(
         "identity",
         "$T",
         { { "v", "$T" } },
         {},
-        ymInertCallBhvrFn)
-        .value();
+        ymInertCallBhvrFn);
     (void)p_def.addTypeParam("identity", "T", "yama:Any").value();
-    (void)p_def.addFn(
+    p_def.addFn(
         "recurse",
         "yama:None",
         { { "level", "yama:UInt" } },
@@ -34,11 +33,11 @@ int32_t main(int32_t argc, char** argv) {
             ym::println("recurse({})\n{}", n, ctx.callStack());
             if (n > 1) {
                 ctx.pushUInt(n - 1);
-                ctx.calld(ctx.ref(0).value(), 1);
+                ctx.calld(ctx.ref(0).value(), 1, "");
             }
             ctx.disown();
-        }).value();
-    auto printT_ind = p_def.addFn(
+        });
+    p_def.addFn(
         "printT",
         "yama:None",
         { { "x", "$T" } },
@@ -55,16 +54,16 @@ int32_t main(int32_t argc, char** argv) {
             else if (T == ctx.ldRune())     ym::println("yama:Rune {}", ym::fmt(x.toRune().value()));
             else if (T == ctx.ldType())     ym::println("yama:Type {}", x.toType().value());
             else                            ym::println("{} n/a", (std::string)T.fullname());
-        }).value();
+        });
     (void)p_def.addTypeParam("printT", "T", "yama:Any").value();
 
     ym::ParcelDef a_def{};
-    (void)a_def.addStruct("A").value();
-    (void)a_def.addMethod("A", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
-    (void)a_def.addStruct("B").value();
-    (void)a_def.addMethod("B", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn).value();
-    (void)a_def.addProtocol("Hash").value();
-    (void)a_def.addMethodReq("Hash", "hash", "yama:UInt", {}).value();
+    a_def.addStruct("A");
+    a_def.addMethod("A", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn);
+    a_def.addStruct("B");
+    a_def.addMethod("B", "hash", "yama:UInt", {}, {}, ymInertCallBhvrFn);
+    a_def.addProtocol("Hash");
+    a_def.addMethodReq("Hash", "hash", "yama:UInt", {});
 
     dm.bind("p", p_def);
     dm.bind("a", a_def);
@@ -95,7 +94,7 @@ int32_t main(int32_t argc, char** argv) {
         });
 
     ctx.pushUInt(10);
-    ctx.calld(ctx.load("p:recurse").value(), 1);
+    ctx.calld(ctx.load("p:recurse").value(), 1, "");
 
     ctx.pushNone();
     ctx.pushInt(-11);
@@ -104,13 +103,13 @@ int32_t main(int32_t argc, char** argv) {
     ctx.pushBool(true);
     ctx.pushRune(U'y');
     ctx.pushType(ctx.ldBool());
-    ctx.calld(ctx.load("p:printT[yama:Type]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:Rune]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:Bool]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:Float]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:UInt]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:Int]").value(), 1);
-    ctx.calld(ctx.load("p:printT[yama:None]").value(), 1);
+    ctx.calld(ctx.load("p:printT[yama:Type]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:Rune]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:Bool]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:Float]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:UInt]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:Int]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:None]").value(), 1, "");
 
     (void)ctx.load("p:printT[p:printT[yama:Int]]");
 

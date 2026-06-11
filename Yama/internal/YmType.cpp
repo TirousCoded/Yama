@@ -13,6 +13,10 @@
 #endif
 
 
+YmKind YmType::kind() const noexcept {
+    return info->kind();
+}
+
 const _ym::Spec& YmType::path() const noexcept {
     return parcel->path;
 }
@@ -22,20 +26,170 @@ const _ym::Spec& YmType::fullname() const noexcept {
 }
 
 const std::string& YmType::localName() const noexcept {
-    return info->localName;
+    return info->localName();
+}
+
+bool YmType::isRegular() const noexcept {
+    return info->isRegular();
+}
+
+bool YmType::isIrregular() const noexcept {
+    return info->isIrregular();
+}
+
+bool YmType::isPrimitive() const noexcept {
+    return info->isPrimitive();
+}
+
+bool YmType::isGetter() const noexcept {
+    return info->isGetter();
+}
+
+bool YmType::isSetter() const noexcept {
+    return info->isSetter();
+}
+
+bool YmType::isVarLike() const noexcept {
+    return info->isVarLike();
+}
+
+bool YmType::isProtocolReq() const noexcept {
+    return info->isProtocolReq();
+}
+
+bool YmType::hasCallSig() const noexcept {
+    return info->hasCallSig();
+}
+
+bool YmType::isOwner() const noexcept {
+    return info->isOwner();
+}
+
+bool YmType::isMember() const noexcept {
+    return info->isMember();
+}
+
+bool YmType::canHaveMembers() const noexcept {
+    return info->canHaveMembers();
+}
+
+bool YmType::hasDefaultValue() const noexcept {
+    return info->hasDefaultValue();
+}
+
+bool YmType::isStruct() const noexcept {
+    return info->isStruct();
+}
+
+bool YmType::isProtocol() const noexcept {
+    return info->isProtocol();
+}
+
+bool YmType::isFn() const noexcept {
+    return info->isFn();
+}
+
+bool YmType::isMethod() const noexcept {
+    return info->isMethod();
+}
+
+bool YmType::isProperty() const noexcept {
+    return info->isProperty();
+}
+
+bool YmType::isPropertyAssigner() const noexcept {
+    return info->isPropertyAssigner();
+}
+
+bool YmType::isRegularStruct() const noexcept {
+    return info->isRegularStruct();
+}
+
+bool YmType::isRegularProtocol() const noexcept {
+    return info->isRegularProtocol();
+}
+
+bool YmType::isRegularFn() const noexcept {
+    return info->isRegularFn();
+}
+
+bool YmType::isRegularMethod() const noexcept {
+    return info->isRegularMethod();
+}
+
+bool YmType::isRegularProperty() const noexcept {
+    return info->isRegularProperty();
+}
+
+bool YmType::isRegularPropertyAssigner() const noexcept {
+    return info->isRegularPropertyAssigner();
+}
+
+bool YmType::isNone() const noexcept {
+    return info->isNone();
+}
+
+bool YmType::isInt() const noexcept {
+    return info->isInt();
+}
+
+bool YmType::isUInt() const noexcept {
+    return info->isUInt();
+}
+
+bool YmType::isFloat() const noexcept {
+    return info->isFloat();
+}
+
+bool YmType::isBool() const noexcept {
+    return info->isBool();
+}
+
+bool YmType::isRune() const noexcept {
+    return info->isRune();
+}
+
+bool YmType::isType() const noexcept {
+    return info->isType();
+}
+
+bool YmType::isMethodReq() const noexcept {
+    return info->isMethodReq();
+}
+
+bool YmType::isStoredPropertyGet() const noexcept {
+    return info->isStoredPropertyGet();
+}
+
+bool YmType::isStoredPropertySet() const noexcept {
+    return info->isStoredPropertySet();
+}
+
+bool YmType::isCallable() const noexcept {
+    return
+        info->hasCallSig() &&
+        (isMethodReq() ? isObjMethod() : true);
+}
+
+bool YmType::isTypeMethod() const noexcept {
+    return owner() && !hasSelfParam();
+}
+
+bool YmType::isObjMethod() const noexcept {
+    return owner() && hasSelfParam();
 }
 
 std::optional<std::string> YmType::callsuff() const {
-    if (!ymKind_IsCallable(kind())) {
+    if (!info->hasCallSig()) {
         return std::nullopt;
     }
     std::string result{};
     result += "(";
-    for (YmParams i = 0; i < positionalParamCount(); i++) {
+    for (YmParams i = 0; i < positionalParams(); i++) {
         if (i >= 1) {
             result += ", ";
         }
-        result += paramType(i)->fullname().string();
+        result += param(i)->type().fullname().string();
     }
     result += ") -> ";
     result += returnType()->fullname().string();
@@ -67,15 +221,15 @@ bool YmType::checkCallSuff(std::optional<std::string_view> callsuff) const {
 
 YmType* YmType::owner() noexcept {
     return
-        ymKind_IsMember(kind())
-        ? constAs<_ym::ConstType::Ref>(info->owner.value()).get()
+        isMember()
+        ? constAsRef(info->ownerConst().value()).get()
         : nullptr;
 }
 
 const YmType* YmType::owner() const noexcept {
     return
-        ymKind_IsMember(kind())
-        ? constAs<_ym::ConstType::Ref>(info->owner.value()).get()
+        isMember()
+        ? constAsRef(info->ownerConst().value()).get()
         : nullptr;
 }
 
@@ -89,157 +243,63 @@ ym::Safe<const YmType> YmType::self() const noexcept {
     return ym::Safe(found ? found : this);
 }
 
-YmMembers YmType::members() const noexcept {
-    return info->memberCount();
-}
-
-YmType* YmType::member(YmMemberIndex member) const noexcept {
-    return
-        member < members()
-        ? constAs<_ym::ConstType::Ref>(info->membersByIndex[member]).get()
-        : nullptr;
-}
-
-YmType* YmType::member(const std::string& name) const noexcept {
-    auto it = info->membersByName.find(name);
-    return
-        it != info->membersByName.end()
-        ? constAs<_ym::ConstType::Ref>(it->second).get()
-        : nullptr;
-}
-
 YmTypeParams YmType::typeParams() const noexcept {
-    return self()->info->typeParamCount();
+    // Can't forget the 'self()->' part!
+    return self()->info->typeParams();
 }
 
-YmType* YmType::typeParam(YmTypeParamIndex index) const noexcept {
-    return
-        index < typeParams()
-        ? self()->typeArgs[size_t(index)].get()
-        : nullptr;
+std::optional<YmType::TypeParam> YmType::typeParam(YmTypeParamIndex index) const noexcept {
+    // Can't forget the 'self()->' part!
+    return _mkHelper<TypeParam>(self()->info->typeParam(index));
 }
 
-YmType* YmType::typeParam(const std::string& name) const noexcept {
-    if (auto found = self()->info->queryTypeParam(name)) {
-        return self()->typeArgs[size_t(found->index)];
-    }
-    return nullptr;
+std::optional<YmType::TypeParam> YmType::typeParam(const std::string& name) const noexcept {
+    // Can't forget the 'self()->' part!
+    return _mkHelper<TypeParam>(self()->info->typeParam(name));
 }
 
-YmType* YmType::typeParamConstraint(YmTypeParamIndex index) const noexcept {
-    return
-        index < typeParams()
-        ? self()->constAsRef(self()->info->typeParams[size_t(index)]->constraint).get()
-        : nullptr;
+YmMembers YmType::members() const noexcept {
+    return info->members();
 }
 
-YmType* YmType::typeParamConstraint(const std::string& name) const noexcept {
-    if (auto found = self()->info->queryTypeParam(name)) {
-        return self()->constAsRef(self()->info->typeParams[size_t(found->index)]->constraint);
-    }
-    return nullptr;
+std::optional<YmType::Member> YmType::member(YmMemberIndex index) const noexcept {
+    return _mkHelper<Member>(info->member(index));
 }
 
-YmParams YmType::paramCount() const noexcept {
-    return info->paramCount();
-}
-
-YmParams YmType::positionalParamCount() const noexcept {
-    return info->positionalParamCount();
-}
-
-YmParams YmType::namedParamCount() const noexcept {
-    return info->namedParamCount();
-}
-
-bool YmType::isPositionalParam(YmParamIndex index) const noexcept {
-    return info->isPositionalParam(index);
-}
-
-bool YmType::isNamedParam(YmParamIndex index) const noexcept {
-    return info->isNamedParam(index);
+std::optional<YmType::Member> YmType::member(const std::string& name) const noexcept {
+    return _mkHelper<Member>(info->member(name));
 }
 
 YmType* YmType::returnType() const noexcept {
-    return
-        info->returnType
-        ? constAs<_ym::ConstType::Ref>(*info->returnType).get()
-        : nullptr;
+    return constAsRef(info->returnTypeConst());
 }
 
-const YmChar* YmType::paramName(YmParamIndex index) const {
-    if (auto p = info->queryParam(index)) {
-        return p->name.c_str();
-    }
-    _ym::Global::raiseErr(
-        YmErrCode_ParamNotFound,
-        "Cannot query parameter name; type {}; no parameter found at index {}!",
-        fullname(),
-        index);
-    return nullptr;
+YmParams YmType::params() const noexcept {
+    return info->params();
 }
 
-YmType* YmType::paramType(YmParamIndex index) const {
-    if (auto p = info->queryParam(index)) {
-        return constAs<_ym::ConstType::Ref>(p->type);
-    }
-    _ym::Global::raiseErr(
-        YmErrCode_ParamNotFound,
-        "Cannot query parameter type; type {}; no parameter found at index {}!",
-        fullname(),
-        index);
-    return nullptr;
+YmParams YmType::positionalParams() const noexcept {
+    return info->positionalParams();
 }
 
-std::optional<YmParamCategory> YmType::paramCategory(YmParamIndex index) const noexcept {
-    if (isPositionalParam(index))   return YmParamCategory_Positional;
-    else if (isNamedParam(index))   return YmParamCategory_Named;
-    _ym::Global::raiseErr(
-        YmErrCode_ParamNotFound,
-        "Cannot query parameter category; type {}; no parameter found at index {}!",
-        fullname(),
-        index);
-    return std::nullopt;
+YmParams YmType::namedParams() const noexcept {
+    return info->namedParams();
 }
 
-std::optional<YmParamIndex> YmType::paramIndex(const std::string& name) const noexcept {
-    if (auto p = info->queryParam(name)) {
-        return p->index;
-    }
-    return std::nullopt;
+std::optional<YmType::Param> YmType::param(YmParamIndex index) const noexcept {
+    return _mkHelper<Param>(info->param(index));
 }
 
-YmType* YmType::assigner() const noexcept {
-    return
-        info->assigner
-        ? constAsRef(*info->assigner).get()
-        : nullptr;
+std::optional<YmType::Param> YmType::param(const std::string& name) const noexcept {
+    return _mkHelper<Param>(info->param(name));
 }
 
 bool YmType::hasSelfParam() const noexcept {
-    return paramCount() >= 1 && paramType(0) == owner();
+    return positionalParams() >= 1 && param(0)->isSelfParam();
 }
 
-bool YmType::isTypeMethod() const noexcept {
-    return owner() && !hasSelfParam();
-}
-
-bool YmType::isObjMethod() const noexcept {
-    return owner() && hasSelfParam();
-}
-
-bool YmType::isCallable() const noexcept {
-    return
-        ymKind_IsCallable(kind()) == YM_TRUE &&
-        (isMethodReq() ? isObjMethod() : true);
-}
-
-bool YmType::isMethodReq() const noexcept {
-    return info->isMethodReq();
-}
-
-bool YmType::hasDefaultValue() const noexcept {
-    return info->hasDefaultValue();
+YmType* YmType::assigner() const noexcept {
+    return constAsRef(info->assignerConst());
 }
 
 YmType* YmType::ref(YmRef reference) const noexcept {
@@ -264,10 +324,10 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
 #if _DUMP_CONFORMS_LOG
     ym::println("YmType::conforms: {} vs. {}", fullname(), protocol->fullname());
 #endif
-    ymAssert(protocol->kind() == YmKind_Protocol);
-    if (ymKind_IsCallable(kind()) == YM_TRUE) {
+    ymAssert(protocol->isProtocol());
+    if (info->hasCallSig()) {
 #if _DUMP_CONFORMS_LOG
-        ym::println("YmType::conforms:     Failed; {} is a callable type!", fullname());
+        ym::println("YmType::conforms:     Failed; {} is a type with a call signature!", fullname());
 #endif
         return false;
     }
@@ -275,11 +335,11 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
         auto& symOfTypeInPMemb = pMemb.info->consts[constIndOfTypeInPMemb].as<_ym::RefInfo>().sym;
         if (!_ym::specifierHasSelf(symOfTypeInPMemb)) {
             // If symOfTypeInPMemb contains no $Self, then simply compare YmType* values.
-            auto& typeInPMemb = pMemb.constAs<_ym::ConstType::Ref>(constIndOfTypeInPMemb);
+            auto& typeInPMemb = *pMemb.constAsRef(constIndOfTypeInPMemb);
 #if _DUMP_CONFORMS_LOG
             ym::println("YmType::conforms:     {} vs. {}", typeInMatch.fullname(), typeInPMemb->fullname());
 #endif
-            return typeInPMemb == typeInMatch;
+            return typeInPMemb.sameAs(typeInMatch);
         }
         else {
             // If symOfTypeInPMemb contains $Self, then solve ref sym to type in pMemb such that $Self is
@@ -296,17 +356,20 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
     // Check for each member req in protocol.
     for (YmMemberIndex i = 0; i < protocol->members(); i++) {
         auto& pMemb = ym::deref(protocol->member(i));
-        auto pMembName = (std::string)pMemb.info->memberName().value();
 #if _DUMP_CONFORMS_LOG
-        ym::println("YmType::conforms: Matching \"{}\".", pMembName);
+        ym::println("YmType::conforms: Matching \"{}\".", pMemb.info->memberName());
 #endif
         // Check that a matching type can be found for each member req in protocol.
-        if (auto match = member(pMembName)) {
+        if (auto match = member(pMemb.name())) {
 #if _DUMP_CONFORMS_LOG
             ym::println("YmType::conforms: Return Types:");
 #endif
             // Check return types.
-            if (!compare(pMemb, ym::deref(pMemb.info->returnType), *match, ym::deref(match->returnType()))) {
+            if (!compare(
+                pMemb.type(),
+                pMemb.type().info->returnTypeConst().value(),
+                match->type(),
+                ym::deref(match->type().returnType()))) {
                 return false;
             }
 #if _DUMP_CONFORMS_LOG
@@ -314,19 +377,23 @@ bool YmType::conforms(ym::Safe<YmType> protocol) const noexcept {
             ym::println("YmType::conforms: Positional Params:");
 #endif
             // Check positional param counts.
-            if (pMemb.positionalParamCount() != match->positionalParamCount()) {
+            if (pMemb.type().positionalParams() != match->type().positionalParams()) {
                 return false;
             }
-            for (YmParamIndex j = 0; j < match->positionalParamCount(); j++) {
+            for (YmParamIndex j = 0; j < match->type().positionalParams(); j++) {
                 // Check positional param types.
-                if (!compare(pMemb, pMemb.info->params[j].type, *match, ym::deref(match->paramType(j)))) {
+                if (!compare(
+                    pMemb.type(),
+                    pMemb.type().info->param(j)->typeConst,
+                    match->type(),
+                    match->type().param(j)->type())) {
                     return false;
                 }
             }
         }
         else {
 #if _DUMP_CONFORMS_LOG
-            ym::println("YmType::conforms: Match not found!", pMembName);
+            ym::println("YmType::conforms: Match not found!", pMemb.info->memberName());
 #endif
             return false;
         }
@@ -397,6 +464,33 @@ void YmType::_initFullname() {
 
 void YmType::_initFullname(YmType& owner) {
     const auto [_, memberExt] = _ym::split_s<YmChar>(localName(), "::", true);
-    _fullname = _ym::Spec::typeFast(std::format("{}{}", owner.fullname(), memberExt));
+    _fullname = _ym::Spec::typeFast(std::format("{}{}", owner.fullname(), (std::string)memberExt));
+}
+
+const decltype(YmType::typeArgs)& YmType::_getTypeArgs() const noexcept {
+    return (isMember() ? owner() : this)->typeArgs;
+}
+
+YmType& YmType::TypeParam::constraint() const noexcept {
+    return *self->constAsRef(info->constraintConst);
+}
+
+YmType& YmType::TypeParam::arg() const noexcept {
+    return *self->_getTypeArgs()[size_t(index())];
+}
+
+YmType& YmType::Member::type() const noexcept {
+    return *self->constAsRef(info->typeConst);
+}
+
+YmType& YmType::Param::type() const noexcept {
+    return *self->constAsRef(info->typeConst);
+}
+
+bool YmType::Param::isSelfParam() const noexcept {
+    return
+        index() == 0 &&
+        isPositional() &&
+        type().sameAs(self->owner());
 }
 

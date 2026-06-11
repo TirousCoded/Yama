@@ -6,6 +6,7 @@
 #include <yama++/print.h>
 
 #include "../utils/utils.h"
+#include "../utils/CtxState.h"
 
 
 TEST(Contexts, CreateAndDestroy) {
@@ -155,13 +156,13 @@ static ErrCounter& getErr() noexcept {
 }
 
 static void objsys_test(
-    std::function<void(YmParcelDef* parceldef, YmTypeIndex f_ind)> setup,
+    std::function<void(YmParcelDef* parceldef)> setup,
     std::function<void(YmCtx* ctx, bool called_in_fn_body)> body) {
     SETUP_ERRCOUNTER;
     SETUP_DM;
     SETUP_PARCELDEF(p_def);
     _err = &err;
-    auto f_ind = ymParcelDef_AddFn(
+    ymParcelDef_AddFn(
         p_def, "f", "yama:None",
         [](YmCtx* ctx, void* body_ptr) {
             auto& _body = *(decltype(body)*)body_ptr;
@@ -179,7 +180,7 @@ static void objsys_test(
     ymParcelDef_AddParam(p_def, "f", "y", "yama:Float");
 
     ym::println("-- setup");
-    setup(p_def, f_ind);
+    setup(p_def);
 
     ymDm_BindParcelDef(dm, "p", p_def);
     {
@@ -206,7 +207,7 @@ static void objsys_test(
 static void objsys_test(
     std::function<void(YmCtx* ctx, bool called_in_fn_body)> body) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {},
+        [](YmParcelDef* parceldef) {},
         body);
 }
 
@@ -556,11 +557,11 @@ TEST(Contexts, SetArg_FailsQuietly_InUserCallFrame) {
 
 TEST(Contexts, Ref) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             EXPECT_EQ(ymParcelDef_AddRef(parceldef, "f", "p:A"), 0);
             EXPECT_EQ(ymParcelDef_AddRef(parceldef, "f", "yama:Float"), 1);
             EXPECT_EQ(ymParcelDef_AddRef(parceldef, "f", "p:A"), 2);
-            EXPECT_NE(ymParcelDef_AddStruct(parceldef, "A"), YM_NO_TYPE_INDEX);
+            EXPECT_EQ(ymParcelDef_AddStruct(parceldef, "A"), YM_TRUE);
         },
         [](YmCtx* ctx, bool called_in_fn_body) {
             if (called_in_fn_body) {
@@ -1106,29 +1107,28 @@ TEST(Contexts, DefaultInit) {
     // NOTE: Don't forget to update DefaultInit_Fail_NoDefaultValue too.
     // NOTE: Also, update the YM_DISCARD tests too.
     auto setupfn =
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
         // Empty Struct
-        auto Struct0_ind = ymParcelDef_AddStruct(parceldef,
+        EXPECT_EQ(ymParcelDef_AddStruct(parceldef,
             "Struct0"
-        );
-        EXPECT_NE(Struct0_ind, YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
 
         // Method (of Struct0)
-        EXPECT_NE(ymParcelDef_AddMethod(parceldef,
+        EXPECT_EQ(ymParcelDef_AddMethod(parceldef,
             "Struct0",
             "m",
             "yama:None",
             ymInertCallBhvrFn,
             nullptr
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
 
         // Fn
-        EXPECT_NE(ymParcelDef_AddFn(parceldef,
+        EXPECT_EQ(ymParcelDef_AddFn(parceldef,
             "Fn0",
             "yama:None",
             ymInertCallBhvrFn,
             nullptr
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
         };
     objsys_test(
         setupfn,
@@ -1245,38 +1245,38 @@ TEST(Contexts, DefaultInit_Fail_LocalNotFound) {
 
 TEST(Contexts, DefaultInit_Fail_NoDefaultValue) {
     auto setupfn =
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
         // Empty Struct
-        EXPECT_NE(ymParcelDef_AddStruct(parceldef, "Struct0"), YM_NO_TYPE_INDEX);
+        EXPECT_EQ(ymParcelDef_AddStruct(parceldef, "Struct0"), YM_TRUE);
 
         // Method (of Struct0)
-        EXPECT_NE(ymParcelDef_AddMethod(parceldef,
+        EXPECT_EQ(ymParcelDef_AddMethod(parceldef,
             "Struct0",
             "m",
             "yama:None",
             ymInertCallBhvrFn,
             nullptr
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
 
         // Property (& Assigner) (of Struct0)
-        EXPECT_NE(ymParcelDef_AddStoredProperty(parceldef,
+        EXPECT_EQ(ymParcelDef_AddStoredProperty(parceldef,
             "Struct0",
             "abc",
             "yama:None"
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
 
         // Empty Protocol
-        EXPECT_NE(ymParcelDef_AddProtocol(parceldef,
+        EXPECT_EQ(ymParcelDef_AddProtocol(parceldef,
             "Protocol0"
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
 
         // Fn
-        EXPECT_NE(ymParcelDef_AddFn(parceldef,
+        EXPECT_EQ(ymParcelDef_AddFn(parceldef,
             "Fn0",
             "yama:None",
             ymInertCallBhvrFn,
             nullptr
-        ), YM_NO_TYPE_INDEX);
+        ), YM_TRUE);
         };
     objsys_test(
         setupfn,
@@ -1298,7 +1298,7 @@ TEST(Contexts, DefaultInit_Fail_NoDefaultValue) {
 
 TEST(Contexts, ExplicitInit_EmptyStruct) {
     auto setup =
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
         ymParcelDef_AddStruct(parceldef, "A");
         ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
             ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
@@ -1354,7 +1354,7 @@ TEST(Contexts, ExplicitInit_EmptyStruct) {
 
 TEST(Contexts, ExplicitInit_NonEmptyStruct) {
     auto setup =
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
         ymParcelDef_AddStruct(parceldef, "A");
         ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
         ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1484,7 +1484,7 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
 
 TEST(Contexts, ExplicitInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1519,7 +1519,7 @@ TEST(Contexts, ExplicitInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
 
 TEST(Contexts, ExplicitInit_Fail_NonStructType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(parceldef, "g", "yama:None", ymInertCallBhvrFn, nullptr);
         },
         [](YmCtx* ctx, bool called_in_fn_body) {
@@ -1535,7 +1535,7 @@ TEST(Contexts, ExplicitInit_Fail_NonStructType) {
 
 TEST(Contexts, ExplicitInit_Fail_IllegalNameList_DoesntSpecifyEveryStoredPropertyOfType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1554,22 +1554,24 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_DoesntSpecifyEveryStoredPropert
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
             //ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            CtxState initial(*ctx);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+            EXPECT_TRUE(initial.expect(*ctx));
 
-            ASSERT_EQ(ymCtx_Locals(ctx), 2);
-            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
-            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
-
-            //EXPECT_EQ(ymObj_RefCount(aa), 1);
-            EXPECT_EQ(ymObj_RefCount(bb), 2);
-            EXPECT_EQ(ymObj_RefCount(cc), 2);
+            //ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            //EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            //EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
+            //
+            ////EXPECT_EQ(ymObj_RefCount(aa), 1);
+            //EXPECT_EQ(ymObj_RefCount(bb), 2);
+            //EXPECT_EQ(ymObj_RefCount(cc), 2);
         });
 }
 
 TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesAPropertyMoreThanOnce) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1589,24 +1591,26 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesAPropertyMoreThanOnce)
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            CtxState initial(*ctx);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+            EXPECT_TRUE(initial.expect(*ctx));
 
-            ASSERT_EQ(ymCtx_Locals(ctx), 4);
-            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
-            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
-            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
-            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), bb);
-
-            EXPECT_EQ(ymObj_RefCount(aa), 2);
-            EXPECT_EQ(ymObj_RefCount(bb), 3);
-            EXPECT_EQ(ymObj_RefCount(cc), 2);
+            //ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            //EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            //EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            //EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            //EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), bb);
+            //
+            //EXPECT_EQ(ymObj_RefCount(aa), 2);
+            //EXPECT_EQ(ymObj_RefCount(bb), 3);
+            //EXPECT_EQ(ymObj_RefCount(cc), 2);
         });
 }
 
 TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAStoredProperty) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1625,23 +1629,25 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAS
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            CtxState initial(*ctx);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,missing,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+            EXPECT_TRUE(initial.expect(*ctx));
 
-            ASSERT_EQ(ymCtx_Locals(ctx), 3);
-            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
-            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
-            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
-
-            EXPECT_EQ(ymObj_RefCount(aa), 2);
-            EXPECT_EQ(ymObj_RefCount(bb), 2);
-            EXPECT_EQ(ymObj_RefCount(cc), 2);
+            //ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            //EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            //EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            //EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            //
+            //EXPECT_EQ(ymObj_RefCount(aa), 2);
+            //EXPECT_EQ(ymObj_RefCount(bb), 2);
+            //EXPECT_EQ(ymObj_RefCount(cc), 2);
         });
 }
 
 TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAStoredProperty_NamesComputedProperty) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1660,23 +1666,25 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAS
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            CtxState initial(*ctx);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,abc,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
+            EXPECT_TRUE(initial.expect(*ctx));
 
-            ASSERT_EQ(ymCtx_Locals(ctx), 3);
-            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
-            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
-            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
-
-            EXPECT_EQ(ymObj_RefCount(aa), 2);
-            EXPECT_EQ(ymObj_RefCount(bb), 2);
-            EXPECT_EQ(ymObj_RefCount(cc), 2);
+            //ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            //EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            //EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            //EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            //
+            //EXPECT_EQ(ymObj_RefCount(aa), 2);
+            //EXPECT_EQ(ymObj_RefCount(bb), 2);
+            //EXPECT_EQ(ymObj_RefCount(cc), 2);
         });
 }
 
 TEST(Contexts, ExplicitInit_Fail_LocalNotFound_ArgObjsNeededExceedsObjStkHeight) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1710,7 +1718,7 @@ TEST(Contexts, ExplicitInit_Fail_LocalNotFound_ArgObjsNeededExceedsObjStkHeight)
 
 TEST(Contexts, ExplicitInit_Fail_TypeMismatch_ArgObjsAreTheWrongTypes) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -1745,7 +1753,7 @@ TEST(Contexts, ExplicitInit_Fail_TypeMismatch_ArgObjsAreTheWrongTypes) {
 
 TEST(Contexts, Call_WithReturnValuePuttingPushingAndDiscard) {
     auto setupfn =
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
         ymParcelDef_AddFn(
             parceldef,
             "g",
@@ -1831,7 +1839,7 @@ namespace {
 }
 
 TEST(Contexts, Call_WithNamedArgs) {
-    auto setup = [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+    auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddFn(parceldef, "g", "yama:Int",
             [](YmCtx* ctx, void*) {
                 observedCalls++;
@@ -2149,23 +2157,23 @@ TEST(Contexts, Call_WithNamedArgs) {
 
 TEST(Contexts, Call_WithDiffKindsOfCallableTypes) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
-            EXPECT_NE(ymParcelDef_AddFn(parceldef, "g", "yama:Int",
+        [](YmParcelDef* parceldef) {
+            EXPECT_EQ(ymParcelDef_AddFn(parceldef, "g", "yama:Int",
                 [](YmCtx* ctx, void*) {
                     ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 21), YM_TAKE);
                     observedCalls++;
                 },
                 nullptr),
-                YM_NO_TYPE_INDEX);
-            auto A_ind = ymParcelDef_AddStruct(parceldef, "A");
-            EXPECT_NE(A_ind, YM_NO_TYPE_INDEX);
-            EXPECT_NE(ymParcelDef_AddMethod(parceldef, "A", "m", "yama:Int",
+                YM_TRUE);
+            EXPECT_EQ(ymParcelDef_AddStruct(parceldef, "A"),
+                YM_TRUE);
+            EXPECT_EQ(ymParcelDef_AddMethod(parceldef, "A", "m", "yama:Int",
                 [](YmCtx* ctx, void*) {
                     ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 13), YM_TAKE);
                     observedCalls++;
                 },
                 nullptr),
-                YM_NO_TYPE_INDEX);
+                YM_TRUE);
         },
         [](YmCtx* ctx, bool called_in_fn_body) {
             auto g = ymCtx_Load(ctx, "p:g");
@@ -2190,7 +2198,7 @@ TEST(Contexts, Call_WithDiffKindsOfCallableTypes) {
 
 TEST(Contexts, Call_MultipleLevelsOfCalls) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2222,7 +2230,7 @@ TEST(Contexts, Call_MultipleLevelsOfCalls) {
 
 TEST(Contexts, Call_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2278,7 +2286,7 @@ TEST(Contexts, Call_Fail_NonCallableType_FnIsNonCallable) {
 
 TEST(Contexts, Call_Fail_LocalNotFound_ArgsExceedsLocalObjectStackHeight) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2310,7 +2318,7 @@ TEST(Contexts, Call_Fail_LocalNotFound_ArgsExceedsLocalObjectStackHeight) {
 
 TEST(Contexts, Call_Fail_CallProcedureError_TooManyPositionalArgs) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2348,7 +2356,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooManyPositionalArgs) {
 
 TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2380,7 +2388,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs) {
 
 TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs_DueToNamedArgs) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2423,7 +2431,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs_DueToNamedArgs)
 
 TEST(Contexts, Call_Fail_IllegalNameList_ArgNameIdentifierMultipleTimes) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2468,7 +2476,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameIdentifierMultipleTimes) {
 
 TEST(Contexts, Call_Fail_IllegalNameList_ArgNameUnknownIdentifier) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2513,7 +2521,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameUnknownIdentifier) {
 
 TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2558,7 +2566,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
 
 TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2594,7 +2602,7 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
 
 TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2631,7 +2639,7 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
 
 TEST(Contexts, Call_Fail_CallProcedureError_NoReturnValueObjectBound) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2671,7 +2679,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_NoReturnValueObjectBound) {
 
 TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2712,7 +2720,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongType) {
 
 TEST(Contexts, Call_Fail_CallStackOverflow) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2747,7 +2755,7 @@ TEST(Contexts, Call_Fail_CallStackOverflow) {
 
 TEST(Contexts, Ret_Borrow) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2776,7 +2784,7 @@ TEST(Contexts, Ret_Borrow) {
 
 TEST(Contexts, Ret_Take) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2806,7 +2814,7 @@ TEST(Contexts, Ret_Take) {
 
 TEST(Contexts, Ret_TakeIfOk) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2836,7 +2844,7 @@ TEST(Contexts, Ret_TakeIfOk) {
 
 TEST(Contexts, Ret_Overwrite) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2912,7 +2920,7 @@ TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
 
 TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2934,7 +2942,7 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
             EXPECT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_FALSE);
         });
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
                 parceldef,
                 "g",
@@ -2967,7 +2975,7 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
 }
 
 TEST(Contexts, GetProperty_StoredProperty) {
-    auto setup = [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+    auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddStruct(parceldef, "A");
         ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
         ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -3126,7 +3134,7 @@ namespace {
 }
 
 TEST(Contexts, GetProperty_ComputedProperty) {
-    auto setup = [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+    auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddStruct(parceldef, "A");
         ymParcelDef_AddReadOnlyComputedProperty(parceldef, "A", "a", "yama:Int",
             [](YmCtx* ctx, void*) {
@@ -3254,7 +3262,7 @@ TEST(Contexts, GetProperty_ComputedProperty) {
 
 TEST(Contexts, GetProperty_Fail_LocalNotFound_WhereIsOutOfBounds) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -3290,7 +3298,7 @@ TEST(Contexts, GetProperty_Fail_NonPropertyType) {
 
 TEST(Contexts, GetProperty_Fail_LocalNotFound_ObjStkIsEmpty) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -3309,7 +3317,7 @@ TEST(Contexts, GetProperty_Fail_LocalNotFound_ObjStkIsEmpty) {
 
 TEST(Contexts, GetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -3332,7 +3340,7 @@ TEST(Contexts, GetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
 
 TEST(Contexts, GetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddReadOnlyComputedProperty(
                 parceldef,
@@ -3372,7 +3380,7 @@ TEST(Contexts, GetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForC
 
 TEST(Contexts, GetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddReadOnlyComputedProperty(
                 parceldef,
@@ -3412,7 +3420,7 @@ TEST(Contexts, GetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForCom
 
 TEST(Contexts, GetProperty_Fail_CallStackOverflow_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddReadOnlyComputedProperty(
                 parceldef,
@@ -3474,7 +3482,7 @@ TEST(Contexts, GetProperty_Fail_CallStackOverflow_ForComputedProperties) {
 
 TEST(Contexts, SetProperty_StoredProperty) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
             ymParcelDef_AddStoredProperty(parceldef, "A", "b", "yama:Float");
@@ -3523,7 +3531,7 @@ namespace {
 
 TEST(Contexts, SetProperty_ComputedProperty) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddComputedProperty(parceldef, "A", "a", "yama:Int",
                 [](YmCtx* ctx, void*) {
@@ -3565,7 +3573,7 @@ TEST(Contexts, SetProperty_Fail_NonPropertyType) {
 
 TEST(Contexts, SetProperty_Fail_ReadOnlyPropertyType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "a", "yama:Int");
         },
@@ -3599,7 +3607,7 @@ TEST(Contexts, SetProperty_Fail_ReadOnlyPropertyType) {
 
 TEST(Contexts, SetProperty_Fail_LocalNotFound_ObjStkHasFewerThanTwoObjs) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
         },
@@ -3620,7 +3628,7 @@ TEST(Contexts, SetProperty_Fail_LocalNotFound_ObjStkHasFewerThanTwoObjs) {
 
 TEST(Contexts, SetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
         },
@@ -3641,7 +3649,7 @@ TEST(Contexts, SetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
 
 TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongType) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
         },
@@ -3663,7 +3671,7 @@ TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongType) {
 
 TEST(Contexts, SetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddComputedProperty(
                 parceldef,
@@ -3713,7 +3721,7 @@ TEST(Contexts, SetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForC
 
 TEST(Contexts, SetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddComputedProperty(
                 parceldef,
@@ -3763,7 +3771,7 @@ TEST(Contexts, SetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForCom
 
 TEST(Contexts, SetProperty_Fail_CallStackOverflow_ForComputedProperties) {
     objsys_test(
-        [](YmParcelDef* parceldef, YmTypeIndex f_ind) {
+        [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
             ymParcelDef_AddComputedProperty(
                 parceldef,

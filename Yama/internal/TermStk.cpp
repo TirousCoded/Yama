@@ -329,8 +329,8 @@ void _ym::TermStk::typeParam(const std::string& id) {
             _errPrefix(),
             id);
     }
-    else if (auto arg = _env()->self->typeParam(id)) {
-        push(Term(ym::Safe(arg)));
+    else if (auto tparam = _env()->self->typeParam(id)) {
+        push(Term(tparam->arg()));
     }
     else {
         operErr(
@@ -417,7 +417,7 @@ void _ym::TermStk::member(const std::string& id) {
             id);
     }
     else {
-        transact(1, Term(ym::Safe(ym::deref(t.concrete()).member(id))));
+        transact(1, Term(ym::deref(t.concrete()).member(id).value().type()));
     }
 }
 
@@ -487,7 +487,7 @@ void _ym::TermStk::endArgs() {
     }
     bool badArgs = false;
     for (size_t i = 0; i < args.size(); i++) {
-        auto& typeParamName = ym::deref(generic.info()).typeParams[i]->name;
+        auto& typeParamName = ym::deref(generic.info()).typeParam(i)->name;
         auto& arg = args[i];
         if (arg.isPath()) {
             badArgs = true;

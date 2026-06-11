@@ -13,7 +13,11 @@
 #endif
 
 
-_ym::SpecSolver::SpecSolver(YmParcel* here, YmType* typeParamsCtx, YmType* self, RedirectSet* redirects) noexcept :
+_ym::SpecSolver::SpecSolver(
+    YmParcel* here,
+    YmType* typeParamsCtx,
+    YmType* self,
+    RedirectSet* redirects) noexcept :
     _here(here),
     _typeParamCtx(typeParamsCtx),
     _self(self),
@@ -227,7 +231,15 @@ void _ym::SpecSolver::rootId(const taul::str& id) {
             _emit("{}", _self->fullname());
             _markAsType();
         }
-        else if (auto typeParam = (id.substr(0, 1) == "$" && _typeParamCtx) ? _typeParamCtx->typeParam(std::string(id)) : nullptr) {
+        else if (auto typeParam =
+            [this, &id]() -> const YmType* {
+                if (id.substr(0, 1) == "$" && _typeParamCtx) {
+                    if (auto tp = _typeParamCtx->typeParam(std::string(id))) {
+                        return &tp->arg();
+                    }
+                }
+                return nullptr;
+            }()) {
 #if _DUMP_LOG
             ym::println("SpecSolver: Type param! -> {}", typeParam->fullname());
 #endif

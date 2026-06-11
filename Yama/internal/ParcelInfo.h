@@ -5,7 +5,6 @@
 
 #include <optional>
 #include <string>
-#include <taul/all.h>
 #include <unordered_map>
 #include <vector>
 
@@ -21,13 +20,12 @@
 namespace _ym {
 
 
-    struct ParamInfo;
-    struct TypeInfo;
+    class TypeInfo;
     class ParcelInfo;
 
 
     std::optional<Spec> normalizeRefSym(const std::string& symbol, std::string_view msg, SpecSolver solver = {});
-    bool checkCallable(const TypeInfo& type, std::string_view msg);
+    bool checkHasCallSig(const TypeInfo& type, std::string_view msg);
     bool checkNonMember(const TypeInfo& type, std::string_view msg);
     bool checkNonProtocolMember(const TypeInfo& type, std::string_view msg);
 
@@ -36,94 +34,309 @@ namespace _ym {
     void storedPropertySetCallBhvr(YmCtx* ctx, void* user);
 
 
-    struct TypeParamInfo final {
-        YmTypeParamIndex index;
-        std::string name;
-        ConstIndex constraint;
+    static_assert(YmKind_Num == 6);
+
+    // Extends YmKind w/ new consts for types w/ irregular semantics.
+    enum class KindEx : YmUInt8 {
+        // Regular
+
+        Struct = 0,
+        Protocol,
+        Fn,
+        Method,
+        Property,
+        PropertyAssigner,
+
+        // Special
+
+        None,
+        Int,
+        UInt,
+        Float,
+        Bool,
+        Rune,
+        Type,
+
+        MethodReq,
+
+        StoredPropertyGet,
+        StoredPropertySet,
+
+        Num, // Enum Size
     };
-    struct ParamInfo final {
-        YmParamIndex index;
-        std::string name;
-        ConstIndex type;
-    };
 
-    struct TypeInfo final {
-        const YmTypeIndex index;
-        const std::string localName;
-        const YmKind kind;
+    constexpr size_t KindExSize = (size_t)KindEx::Num;
 
-        // TODO: TypeInfo is rather *fat*, w/ types carrying a LOT of data, much of which many
-        //       don't even need to define themselves. To this end, look into a 'descriptor' setup,
-        //       like in our old impl, to reduce per-type memory consumption.
-        //          * Lol, sizeof(TypeInfo) is around 0.5KB now, so ya, we'd be best to try and reduce
-        //            this at some point in the future.
+    constexpr KindEx kindExOf(YmKind k) noexcept {
+        return KindEx(k);
+    }
+    constexpr YmKind kindOf(KindEx x) noexcept {
+        static_assert(KindExSize == 16);
+        switch (x) {
+        case KindEx::Struct:                return YmKind_Struct;
+        case KindEx::Protocol:              return YmKind_Protocol;
+        case KindEx::Fn:                    return YmKind_Fn;
+        case KindEx::Method:                return YmKind_Method;
+        case KindEx::Property:              return YmKind_Property;
+        case KindEx::PropertyAssigner:      return YmKind_PropertyAssigner;
 
-        // TODO: When we impl descriptors, be sure to also reorganize TypeInfo owner/member relationships
-        //       so that member TypeInfo have DIRECT access to the type param data of their owner, as
-        //       right now the lack of this ability is a MAJOR flaw of our currennt impl.
+        case KindEx::None:                  return YmKind_Struct;
+        case KindEx::Int:                   return YmKind_Struct;
+        case KindEx::UInt:                  return YmKind_Struct;
+        case KindEx::Float:                 return YmKind_Struct;
+        case KindEx::Bool:                  return YmKind_Struct;
+        case KindEx::Rune:                  return YmKind_Struct;
+        case KindEx::Type:                  return YmKind_Struct;
+
+        case KindEx::MethodReq:             return YmKind_Method;
+
+        case KindEx::StoredPropertyGet:     return YmKind_Property;
+        case KindEx::StoredPropertySet:     return YmKind_PropertyAssigner;
+
+        default:                            return YmKind{};
+        }
+    }
+    template<YmKind MustBe>
+    inline KindEx mustBe(KindEx x) noexcept {
+        ymAssert(kindOf(x) == MustBe);
+        return x;
+    }
+
+    constexpr bool isRegular(KindEx x) noexcept {
+        return size_t(x) < YmKind_Num;
+    }
+    constexpr bool isIrregular(KindEx x) noexcept {
+        return !isRegular(x);
+    }
+    constexpr bool isPrimitive(KindEx x) noexcept {
+        return
+            x >= KindEx::None &&
+            x <= KindEx::Type;
+    }
+    constexpr bool isGetter(KindEx x) noexcept {
+        // TODO: Update later when we add parcel variables.
+        return kindOf(x) == YmKind_Property;
+    }
+    constexpr bool isSetter(KindEx x) noexcept {
+        // TODO: Update later when we add parcel variables.
+        return kindOf(x) == YmKind_PropertyAssigner;
+    }
+    constexpr bool isVarLike(KindEx x) noexcept {
+        return isGetter(x) || isSetter(x);
+    }
+    constexpr bool isProtocolReq(KindEx x) noexcept {
+        // TODO: Update whenever we add new protocol req. types.
+        return x == KindEx::MethodReq;
+    }
+
+
+    class TypeInfo final {
+    public:
+        struct TypeParam final {
+            YmTypeParamIndex index;
+            std::string name;
+            ConstIndex constraintConst;
+        };
+        struct Member final {
+            YmMemberIndex index;
+            std::string name;
+            ym::Safe<TypeInfo> type;
+            ConstIndex typeConst;
+        };
+        struct Param final {
+            YmParamCategory category;
+            YmParamIndex index;
+            std::string name;
+            ConstIndex typeConst;
+
+
+            inline bool isPositional() const noexcept { return category == YmParamCategory_Positional; }
+            inline bool isNamed() const noexcept { return category == YmParamCategory_Named; }
+        };
+
 
         uint16_t slots = 0;
-        std::optional<CallBhvrCallbackInfo> callBehaviour;
-        std::optional<ConstIndex> owner;
-        std::vector<std::shared_ptr<TypeParamInfo>> typeParams;
-        std::unordered_map<std::string, ym::Safe<TypeParamInfo>> typeParamNameMap;
-        std::vector<ConstIndex> membersByIndex;
-        std::unordered_map<std::string, ConstIndex> membersByName;
-        std::optional<ConstIndex> returnType;
-        std::vector<ParamInfo> params;
-        YmParams positionalParams = 0;
-        std::optional<ConstIndex> assigner;
         ConstTableInfo consts;
         std::vector<ConstIndex> refs;
 
-        // TODO: usesNamedParams is only here for ymParcelDef_*** API, so later try to find a way
-        //       to move this out of here.
 
-        bool usesNamedParams = false;
+        TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localName);
 
 
-        bool returnTypeIsSelf() const noexcept;
-        bool paramTypeIsSelf(YmParamIndex index) const noexcept;
+        ParcelInfo& parcel() const noexcept;
+        KindEx kindEx() const noexcept;
+        YmKind kind() const noexcept;
+        const std::string& localName() const noexcept;
 
-        // TODO: Currently, TypeInfo of member types have NO KNOWLEDGE of type params, which MUST all
-        //       be in the owner's TypeInfo, and are thus unavailable to member TypeInfo.
+        bool isRegular() const noexcept;
+        bool isIrregular() const noexcept;
+        bool isPrimitive() const noexcept;
+        bool isGetter() const noexcept;
+        bool isSetter() const noexcept;
+        bool isVarLike() const noexcept;
+        bool isProtocolReq() const noexcept;
 
-        bool isOwner() const noexcept; // Detects if owner based on name syntax.
-        std::optional<std::string_view> ownerName() const noexcept;
-        std::optional<std::string_view> memberName() const noexcept;
-        const TypeParamInfo* queryTypeParam(YmTypeParamIndex index) const noexcept;
-        const TypeParamInfo* queryTypeParam(const std::string& name) const noexcept;
-        const ParamInfo* queryParam(YmParamIndex index) const noexcept;
-        const ParamInfo* queryParam(const std::string& localName) const noexcept;
+        bool hasCallSig() const noexcept;
+        bool isOwner() const noexcept;
+        bool isMember() const noexcept;
+        bool canHaveMembers() const noexcept;
+
+        bool hasDefaultValue() const noexcept;
+
+        // NOTE: These don't differentiate regular from irregular.
+        static_assert(YmKind_Num == 6);
+        bool isStruct() const noexcept;
+        bool isProtocol() const noexcept;
+        bool isFn() const noexcept;
+        bool isMethod() const noexcept;
+        bool isProperty() const noexcept;
+        bool isPropertyAssigner() const noexcept;
+
+        static_assert(YmKind_Num == 6);
+        bool isRegularStruct() const noexcept;
+        bool isRegularProtocol() const noexcept;
+        bool isRegularFn() const noexcept;
+        bool isRegularMethod() const noexcept;
+        bool isRegularProperty() const noexcept;
+        bool isRegularPropertyAssigner() const noexcept;
+
+        bool isNone() const noexcept;
+        bool isInt() const noexcept;
+        bool isUInt() const noexcept;
+        bool isFloat() const noexcept;
+        bool isBool() const noexcept;
+        bool isRune() const noexcept;
+        bool isType() const noexcept;
+
         bool isMethodReq() const noexcept;
 
         bool isStoredPropertyGet() const noexcept;
         bool isStoredPropertySet() const noexcept;
-        std::optional<YmUInt16> storedPropertyIndex() const noexcept;
 
-        YmParams paramCount() const noexcept;
-        YmParams positionalParamCount() const noexcept;
-        YmParams namedParamCount() const noexcept;
-        bool isPositionalParam(YmParamIndex index) const noexcept;
-        bool isNamedParam(YmParamIndex index) const noexcept;
+        TypeInfo* owner() const noexcept;
+        std::optional<ConstIndex> ownerConst() const noexcept;
+        const std::string& ownerName() const noexcept; // Returns local name if owner type.
+        const std::string& memberName() const noexcept; // Returns empty string if owner type.
 
-        YmMembers memberCount() const noexcept;
-        YmTypeParams typeParamCount() const noexcept;
+        // TODO: Currently, TypeInfo of member types have NO KNOWLEDGE of type params, which MUST all
+        //       be in the owner's TypeInfo, and are thus unavailable to member TypeInfo.
+
+        YmTypeParams typeParams() const noexcept;
         bool isParameterized() const noexcept;
+        const TypeParam* typeParam(ConstIndex index) const noexcept;
+        const TypeParam* typeParam(const std::string& name) const noexcept;
 
-        bool hasDefaultValue() const noexcept;
+        YmMembers members() const noexcept;
+        const Member* member(ConstIndex index) const noexcept;
+        const Member* member(const std::string& name) const noexcept;
+
+        // NOTE: Remember, since it's possible for a self param to be specified by multiple different
+        //       symbols (ie. not just $Self), and which symbols do/don't CAN CHANGE BASED ON THE
+        //       IMPORT ENVIRONMENT WHEN A YmType IS LOADED!!!
+        //
+        //       As such, it's not appropriate to check for self params at the TypeInfo level.
+
+        std::optional<ConstIndex> returnTypeConst() const noexcept;
+        YmParams params() const noexcept;
+        YmParams positionalParams() const noexcept;
+        YmParams namedParams() const noexcept;
+        const Param* param(YmParamIndex index) const noexcept;
+        // O(n) time complexity.
+        const Param* param(const std::string& name) const noexcept;
+        const CallBhvrCallbackInfo* callBehaviour() const noexcept;
+
+        std::optional<ConstIndex> assignerConst() const noexcept;
+
+        std::optional<YmUInt16> storedPropertySlot() const noexcept;
 
         uint16_t nextSlot() noexcept;
         // Unwinds nextSlot incrs.
         void unwindSlots(uint16_t n = 1) noexcept;
 
         std::optional<YmTypeParamIndex> addTypeParam(std::string name, std::string constraintTypeSymbol);
-        std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol, bool skipCallabilityCheck = false);
+        std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol, bool skipHasCallSigCheck = false);
         void beginNamedParams();
         std::optional<YmRef> addRef(std::string symbol);
 
-        void attemptSetupAsMember(ParcelInfo& parcel);
+        void registerMember(const std::string& name);
+
+        // This isn't performed up-front in _initMembership, as if addType thereafter
+        // fails, that would leave the owner TypeInfo w/ a member registered which
+        // never actually got added to parcel.
+        void registerMembershipWithOwner();
+
+        void setupCall(
+            CallBhvrCallbackInfo callBehaviour,
+            std::optional<ConstIndex> assignerConst,
+            ConstIndex returnTypeConst);
+
         std::string fullnameForRef() const;
+
+
+    private:
+        struct _Membership final {
+            std::string ownerName, memberName;
+            ym::Safe<TypeInfo> owner;
+            ConstIndex ownerConst;
+        };
+        struct _TypeParams final {
+            std::vector<std::unique_ptr<const TypeParam>> typeParamsByIndex;
+            std::unordered_map<std::string, ym::Safe<const TypeParam>> typeParamsByName;
+
+
+            YmTypeParams count() const noexcept;
+            const TypeParam* byIndex(size_t index) const noexcept;
+            const TypeParam* byName(const std::string& name) const noexcept;
+
+            bool add(const std::string& name, ConstIndex constraintConst);
+        };
+        struct _Members final {
+            std::vector<std::unique_ptr<const Member>> membersByIndex;
+            std::unordered_map<std::string, ym::Safe<const Member>> membersByName;
+
+
+            YmMembers count() const noexcept;
+            const Member* byIndex(size_t index) const noexcept;
+            const Member* byName(const std::string& name) const noexcept;
+
+            // Fails quietly if already registered.
+            void registerMember(TypeInfo& owner, const std::string& name);
+        };
+        struct _Call final {
+            CallBhvrCallbackInfo callBehaviour;
+            std::optional<ConstIndex> assignerConst;
+            ConstIndex returnTypeConst;
+            std::vector<Param> params;
+            YmParams positionalParamsN = 0;
+            bool definingNamed = false;
+
+
+            YmParams count() const noexcept;
+            YmParams positionalCount() const noexcept;
+            YmParams namedCount() const noexcept;
+            const Param* param(YmParamIndex index) const noexcept;
+            const Param* param(const std::string& name) const noexcept;
+
+            bool addParam(const std::string& name, ConstIndex typeConst);
+            void beginNamedParams() noexcept;
+        };
+
+
+        ParcelInfo* _parcel;
+        KindEx _k;
+        std::string _localName;
+        std::unique_ptr<_Membership> _membership;
+        std::unique_ptr<_TypeParams> _typeParams;
+        std::unique_ptr<_Members> _members;
+        std::unique_ptr<_Call> _call;
+
+
+        void _initMembership();
+        void _initTypeParams();
+        void _initMembers();
+
+        static std::string _extractOwnerName(const std::string& localName) noexcept;
+        static std::string _extractMemberName(const std::string& localName) noexcept;
     };
 
     // Encapsulates static parcel data in the absence of linkage.
@@ -137,27 +350,38 @@ namespace _ym {
         size_t types() const noexcept;
         TypeInfo* type(const std::string& localName) noexcept;
         const TypeInfo* type(const std::string& localName) const noexcept;
-        TypeInfo* type(YmTypeIndex index) noexcept;
-        const TypeInfo* type(YmTypeIndex index) const noexcept;
 
         // Fails if name conflict arises.
         // Invalidates type pointers.
-        std::optional<YmTypeIndex> addType(
-            std::string localName,
-            YmKind kind,
-            std::optional<std::string> returnTypeSymbol = std::nullopt,
-            std::optional<std::string> assignerTypeSymbol = std::nullopt,
-            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt,
+        bool addType(
+            KindEx k,
+            const std::string& localName,
             bool skipLocalNameLegalityCheck = false);
         // Fails if name conflict arises.
         // Invalidates type pointers.
-        std::optional<YmTypeIndex> addType(
-            std::string ownerName,
-            std::string memberName,
-            YmKind kind,
-            std::optional<std::string> returnTypeSymbol = std::nullopt,
-            std::optional<std::string> assignerTypeSymbol = std::nullopt,
-            std::optional<CallBhvrCallbackInfo> callBehaviour = std::nullopt,
+        bool addType(
+            KindEx k,
+            const std::string& ownerName,
+            const std::string& memberName,
+            bool skipLocalNameLegalityCheck = false);
+        // Fails if name conflict arises.
+        // Invalidates type pointers.
+        bool addType(
+            KindEx k,
+            const std::string& localName,
+            CallBhvrCallbackInfo callBehaviour,
+            std::string returnTypeSymbol,
+            std::optional<std::string> assignerSymbol = std::nullopt,
+            bool skipLocalNameLegalityCheck = false);
+        // Fails if name conflict arises.
+        // Invalidates type pointers.
+        bool addType(
+            KindEx k,
+            const std::string& ownerName,
+            const std::string& memberName,
+            CallBhvrCallbackInfo callBehaviour,
+            std::string returnTypeSymbol,
+            std::optional<std::string> assignerSymbol = std::nullopt,
             bool skipLocalNameLegalityCheck = false);
 
         std::optional<YmTypeParamIndex> addTypeParam(
@@ -177,14 +401,31 @@ namespace _ym {
 
 
     private:
-        std::vector<TypeInfo> _types;
-        std::unordered_map<std::string, YmTypeIndex> _lookup;
+        std::vector<std::unique_ptr<TypeInfo>> _types;
+        std::unordered_map<std::string, size_t> _lookup;
 
 
         _ym::TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
         bool _checkNameLegality(const std::string& name, std::string_view msg);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
         bool _checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg);
+
+        std::optional<_ym::TypeInfo> _makeType(
+            KindEx k,
+            const std::string& localName,
+            bool skipLocalNameLegalityCheck);
+        std::optional<_ym::TypeInfo> _makeType(
+            KindEx k,
+            const std::string& ownerName,
+            const std::string& memberName,
+            bool skipLocalNameLegalityCheck);
+        bool _setupCall(
+            TypeInfo& t,
+            CallBhvrCallbackInfo callBehaviour,
+            std::string returnTypeSymbol,
+            std::optional<std::string> assignerSymbol);
+        bool _registerType(TypeInfo t);
+        bool _registerType(std::optional<TypeInfo> t);
     };
 }
 

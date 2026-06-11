@@ -25,10 +25,10 @@ std::optional<const ym::Safe<YmType>*> _ym::PTableManager::_generate(YmType& pro
     std::vector<ym::Safe<YmType>> ptable{};
     ptable.reserve(proto.members());
     for (YmMemberIndex i = 0; i < proto.members(); i++) {
-        auto& localName = ym::deref(proto.member(i)).localName();
+        auto& localName = proto.member(i)->type().localName();
         const auto [_, memberName] = _ym::split_s<YmChar>(localName, "::");
         // TODO: This std::string alloc is suboptimal.
-        ptable.push_back(ym::Safe(boxed.member((std::string)memberName)));
+        ptable.push_back(boxed.member((std::string)memberName).value().type());
     }
     return _ptables.try_emplace(_mkKey(proto, boxed), std::move(ptable)).first->second.data();
 }

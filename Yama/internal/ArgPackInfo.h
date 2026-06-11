@@ -46,7 +46,7 @@ namespace _ym {
 			_namedParamBindsMap.fill(_unbound);
 		}
 		inline ArgPackInfo(YmType& fn) :
-			ArgPackInfo(fn.positionalParamCount(), fn.namedParamCount()) {
+			ArgPackInfo(fn.positionalParams(), fn.namedParams()) {
 		}
 		// Inits w/ 0 positional, named and dummy args.
 		inline ArgPackInfo() {

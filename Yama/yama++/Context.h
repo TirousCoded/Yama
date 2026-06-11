@@ -61,6 +61,13 @@ namespace ym {
         inline Context(Safe<YmCtx> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
+        // Increments resource's ref count if secure == true.
+        inline static std::optional<Context> maybe(YmCtx* resource, bool secure) noexcept {
+            return
+                resource
+                ? std::make_optional(Context(*resource, secure))
+                : std::nullopt;
+        }
 
 
         inline Domain domain() const noexcept {
@@ -68,20 +75,12 @@ namespace ym {
         }
 
         // path is expected to be null-terminated.
-        inline std::optional<Parcel> import(
-            std::convertible_to<std::string_view> auto const& path) noexcept {
-            if (auto result = ymCtx_Import(get(), std::string_view(path).data())) {
-                return Parcel(Safe(result));
-            }
-            return std::nullopt;
+        inline std::optional<Parcel> import(std::convertible_to<std::string_view> auto const& path) noexcept {
+            return Parcel::maybe(ymCtx_Import(get(), std::string_view(path).data()));
         }
         // fullname is expected to be null-terminated.
-        inline std::optional<Type> load(
-            std::convertible_to<std::string_view> auto const& fullname) noexcept {
-            if (auto result = ymCtx_Load(get(), std::string_view(fullname).data())) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+        inline std::optional<Type> load(std::convertible_to<std::string_view> auto const& fullname) noexcept {
+            return Type::maybe(ymCtx_Load(get(), std::string_view(fullname).data()));
         }
 
         inline Type ldNone() const noexcept { return Type(Safe(ymCtx_LdNone(get()))); }
@@ -110,38 +109,17 @@ namespace ym {
         inline CallStack callStack() const noexcept { return CallStack(*this); }
         inline YmUInt16 args() const noexcept { return ymCtx_Args(get()); }
         inline std::optional<Object> arg(YmUInt16 which) noexcept {
-            auto temp = ymCtx_Arg(get(), which, YM_TAKE);
-            return
-                temp
-                ? std::make_optional(Object(*temp, false))
-                : std::nullopt;
+            return Object::maybe(ymCtx_Arg(get(), which, YM_TAKE), false);
         }
-        inline std::optional<Type> ref(YmRef reference) const noexcept {
-            auto temp = ymCtx_Ref(get(), reference);
-            return
-                temp
-                ? std::make_optional(Type(*temp))
-                : std::nullopt;
-        }
+        inline std::optional<Type> ref(YmRef reference) const noexcept { return Type::maybe(ymCtx_Ref(get(), reference)); }
         inline YmLocals locals() const noexcept { return ymCtx_Locals(get()); }
         inline std::optional<Object> local(YmLocal where) noexcept {
-            auto temp = ymCtx_Local(get(), where, YM_TAKE);
-            return
-                temp
-                ? std::make_optional(Object(*temp, false))
-                : std::nullopt;
+            return Object::maybe(ymCtx_Local(get(), where, YM_TAKE), false);
         }
 
         inline void pop(YmLocals n = 1) noexcept { ymCtx_Pop(get(), n); }
         inline void popAll() noexcept { ymCtx_PopAll(get()); }
-
-        inline std::optional<Object> pull() noexcept {
-            auto temp = ymCtx_Pull(get());
-            return
-                temp
-                ? std::make_optional(Object(*temp, false))
-                : std::nullopt;
-        }
+        inline std::optional<Object> pull() noexcept { return Object::maybe(ymCtx_Pull(get()), false); }
 
         inline bool put(YmLocal where, const Object& what) noexcept {
             return ymCtx_Put(get(), where, what.get(), YM_BORROW) == YM_TRUE;
@@ -153,7 +131,6 @@ namespace ym {
         inline bool putBool(YmLocal where, bool v) noexcept { return ymCtx_PutBool(get(), where, YmBool(v)) == YM_TRUE; }
         inline bool putRune(YmLocal where, YmRune v) noexcept { return ymCtx_PutRune(get(), where, v) == YM_TRUE; }
         inline bool putType(YmLocal where, const Type& v) noexcept { return ymCtx_PutType(get(), where, v.get()) == YM_TRUE; }
-        inline bool putDefault(YmLocal where, const Type& type) noexcept { return ymCtx_DefaultInit(get(), where, type.get()) == YM_TRUE; }
 
         inline bool push(const Object& what) noexcept { return put(YM_NEWTOP, what); }
         inline bool pushNone() noexcept { return putNone(YM_NEWTOP); }
@@ -163,18 +140,46 @@ namespace ym {
         inline bool pushBool(bool v) noexcept { return putBool(YM_NEWTOP, v); }
         inline bool pushRune(YmRune v) noexcept { return putRune(YM_NEWTOP, v); }
         inline bool pushType(const Type& v) noexcept { return putType(YM_NEWTOP, v); }
-        inline bool pushDefault(const Type& type) noexcept { return putDefault(YM_NEWTOP, type); }
 
-        // TODO: Add named param support to below methods.
+        // TODO: Reorder ymCtx_[Default|Explicit]Init params so where comes last.
 
-        inline bool call(const Type& fn, YmUInt16 argsN, YmLocal returnTo) noexcept {
-            return ymCtx_Call(get(), fn.get(), argsN, "", returnTo) == YM_TRUE;
+        inline bool defaultInit(
+            const Type& type,
+            YmLocal where = YM_NEWTOP) noexcept {
+            return ymCtx_DefaultInit(get(), where, type.get()) == YM_TRUE;
         }
-        // Pushes return value.
-        inline bool callp(const Type& fn, YmUInt16 argsN) noexcept { return call(fn, argsN, YM_NEWTOP); }
+        // argNames is expected to be null-terminated.
+        inline bool explicitInit(
+            const Type& type,
+            std::convertible_to<std::string_view> auto const& argNames,
+            YmLocal where = YM_NEWTOP) noexcept {
+            return ymCtx_ExplicitInit(get(), where, type.get(), std::string_view(argNames).data()) == YM_TRUE;
+        }
+
+        // argNames is expected to be null-terminated.
+        inline bool call(
+            const Type& fn,
+            YmUInt16 argsN,
+            std::convertible_to<std::string_view> auto const& argNames,
+            YmLocal returnTo = YM_NEWTOP) noexcept {
+            return ymCtx_Call(get(), fn.get(), argsN, std::string_view(argNames).data(), returnTo) == YM_TRUE;
+        }
         // Discards return value.
-        inline bool calld(const Type& fn, YmUInt16 argsN) noexcept { return call(fn, argsN, YM_DISCARD); }
+        // argNames is expected to be null-terminated.
+        inline bool calld(
+            const Type& fn,
+            YmUInt16 argsN,
+            std::convertible_to<std::string_view> auto const& argNames) noexcept {
+            return call(fn, argsN, argNames, YM_DISCARD);
+        }
         inline void ret(const Object& what) noexcept { ymCtx_Ret(get(), what.get(), YM_BORROW); }
+
+        inline bool getProperty(const Type& property, YmLocal where = YM_NEWTOP) noexcept {
+            return ymCtx_GetProperty(get(), property.get(), where) == YM_TRUE;
+        }
+        inline bool setProperty(const Type& property) noexcept {
+            return ymCtx_SetProperty(get(), property.get()) == YM_TRUE;
+        }
     };
 }
 

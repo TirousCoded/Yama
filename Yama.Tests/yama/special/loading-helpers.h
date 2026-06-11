@@ -14,29 +14,29 @@
 #include "../../utils/utils.h"
 
 
-inline YmTypeIndex setup_helper(
+inline bool setup_helper(
     YmParcelDef* def,
     const std::string& localName,
-    std::function<YmTypeIndex()> builder,
+    std::function<bool()> builder,
     std::initializer_list<std::string> refs,
     std::initializer_list<std::pair<std::string, std::string>> typeParams) {
     if (!def) {
         ADD_FAILURE();
-        return YM_NO_TYPE_INDEX;
+        return false;
     }
-    YmTypeIndex result = builder();
+    bool result = builder();
     for (const auto& refconst : refs) {
         ymParcelDef_AddRef(def, localName.c_str(), refconst.c_str());
     }
     for (const auto& [name, constraint] : typeParams) {
         ymParcelDef_AddTypeParam(def, localName.c_str(), name.c_str(), constraint.c_str());
     }
-    if (result == YM_NO_TYPE_INDEX) {
+    if (!result) {
         ADD_FAILURE();
     }
     return result;
 }
-inline YmTypeIndex setup_struct(
+inline bool setup_struct(
     YmParcelDef* def,
     const std::string& localName,
     std::initializer_list<std::string> refs,
@@ -44,13 +44,13 @@ inline YmTypeIndex setup_struct(
     return setup_helper(
         def,
         localName,
-        [def, localName]() -> YmTypeIndex {
+        [def, localName]() -> bool {
             return ymParcelDef_AddStruct(def, localName.c_str());
         },
         refs,
         typeParams);
 }
-inline YmTypeIndex setup_protocol(
+inline bool setup_protocol(
     YmParcelDef* def,
     const std::string& localName,
     std::initializer_list<std::string> refs,
@@ -58,13 +58,13 @@ inline YmTypeIndex setup_protocol(
     return setup_helper(
         def,
         localName,
-        [def, localName]() -> YmTypeIndex {
+        [def, localName]() -> bool {
             return ymParcelDef_AddProtocol(def, localName.c_str());
         },
         refs,
         typeParams);
 }
-inline YmTypeIndex setup_fn(
+inline bool setup_fn(
     YmParcelDef* def,
     const std::string& localName,
     const std::string& returnTypeSymbol,
@@ -73,13 +73,13 @@ inline YmTypeIndex setup_fn(
     return setup_helper(
         def,
         localName,
-        [def, localName, returnTypeSymbol]() -> YmTypeIndex {
+        [def, localName, returnTypeSymbol]() -> bool {
             return ymParcelDef_AddFn(def, localName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
         },
         refs,
         typeParams);
 }
-inline YmTypeIndex setup_method(
+inline bool setup_method(
     YmParcelDef* def,
     const std::string& ownerName,
     const std::string& memberName,
@@ -88,13 +88,13 @@ inline YmTypeIndex setup_method(
     return setup_helper(
         def,
         std::format("{}::{}", ownerName, memberName),
-        [def, ownerName, memberName, returnTypeSymbol]() -> YmTypeIndex {
+        [def, ownerName, memberName, returnTypeSymbol]() -> bool {
             return ymParcelDef_AddMethod(def, ownerName.c_str(), memberName.c_str(), returnTypeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
         },
         refs,
         {});
 }
-inline YmTypeIndex setup_property_and_assigner(
+inline bool setup_property_and_assigner(
     YmParcelDef* def,
     const std::string& ownerName,
     const std::string& memberName,
@@ -103,7 +103,7 @@ inline YmTypeIndex setup_property_and_assigner(
     return setup_helper(
         def,
         std::format("{}::{}", ownerName, memberName),
-        [def, ownerName, memberName, typeSymbol]() -> YmTypeIndex {
+        [def, ownerName, memberName, typeSymbol]() -> bool {
             return ymParcelDef_AddStoredProperty(def, ownerName.c_str(), memberName.c_str(), typeSymbol.c_str());
         },
         refs,

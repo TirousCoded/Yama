@@ -124,8 +124,8 @@ void _ym::LoadManager::_genTypeDataForMembers(
     ym::Safe<const _ym::TypeInfo> info,
     ym::Safe<YmType> self) {
     ymAssert(info->isOwner());
-    for (const auto& [name, constInd] : info->membersByName) {
-        _genMemberTypeData(parcel, ym::Safe(_lookupMemberInfo(parcel, *info, name)), self);
+    for (YmMembers i = 0; i < info->members(); i++) {
+        _genMemberTypeData(parcel, ym::Safe(_lookupMemberInfo(parcel, *info, info->member(i)->name)), self);
     }
 }
 
@@ -150,7 +150,7 @@ std::string _ym::LoadManager::_localNameOfMember(
     const _ym::TypeInfo& ownerInfo,
     const std::string& memberName) {
     ymAssert(ownerInfo.isOwner());
-    return std::format("{}::{}", ownerInfo.localName, memberName);
+    return std::format("{}::{}", ownerInfo.localName(), memberName);
 }
 
 bool _ym::LoadManager::_isEarlyResolveConst(const ConstInfo& constInfo) const {
@@ -167,7 +167,7 @@ void _ym::LoadManager::_earlyResolveMembers(YmType& x, ym::Safe<YmType> self) {
 #endif
     ymAssert(!x.owner());
     for (YmMemberIndex i = 0; i < x.members(); i++) {
-        _earlyResolveType(ym::deref(x.member(i)), self);
+        _earlyResolveType(x.member(i)->type(), self);
     }
 }
 
@@ -317,26 +317,26 @@ void _ym::LoadManager::_checkConstraintTypeLegality() {
 #if _DUMP_LOG
         ym::println("LoadManager: Checking {} type params.", type.fullname());
 #endif
-        for (YmTypeParamIndex i = 0; i < type.info->typeParamCount(); i++) {
-            auto& typeParamConstraint = ym::deref(type.typeParamConstraint(i));
-            if (typeParamConstraint.kind() != YmKind_Protocol) {
+        for (YmTypeParamIndex i = 0; i < type.info->typeParams(); i++) {
+            auto tparam = type.typeParam(i).value();
+            if (!tparam.constraint().isProtocol()) {
                 _err(
                     YmErrCode_NonProtocolType,
                     "{} type parameter #{} ({}) constraint type {} is not a protocol!",
                     type.fullname(),
                     i + 1,
-                    type.info->typeParams[i]->name,
-                    typeParamConstraint.fullname());
+                    tparam.name(),
+                    tparam.constraint().fullname());
             }
             static const auto immediateTypeParamRefConstraintRefSymPattern = std::regex("^(?!\\$Self)([^\\[:/]+)$");
-            const auto& typeParamConstraintRefSym = type.info->consts[type.info->typeParams[i]->constraint].as<RefInfo>().sym;
+            const auto& typeParamConstraintRefSym = type.info->consts[tparam.info->constraintConst].as<RefInfo>().sym;
             if (std::regex_match(typeParamConstraintRefSym.string(), immediateTypeParamRefConstraintRefSymPattern)) {
                 _err(
                     YmErrCode_IllegalConstraint,
                     "{} type parameter #{} ({}) constraint type symbol {} cannot use type parameter as a constraint type (as the constraining protocol's interface would be indeterminate!)",
                     type.fullname(),
                     i + 1,
-                    type.info->typeParams[i]->name,
+                    tparam.name(),
                     typeParamConstraintRefSym);
             }
         }
@@ -354,18 +354,17 @@ void _ym::LoadManager::_enforceConstraints() {
 #if _DUMP_LOG
         ym::println("LoadManager: Checking {} type args.", type.fullname());
 #endif
-        for (YmTypeParamIndex i = 0; i < type.info->typeParamCount(); i++) {
-            auto& typeArg = ym::deref(type.typeParam(i));
-            auto& typeParamConstraint = ym::deref(type.typeParamConstraint(i));
-            if (!typeArg.conforms(typeParamConstraint)) {
+        for (YmTypeParamIndex i = 0; i < type.info->typeParams(); i++) {
+            auto tparam = type.typeParam(i).value();
+            if (!tparam.arg().conforms(tparam.constraint())) {
                 _err(
                     YmErrCode_TypeArgsError,
                     "{} type argument #{} ({}={}) doesn't conform to constraint {}!",
                     type.fullname(),
                     i + 1,
-                    type.info->typeParams[i]->name,
-                    typeArg.fullname(),
-                    typeParamConstraint.fullname());
+                    tparam.name(),
+                    tparam.arg().fullname(),
+                    tparam.constraint().fullname());
             }
         }
     }

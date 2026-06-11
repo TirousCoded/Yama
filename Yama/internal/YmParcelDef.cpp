@@ -9,65 +9,57 @@ bool YmParcelDef::verify() const {
     return info->verify();
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addStruct(
-    const std::string& name) {
-    return info->addType(
-        name,
-        YmKind_Struct);
+bool YmParcelDef::addStruct(
+    const std::string& name,
+    _ym::KindEx k) {
+    return info->addType(_ym::mustBe<YmKind_Struct>(k), name);
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addProtocol(
+bool YmParcelDef::addProtocol(
     const std::string& name) {
-    return info->addType(
-        name,
-        YmKind_Protocol);
+    return info->addType(_ym::KindEx::Protocol, name);
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addFn(
+bool YmParcelDef::addFn(
     const std::string& name,
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
-    return info->addType(
-        name,
-        YmKind_Fn,
-        std::make_optional(std::move(returnTypeSymbol)),
-        std::nullopt,
-        callBehaviour);
+    return info->addType(_ym::KindEx::Fn, name, callBehaviour, std::move(returnTypeSymbol));
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addMethod(
+bool YmParcelDef::addMethod(
     const std::string& ownerName,
     const std::string& name,
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
-    return info->addType(
+    return _addMethod(
         ownerName,
         name,
-        YmKind_Method,
-        std::make_optional(std::move(returnTypeSymbol)),
-        std::nullopt,
-        callBehaviour);
+        std::move(returnTypeSymbol),
+        std::move(callBehaviour),
+        _ym::KindEx::Method);
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addMethodReq(
+bool YmParcelDef::addMethodReq(
     const std::string& ownerName,
     const std::string& name,
     std::string returnTypeSymbol) {
     auto index = uintptr_t(-1);
     if (auto ownerType = info->type(ownerName)) {
-        index = ownerType->memberCount();
+        index = ownerType->members();
     }
-    return addMethod(
+    return _addMethod(
         ownerName,
         name,
         std::move(returnTypeSymbol),
         _ym::CallBhvrCallbackInfo::mk(
             _ym::methodReqCallBhvr,
             // Give the method its member index.
-            (void*)index));
+            (void*)index),
+        _ym::KindEx::MethodReq);
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addReadOnlyStoredProperty(
+bool YmParcelDef::addReadOnlyStoredProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol) {
@@ -83,16 +75,17 @@ std::optional<YmTypeIndex> YmParcelDef::addReadOnlyStoredProperty(
         _ym::CallBhvrCallbackInfo::mk(
             _ym::storedPropertyGetCallBhvr,
             // Pass slot index.
-            (void*)slot))) {
+            (void*)slot),
+        _ym::KindEx::StoredPropertyGet)) {
         return result;
     }
     if (ownerType) {
         ownerType->unwindSlots(); // If fails.
     }
-    return std::nullopt;
+    return false;
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addStoredProperty(
+bool YmParcelDef::addStoredProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol) {
@@ -101,7 +94,7 @@ std::optional<YmTypeIndex> YmParcelDef::addStoredProperty(
     //       called, as otherwise we won't get proper error msgs.
     auto ownerType = info->type(ownerName);
     uint16_t slot = ownerType ? ownerType->nextSlot() : 0;
-    if (auto result = _addProperty(
+    if (_addProperty(
         ownerName,
         name,
         std::move(typeSymbol),
@@ -112,16 +105,18 @@ std::optional<YmTypeIndex> YmParcelDef::addStoredProperty(
         _ym::CallBhvrCallbackInfo::mk(
             _ym::storedPropertySetCallBhvr,
             // Pass slot index.
-            (void*)slot))) {
-        return result;
+            (void*)slot),
+        _ym::KindEx::StoredPropertyGet,
+        _ym::KindEx::StoredPropertySet)) {
+        return true;
     }
     if (ownerType) {
         ownerType->unwindSlots(); // If fails.
     }
-    return std::nullopt;
+    return false;
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addReadOnlyComputedProperty(
+bool YmParcelDef::addReadOnlyComputedProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol,
@@ -130,10 +125,11 @@ std::optional<YmTypeIndex> YmParcelDef::addReadOnlyComputedProperty(
         ownerName,
         name,
         std::move(typeSymbol),
-        getCallBehaviour);
+        getCallBehaviour,
+        _ym::KindEx::Property);
 }
 
-std::optional<YmTypeIndex> YmParcelDef::addComputedProperty(
+bool YmParcelDef::addComputedProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol,
@@ -144,7 +140,9 @@ std::optional<YmTypeIndex> YmParcelDef::addComputedProperty(
         name,
         std::move(typeSymbol),
         getCallBehaviour,
-        setCallBehaviour);
+        setCallBehaviour,
+        _ym::KindEx::Property,
+        _ym::KindEx::PropertyAssigner);
 }
 
 std::optional<YmTypeParamIndex> YmParcelDef::addTypeParam(
@@ -180,53 +178,49 @@ std::optional<YmRef> YmParcelDef::addRef(
         std::move(symbol));
 }
 
-std::optional<YmTypeIndex> YmParcelDef::_addReadOnlyProperty(
+bool YmParcelDef::_addMethod(
     const std::string& ownerName,
     const std::string& name,
-    std::string typeSymbol,
-    _ym::CallBhvrCallbackInfo getCallBehaviour) {
-    if (auto result = info->addType(
-        ownerName,
-        name,
-        YmKind_Property,
-        typeSymbol,
-        std::nullopt,
-        getCallBehaviour)) {
-        (void)info->addParam(std::format("{}::{}", ownerName, name), "self", "$Self", true).value();
-        return result;
-    }
-    return std::nullopt;
+    std::string returnTypeSymbol,
+    _ym::CallBhvrCallbackInfo callBehaviour,
+    _ym::KindEx k) {
+    return info->addType(_ym::mustBe<YmKind_Method>(k), ownerName, name, callBehaviour, std::move(returnTypeSymbol));
 }
 
-std::optional<YmTypeIndex> YmParcelDef::_addProperty(
+bool YmParcelDef::_addReadOnlyProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol,
     _ym::CallBhvrCallbackInfo getCallBehaviour,
-    _ym::CallBhvrCallbackInfo setCallBehaviour) {
-    if (auto result = info->addType(
-        ownerName,
-        name,
-        YmKind_Property,
-        typeSymbol,
-        std::format("$Self::{}$assigner", name),
-        getCallBehaviour)) {
+    _ym::KindEx getK) {
+    if (info->addType(_ym::mustBe<YmKind_Property>(getK), ownerName, name, getCallBehaviour, std::move(typeSymbol))) {
+        (void)info->addParam(std::format("{}::{}", ownerName, name), "self", "$Self", true).value();
+        return true;
+    }
+    return false;
+}
+
+bool YmParcelDef::_addProperty(
+    const std::string& ownerName,
+    const std::string& name,
+    std::string typeSymbol,
+    _ym::CallBhvrCallbackInfo getCallBehaviour,
+    _ym::CallBhvrCallbackInfo setCallBehaviour,
+    _ym::KindEx getK,
+    _ym::KindEx setK) {
+    if (info->addType(
+        _ym::mustBe<YmKind_Property>(getK),
+        ownerName, name, getCallBehaviour, typeSymbol, std::format("$Self::{}$assigner", name))) {
         (void)info->addParam(std::format("{}::{}", ownerName, name), "self", "$Self", true).value();
         auto assignerName = std::format("{}$assigner", name);
         (void)info->addType(
-            ownerName,
-            assignerName,
-            YmKind_PropertyAssigner,
-            "yama:None",
-            std::nullopt,
-            setCallBehaviour,
-            true)
-            .value();
+            _ym::mustBe<YmKind_PropertyAssigner>(setK),
+            ownerName, assignerName, setCallBehaviour, "yama:None", std::nullopt, true);
         auto assignerLocalName = std::format("{}::{}", ownerName, assignerName);
         (void)info->addParam(assignerLocalName, "self", "$Self", true).value();
         (void)info->addParam(assignerLocalName, "x", typeSymbol, true).value();
-        return result;
+        return true;
     }
-    return std::nullopt;
+    return false;
 }
 

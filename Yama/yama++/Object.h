@@ -23,6 +23,13 @@ namespace ym {
         inline explicit Object(Safe<YmObj> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
+        // Increments resource's ref count if secure == true.
+        inline static std::optional<Object> maybe(YmObj* resource, bool secure) noexcept {
+            return
+                resource
+                ? std::make_optional(Object(*resource, secure))
+                : std::nullopt;
+        }
 
 
         inline Type type() const noexcept {

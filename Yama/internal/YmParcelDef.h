@@ -33,37 +33,38 @@ public:
 
     bool verify() const;
 
-    std::optional<YmTypeIndex> addStruct(
+    bool addStruct(
+        const std::string& name,
+        _ym::KindEx k = _ym::KindEx::Struct);
+    bool addProtocol(
         const std::string& name);
-    std::optional<YmTypeIndex> addProtocol(
-        const std::string& name);
-    std::optional<YmTypeIndex> addFn(
+    bool addFn(
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
-    std::optional<YmTypeIndex> addMethod(
+    bool addMethod(
         const std::string& ownerName,
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
-    std::optional<YmTypeIndex> addMethodReq(
+    bool addMethodReq(
         const std::string& ownerName,
         const std::string& name,
         std::string returnTypeSymbol);
-    std::optional<YmTypeIndex> addReadOnlyStoredProperty(
+    bool addReadOnlyStoredProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol);
-    std::optional<YmTypeIndex> addStoredProperty(
+    bool addStoredProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol);
-    std::optional<YmTypeIndex> addReadOnlyComputedProperty(
+    bool addReadOnlyComputedProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
         _ym::CallBhvrCallbackInfo getCallBehaviour);
-    std::optional<YmTypeIndex> addComputedProperty(
+    bool addComputedProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
@@ -86,16 +87,25 @@ public:
 
 
 private:
-    std::optional<YmTypeIndex> _addReadOnlyProperty(
+    bool _addMethod(
         const std::string& ownerName,
         const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getCallBehaviour);
-    std::optional<YmTypeIndex> _addProperty(
+        std::string returnTypeSymbol,
+        _ym::CallBhvrCallbackInfo callBehaviour,
+        _ym::KindEx k);
+    bool _addReadOnlyProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
         _ym::CallBhvrCallbackInfo getCallBehaviour,
-        _ym::CallBhvrCallbackInfo setCallBehaviour);
+        _ym::KindEx getK);
+    bool _addProperty(
+        const std::string& ownerName,
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getCallBehaviour,
+        _ym::CallBhvrCallbackInfo setCallBehaviour,
+        _ym::KindEx getK,
+        _ym::KindEx setK);
 };
 

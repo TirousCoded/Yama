@@ -85,18 +85,18 @@ namespace _ym {
         inline std::optional<YmKind> kind() const noexcept {
             return
                 isType()
-                ? std::make_optional(info()->kind)
+                ? std::make_optional(info()->kind())
                 : std::nullopt;
         }
 
         inline bool hasMembers() const noexcept {
-            if (auto k = kind())    return ymKind_HasMembers(*k) == YM_TRUE;
+            if (auto k = kind())    return ymKind_CanHaveMembers(*k) == YM_TRUE;
             else                    return false;
         }
         inline bool hasMember(const std::string& name) const noexcept {
             return
                 isType()
-                ? info()->membersByName.contains(name)
+                ? info()->member(name)
                 : false;
         }
 
@@ -126,7 +126,7 @@ namespace _ym {
         inline size_t typeParamCount() const noexcept {
             return
                 isType()
-                ? ym::deref(info()).typeParamCount()
+                ? ym::deref(info()).typeParams()
                 : 0;
         }
 
@@ -135,14 +135,14 @@ namespace _ym {
                 if (isErr())            return "<error>";
                 else if (isPath())      return path().value();
                 else if (isConcrete())  return type()->fullname();
-                else if (isGeneric())   return std::format("{}:{}", path().value(), info()->localName);
+                else if (isGeneric())   return std::format("{}:{}", path().value(), info()->localName());
                 else                    return "???";
             }
             else {
                 if (isErr())            return "[Error]";
                 else if (isPath())      return "[Path " + path().value().fmt() + "]";
                 else if (isConcrete())  return "[Concrete " + type()->fullname().string() + "]";
-                else if (isGeneric())   return "[Generic " + std::format("{}:{}", path().value(), info()->localName) + "]";
+                else if (isGeneric())   return "[Generic " + std::format("{}:{}", path().value(), info()->localName()) + "]";
                 else                    return "[???]";
             }
         }

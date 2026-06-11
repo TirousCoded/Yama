@@ -120,7 +120,11 @@ std::string _ym::Spec::fmt() const {
 	return _spec;
 }
 
-_ym::Spec _ym::Spec::transformed(RedirectSet* redirects, YmParcel* here, YmType* typeParamsCtx, YmType* self) const {
+_ym::Spec _ym::Spec::transformed(
+	RedirectSet* redirects,
+	YmParcel* here,
+	YmType* typeParamsCtx,
+	YmType* self) const {
 	return Spec(SpecSolver(here, typeParamsCtx, self, redirects)(_spec).value(), type());
 }
 

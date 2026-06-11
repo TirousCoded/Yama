@@ -20,6 +20,12 @@ namespace ym {
         inline explicit Parcel(Safe<YmParcel> x) noexcept :
             Handle(x) {
         }
+        inline static std::optional<Parcel> maybe(YmParcel* resource) noexcept {
+            return
+                resource
+                ? std::make_optional(Parcel(*resource))
+                : std::nullopt;
+        }
 
 
         inline std::string_view path() const noexcept {

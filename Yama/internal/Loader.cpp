@@ -160,13 +160,13 @@ std::shared_ptr<YmType> _ym::DmLoader::load(const Spec& fullname) {
 
 void _ym::DmLoader::_bindYamaParcel() {
     auto p = ym::makeScoped<YmParcelDef>();
-    p->addStruct("None");
-    p->addStruct("Int");
-    p->addStruct("UInt");
-    p->addStruct("Float");
-    p->addStruct("Bool");
-    p->addStruct("Rune");
-    p->addStruct("Type");
+    p->addStruct("None", KindEx::None);
+    p->addStruct("Int", KindEx::Int);
+    p->addStruct("UInt", KindEx::UInt);
+    p->addStruct("Float", KindEx::Float);
+    p->addStruct("Bool", KindEx::Bool);
+    p->addStruct("Rune", KindEx::Rune);
+    p->addStruct("Type", KindEx::Type);
     p->addProtocol("Any");
     if (!bindParcelDef("yama", *p, true)) YM_DEADEND;
 }

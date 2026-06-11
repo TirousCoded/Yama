@@ -441,27 +441,27 @@ bool YmCtx::explicitInit(YmLocal where, YmType& type, std::string_view argNames)
         std::string_view argName(it.begin(), it.end());
         // TODO: Optimize out this std::string heap alloc.
         if (auto getter = type.member((std::string)argName);
-            getter && getter->info->isStoredPropertyGet()) {
+            getter && getter->info->type->isStoredPropertyGet()) {
             // TODO: When we figure out max stored properties, be sure to account for
             //       the 'YmUInt8(~)' here too.
-            YmUInt8 storedPropertyIndex = YmUInt8(getter->info->storedPropertyIndex().value());
-            if (!argPack.specifyNextNamedArg(storedPropertyIndex)) {
+            YmUInt8 storedPropertySlot = YmUInt8(getter->info->type->storedPropertySlot().value());
+            if (!argPack.specifyNextNamedArg(storedPropertySlot)) {
                 _ym::Global::raiseErr(
                     YmErrCode_IllegalNameList,
                     "Explicit init failed; stored property {} specified multiple times!",
                     (std::string)argName);
                 return false;
             }
-            uint8_t argOffset = argPack.argOffset(storedPropertyIndex, true).value();
+            uint8_t argOffset = argPack.argOffset(storedPropertySlot, true).value();
             auto& arg = ym::deref(local(locals() - YmLocals(argNameCount) + argOffset));
-            if (arg.type != getter->returnType()) {
+            if (arg.type != getter->type().returnType()) {
                 _ym::Global::raiseErr(
                     YmErrCode_TypeMismatch,
                     "Explicit init failed; arg #{} (for stored property {}) is {}, but expected {}!",
                     argOffset + 1,
                     (std::string)argName,
                     arg.type->fullname(),
-                    getter->returnType()->fullname());
+                    getter->type().fullname());
                 return false;
             }
         }
@@ -556,8 +556,7 @@ bool YmCtx::getProperty(YmType& propertyType, YmLocal where) {
         return false;
     }
     if (propertyType.info->isStoredPropertyGet()) { // Stored
-        size_t slotInd = propertyType.info->storedPropertyIndex().value();
-        auto result = ym::Safe(subject.slot(slotInd).ref);
+        auto result = ym::Safe(subject.slot(propertyType.info->storedPropertySlot().value()).ref);
         secure(*result);
         pop(1);
         put(where, *result);
@@ -616,7 +615,7 @@ bool YmCtx::setProperty(YmType& propertyType) {
         return false;
     }
     if (assigner.info->isStoredPropertySet()) { // Stored
-        auto& target = subject.slot(assigner.info->storedPropertyIndex().value()).ref;
+        auto& target = subject.slot(assigner.info->storedPropertySlot().value()).ref;
         // Release slot's current ref.
         release(ym::deref(target));
         // Assign new ref, stealing it from stack.
@@ -841,21 +840,21 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmL
     for (const auto& it : argNames | std::views::split(',')) {
         std::string_view argName(it.begin(), it.end());
         // TODO: Optimize out this std::string heap alloc.
-        if (auto paramInd = fn.paramIndex((std::string)argName)) {
-            if (fn.isPositionalParam(*paramInd)) {
+        if (auto tparam = fn.param((std::string)argName)) {
+            if (tparam->isPositional()) {
                 _ym::Global::raiseErr(
                     YmErrCode_IllegalNameList,
                     "Call to {} failed; {} is a positional param, not a named one!",
                     fn.fullname(),
-                    fn.paramName(*paramInd));
+                    tparam->name());
                 return false;
             }
-            if (!argPack.specifyNextNamedArg(*paramInd)) {
+            if (!argPack.specifyNextNamedArg(tparam->index())) {
                 _ym::Global::raiseErr(
                     YmErrCode_IllegalNameList,
                     "Call to {} failed; named param {} specified multiple times!",
                     fn.fullname(),
-                    fn.paramName(*paramInd));
+                    tparam->name());
                 return false;
             }
         }
@@ -884,16 +883,16 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmL
         // Quietly skip unspecified named args.
         if (auto argOffset = argPack.argOffset(param, true)) {
             auto t = ym::deref(local(locals() - args + *argOffset)).type;
-            if (t != fn.paramType(param)) {
+            if (auto p = fn.param(param); !p->type().sameAs(t)) {
                 _ym::Global::raiseErr(
                     YmErrCode_TypeMismatch,
                     "Call to {} failed; arg #{} (for {} param {}) is {}, but expected {}!",
                     fn.fullname(),
                     *argOffset + 1,
-                    fn.isPositionalParam(param) ? "positional" : "named",
-                    fn.paramName(param),
+                    p->isPositional() ? "positional" : "named",
+                    p->name(),
                     t->fullname(),
-                    fn.paramType(param)->fullname());
+                    p->type().fullname());
                 return false;
             }
         }
@@ -950,13 +949,13 @@ void YmCtx::_dispatchCall(YmType& fn) {
     if (fn.isMethodReq()) { // Protocol Method Dispatch
         // NOTE: Prior to changing fwdFromProto, arg(0) shouldn't see through boxing.
         auto callobj = arg(0);
-        auto ptableInd = (uintptr_t)fn.info->callBehaviour.value().user;
+        auto ptableInd = (uintptr_t)ym::deref(fn.info->callBehaviour()).user;
         auto forwardedTo = callobj->ptable()[ptableInd];
         cf.fn = forwardedTo;
         cf.fwdFromProto = true;
         // If indirectly called method has named params, we gotta add proper number
         // of dummies to cf.argPack, and we gotta push dummy objects for each.
-        if (auto named = forwardedTo->namedParamCount(); named >= 1) {
+        if (auto named = forwardedTo->namedParams(); named >= 1) {
             for (YmParams i = 0; i < named; i++) {
                 ymCtx_PutNone(this, YM_NEWTOP);
             }
@@ -964,7 +963,7 @@ void YmCtx::_dispatchCall(YmType& fn) {
             cf.localsOffset += named;
         }
     }
-    auto& callBhvrInfo = cf.fn->info->callBehaviour.value();
+    auto& callBhvrInfo = ym::deref(cf.fn->info->callBehaviour());
     callBhvrInfo.fn(this, callBhvrInfo.user);
 }
 

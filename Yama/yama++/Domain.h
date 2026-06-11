@@ -23,6 +23,13 @@ namespace ym {
         inline Domain(Safe<YmDm> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
+        // Increments resource's ref count if secure == true.
+        inline static std::optional<Domain> maybe(YmDm* resource, bool secure) noexcept {
+            return
+                resource
+                ? std::make_optional(Domain(*resource, secure))
+                : std::nullopt;
+        }
 
 
         // path is expected to be null-terminated.

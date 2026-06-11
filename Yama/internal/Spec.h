@@ -81,7 +81,11 @@ namespace _ym {
 		size_t hash() const noexcept;
 		std::string fmt() const;
 
-		Spec transformed(RedirectSet* redirects, YmParcel* here = nullptr, YmType* typeParamsCtx = nullptr, YmType* self = nullptr) const;
+		Spec transformed(
+			RedirectSet* redirects,
+			YmParcel* here = nullptr,
+			YmType* typeParamsCtx = nullptr,
+			YmType* self = nullptr) const;
 		Spec removeCallSuff() const;
 
 

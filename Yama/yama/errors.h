@@ -28,9 +28,10 @@ extern "C" {
         YmErrCode_IllegalConstraint,        /* Illegal type parameter constraint. */
         YmErrCode_PathBindError,            /* Path binding error. */
         YmErrCode_TypeArgsError,            /* Type arguments error. */
-        YmErrCode_ParcelNotFound,           /* Couldn't find a specific parcel. */
-        YmErrCode_TypeNotFound,             /* Couldn't find a specific type. */
-        YmErrCode_ParamNotFound,            /* Couldn't find a specific parameter. */
+        YmErrCode_ParcelNotFound,           /* Parcel not found. */
+        YmErrCode_TypeNotFound,             /* Type not found. */
+        YmErrCode_ParamNotFound,            /* Parameter not found. */
+        YmErrCode_CallSigNotFound,          /* Call signature not found. */
         YmErrCode_IllegalName,              /* Illegal name. */
         YmErrCode_NameConflict,             /* Name conflict detected. */
         YmErrCode_LimitReached,             /* Known limit reached. */

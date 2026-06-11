@@ -41,8 +41,8 @@ TEST(Types, Kind) {
 TEST(Types, Owner_MemberType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -64,9 +64,9 @@ TEST(Types, Owner_NonMemberType) {
 TEST(Types, Members_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -80,8 +80,8 @@ TEST(Types, Members_OwnerType) {
 TEST(Types, Members_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -93,9 +93,9 @@ TEST(Types, Members_NonOwnerType) {
 TEST(Types, MemberByIndex_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -111,8 +111,8 @@ TEST(Types, MemberByIndex_OwnerType) {
 TEST(Types, MemberByIndex_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -124,9 +124,9 @@ TEST(Types, MemberByIndex_NonOwnerType) {
 TEST(Types, MemberByName_OwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m1_index = ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
-    auto A_m2_index = ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m1 = ymCtx_Load(ctx, "p:A::m1");
@@ -142,8 +142,8 @@ TEST(Types, MemberByName_OwnerType) {
 TEST(Types, MemberByName_NonOwnerType) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
-    auto A_index = ymParcelDef_AddStruct(p_def, "A");
-    auto A_m_index = ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymDm_BindParcelDef(dm, "p", p_def);
     auto A = ymCtx_Load(ctx, "p:A");
     auto A_m = ymCtx_Load(ctx, "p:A::m");
@@ -267,7 +267,7 @@ TEST(Types, TypeParamByName_NonOwnerType) {
 static void setup_fn_type_with_three_pos_and_two_named_params(YmDm* dm, YmParcelDef* p_def) {
     ymAssert(dm != nullptr);
     ymAssert(p_def != nullptr);
-    auto A_index = ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddFn(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddStruct(p_def, "B");
     ymParcelDef_AddStruct(p_def, "C");
     ymParcelDef_AddStruct(p_def, "D");
@@ -345,25 +345,10 @@ TEST(Types, ParamName_Callable) {
     EXPECT_STREQ(ymType_ParamName(A, 2), "z");
     EXPECT_STREQ(ymType_ParamName(A, 3), "a");
     EXPECT_STREQ(ymType_ParamName(A, 4), "b");
-}
-
-TEST(Types, ParamName_ParamNotFound_Callable) {
-    SETUP_ALL(ctx);
-    SETUP_PARCELDEF(p_def);
-    setup_fn_type_with_three_pos_and_two_named_params(dm, p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
     EXPECT_EQ(ymType_ParamName(A, 5), nullptr);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
-TEST(Types, ParamName_ParamNotFound_NonCallable) {
+TEST(Types, ParamName_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddStruct(p_def, "A");
@@ -371,7 +356,6 @@ TEST(Types, ParamName_ParamNotFound_NonCallable) {
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
     EXPECT_EQ(ymType_ParamName(A, 0), nullptr);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
 TEST(Types, ParamType_Callable) {
@@ -391,25 +375,10 @@ TEST(Types, ParamType_Callable) {
     EXPECT_EQ(ymType_ParamType(A, 2), D);
     EXPECT_EQ(ymType_ParamType(A, 3), B);
     EXPECT_EQ(ymType_ParamType(A, 4), C);
-}
-
-TEST(Types, ParamType_ParamNotFound_Callable) {
-    SETUP_ALL(ctx);
-    SETUP_PARCELDEF(p_def);
-    setup_fn_type_with_three_pos_and_two_named_params(dm, p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    auto B = ymCtx_Load(ctx, "p:B");
-    auto C = ymCtx_Load(ctx, "p:C");
-    auto D = ymCtx_Load(ctx, "p:D");
-    ASSERT_TRUE(A);
-    ASSERT_TRUE(B);
-    ASSERT_TRUE(C);
-    ASSERT_TRUE(D);
     EXPECT_EQ(ymType_ParamType(A, 5), nullptr);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
-TEST(Types, ParamType_ParamNotFound_NonCallable) {
+TEST(Types, ParamType_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddStruct(p_def, "A");
@@ -417,7 +386,6 @@ TEST(Types, ParamType_ParamNotFound_NonCallable) {
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
     EXPECT_EQ(ymType_ParamType(A, 0), nullptr);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
 TEST(Types, ParamCategory_Callable) {
@@ -431,19 +399,10 @@ TEST(Types, ParamCategory_Callable) {
     EXPECT_EQ(ymType_ParamCategory(A, 2), YmParamCategory_Positional);
     EXPECT_EQ(ymType_ParamCategory(A, 3), YmParamCategory_Named);
     EXPECT_EQ(ymType_ParamCategory(A, 4), YmParamCategory_Named);
-}
-
-TEST(Types, ParamCategory_ParamNotFound_Callable) {
-    SETUP_ALL(ctx);
-    SETUP_PARCELDEF(p_def);
-    setup_fn_type_with_three_pos_and_two_named_params(dm, p_def);
-    auto A = ymCtx_Load(ctx, "p:A");
-    ASSERT_TRUE(A);
     EXPECT_EQ(ymType_ParamCategory(A, 5), YmParamCategory_Positional);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
-TEST(Types, ParamCategory_ParamNotFound_NonCallable) {
+TEST(Types, ParamCategory_NonCallable) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddStruct(p_def, "A");
@@ -451,7 +410,6 @@ TEST(Types, ParamCategory_ParamNotFound_NonCallable) {
     auto A = ymCtx_Load(ctx, "p:A");
     ASSERT_TRUE(A);
     EXPECT_EQ(ymType_ParamCategory(A, 0), YmParamCategory_Positional);
-    EXPECT_EQ(err[YmErrCode_ParamNotFound], 1);
 }
 
 TEST(Types, Ref) {

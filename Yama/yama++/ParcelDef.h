@@ -23,53 +23,51 @@ namespace ym {
         inline explicit ParcelDef(Safe<YmParcelDef> resource, bool secure) noexcept :
             Handle(resource, secure) {
         }
+        // Increments resource's ref count if secure == true.
+        inline static std::optional<ParcelDef> maybe(YmParcelDef* resource, bool secure) noexcept {
+            return
+                resource
+                ? std::make_optional(ParcelDef(*resource, secure))
+                : std::nullopt;
+        }
 
 
-        inline std::optional<YmTypeIndex> addStruct(
+        inline bool addStruct(
             const std::string& name) noexcept {
-            if (auto result = ymParcelDef_AddStruct(
+            return ymParcelDef_AddStruct(
                 get(),
                 name.c_str());
-                result != YM_NO_TYPE_INDEX) {
-                return result;
-            }
-            return std::nullopt;
         }
-        inline std::optional<YmTypeIndex> addProtocol(
+        inline bool addProtocol(
             const std::string& name) noexcept {
-            if (auto result = ymParcelDef_AddProtocol(
+            return ymParcelDef_AddProtocol(
                 get(),
                 name.c_str());
-                result != YM_NO_TYPE_INDEX) {
-                return result;
-            }
-            return std::nullopt;
         }
-        inline std::optional<YmTypeIndex> addFn(
+        inline bool addFn(
             const std::string& name,
             const std::string& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
             const std::vector<std::string>& refTypeSymbols,
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
-            if (auto result = ymParcelDef_AddFn(
+            if (ymParcelDef_AddFn(
                 get(),
                 name.c_str(),
                 returnTypeSymbol.c_str(),
                 callBehaviour,
-                callBehaviourData);
-                result != YM_NO_TYPE_INDEX) {
+                callBehaviourData)) {
                 for (const auto& [paramName, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(name, paramName, typeSymbol);
                 }
                 for (const auto& typeSymbol : refTypeSymbols) {
                     addRef(name, typeSymbol);
                 }
-                return result;
+                return true;
             }
-            return std::nullopt;
+            return false;
         }
-        inline std::optional<YmTypeIndex> addMethod(
+        inline bool addMethod(
             const std::string& ownerName,
             const std::string& name,
             const std::string& returnTypeSymbol,
@@ -77,14 +75,13 @@ namespace ym {
             const std::vector<std::string>& refTypeSymbols,
             YmCallBhvrCallbackFn callBehaviour,
             void* callBehaviourData = nullptr) noexcept {
-            if (auto result = ymParcelDef_AddMethod(
+            if (ymParcelDef_AddMethod(
                 get(),
                 ownerName.c_str(),
                 name.c_str(),
                 returnTypeSymbol.c_str(),
                 callBehaviour,
-                callBehaviourData);
-                result != YM_NO_TYPE_INDEX) {
+                callBehaviourData)) {
                 auto methodName = std::format("{}::{}", ownerName, name);
                 for (const auto& [paramName, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(methodName, paramName, typeSymbol);
@@ -92,28 +89,27 @@ namespace ym {
                 for (const auto& typeSymbol : refTypeSymbols) {
                     addRef(methodName, typeSymbol);
                 }
-                return result;
+                return true;
             }
-            return std::nullopt;
+            return false;
         }
-        inline std::optional<YmTypeIndex> addMethodReq(
+        inline bool addMethodReq(
             const std::string& ownerName,
             const std::string& name,
             const std::string& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols) noexcept {
-            if (auto result = ymParcelDef_AddMethodReq(
+            if (ymParcelDef_AddMethodReq(
                 get(),
                 ownerName.c_str(),
                 name.c_str(),
-                returnTypeSymbol.c_str());
-                result != YM_NO_TYPE_INDEX) {
+                returnTypeSymbol.c_str())) {
                 auto methodName = std::format("{}::{}", ownerName, name);
                 for (const auto& [paramName, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(methodName, paramName, typeSymbol);
                 }
-                return result;
+                return true;
             }
-            return std::nullopt;
+            return false;
         }
         inline std::optional<YmTypeParamIndex> addTypeParam(
             const std::string& typeName,

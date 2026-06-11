@@ -59,6 +59,12 @@ namespace ym {
         inline explicit Type(Safe<YmType> x) noexcept :
             Handle(x) {
         }
+        inline static std::optional<Type> maybe(YmType* resource) noexcept {
+            return
+                resource
+                ? std::make_optional(Type(*resource))
+                : std::nullopt;
+        }
 
 
         inline Parcel parcel() const noexcept {
@@ -74,31 +80,20 @@ namespace ym {
             return ymType_Kind(get());
         }
         inline std::optional<Type> owner() const noexcept {
-            if (auto result = ymType_Owner(get())) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+            return maybe(ymType_Owner(get()));
         }
         inline YmMembers members() const noexcept {
             return ymType_Members(get());
         }
         inline std::optional<Type> member(YmMemberIndex member) const noexcept {
-            if (auto result = ymType_MemberByIndex(get(), member)) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+            return maybe(ymType_MemberByIndex(get(), member));
         }
+        // name is expected to be null-terminated.
         inline std::optional<Type> member(std::convertible_to<std::string_view> auto const& name) const noexcept {
-            if (auto result = ymType_MemberByName(get(), std::string_view(name).data())) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+            return maybe(ymType_MemberByName(get(), std::string_view(name).data()));
         }
         inline std::optional<Type> returnType() const noexcept {
-            if (auto result = ymType_ReturnType(get())) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+            return maybe(ymType_ReturnType(get()));
         }
         inline YmParams params() const noexcept {
             return ymType_Params(get(), YM_TRUE);
@@ -116,10 +111,7 @@ namespace ym {
                 : std::nullopt;
         }
         inline std::optional<Type> ref(YmRef reference) const noexcept {
-            if (auto result = ymType_Ref(get(), reference)) {
-                return Type(Safe(result));
-            }
-            return std::nullopt;
+            return maybe(ymType_Ref(get(), reference));
         }
         inline bool depends(const Type& other) const noexcept {
             return ymType_Depends(get(), other.get());

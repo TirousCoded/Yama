@@ -7,7 +7,7 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 32);
+    static_assert(YmErrCode_Num == 33);
     switch (code) {
     case YmErrCode_IllegalSpecifier:        return "IllegalSpecifier";
     case YmErrCode_IllegalConstraint:       return "IllegalConstraint";
@@ -16,6 +16,7 @@ const YmChar* ymFmtYmErrCode(YmErrCode code) {
     case YmErrCode_ParcelNotFound:          return "ParcelNotFound";
     case YmErrCode_TypeNotFound:            return "TypeNotFound";
     case YmErrCode_ParamNotFound:           return "ParamNotFound";
+    case YmErrCode_CallSigNotFound:         return "CallSigNotFound";
     case YmErrCode_IllegalName:             return "IllegalName";
     case YmErrCode_NameConflict:            return "NameConflict";
     case YmErrCode_LimitReached:            return "LimitReached";

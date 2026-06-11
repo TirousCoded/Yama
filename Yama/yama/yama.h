@@ -333,13 +333,22 @@ extern "C" {
     /* The memory of the returned string is static and is valid for the lifetime of the process. */
     const YmChar* ymKind_Fmt(YmKind x);
 
-    /* TODO: ymKind_IsCallable hasn't been unit tested.
+    /* TODO: ymKind_HasCallSig hasn't been unit tested.
     */
 
-    /* Returns if kind x is for callable types. */
+    /* Returns if kind x is for kinds which (always) have call signatures. */
+    /* Having a call signature does not guarantee callability. */
     /* Undefined Behaviour: */
     /*   - x is invalid. */
-    YmBool ymKind_IsCallable(YmKind x);
+    YmBool ymKind_HasCallSig(YmKind x);
+
+    /* TODO: ymKind_IsOwner hasn't been unit tested.
+    */
+
+    /* Returns if kind x is for owner types. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
+    YmBool ymKind_IsOwner(YmKind x);
 
     /* TODO: ymKind_IsMember hasn't been unit tested.
     */
@@ -349,13 +358,13 @@ extern "C" {
     /*   - x is invalid. */
     YmBool ymKind_IsMember(YmKind x);
 
-    /* TODO: ymKind_HasMembers hasn't been unit tested.
+    /* TODO: ymKind_CanHaveMembers hasn't been unit tested.
     */
 
     /* Returns if kind x is types which can have members. */
     /* Undefined Behaviour: */
     /*   - x is invalid. */
-    YmBool ymKind_HasMembers(YmKind x);
+    YmBool ymKind_CanHaveMembers(YmKind x);
 
 
     /* NOTE: By default, Yama frontend API fns work w/ ref counts according to Python rules.
@@ -440,13 +449,6 @@ extern "C" {
 
     /* Sentinel ID for no reference. */
 #define YM_NO_REF (YmRef(-1))
-
-
-    /* Index of a type in a parcel. */
-    typedef YmUInt16 YmTypeIndex;
-
-    /* Sentinel index for no type. */
-#define YM_NO_TYPE_INDEX (YmTypeIndex(-1))
 
 
     /* Index of a type member (ie. in its owner's member list.) */
@@ -670,7 +672,7 @@ extern "C" {
     /* Creates a new Yama context, returning a pointer to it. */
     /* domain is the Yama domain the context is to be associated with. */
     /* Undefined Behaviour: */
-    /*   - domain is invalid. */
+    /*   - dm is invalid. */
     struct YmCtx* ymCtx_Create(struct YmDm* dm);
 
     /* Increments the ref count of context ctx. */
@@ -785,6 +787,9 @@ extern "C" {
     *        so that their doc comments describe this and tell end-user to check for panic.
     */
     /* TODO: Finish adding panic stuff later.
+    */
+
+    /* TODO: For ABI, maybe it's better not to use C variadics here.
     */
 
     /* TODO */
@@ -963,6 +968,18 @@ extern "C" {
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
     struct YmObj* ymCtx_Pull(struct YmCtx* ctx);
+
+    /* TODO: ymCtx_Copy hasn't been unit tested yet!
+    */
+
+    /* StkFx: ...objs -- result->to */
+    /* Copies object at from in objs into to, returning if successful. */
+    /* Failure: */
+    /*   - from is out-of-bounds. */
+    /*   - to is out-of-bounds. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    YmBool ymCtx_Copy(struct YmCtx* ctx, YmLocal from, YmLocal to);
 
     /* TODO: At some point we'll need a max limit on object stack (either limit per-call frame,
     *        or of the global stack all call frame object stacks are allocated w/.)
@@ -1161,25 +1178,25 @@ extern "C" {
     *        '_' ASCII chars, and may not start w/ a digit.
     */
 
-    /* Adds a new struct to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new struct to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type's fullname conflicts with an existing declaration. */
     /*   - name is illegal. */
     /* Undefined Behaviour: */
     /*   - parceldef is invalid. */
     /*   - name (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddStruct(
+    YmBool ymParcelDef_AddStruct(
         struct YmParcelDef* parceldef,
         const YmChar* name);
 
-    /* Adds a new protocol to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new protocol to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type's fullname conflicts with an existing declaration. */
     /*   - name is illegal. */
     /* Undefined Behaviour: */
     /*   - parceldef is invalid. */
     /*   - name (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddProtocol(
+    YmBool ymParcelDef_AddProtocol(
         struct YmParcelDef* parceldef,
         const YmChar* name);
 
@@ -1194,7 +1211,7 @@ extern "C" {
     /* TODO: Maybe make callBehaviour being YM_NIL not UB, but instead a proper non-fatal error.
     */
 
-    /* Adds a new function to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new function to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type's fullname conflicts with an existing declaration. */
     /*   - name is illegal. */
@@ -1204,7 +1221,7 @@ extern "C" {
     /*   - name (pointer) is invalid. */
     /*   - returnType (pointer) is invalid. */
     /*   - callBehaviour is invalid. */
-    YmTypeIndex ymParcelDef_AddFn(
+    YmBool ymParcelDef_AddFn(
         struct YmParcelDef* parceldef,
         const YmChar* name,
         YmRefSym returnType,
@@ -1215,7 +1232,7 @@ extern "C" {
     *        in which case the description for below will need to be updated.
     */
 
-    /* Adds a new method to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new method to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1229,7 +1246,7 @@ extern "C" {
     /*   - name (pointer) is invalid. */
     /*   - returnType (pointer) is invalid. */
     /*   - callBehaviour is invalid. */
-    YmTypeIndex ymParcelDef_AddMethod(
+    YmBool ymParcelDef_AddMethod(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
@@ -1243,7 +1260,7 @@ extern "C" {
     *        These behave otherwise like regular methods, but have this special additional role.
     */
 
-    /* Adds a new method req. to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new method req. to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1256,13 +1273,13 @@ extern "C" {
     /*   - ownerName (pointer) is invalid. */
     /*   - name (pointer) is invalid. */
     /*   - returnType (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddMethodReq(
+    YmBool ymParcelDef_AddMethodReq(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym returnType);
 
-    /* Adds a new read-only stored property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new read-only stored property to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1275,13 +1292,13 @@ extern "C" {
     /*   - ownerName (pointer) is invalid. */
     /*   - name (pointer) is invalid. */
     /*   - type (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddReadOnlyStoredProperty(
+    YmBool ymParcelDef_AddReadOnlyStoredProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym type);
 
-    /* Adds a new stored property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new stored property to parceldef, returning if successful. */
     /* A corresponding property assigner type is added immediately after the property type. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
@@ -1295,13 +1312,13 @@ extern "C" {
     /*   - ownerName (pointer) is invalid. */
     /*   - name (pointer) is invalid. */
     /*   - type (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddStoredProperty(
+    YmBool ymParcelDef_AddStoredProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym type);
 
-    /* Adds a new read-only computed property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new read-only computed property to parceldef, returning if successful. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1315,7 +1332,7 @@ extern "C" {
     /*   - name (pointer) is invalid. */
     /*   - type (pointer) is invalid. */
     /*   - getCallBehaviour (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddReadOnlyComputedProperty(
+    YmBool ymParcelDef_AddReadOnlyComputedProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
@@ -1323,7 +1340,7 @@ extern "C" {
         YmCallBhvrCallbackFn getCallBehaviour,
         void* getCallBehaviourData);
 
-    /* Adds a new computed property to parceldef, returning its index, or YM_NO_TYPE_INDEX on failure. */
+    /* Adds a new computed property to parceldef, returning if successful. */
     /* A corresponding property assigner type is added immediately after the property type. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
@@ -1339,7 +1356,7 @@ extern "C" {
     /*   - type (pointer) is invalid. */
     /*   - getCallBehaviour (pointer) is invalid. */
     /*   - setCallBehaviour (pointer) is invalid. */
-    YmTypeIndex ymParcelDef_AddComputedProperty(
+    YmBool ymParcelDef_AddComputedProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,

@@ -40,9 +40,53 @@ namespace _ym {
 }
 
 
+// TODO: One issue w/ YmType is that its use of 'YmType*' vs. 'const YmType*' is inconsistent.
+
 struct YmType final : public std::enable_shared_from_this<YmType> {
 public:
     using Name = _ym::Spec;
+
+    struct TypeParam final {
+        using Info = _ym::TypeInfo::TypeParam;
+
+
+        ym::Safe<const YmType> self; // No relation to '$Self'.
+        ym::Safe<const Info> info;
+
+
+        inline YmTypeParamIndex index() const noexcept { return info->index; }
+        inline const std::string& name() const noexcept { return info->name; }
+        YmType& constraint() const noexcept;
+        YmType& arg() const noexcept;
+    };
+    struct Member final {
+        using Info = _ym::TypeInfo::Member;
+
+
+        ym::Safe<const YmType> self; // No relation to '$Self'.
+        ym::Safe<const Info> info;
+
+
+        inline YmMemberIndex index() const noexcept { return info->index; }
+        inline const std::string& name() const noexcept { return info->name; }
+        YmType& type() const noexcept;
+    };
+    struct Param final {
+        using Info = _ym::TypeInfo::Param;
+
+
+        ym::Safe<const YmType> self; // No relation to '$Self'.
+        ym::Safe<const Info> info;
+
+
+        inline YmParamIndex index() const noexcept { return info->index; }
+        inline const std::string& name() const noexcept { return info->name; }
+        inline YmParamCategory category() const noexcept { return info->category; }
+        YmType& type() const noexcept;
+        inline bool isPositional() const noexcept { return info->isPositional(); }
+        inline bool isNamed() const noexcept { return info->isNamed(); }
+        bool isSelfParam() const noexcept;
+    };
 
 
     const ym::Safe<YmParcel> parcel;
@@ -59,7 +103,7 @@ public:
         typeArgs(std::move(typeArgs)),
         // TODO: This 'dummy' Spec is gross.
         _fullname(_ym::Spec::pathFast("dummy")) {
-        ymAssert(!ymKind_IsMember(kind()) || this->typeArgs.empty());
+        ymAssert(!isMember() || this->typeArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname();
     }
@@ -72,21 +116,70 @@ public:
         typeArgs(std::move(typeArgs)),
         // TODO: This 'dummy' Spec is gross.
         _fullname(_ym::Spec::pathFast("dummy")) {
-        ymAssert(!ymKind_IsMember(kind()) || this->typeArgs.empty());
+        ymAssert(!isMember() || this->typeArgs.empty());
         _initConstsArrayToDummyIntConsts();
         _initFullname(owner);
     }
 
 
-    inline YmKind kind() const noexcept { return info->kind; }
+    inline bool sameAs(const YmType* other) const noexcept { return this == other; }
+    inline bool sameAs(const YmType& other) const noexcept { return sameAs(&other); }
+
+    YmKind kind() const noexcept;
     const _ym::Spec& path() const noexcept;
     const _ym::Spec& fullname() const noexcept;
     const std::string& localName() const noexcept;
 
+    bool isRegular() const noexcept;
+    bool isIrregular() const noexcept;
+    bool isPrimitive() const noexcept;
+    bool isGetter() const noexcept;
+    bool isSetter() const noexcept;
+    bool isVarLike() const noexcept;
+    bool isProtocolReq() const noexcept;
+
+    bool hasCallSig() const noexcept;
+    bool isOwner() const noexcept;
+    bool isMember() const noexcept;
+    bool canHaveMembers() const noexcept;
+
+    bool hasDefaultValue() const noexcept;
+
+    static_assert(YmKind_Num == 6);
+    bool isStruct() const noexcept;
+    bool isProtocol() const noexcept;
+    bool isFn() const noexcept;
+    bool isMethod() const noexcept;
+    bool isProperty() const noexcept;
+    bool isPropertyAssigner() const noexcept;
+
+    static_assert(YmKind_Num == 6);
+    bool isRegularStruct() const noexcept;
+    bool isRegularProtocol() const noexcept;
+    bool isRegularFn() const noexcept;
+    bool isRegularMethod() const noexcept;
+    bool isRegularProperty() const noexcept;
+    bool isRegularPropertyAssigner() const noexcept;
+
+    bool isNone() const noexcept;
+    bool isInt() const noexcept;
+    bool isUInt() const noexcept;
+    bool isFloat() const noexcept;
+    bool isBool() const noexcept;
+    bool isRune() const noexcept;
+    bool isType() const noexcept;
+
+    bool isMethodReq() const noexcept;
+
+    bool isStoredPropertyGet() const noexcept;
+    bool isStoredPropertySet() const noexcept;
+
+    bool isCallable() const noexcept;
+    bool isTypeMethod() const noexcept;
+    bool isObjMethod() const noexcept;
+
     std::optional<std::string> callsuff() const;
     std::optional<_ym::Spec> callsig() const;
-
-    inline bool sameAs(YmType& other) const noexcept { return this == &other; }
 
     // TODO: We should look into how we may need to update callsigs and callsuffs
     //       to account for named params properly.
@@ -99,36 +192,24 @@ public:
     const YmType* owner() const noexcept;
     ym::Safe<YmType> self() noexcept;
     ym::Safe<const YmType> self() const noexcept;
-    YmMembers members() const noexcept;
-    YmType* member(YmMemberIndex member) const noexcept;
-    YmType* member(const std::string& name) const noexcept;
-    YmTypeParams typeParams() const noexcept;
-    YmType* typeParam(YmTypeParamIndex index) const noexcept;
-    YmType* typeParam(const std::string& name) const noexcept;
-    YmType* typeParamConstraint(YmTypeParamIndex index) const noexcept;
-    YmType* typeParamConstraint(const std::string& name) const noexcept;
 
-    YmParams paramCount() const noexcept;
-    YmParams positionalParamCount() const noexcept;
-    YmParams namedParamCount() const noexcept;
-    bool isPositionalParam(YmParamIndex index) const noexcept;
-    bool isNamedParam(YmParamIndex index) const noexcept;
+    YmTypeParams typeParams() const noexcept;
+    std::optional<TypeParam> typeParam(YmTypeParamIndex index) const noexcept;
+    std::optional<TypeParam> typeParam(const std::string& name) const noexcept;
+
+    YmMembers members() const noexcept;
+    std::optional<Member> member(YmMemberIndex index) const noexcept;
+    std::optional<Member> member(const std::string& name) const noexcept;
+
     YmType* returnType() const noexcept;
-    const YmChar* paramName(YmParamIndex index) const;
-    YmType* paramType(YmParamIndex index) const;
-    std::optional<YmParamCategory> paramCategory(YmParamIndex index) const noexcept;
-    std::optional<YmParamIndex> paramIndex(const std::string& name) const noexcept;
+    YmParams params() const noexcept;
+    YmParams positionalParams() const noexcept;
+    YmParams namedParams() const noexcept;
+    std::optional<Param> param(YmParamIndex index) const noexcept;
+    std::optional<Param> param(const std::string& name) const noexcept;
+    bool hasSelfParam() const noexcept;
 
     YmType* assigner() const noexcept;
-
-    bool hasSelfParam() const noexcept;
-    bool isTypeMethod() const noexcept;
-    bool isObjMethod() const noexcept;
-
-    bool isCallable() const noexcept;
-    bool isMethodReq() const noexcept;
-
-    bool hasDefaultValue() const noexcept;
 
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;
@@ -146,6 +227,12 @@ public:
     }
     inline ym::Safe<YmType> constAsRef(size_t index) const noexcept {
         return constAs<_ym::ConstType::Ref>(index);
+    }
+    inline YmType* constAsRef(std::optional<size_t> index) const noexcept {
+        return
+            index
+            ? constAsRef(*index).get()
+            : nullptr;
     }
 
     void putValConst(size_t index);
@@ -176,11 +263,22 @@ private:
     void _initFullname();
     void _initFullname(YmType& owner);
 
+    // Discerns type args vector to use, forwarding to owner for member types.
+    const decltype(typeArgs)& _getTypeArgs() const noexcept;
+
     template<typename T>
     inline void _putValConstAs(size_t index) {
         ymAssert(size_t(index) < info->consts.size());
         ymAssert(info->consts.isVal(index));
         _consts[index] = _ym::Const::byType<T>(info->consts[index].as<T>());
+    }
+
+    template<typename T>
+    inline std::optional<T> _mkHelper(const T::Info* info) const noexcept {
+        if (info) {
+            return T{ .self = *this, .info = *info };
+        }
+        return std::nullopt;
     }
 };
 
