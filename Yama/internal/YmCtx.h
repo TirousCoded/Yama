@@ -136,7 +136,9 @@ private:
 	bool _endCall() noexcept;
 	void _dispatchCall(YmType& fn);
 
-	bool _localInBoundsForWrite(YmLocal where) const noexcept;
+	// Transforms negative indices into positive absolute ones, and fails if out-of-bounds.
+	std::optional<YmLocal> _absIndex(YmLocal x) const noexcept;
+	std::optional<YmLocal> _absIndexForRead(YmLocal x) const noexcept;
 
 	static YmRune _uint2rune(YmUInt x) noexcept;
 };

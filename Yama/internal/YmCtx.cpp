@@ -297,9 +297,10 @@ YmType* YmCtx::ref(YmRef reference) {
 
 YmObj* YmCtx::local(YmLocal where, YmRefPolicy returnPolicy) {
     auto& cf = _callStk.back();
+    auto local = _absIndexForRead(where);
     auto result =
-        where < locals()
-        ? _globalObjStk[cf.localOffset(where)].get()
+        local
+        ? _globalObjStk[cf.localOffset(*local)].get()
         : nullptr;
     if (result && returnPolicy != YM_BORROW) {
         secure(*result);
@@ -318,11 +319,14 @@ YmObj* YmCtx::pull() noexcept {
 }
 
 void YmCtx::pop(YmLocals n, bool releaseObjs) {
+    if (n < 0) {
+        return;
+    }
     if (n > locals()) {
         n = locals();
     }
     if (releaseObjs) {
-        for (YmUInt16 i = 0; i < n; i++) {
+        for (YmLocal i = 0; i < n; i++) {
             release(ym::deref(pull()));
         }
     }
@@ -341,14 +345,23 @@ bool YmCtx::put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy) {
         }
         return true;
     }
-    if (where == YM_NEWTOP) {
+    if (where == YM_PUSH) {
         _globalObjStk.push_back(what);
         if (whatPolicy == YM_BORROW) {
             secure(what);
         }
         return true;
     }
-    if (where >= locals()) {
+    if (auto whereAbs = _absIndex(where)) {
+        release(ym::deref(local(*whereAbs)));
+        auto& cf = _callStk.back();
+        _globalObjStk[cf.localOffset(*whereAbs)] = what;
+        if (whatPolicy == YM_BORROW) {
+            secure(what);
+        }
+        return true;
+    }
+    else {
         _ym::Global::raiseErr(
             YmErrCode_LocalNotFound,
             "Put failed; local object index {} out-of-bounds!",
@@ -358,29 +371,22 @@ bool YmCtx::put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy) {
         }
         return false;
     }
-    release(ym::deref(local(where)));
-    auto& cf = _callStk.back();
-    _globalObjStk[cf.localOffset(where)] = what;
-    if (whatPolicy == YM_BORROW) {
-        secure(what);
-    }
-    return true;
 }
 
 bool YmCtx::swap(YmLocal a, YmLocal b) {
-    if (a >= locals()) {
+    auto aLocal = _absIndex(a);
+    auto bLocal = _absIndex(b);
+    if (aLocal && bLocal) {
+        auto& cf = _callStk.back();
+        std::swap(
+            _globalObjStk[cf.localOffset(*aLocal)],
+            _globalObjStk[cf.localOffset(*bLocal)]);
+        return true;
+    }
+    else {
         // TODO: Maybe error msg?
         return false;
     }
-    if (b >= locals()) {
-        // TODO: Maybe error msg?
-        return false;
-    }
-    auto& cf = _callStk.back();
-    std::swap(
-        _globalObjStk[cf.localOffset(a)],
-        _globalObjStk[cf.localOffset(b)]);
-    return true;
 }
 
 bool YmCtx::defaultInit(YmLocal where, YmType& type) {
@@ -391,7 +397,7 @@ bool YmCtx::defaultInit(YmLocal where, YmType& type) {
 }
 
 bool YmCtx::explicitInit(YmLocal where, YmType& type, std::string_view argNames) {
-    if (!_localInBoundsForWrite(where)) {
+    if (!_absIndex(where)) {
         _ym::Global::raiseErr(
             YmErrCode_LocalNotFound,
             "Explicit init failed; local object index {} out-of-bounds!",
@@ -526,7 +532,7 @@ bool YmCtx::ret(YmObj* what, YmRefPolicy whatPolicy) {
 }
 
 bool YmCtx::getProperty(YmType& propertyType, YmLocal where) {
-    if (!_localInBoundsForWrite(where)) {
+    if (!_absIndex(where)) {
         _ym::Global::raiseErr(
             YmErrCode_LocalNotFound,
             "Property get failed; local object index {} out-of-bounds!",
@@ -630,7 +636,7 @@ bool YmCtx::setProperty(YmType& propertyType) {
 }
 
 bool YmCtx::convert(YmType& type, YmLocal returnTo) {
-    if (returnTo != YM_NEWTOP && returnTo != YM_DISCARD && returnTo >= locals()) {
+    if (!_absIndex(returnTo)) {
         _ym::Global::raiseErr(
             YmErrCode_LocalNotFound,
             "Conversion failed; local object index {} out-of-bounds!",
@@ -812,7 +818,7 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmL
             fn.fullname());
         return false;
     }
-    if (!_localInBoundsForWrite(returnTo)) {
+    if (!_absIndex(returnTo)) {
         _ym::Global::raiseErr(
             YmErrCode_LocalNotFound,
             "Call to {} failed; local object index {} out-of-bounds!",
@@ -899,13 +905,13 @@ bool YmCtx::_beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmL
     }
     // Append arg pack w/ dummy objects, then push call frame, and return.
     for (YmParams i = 0; i < argPack.dummies(); i++) {
-        ymCtx_PutNone(this, YM_NEWTOP);
+        ymCtx_PutNone(this, YM_PUSH);
     }
     _callStk.push_back(_CallFrame{
         .fn = &fn,
         .argPack = std::move(argPack),
         .returnTo = returnTo,
-        .localsOffset = YmLocal(_globalObjStk.size()),
+        .localsOffset = YmUInt32(_globalObjStk.size()),
         });
     return true;
 }
@@ -957,7 +963,7 @@ void YmCtx::_dispatchCall(YmType& fn) {
         // of dummies to cf.argPack, and we gotta push dummy objects for each.
         if (auto named = forwardedTo->namedParams(); named >= 1) {
             for (YmParams i = 0; i < named; i++) {
-                ymCtx_PutNone(this, YM_NEWTOP);
+                ymCtx_PutNone(this, YM_PUSH);
             }
             cf.argPack.addDummies(named);
             cf.localsOffset += named;
@@ -967,11 +973,28 @@ void YmCtx::_dispatchCall(YmType& fn) {
     callBhvrInfo.fn(this, callBhvrInfo.user);
 }
 
-bool YmCtx::_localInBoundsForWrite(YmLocal where) const noexcept {
+std::optional<YmLocal> YmCtx::_absIndex(YmLocal x) const noexcept {
+    if (x == YM_PUSH || x == YM_DISCARD) {
+        return x;
+    }
+    if (x >= locals()) {
+        return std::nullopt;
+    }
+    // The 'x < 0' part is to avoid the potential overflow related edge cases.
+    if (x < 0 && locals() + x < 0) {
+        return std::nullopt;
+    }
     return
-        where == YM_NEWTOP ||
-        where == YM_DISCARD ||
-        where < locals();
+        x >= 0
+        ? x
+        : locals() + x;
+}
+
+std::optional<YmLocal> YmCtx::_absIndexForRead(YmLocal x) const noexcept {
+    if (x == YM_PUSH || x == YM_DISCARD) {
+        return std::nullopt;
+    }
+    return _absIndex(x);
 }
 
 YmRune YmCtx::_uint2rune(YmUInt x) noexcept {

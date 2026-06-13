@@ -132,27 +132,27 @@ namespace ym {
         inline bool putRune(YmLocal where, YmRune v) noexcept { return ymCtx_PutRune(get(), where, v) == YM_TRUE; }
         inline bool putType(YmLocal where, const Type& v) noexcept { return ymCtx_PutType(get(), where, v.get()) == YM_TRUE; }
 
-        inline bool push(const Object& what) noexcept { return put(YM_NEWTOP, what); }
-        inline bool pushNone() noexcept { return putNone(YM_NEWTOP); }
-        inline bool pushInt(YmInt v) noexcept { return putInt(YM_NEWTOP, v); }
-        inline bool pushUInt(YmUInt v) noexcept { return putUInt(YM_NEWTOP, v); }
-        inline bool pushFloat(YmFloat v) noexcept { return putFloat(YM_NEWTOP, v); }
-        inline bool pushBool(bool v) noexcept { return putBool(YM_NEWTOP, v); }
-        inline bool pushRune(YmRune v) noexcept { return putRune(YM_NEWTOP, v); }
-        inline bool pushType(const Type& v) noexcept { return putType(YM_NEWTOP, v); }
+        inline bool push(const Object& what) noexcept { return put(YM_PUSH, what); }
+        inline bool pushNone() noexcept { return putNone(YM_PUSH); }
+        inline bool pushInt(YmInt v) noexcept { return putInt(YM_PUSH, v); }
+        inline bool pushUInt(YmUInt v) noexcept { return putUInt(YM_PUSH, v); }
+        inline bool pushFloat(YmFloat v) noexcept { return putFloat(YM_PUSH, v); }
+        inline bool pushBool(bool v) noexcept { return putBool(YM_PUSH, v); }
+        inline bool pushRune(YmRune v) noexcept { return putRune(YM_PUSH, v); }
+        inline bool pushType(const Type& v) noexcept { return putType(YM_PUSH, v); }
 
         // TODO: Reorder ymCtx_[Default|Explicit]Init params so where comes last.
 
         inline bool defaultInit(
             const Type& type,
-            YmLocal where = YM_NEWTOP) noexcept {
+            YmLocal where = YM_PUSH) noexcept {
             return ymCtx_DefaultInit(get(), where, type.get()) == YM_TRUE;
         }
         // argNames is expected to be null-terminated.
         inline bool explicitInit(
             const Type& type,
             std::convertible_to<std::string_view> auto const& argNames,
-            YmLocal where = YM_NEWTOP) noexcept {
+            YmLocal where = YM_PUSH) noexcept {
             return ymCtx_ExplicitInit(get(), where, type.get(), std::string_view(argNames).data()) == YM_TRUE;
         }
 
@@ -161,7 +161,7 @@ namespace ym {
             const Type& fn,
             YmUInt16 argsN,
             std::convertible_to<std::string_view> auto const& argNames,
-            YmLocal returnTo = YM_NEWTOP) noexcept {
+            YmLocal returnTo = YM_PUSH) noexcept {
             return ymCtx_Call(get(), fn.get(), argsN, std::string_view(argNames).data(), returnTo) == YM_TRUE;
         }
         // Discards return value.
@@ -174,7 +174,7 @@ namespace ym {
         }
         inline void ret(const Object& what) noexcept { ymCtx_Ret(get(), what.get(), YM_BORROW); }
 
-        inline bool getProperty(const Type& property, YmLocal where = YM_NEWTOP) noexcept {
+        inline bool getProperty(const Type& property, YmLocal where = YM_PUSH) noexcept {
             return ymCtx_GetProperty(get(), property.get(), where) == YM_TRUE;
         }
         inline bool setProperty(const Type& property) noexcept {

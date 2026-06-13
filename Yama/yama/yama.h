@@ -516,18 +516,19 @@ extern "C" {
 
 
     /* Index of an object on a local object stack. */
-    typedef YmUInt32 YmLocal;
+    /* Negative values index from the stack top, downwards. */
+    typedef YmInt32 YmLocal;
 
     /* Height of a local object stack. */
     typedef YmLocal YmLocals;
 
     /* Sentinel index used to tell the system to, when putting an object into a local index, push to */
     /* a new top stack index rather than putting into an existing index. */
-#define YM_NEWTOP (YmLocal(-1))
+#define YM_PUSH (YmLocal(YM_MIN_INT32 + 0))
 
     /* Sentinel index used to tell the system to, when putting an object into a local index, instead */
     /* discard it, releasing its ref. */
-#define YM_DISCARD (YmLocal(-2))
+#define YM_DISCARD (YmLocal(YM_MIN_INT32 + 1))
 
 
     /* A callback function used to perform call behaviour (ie. of a fn/method/etc.) */
@@ -953,6 +954,8 @@ extern "C" {
     /* StkFx: ...topN -- */
     /* Pops the top n objects. */
     /* Stops prematurely if the stack is emptied. */
+    /* Failure: */
+    /*   - n <= -1. (Quiet) */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
     void ymCtx_Pop(struct YmCtx* ctx, YmLocals n);
@@ -1014,6 +1017,12 @@ extern "C" {
     */
     /* TODO: Later, when we add 'yama:Fn#' types, we'll need to add semantics where fn/method/etc.
     *        types, w/ ymCtx_DefaultInit, init to 'yama:FnValue#' values.
+    */
+
+    /* TODO: Do negative values for params like ymCtx_DefaultInit's 'where' refer to top BEFORE
+    *        the operation, or AFTER it?
+    *        Is our choice properly tested?
+    *           * I think our tests expect 'after'.
     */
 
     /* StkFx: -- result->where */

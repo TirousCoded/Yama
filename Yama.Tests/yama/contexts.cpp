@@ -198,8 +198,8 @@ static void objsys_test(
         auto f = ymCtx_Load(ctx, "p:f");
         ASSERT_TRUE(f);
 
-        ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
-        ASSERT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
+        ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
+        ASSERT_EQ(ymCtx_PutFloat(ctx, YM_PUSH, 3.14159), YM_TRUE);
         EXPECT_EQ(ymCtx_Call(ctx, f, 2, "", YM_DISCARD), YM_TRUE);
     }
 }
@@ -582,15 +582,15 @@ TEST(Contexts, Ref) {
 TEST(Contexts, Locals) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         EXPECT_EQ(ymCtx_Locals(ctx), 0);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
         EXPECT_EQ(ymCtx_Locals(ctx), 1);
         });
 }
 
 TEST(Contexts, Local_Borrow) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
-        EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_PUSH, 3.14159), YM_TRUE);
 
         if (auto a = ymCtx_Local(ctx, 0, YM_BORROW)) {
             EXPECT_EQ(ymObj_RefCount(a), 1);
@@ -604,13 +604,28 @@ TEST(Contexts, Local_Borrow) {
         }
 
         EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), nullptr);
+
+        // Negative Indices
+
+        if (auto a = ymCtx_Local(ctx, -2, YM_BORROW)) {
+            EXPECT_EQ(ymObj_RefCount(a), 1);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdInt(ctx));
+            EXPECT_EQ(ymObj_ToInt(a, nullptr), 10);
+        }
+        if (auto a = ymCtx_Local(ctx, -1, YM_BORROW)) {
+            EXPECT_EQ(ymObj_RefCount(a), 1);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdFloat(ctx));
+            EXPECT_DOUBLE_EQ(ymObj_ToFloat(a, nullptr), 3.14159);
+        }
+
+        EXPECT_EQ(ymCtx_Local(ctx, -3, YM_BORROW), nullptr);
         });
 }
 
 TEST(Contexts, Local_Take) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
-        EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_PUSH, 3.14159), YM_TRUE);
 
         if (auto a = ymCtx_Local(ctx, 0, YM_TAKE)) {
             EXPECT_EQ(ymObj_RefCount(a), 2);
@@ -626,13 +641,30 @@ TEST(Contexts, Local_Take) {
         }
 
         EXPECT_EQ(ymCtx_Local(ctx, 2, YM_TAKE), nullptr);
+
+        // Negative Indices
+
+        if (auto a = ymCtx_Local(ctx, -2, YM_TAKE)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdInt(ctx));
+            EXPECT_EQ(ymObj_ToInt(a, nullptr), 10);
+            ymObj_Release(a);
+        }
+        if (auto a = ymCtx_Local(ctx, -1, YM_TAKE)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdFloat(ctx));
+            EXPECT_DOUBLE_EQ(ymObj_ToFloat(a, nullptr), 3.14159);
+            ymObj_Release(a);
+        }
+
+        EXPECT_EQ(ymCtx_Local(ctx, -3, YM_TAKE), nullptr);
         });
 }
 
 TEST(Contexts, Local_TakeIfOk) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
-        EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 10), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_PUSH, 3.14159), YM_TRUE);
 
         if (auto a = ymCtx_Local(ctx, 0, YM_TAKE_IF_OK)) {
             EXPECT_EQ(ymObj_RefCount(a), 2);
@@ -648,6 +680,23 @@ TEST(Contexts, Local_TakeIfOk) {
         }
 
         EXPECT_EQ(ymCtx_Local(ctx, 2, YM_TAKE_IF_OK), nullptr);
+
+        // Negative Indices
+
+        if (auto a = ymCtx_Local(ctx, -2, YM_TAKE_IF_OK)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdInt(ctx));
+            EXPECT_EQ(ymObj_ToInt(a, nullptr), 10);
+            ymObj_Release(a);
+        }
+        if (auto a = ymCtx_Local(ctx, -1, YM_TAKE_IF_OK)) {
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_Type(a), ymCtx_LdFloat(ctx));
+            EXPECT_DOUBLE_EQ(ymObj_ToFloat(a, nullptr), 3.14159);
+            ymObj_Release(a);
+        }
+
+        EXPECT_EQ(ymCtx_Local(ctx, -3, YM_TAKE_IF_OK), nullptr);
         });
 }
 
@@ -655,11 +704,11 @@ TEST(Contexts, Pop) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         auto aa = ymCtx_NewInt(ctx, 50);
 
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Locals(ctx), 5);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
@@ -681,15 +730,49 @@ TEST(Contexts, Pop) {
         });
 }
 
+TEST(Contexts, Pop_FailQuietly_NIsNegative) {
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        auto aa = ymCtx_NewInt(ctx, 50);
+        auto bb = ymCtx_NewInt(ctx, 150);
+        auto cc = ymCtx_NewInt(ctx, 200);
+
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+
+        EXPECT_EQ(ymCtx_Locals(ctx), 3);
+        EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
+        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
+        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+
+        ymCtx_Pop(ctx, -1); // Fails Quietly
+
+        EXPECT_EQ(ymCtx_Locals(ctx), 3);
+        EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
+        EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
+        EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 2);
+        EXPECT_EQ(ymObj_RefCount(bb), 2);
+        EXPECT_EQ(ymObj_RefCount(cc), 2);
+
+        EXPECT_EQ(ymObj_Release(aa), 2);
+        EXPECT_EQ(ymObj_Release(bb), 2);
+        EXPECT_EQ(ymObj_Release(cc), 2);
+        });
+}
+
 TEST(Contexts, PopAll) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         auto aa = ymCtx_NewInt(ctx, 50);
 
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Locals(ctx), 5);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
@@ -711,9 +794,9 @@ TEST(Contexts, Pull) {
         auto bb = ymCtx_NewInt(ctx, 100);
         auto cc = ymCtx_NewInt(ctx, 150);
 
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Locals(ctx), 3);
         EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
@@ -786,9 +869,9 @@ TEST(Contexts, Put_Borrow) {
         EXPECT_EQ(ymObj_RefCount(bb), 1);
         EXPECT_EQ(ymObj_RefCount(cc), 1);
 
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
@@ -803,14 +886,17 @@ TEST(Contexts, Put_Borrow) {
 
         // Putting
 
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
 
         EXPECT_EQ(ymObj_RefCount(aa), 1);
         EXPECT_EQ(ymObj_RefCount(bb), 1);
         EXPECT_EQ(ymObj_RefCount(cc), 1);
-        EXPECT_EQ(ymObj_RefCount(dd), 4);
+        EXPECT_EQ(ymObj_RefCount(dd), 7);
 
         EXPECT_EQ(ymCtx_Put(ctx, 0, aa, YM_BORROW), YM_TRUE);
         EXPECT_EQ(ymCtx_Put(ctx, 1, bb, YM_BORROW), YM_TRUE);
@@ -819,9 +905,18 @@ TEST(Contexts, Put_Borrow) {
         EXPECT_EQ(ymObj_RefCount(aa), 2);
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
+        EXPECT_EQ(ymObj_RefCount(dd), 4);
+
+        EXPECT_EQ(ymCtx_Put(ctx, -3, aa, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -2, bb, YM_BORROW), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -1, cc, YM_BORROW), YM_TRUE);
+
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
         EXPECT_EQ(ymObj_RefCount(dd), 1);
 
-        ymCtx_Pop(ctx, 3);
+        ymCtx_Pop(ctx, 6);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         EXPECT_EQ(ymObj_RefCount(aa), 1);
@@ -851,9 +946,9 @@ TEST(Contexts, Put_Take) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
 
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_TAKE), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_TAKE), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_TAKE), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_TAKE), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_TAKE), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_TAKE), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
@@ -868,28 +963,43 @@ TEST(Contexts, Put_Take) {
 
         // Putting
 
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
 
         ymObj_Secure(aa);
+        ymObj_Secure(aa);
+        ymObj_Secure(bb);
         ymObj_Secure(bb);
         ymObj_Secure(cc);
-        EXPECT_EQ(ymObj_RefCount(aa), 2);
-        EXPECT_EQ(ymObj_RefCount(bb), 2);
-        EXPECT_EQ(ymObj_RefCount(cc), 2);
-        EXPECT_EQ(ymObj_RefCount(dd), 4);
+        ymObj_Secure(cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
+        EXPECT_EQ(ymObj_RefCount(dd), 7);
 
         EXPECT_EQ(ymCtx_Put(ctx, 0, aa, YM_TAKE), YM_TRUE);
         EXPECT_EQ(ymCtx_Put(ctx, 1, bb, YM_TAKE), YM_TRUE);
         EXPECT_EQ(ymCtx_Put(ctx, 2, cc, YM_TAKE), YM_TRUE);
 
-        EXPECT_EQ(ymObj_RefCount(aa), 2);
-        EXPECT_EQ(ymObj_RefCount(bb), 2);
-        EXPECT_EQ(ymObj_RefCount(cc), 2);
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
+        EXPECT_EQ(ymObj_RefCount(dd), 4);
+
+        EXPECT_EQ(ymCtx_Put(ctx, -3, aa, YM_TAKE), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -2, bb, YM_TAKE), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -1, cc, YM_TAKE), YM_TRUE);
+
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
         EXPECT_EQ(ymObj_RefCount(dd), 1);
 
-        ymCtx_Pop(ctx, 3);
+        ymCtx_Pop(ctx, 6);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         // Add ref count incr that the YM_DISCARD put is to consume.
@@ -920,9 +1030,9 @@ TEST(Contexts, Put_TakeIfOk) {
         EXPECT_EQ(ymObj_RefCount(bb), 2);
         EXPECT_EQ(ymObj_RefCount(cc), 2);
 
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_TAKE_IF_OK), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_TAKE_IF_OK), YM_TRUE);
-        EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_TAKE_IF_OK), YM_TRUE);
 
         EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), aa);
         EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), bb);
@@ -937,28 +1047,43 @@ TEST(Contexts, Put_TakeIfOk) {
 
         // Putting
 
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
-        ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
+        ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, dd, YM_BORROW), YM_TRUE);
 
         ymObj_Secure(aa);
+        ymObj_Secure(aa);
+        ymObj_Secure(bb);
         ymObj_Secure(bb);
         ymObj_Secure(cc);
-        EXPECT_EQ(ymObj_RefCount(aa), 2);
-        EXPECT_EQ(ymObj_RefCount(bb), 2);
-        EXPECT_EQ(ymObj_RefCount(cc), 2);
-        EXPECT_EQ(ymObj_RefCount(dd), 4);
+        ymObj_Secure(cc);
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
+        EXPECT_EQ(ymObj_RefCount(dd), 7);
 
         EXPECT_EQ(ymCtx_Put(ctx, 0, aa, YM_TAKE_IF_OK), YM_TRUE);
         EXPECT_EQ(ymCtx_Put(ctx, 1, bb, YM_TAKE_IF_OK), YM_TRUE);
         EXPECT_EQ(ymCtx_Put(ctx, 2, cc, YM_TAKE_IF_OK), YM_TRUE);
 
-        EXPECT_EQ(ymObj_RefCount(aa), 2);
-        EXPECT_EQ(ymObj_RefCount(bb), 2);
-        EXPECT_EQ(ymObj_RefCount(cc), 2);
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
+        EXPECT_EQ(ymObj_RefCount(dd), 4);
+
+        EXPECT_EQ(ymCtx_Put(ctx, -3, aa, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -2, bb, YM_TAKE_IF_OK), YM_TRUE);
+        EXPECT_EQ(ymCtx_Put(ctx, -1, cc, YM_TAKE_IF_OK), YM_TRUE);
+
+        EXPECT_EQ(ymObj_RefCount(aa), 3);
+        EXPECT_EQ(ymObj_RefCount(bb), 3);
+        EXPECT_EQ(ymObj_RefCount(cc), 3);
         EXPECT_EQ(ymObj_RefCount(dd), 1);
 
-        ymCtx_Pop(ctx, 3);
+        ymCtx_Pop(ctx, 6);
         ASSERT_EQ(ymCtx_Locals(ctx), 0);
 
         // Add ref count incr that the YM_DISCARD put is to consume.
@@ -984,9 +1109,26 @@ TEST(Contexts, Put_Fail_LocalNotFound) {
         });
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
+
+        EXPECT_EQ(ymCtx_Put(ctx, -1, a, YM_BORROW), YM_FALSE);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+        EXPECT_EQ(ymObj_RefCount(a), 1);
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
         SETUP_OBJ_REF_COPY(a2, a);
 
         EXPECT_EQ(ymCtx_Put(ctx, 0, a, YM_TAKE), YM_FALSE);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+        EXPECT_EQ(ymObj_RefCount(a), 1); // API took ref anyway.
+        });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
+        SETUP_OBJ_REF_COPY(a2, a);
+
+        EXPECT_EQ(ymCtx_Put(ctx, -1, a, YM_TAKE), YM_FALSE);
         EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
         EXPECT_EQ(ymObj_RefCount(a), 1); // API took ref anyway.
@@ -999,30 +1141,39 @@ TEST(Contexts, Put_Fail_LocalNotFound) {
 
         EXPECT_EQ(ymObj_RefCount(a), 1);
         });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        SETUP_OBJ(a, ymCtx_NewInt(ctx, 50));
+
+        EXPECT_EQ(ymCtx_Put(ctx, -1, a, YM_TAKE_IF_OK), YM_FALSE);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+        EXPECT_EQ(ymObj_RefCount(a), 1);
+        });
 }
 
 TEST(Contexts, PutXXXX) {
     objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
         // Test w/ pushing.
-        EXPECT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, -10), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutUInt(ctx, YM_NEWTOP, 10), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_NEWTOP, 3.14159), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutRune(ctx, YM_NEWTOP, U'y'), YM_TRUE);
-        EXPECT_EQ(ymCtx_PutType(ctx, YM_NEWTOP, ymCtx_LdInt(ctx)), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, YM_PUSH, -10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutUInt(ctx, YM_PUSH, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, YM_PUSH, 3.14159), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutRune(ctx, YM_PUSH, U'y'), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutType(ctx, YM_PUSH, ymCtx_LdInt(ctx)), YM_TRUE);
 
-        auto num = ymCtx_Locals(ctx);
+        auto num = (YmLocal)ymCtx_Locals(ctx);
 
         // Setup for test w/ putting.
+        // Need num * 2 objects as ladder is needed to test negative indices.
         SETUP_OBJ(temp, ymCtx_NewInt(ctx, 100));
-        for (YmLocal i = 0; i < num; i++) {
-            EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, temp, YM_BORROW), YM_TRUE) << "i==" << i;
+        for (YmLocal i = 0; i < num * 2; i++) {
+            EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, temp, YM_BORROW), YM_TRUE) << "i==" << i;
         }
-        ASSERT_EQ(ymCtx_Locals(ctx), num * 2);
+        ASSERT_EQ(ymCtx_Locals(ctx), num * 3);
 
         // Before puts overwrite temp locals.
-        EXPECT_EQ(ymObj_RefCount(temp), num + 1);
+        EXPECT_EQ(ymObj_RefCount(temp), num * 2 + 1);
 
         // Perform putting.
         EXPECT_EQ(ymCtx_PutNone(ctx, num + 0), YM_TRUE);
@@ -1033,12 +1184,21 @@ TEST(Contexts, PutXXXX) {
         EXPECT_EQ(ymCtx_PutRune(ctx, num + 5, U'y'), YM_TRUE);
         EXPECT_EQ(ymCtx_PutType(ctx, num + 6, ymCtx_LdInt(ctx)), YM_TRUE);
 
+        // Perform putting w/ negative indices.
+        EXPECT_EQ(ymCtx_PutNone(ctx, -num + 0), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, -num + 1, -10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutUInt(ctx, -num + 2, 10), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, -num + 3, 3.14159), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutBool(ctx, -num + 4, YM_TRUE), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutRune(ctx, -num + 5, U'y'), YM_TRUE);
+        EXPECT_EQ(ymCtx_PutType(ctx, -num + 6, ymCtx_LdInt(ctx)), YM_TRUE);
+
         // After puts overwrite temp locals.
         EXPECT_EQ(ymObj_RefCount(temp), 1);
 
-        // Now check everything (we loop twice for each as the sequence should be the
-        // same for both pushing and putting.)
-        for (YmLocal i = 0; i < 2; i++) {
+        // Now check everything (we loop thrice for each as the sequence should be the
+        // same for both pushing, putting, and putting w/ negative indices.)
+        for (YmLocal i = 0; i < 3; i++) {
             if (auto x = ymCtx_Local(ctx, num * i + 0, YM_BORROW)) {
                 EXPECT_EQ(ymObj_RefCount(x), 1);
                 EXPECT_EQ(ymObj_Type(x), ymCtx_LdNone(ctx));
@@ -1101,6 +1261,18 @@ TEST(Contexts, PutXXXX_Fail_LocalNotFound) {
 
         EXPECT_EQ(ymCtx_Locals(ctx), 0);
         });
+    objsys_test([](YmCtx* ctx, bool called_in_fn_body) {
+        EXPECT_EQ(ymCtx_PutNone(ctx, -1), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutInt(ctx, -1, -50), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutUInt(ctx, -1, 50), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutFloat(ctx, -1, 3.14159), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutBool(ctx, -1, YM_TRUE), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutRune(ctx, -1, U'y'), YM_FALSE);
+        EXPECT_EQ(ymCtx_PutType(ctx, -1, ymCtx_LdInt(ctx)), YM_FALSE);
+        EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 7);
+
+        EXPECT_EQ(ymCtx_Locals(ctx), 0);
+        });
 }
 
 TEST(Contexts, DefaultInit) {
@@ -1137,26 +1309,27 @@ TEST(Contexts, DefaultInit) {
             ASSERT_TRUE(Struct0);
 
             // Test w/ pushing.
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdNone(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdUInt(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdFloat(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdBool(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdRune(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, ymCtx_LdType(ctx)), YM_TRUE);
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, Struct0), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdNone(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdUInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdFloat(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdBool(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdRune(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, ymCtx_LdType(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, Struct0), YM_TRUE);
 
-            auto num = ymCtx_Locals(ctx);
+            auto num = (YmLocal)ymCtx_Locals(ctx);
 
             // Setup for test w/ putting.
+            // Need num * 2 objects as ladder is needed to test negative indices.
             SETUP_OBJ(temp, ymCtx_NewInt(ctx, 100));
-            for (YmLocal i = 0; i < num; i++) {
-                EXPECT_EQ(ymCtx_Put(ctx, YM_NEWTOP, temp, YM_BORROW), YM_TRUE) << "i==" << i;
+            for (YmLocal i = 0; i < num * 2; i++) {
+                EXPECT_EQ(ymCtx_Put(ctx, YM_PUSH, temp, YM_BORROW), YM_TRUE) << "i==" << i;
             }
-            ASSERT_EQ(ymCtx_Locals(ctx), num * 2);
+            ASSERT_EQ(ymCtx_Locals(ctx), num * 3);
 
             // Before puts overwrite temp locals.
-            EXPECT_EQ(ymObj_RefCount(temp), num + 1);
+            EXPECT_EQ(ymObj_RefCount(temp), num * 2 + 1);
 
             // Perform putting.
             EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 0, ymCtx_LdNone(ctx)), YM_TRUE);
@@ -1168,12 +1341,22 @@ TEST(Contexts, DefaultInit) {
             EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 6, ymCtx_LdType(ctx)), YM_TRUE);
             EXPECT_EQ(ymCtx_DefaultInit(ctx, num + 7, Struct0), YM_TRUE);
 
+            // Perform putting.
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 0, ymCtx_LdNone(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 1, ymCtx_LdInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 2, ymCtx_LdUInt(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 3, ymCtx_LdFloat(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 4, ymCtx_LdBool(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 5, ymCtx_LdRune(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 6, ymCtx_LdType(ctx)), YM_TRUE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -num + 7, Struct0), YM_TRUE);
+
             // After puts overwrite temp locals.
             EXPECT_EQ(ymObj_RefCount(temp), 1);
 
-            // Now check everything (we loop twice for each as the sequence should be the
-            // same for both pushing and putting.)
-            for (YmLocal i = 0; i < 2; i++) {
+            // Now check everything (we loop thrice for each as the sequence should be the
+            // same for both pushing, putting, and putting w/ negative indices.)
+            for (YmLocal i = 0; i < 3; i++) {
                 if (auto x = ymCtx_Local(ctx, num * i + 0, YM_BORROW)) {
                     EXPECT_EQ(ymObj_RefCount(x), 1);
                     EXPECT_EQ(ymObj_Type(x), ymCtx_LdNone(ctx));
@@ -1241,6 +1424,13 @@ TEST(Contexts, DefaultInit_Fail_LocalNotFound) {
 
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
         });
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, -1, ymCtx_LdInt(ctx)), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+            EXPECT_EQ(ymCtx_Locals(ctx), 0);
+        });
 }
 
 TEST(Contexts, DefaultInit_Fail_NoDefaultValue) {
@@ -1291,7 +1481,7 @@ TEST(Contexts, DefaultInit_Fail_NoDefaultValue) {
             static_assert(YmKind_Num == 6);
 
             // Protocols
-            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_NEWTOP, Protocol0), YM_FALSE);
+            EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, Protocol0), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_NoDefaultValue], 1);
         });
 }
@@ -1313,7 +1503,7 @@ TEST(Contexts, ExplicitInit_EmptyStruct) {
 
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, 0, A, ""), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
@@ -1329,9 +1519,29 @@ TEST(Contexts, ExplicitInit_EmptyStruct) {
             auto A = ymCtx_Load(ctx, "p:A");
             ASSERT_TRUE(A);
 
-            // test w/ newtop
+            // test w/ negative index
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, -1, A, ""), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            EXPECT_EQ(ymObj_RefCount(x), 1);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            // test w/ push
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
             auto result = ymCtx_Local(ctx, 0, YM_BORROW);
@@ -1381,10 +1591,10 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, 0, A, "c,a,b"), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
@@ -1392,12 +1602,12 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
             EXPECT_EQ(ymObj_Type(result), A);
             EXPECT_EQ(ymObj_RefCount(result), 1);
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
             EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
             EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
@@ -1420,28 +1630,74 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
             ASSERT_TRUE(A_b);
             ASSERT_TRUE(A_c);
 
-            // test w/ newtop
+            // test w/ negative index
 
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, -1, A, "c,a,b"), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
             auto result = ymCtx_Local(ctx, 0, YM_BORROW);
             EXPECT_EQ(ymObj_Type(result), A);
             EXPECT_EQ(ymObj_RefCount(result), 1);
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, result, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), cc);
+
+            EXPECT_EQ(ymObj_RefCount(x), 1);
+            EXPECT_EQ(ymObj_RefCount(aa), 3);
+            EXPECT_EQ(ymObj_RefCount(bb), 3);
+            EXPECT_EQ(ymObj_RefCount(cc), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ push
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,a,b"), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
             EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
             EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
@@ -1469,9 +1725,9 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, A, "c,a,b"), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
@@ -1483,15 +1739,16 @@ TEST(Contexts, ExplicitInit_NonEmptyStruct) {
 }
 
 TEST(Contexts, ExplicitInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+            ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        };
     objsys_test(
-        [](YmParcelDef* parceldef) {
-            ymParcelDef_AddStruct(parceldef, "A");
-            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
-            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
-            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
-            ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
-                ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
-        },
+        setup,
         [](YmCtx* ctx, bool called_in_fn_body) {
             auto A = ymCtx_Load(ctx, "p:A");
             ASSERT_TRUE(A);
@@ -1500,10 +1757,35 @@ TEST(Contexts, ExplicitInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_ExplicitInit(ctx, 10'000, A, "c,a,b"), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 3);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), cc);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 2);
+            EXPECT_EQ(ymObj_RefCount(bb), 2);
+            EXPECT_EQ(ymObj_RefCount(cc), 2);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            ASSERT_TRUE(A);
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, -10'000, A, "c,a,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
@@ -1526,7 +1808,7 @@ TEST(Contexts, ExplicitInit_Fail_NonStructType) {
             auto g = ymCtx_Load(ctx, "p:g");
             ASSERT_TRUE(g);
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, g, ""), YM_FALSE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, g, ""), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_NonStructType], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
@@ -1551,11 +1833,11 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_DoesntSpecifyEveryStoredPropert
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            //ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            //ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             CtxState initial(*ctx);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
             EXPECT_TRUE(initial.expect(*ctx));
 
@@ -1587,12 +1869,12 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesAPropertyMoreThanOnce)
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             CtxState initial(*ctx);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,a,b,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
             EXPECT_TRUE(initial.expect(*ctx));
 
@@ -1626,11 +1908,11 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAS
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             CtxState initial(*ctx);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,missing,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,missing,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
             EXPECT_TRUE(initial.expect(*ctx));
 
@@ -1663,11 +1945,11 @@ TEST(Contexts, ExplicitInit_Fail_IllegalNameList_SpecifiesANameWhichDoesntNameAS
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
             CtxState initial(*ctx);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,abc,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,abc,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_IllegalNameList], 1);
             EXPECT_TRUE(initial.expect(*ctx));
 
@@ -1700,10 +1982,10 @@ TEST(Contexts, ExplicitInit_Fail_LocalNotFound_ArgObjsNeededExceedsObjStkHeight)
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            //ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            //ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,a,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
@@ -1734,10 +2016,10 @@ TEST(Contexts, ExplicitInit_Fail_TypeMismatch_ArgObjsAreTheWrongTypes) {
             SETUP_OBJ(bb, ymCtx_NewBool(ctx, false)); // Wrong type for bb.
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "c,a,b"), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "c,a,b"), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
@@ -1780,9 +2062,9 @@ TEST(Contexts, Call_WithReturnValuePuttingPushingAndDiscard) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", 0), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
@@ -1797,14 +2079,36 @@ TEST(Contexts, Call_WithReturnValuePuttingPushingAndDiscard) {
             auto g = ymCtx_Load(ctx, "p:g");
             ASSERT_TRUE(g);
 
-            // test w/ newtop
+            // test w/ negative index
 
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", -1), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), y);
+            EXPECT_EQ(ymObj_RefCount(x), 1);
+            EXPECT_EQ(ymObj_RefCount(y), 2);
+            EXPECT_EQ(observedCalls, 1);
+        });
+    objsys_test(
+        setupfn,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+
+            // test w/ push
+
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
+            SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_PUSH), YM_TRUE);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
             EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), y);
@@ -1823,8 +2127,8 @@ TEST(Contexts, Call_WithReturnValuePuttingPushingAndDiscard) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_DISCARD), YM_TRUE);
             
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
@@ -1960,197 +2264,197 @@ TEST(Contexts, Call_WithNamedArgs) {
             // 0 named
             
             test(50, false, false, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 1, "", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 1, "", YM_PUSH), YM_TRUE);
                 });
             test(50, false, false, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 1, "", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 1, "", YM_PUSH), YM_TRUE);
                 });
 
             // 1 named, w/ each
 
             test(53, true, false, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "plus", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "plus", YM_PUSH), YM_TRUE);
                 });
             test(53, true, false, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "plus", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "plus", YM_PUSH), YM_TRUE);
                 });
 
             test(-50, false, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "negate", YM_PUSH), YM_TRUE);
                 });
             test(50, false, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "negate", YM_PUSH), YM_TRUE);
                 });
             test(-50, false, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "negate", YM_PUSH), YM_TRUE);
                 });
             test(50, false, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "negate", YM_PUSH), YM_TRUE);
                 });
 
             test(500, false, false, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 2, "timesTen", YM_PUSH), YM_TRUE);
                 });
             test(500, false, false, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 2, "timesTen", YM_PUSH), YM_TRUE);
                 });
 
             // 2 named, w/ reversed
 
             test(-53, true, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "negate,plus", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "negate,plus", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, false, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "negate,plus", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "negate,plus", YM_PUSH), YM_TRUE);
                 });
 
             test(-500, false, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-500, false, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "timesTen,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 3, "timesTen,negate", YM_PUSH), YM_TRUE);
                 });
             test(-500, false, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-500, false, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "timesTen,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 3, "timesTen,negate", YM_PUSH), YM_TRUE);
                 });
 
             // 3 named, w/ diff orders
 
             test(-530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, g, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
 
             test(-530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "plus,negate,timesTen", YM_PUSH), YM_TRUE);
                 });
             test(-530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(530, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
             test(-53, true, true, true, [=]() {
-                ymCtx_PutInt(ctx, YM_NEWTOP, 50);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_FALSE);
-                ymCtx_PutInt(ctx, YM_NEWTOP, 3);
-                ymCtx_PutBool(ctx, YM_NEWTOP, YM_TRUE);
-                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_NEWTOP), YM_TRUE);
+                ymCtx_PutInt(ctx, YM_PUSH, 50);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_FALSE);
+                ymCtx_PutInt(ctx, YM_PUSH, 3);
+                ymCtx_PutBool(ctx, YM_PUSH, YM_TRUE);
+                EXPECT_EQ(ymCtx_Call(ctx, A_m, 4, "timesTen,plus,negate", YM_PUSH), YM_TRUE);
                 });
         });
 }
@@ -2183,8 +2487,8 @@ TEST(Contexts, Call_WithDiffKindsOfCallableTypes) {
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_m);
 
-            EXPECT_EQ(ymCtx_Call(ctx, g, 0, "", YM_NEWTOP), YM_TRUE);
-            EXPECT_EQ(ymCtx_Call(ctx, A_m, 0, "", YM_NEWTOP), YM_TRUE);
+            EXPECT_EQ(ymCtx_Call(ctx, g, 0, "", YM_PUSH), YM_TRUE);
+            EXPECT_EQ(ymCtx_Call(ctx, A_m, 0, "", YM_PUSH), YM_TRUE);
 
             auto g_result = ymCtx_Local(ctx, 0, YM_BORROW);
             auto A_m_result = ymCtx_Local(ctx, 1, YM_BORROW);
@@ -2212,7 +2516,7 @@ TEST(Contexts, Call_MultipleLevelsOfCalls) {
                     ASSERT_TRUE(n_arg);
                     auto n = ymObj_ToUInt(n_arg, nullptr);
                     if (n > 1) {
-                        ASSERT_EQ(ymCtx_PutUInt(ctx, YM_NEWTOP, n - 1), YM_TRUE);
+                        ASSERT_EQ(ymCtx_PutUInt(ctx, YM_PUSH, n - 1), YM_TRUE);
                         ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_DISCARD), YM_TRUE);
                     }
                 },
@@ -2222,27 +2526,28 @@ TEST(Contexts, Call_MultipleLevelsOfCalls) {
         [](YmCtx* ctx, bool called_in_fn_body) {
             auto g = ymCtx_Load(ctx, "p:g");
             ASSERT_TRUE(g);
-            ASSERT_EQ(ymCtx_PutUInt(ctx, YM_NEWTOP, 10), YM_TRUE);
+            ASSERT_EQ(ymCtx_PutUInt(ctx, YM_PUSH, 10), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_DISCARD), YM_TRUE);
             EXPECT_EQ(observedCalls, 10);
         });
 }
 
 TEST(Contexts, Call_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddFn(
+            parceldef,
+            "g",
+            "yama:Int",
+            [](YmCtx* ctx, void* user) {
+                observedCalls++;
+                ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+            },
+            nullptr);
+        ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
+        ymParcelDef_AddParam(parceldef, "g", "y", "yama:Int");
+        };
     objsys_test(
-        [](YmParcelDef* parceldef) {
-            ymParcelDef_AddFn(
-                parceldef,
-                "g",
-                "yama:Int",
-                [](YmCtx* ctx, void* user) {
-                    observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
-                },
-                nullptr);
-            ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
-            ymParcelDef_AddParam(parceldef, "g", "y", "yama:Int");
-        },
+        setup,
         [](YmCtx* ctx, bool called_in_fn_body) {
             auto g = ymCtx_Load(ctx, "p:g");
             ASSERT_TRUE(g);
@@ -2250,9 +2555,30 @@ TEST(Contexts, Call_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
             ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", 10'000), YM_FALSE);
+            EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), y);
+            EXPECT_EQ(ymObj_RefCount(x), 2);
+            EXPECT_EQ(ymObj_RefCount(y), 2);
+            EXPECT_EQ(observedCalls, 0);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = ymCtx_Load(ctx, "p:g");
+            ASSERT_TRUE(g);
+
+            SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
+            SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", -10'000), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
@@ -2270,9 +2596,9 @@ TEST(Contexts, Call_Fail_NonCallableType_FnIsNonCallable) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, ymCtx_LdInt(ctx), 2, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, ymCtx_LdInt(ctx), 2, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_NonCallableType], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
@@ -2305,8 +2631,8 @@ TEST(Contexts, Call_Fail_LocalNotFound_ArgsExceedsLocalObjectStackHeight) {
 
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
@@ -2338,10 +2664,10 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooManyPositionalArgs) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 3, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 3, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
@@ -2375,8 +2701,8 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs) {
 
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
@@ -2412,10 +2738,10 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs_DueToNamedArgs)
             SETUP_OBJ(a, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(b, ymCtx_NewInt(ctx, -3));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, a, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 3, "a,b", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, a, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 3, "a,b", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
@@ -2455,11 +2781,11 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameIdentifierMultipleTimes) {
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -3));
             SETUP_OBJ(b, ymCtx_NewInt(ctx, -13));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "b,b", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "b,b", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
@@ -2500,11 +2826,11 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameUnknownIdentifier) {
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -3));
             SETUP_OBJ(b, ymCtx_NewInt(ctx, -13));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "missing,b", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "missing,b", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
@@ -2545,11 +2871,11 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -3));
             SETUP_OBJ(b, ymCtx_NewInt(ctx, -13));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, b, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "x,b", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, b, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 4, "x,b", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_IllegalNameList], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
@@ -2586,9 +2912,9 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_TypeMismatch], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
@@ -2623,9 +2949,9 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewRune(ctx, U'y'));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "x,y", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "x,y", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_TypeMismatch], 1);
 
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
@@ -2659,9 +2985,9 @@ TEST(Contexts, Call_Fail_CallProcedureError_NoReturnValueObjectBound) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             // Take note that, for this error, call behaviour occurs (ie. that's what resulted
@@ -2700,9 +3026,9 @@ TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongType) {
             SETUP_OBJ(x, ymCtx_NewFloat(ctx, 3.14159));
             SETUP_OBJ(y, ymCtx_NewInt(ctx, -50));
 
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, x, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Put(ctx, YM_NEWTOP, y, YM_BORROW), YM_TRUE);
-            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, y, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 2, "", YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             // Take note that, for this error, call behaviour occurs (ie. that's what resulted
@@ -2999,27 +3325,27 @@ TEST(Contexts, GetProperty_StoredProperty) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c"), YM_TRUE);
 
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_PutNone(ctx, YM_NEWTOP);
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, 1), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
 
-            ymCtx_PutNone(ctx, YM_NEWTOP);
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, 2), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
 
-            ymCtx_PutNone(ctx, YM_NEWTOP);
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, 3), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
 
@@ -3046,31 +3372,85 @@ TEST(Contexts, GetProperty_StoredProperty) {
             ASSERT_TRUE(A_b);
             ASSERT_TRUE(A_c);
 
-            // test w/ newtop
+            // test w/ negative index
 
             SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c"), YM_TRUE);
 
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_PutNone(ctx, YM_PUSH);
+
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, -3), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, -2), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, -1), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+
+            auto a = ymCtx_Local(ctx, 1, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 2, YM_BORROW);
+            auto c = ymCtx_Local(ctx, 3, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+            ASSERT_EQ(c, cc);
+
+            EXPECT_EQ(ymObj_RefCount(a), 3);
+            EXPECT_EQ(ymObj_RefCount(b), 3);
+            EXPECT_EQ(ymObj_RefCount(c), 3);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            auto A_c = ymCtx_Load(ctx, "p:A::c");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+            ASSERT_TRUE(A_c);
+
+            // test w/ push
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c"), YM_TRUE);
+
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 3);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_NEWTOP), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 4);
 
             auto a = ymCtx_Local(ctx, 1, YM_BORROW);
@@ -3102,24 +3482,24 @@ TEST(Contexts, GetProperty_StoredProperty) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c"), YM_TRUE);
 
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_DISCARD), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_DISCARD), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_DISCARD), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
@@ -3171,14 +3551,14 @@ TEST(Contexts, GetProperty_ComputedProperty) {
             compProp_A_a_obj = aa;
             compProp_A_b_obj = bb;
 
-            ymCtx_PutNone(ctx, YM_NEWTOP);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, 0), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
             EXPECT_EQ(observedCalls, 1);
 
-            ymCtx_PutNone(ctx, YM_NEWTOP);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, 1), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
             EXPECT_EQ(observedCalls, 2);
@@ -3201,7 +3581,7 @@ TEST(Contexts, GetProperty_ComputedProperty) {
             ASSERT_TRUE(A_a);
             ASSERT_TRUE(A_b);
 
-            // test w/ newtop
+            // test w/ negative index
 
             SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
             SETUP_OBJ(bb, ymCtx_NewRune(ctx, U'y'));
@@ -3209,13 +3589,52 @@ TEST(Contexts, GetProperty_ComputedProperty) {
             compProp_A_a_obj = aa;
             compProp_A_b_obj = bb;
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_TRUE);
+            ymCtx_PutNone(ctx, YM_PUSH);
+            ymCtx_PutNone(ctx, YM_PUSH);
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, -2), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(observedCalls, 1);
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, -1), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 2);
+            EXPECT_EQ(observedCalls, 2);
+
+            auto a = ymCtx_Local(ctx, 0, YM_BORROW);
+            auto b = ymCtx_Local(ctx, 1, YM_BORROW);
+            ASSERT_EQ(a, aa);
+            ASSERT_EQ(b, bb);
+
+            EXPECT_EQ(ymObj_RefCount(a), 2);
+            EXPECT_EQ(ymObj_RefCount(b), 2);
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            auto A_b = ymCtx_Load(ctx, "p:A::b");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+            ASSERT_TRUE(A_b);
+
+            // test w/ push
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewRune(ctx, U'y'));
+
+            compProp_A_a_obj = aa;
+            compProp_A_b_obj = bb;
+
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
             EXPECT_EQ(observedCalls, 1);
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
             EXPECT_EQ(observedCalls, 2);
 
@@ -3245,12 +3664,12 @@ TEST(Contexts, GetProperty_ComputedProperty) {
             compProp_A_a_obj = aa;
             compProp_A_b_obj = bb;
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_DISCARD), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
             EXPECT_EQ(observedCalls, 1);
 
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, ""), YM_TRUE);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, ""), YM_TRUE);
             ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_DISCARD), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
             EXPECT_EQ(observedCalls, 2);
@@ -3261,27 +3680,48 @@ TEST(Contexts, GetProperty_ComputedProperty) {
 }
 
 TEST(Contexts, GetProperty_Fail_LocalNotFound_WhereIsOutOfBounds) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
+        ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
+        };
     objsys_test(
-        [](YmParcelDef* parceldef) {
-            ymParcelDef_AddStruct(parceldef, "A");
-            ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Int");
-            ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Float");
-            ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Rune");
-        },
+        setup,
         [](YmCtx* ctx, bool called_in_fn_body) {
             auto A = ymCtx_Load(ctx, "p:A");
             auto A_a = ymCtx_Load(ctx, "p:A::a");
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_PutInt(ctx, YM_NEWTOP, -4);
-            ymCtx_PutFloat(ctx, YM_NEWTOP, 10.41);
-            ymCtx_PutRune(ctx, YM_NEWTOP, U'y');
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c");
+            ymCtx_PutInt(ctx, YM_PUSH, -4);
+            ymCtx_PutFloat(ctx, YM_PUSH, 10.41);
+            ymCtx_PutRune(ctx, YM_PUSH, U'y');
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c");
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
 
             EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, 10'000), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
+
+            // TODO: What about post-conditions?
+        });
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = ymCtx_Load(ctx, "p:A");
+            auto A_a = ymCtx_Load(ctx, "p:A::a");
+            ASSERT_TRUE(A);
+            ASSERT_TRUE(A_a);
+
+            ymCtx_PutInt(ctx, YM_PUSH, -4);
+            ymCtx_PutFloat(ctx, YM_PUSH, 10.41);
+            ymCtx_PutRune(ctx, YM_PUSH, U'y');
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c");
+            auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
+            ASSERT_TRUE(A_obj);
+
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, -10'000), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
 
             // TODO: What about post-conditions?
@@ -3291,7 +3731,7 @@ TEST(Contexts, GetProperty_Fail_LocalNotFound_WhereIsOutOfBounds) {
 TEST(Contexts, GetProperty_Fail_NonPropertyType) {
     objsys_test(
         [](YmCtx* ctx, bool called_in_fn_body) {
-            EXPECT_EQ(ymCtx_GetProperty(ctx, ymCtx_LdInt(ctx), YM_NEWTOP), YM_FALSE);
+            EXPECT_EQ(ymCtx_GetProperty(ctx, ymCtx_LdInt(ctx), YM_PUSH), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_NonPropertyType], 1);
         });
 }
@@ -3308,7 +3748,7 @@ TEST(Contexts, GetProperty_Fail_LocalNotFound_ObjStkIsEmpty) {
             auto A_a = ymCtx_Load(ctx, "p:A::a");
             ASSERT_TRUE(A_a);
 
-            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
 
             // TODO: What about post-conditions?
@@ -3327,11 +3767,11 @@ TEST(Contexts, GetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
             auto A_a = ymCtx_Load(ctx, "p:A::a");
             ASSERT_TRUE(A_a);
 
-            ymCtx_PutInt(ctx, YM_NEWTOP, -4);
+            ymCtx_PutInt(ctx, YM_PUSH, -4);
             auto Int_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(Int_obj);
 
-            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            EXPECT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
 
             // TODO: What about post-conditions?
@@ -3359,12 +3799,12 @@ TEST(Contexts, GetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForC
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
             auto a = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(a);
 
-            ymCtx_Put(ctx, YM_NEWTOP, a, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            ymCtx_Put(ctx, YM_PUSH, a, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             // Take note that, for this error, call behaviour occurs (ie. that's what resulted
@@ -3399,12 +3839,12 @@ TEST(Contexts, GetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForCom
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
             auto a = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(a);
 
-            ymCtx_Put(ctx, YM_NEWTOP, a, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_NEWTOP), YM_FALSE);
+            ymCtx_Put(ctx, YM_PUSH, a, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
             // Take note that, for this error, call behaviour occurs (ie. that's what resulted
@@ -3449,7 +3889,7 @@ TEST(Contexts, GetProperty_Fail_CallStackOverflow_ForComputedProperties) {
                         ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
                     }
                     else {
-                        ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+                        ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
                         auto a = ymCtx_Local(ctx, 0, YM_BORROW);
                         ASSERT_TRUE(a);
                         auto observedCallsN = observedCalls;
@@ -3500,21 +3940,21 @@ TEST(Contexts, SetProperty_StoredProperty) {
             SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.41));
             SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
 
-            ymCtx_Put(ctx, YM_NEWTOP, aa, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, bb, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, cc, YM_BORROW);
-            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a,b,c"), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW);
+            ASSERT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a,b,c"), YM_TRUE);
 
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
             ASSERT_EQ(ymCtx_Locals(ctx), 1);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
             ASSERT_EQ(ymCtx_SetProperty(ctx, A_b), YM_TRUE);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_NEWTOP), YM_TRUE);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
             ASSERT_EQ(ymCtx_Locals(ctx), 2);
             EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), xx);
 
@@ -3554,8 +3994,8 @@ TEST(Contexts, SetProperty_ComputedProperty) {
             SETUP_OBJ(xx, ymCtx_NewInt(ctx, -31));
             compProp_expected_by_setter = xx;
 
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
             ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_TRUE);
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
 
@@ -3585,13 +4025,13 @@ TEST(Contexts, SetProperty_Fail_ReadOnlyPropertyType) {
 
             SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
 
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "a");
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "a");
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
             EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_ReadOnlyPropertyType], 1);
 
@@ -3617,8 +4057,8 @@ TEST(Contexts, SetProperty_Fail_LocalNotFound_ObjStkHasFewerThanTwoObjs) {
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_PutInt(ctx, YM_PUSH, 14);
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
             EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_LocalNotFound], 1);
 
@@ -3638,8 +4078,8 @@ TEST(Contexts, SetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_PutInt(ctx, YM_NEWTOP, 14); // Wrong subject type!
-            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
+            ymCtx_PutInt(ctx, YM_PUSH, 14); // Wrong subject type!
+            ymCtx_PutInt(ctx, YM_PUSH, 14);
             EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
 
@@ -3659,9 +4099,9 @@ TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongType) {
             ASSERT_TRUE(A);
             ASSERT_TRUE(A_a);
 
-            ymCtx_PutInt(ctx, YM_NEWTOP, 14);
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
-            ymCtx_PutFloat(ctx, YM_NEWTOP, 1.041); // Wrong value type!
+            ymCtx_PutInt(ctx, YM_PUSH, 14);
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
+            ymCtx_PutFloat(ctx, YM_PUSH, 1.041); // Wrong value type!
             EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
 
@@ -3696,12 +4136,12 @@ TEST(Contexts, SetProperty_Fail_CallProcedureError_NoReturnValueObjectBound_ForC
 
             SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
 
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
             ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
@@ -3746,12 +4186,12 @@ TEST(Contexts, SetProperty_Fail_CallProcedureError_ReturnValueIsWrongType_ForCom
 
             SETUP_OBJ(xx, ymCtx_NewInt(ctx, 14));
 
-            ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+            ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
             auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
             ASSERT_TRUE(A_obj);
 
-            ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-            ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+            ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
             ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
             EXPECT_EQ(getErr()[YmErrCode_CallProcedureError], 1);
 
@@ -3806,13 +4246,13 @@ TEST(Contexts, SetProperty_Fail_CallStackOverflow_ForComputedProperties) {
                     else {
                         SETUP_OBJ(xx, ymCtx_NewInt(ctx, 4));
 
-                        ymCtx_ExplicitInit(ctx, YM_NEWTOP, A, "");
+                        ymCtx_ExplicitInit(ctx, YM_PUSH, A, "");
                         auto A_obj = ymCtx_Local(ctx, 0, YM_BORROW);
                         ASSERT_TRUE(A_obj);
                         auto observedCallsN = observedCalls;
 
-                        ymCtx_Put(ctx, YM_NEWTOP, A_obj, YM_BORROW);
-                        ymCtx_Put(ctx, YM_NEWTOP, xx, YM_BORROW);
+                        ymCtx_Put(ctx, YM_PUSH, A_obj, YM_BORROW);
+                        ymCtx_Put(ctx, YM_PUSH, xx, YM_BORROW);
                         ASSERT_EQ(ymCtx_SetProperty(ctx, A_a), YM_FALSE);
                         ASSERT_EQ(getErr()[YmErrCode_CallStackOverflow], 1);
 
@@ -3848,10 +4288,10 @@ TEST(Contexts, Convert) {
             auto UInt = ymCtx_LdUInt(ctx);
             ASSERT_TRUE(UInt);
 
-            // Test w/ regular indices.
+            // Test w/ regular index.
 
-            ASSERT_EQ(ymCtx_PutNone(ctx, YM_NEWTOP), YM_TRUE); // Result goes here.
-            ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE); // Result goes here.
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
             ASSERT_EQ(ymCtx_Convert(ctx, UInt, 0), YM_TRUE);
 
             EXPECT_EQ(ymCtx_Locals(ctx), 1);
@@ -3868,10 +4308,30 @@ TEST(Contexts, Convert) {
             auto UInt = ymCtx_LdUInt(ctx);
             ASSERT_TRUE(UInt);
 
-            // Test w/ newtop.
+            // Test w/ negative index.
 
-            ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 13), YM_TRUE);
-            ASSERT_EQ(ymCtx_Convert(ctx, UInt, YM_NEWTOP), YM_TRUE);
+            ASSERT_EQ(ymCtx_PutNone(ctx, YM_PUSH), YM_TRUE); // Result goes here.
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, UInt, -1), YM_TRUE);
+
+            EXPECT_EQ(ymCtx_Locals(ctx), 1);
+            if (auto x = ymCtx_Local(ctx, 0, YM_BORROW)) {
+                EXPECT_EQ(ymObj_Type(x), UInt);
+                YmBool success{};
+                EXPECT_EQ(ymObj_ToUInt(x, &success), 13);
+                EXPECT_EQ(success, YM_TRUE);
+            }
+            else ADD_FAILURE();
+        });
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto UInt = ymCtx_LdUInt(ctx);
+            ASSERT_TRUE(UInt);
+
+            // Test w/ push.
+
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, UInt, YM_PUSH), YM_TRUE);
 
             EXPECT_EQ(ymCtx_Locals(ctx), 1);
             if (auto x = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -3889,7 +4349,7 @@ TEST(Contexts, Convert) {
 
             // Test w/ discard.
 
-            ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
             ASSERT_EQ(ymCtx_Convert(ctx, UInt, YM_DISCARD), YM_TRUE);
 
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
@@ -3904,8 +4364,29 @@ TEST(Contexts, Convert_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
             ASSERT_TRUE(Int);
             ASSERT_TRUE(UInt);
 
-            ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
             ASSERT_EQ(ymCtx_Convert(ctx, UInt, 100), YM_FALSE);
+            ASSERT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
+
+            // Ensure stack was left unchanged.
+            EXPECT_EQ(ymCtx_Locals(ctx), 1);
+            if (auto x = ymCtx_Local(ctx, 0, YM_BORROW)) {
+                EXPECT_EQ(ymObj_Type(x), Int);
+                YmBool success{};
+                EXPECT_EQ(ymObj_ToInt(x, &success), 13);
+                EXPECT_EQ(success, YM_TRUE);
+            }
+            else ADD_FAILURE();
+        });
+    objsys_test(
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto Int = ymCtx_LdInt(ctx);
+            auto UInt = ymCtx_LdUInt(ctx);
+            ASSERT_TRUE(Int);
+            ASSERT_TRUE(UInt);
+
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, UInt, -100), YM_FALSE);
             ASSERT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
             // Ensure stack was left unchanged.
@@ -3928,7 +4409,7 @@ TEST(Contexts, Convert_Fail_LocalNotFound_LocalObjectStackIsEmpty) {
             ASSERT_TRUE(Int);
             ASSERT_TRUE(UInt);
 
-            ASSERT_EQ(ymCtx_Convert(ctx, UInt, YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_Convert(ctx, UInt, YM_PUSH), YM_FALSE);
             ASSERT_EQ(getErr()[YmErrCode_LocalNotFound], 1);
 
             // Ensure stack was left unchanged.
@@ -3944,8 +4425,8 @@ TEST(Contexts, Convert_Fail_IllegalConversion) {
             ASSERT_TRUE(Int);
             ASSERT_TRUE(Type);
 
-            ASSERT_EQ(ymCtx_PutInt(ctx, YM_NEWTOP, 13), YM_TRUE);
-            ASSERT_EQ(ymCtx_Convert(ctx, Type, YM_NEWTOP), YM_FALSE);
+            ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 13), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, Type, YM_PUSH), YM_FALSE);
             ASSERT_EQ(getErr()[YmErrCode_IllegalConversion], 1);
 
             // Ensure stack was left unchanged.
