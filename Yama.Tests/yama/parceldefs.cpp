@@ -287,6 +287,382 @@ TEST(ParcelDefs, AddFn_IllegalSpecifier_InvalidReturnTypeSymbol) {
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
+TEST(ParcelDefs, AddReadOnlyStoredVar) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
+    auto nonASCIIFullname_init = nonASCIIFullname + "$init";
+    ymParcelDef_AddStruct(p_def, "A");
+
+    ymParcelDef_AddReadOnlyStoredVar(p_def, "foo", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddReadOnlyStoredVar(p_def, nonASCIIName.c_str(), "p:A", ymInertCallBhvrFn, nullptr);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto foo = ymCtx_Load(ctx, "p:foo");
+    auto other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(foo);
+    ASSERT_TRUE(other);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Var);
+    EXPECT_EQ(ymType_Owner(foo), nullptr);
+    EXPECT_EQ(ymType_Owner(other), nullptr);
+    EXPECT_EQ(ymType_Type(foo), A);
+    EXPECT_EQ(ymType_Type(other), A);
+    EXPECT_EQ(ymType_ReturnType(foo), A);
+    EXPECT_EQ(ymType_ReturnType(other), A);
+    EXPECT_EQ(ymType_Params(foo, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other, YM_FALSE), 0);
+
+    auto foo_init = ymCtx_Load(ctx, "p:foo$init");
+    auto other_init = ymCtx_Load(ctx, nonASCIIFullname_init.c_str());
+    ASSERT_TRUE(foo_init);
+    ASSERT_TRUE(other_init);
+    EXPECT_STREQ(ymType_Fullname(foo_init), "p:foo$init");
+    EXPECT_STREQ(ymType_Fullname(other_init), nonASCIIFullname_init.c_str());
+    EXPECT_EQ(ymType_Kind(foo_init), YmKind_Fn);
+    EXPECT_EQ(ymType_Kind(other_init), YmKind_Fn);
+    EXPECT_EQ(ymType_ReturnType(foo_init), A);
+    EXPECT_EQ(ymType_ReturnType(other_init), A);
+    EXPECT_EQ(ymType_Params(foo_init, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other_init, YM_FALSE), 0);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredVar_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyStoredVar(p_def, "B", "  p  : \n\n A  ", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    ASSERT_EQ(ymType_Type(B), A);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredVar_NameConflict) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredVar(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_TRUE);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredVar(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredVar_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            EXPECT_EQ(
+                ymParcelDef_AddReadOnlyStoredVar(parceldef, name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr),
+                shouldSucceed ? YM_TRUE : YM_FALSE);
+            return std::format("p:{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddReadOnlyStoredVar_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredVar(p_def, "A", "/", ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddStoredVar) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
+    auto nonASCIIFullname_init = nonASCIIFullname + "$init";
+    auto other_assigner_fln = std::format("{}$assigner", nonASCIIFullname);
+    ymParcelDef_AddStruct(p_def, "A");
+
+    ymParcelDef_AddStoredVar(p_def, "foo", "p:A", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredVar(p_def, nonASCIIName.c_str(), "p:A", ymInertCallBhvrFn, nullptr);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto foo = ymCtx_Load(ctx, "p:foo");
+    auto foo_assigner = ymCtx_Load(ctx, "p:foo$assigner");
+    auto other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    auto other_assigner = ymCtx_Load(ctx, other_assigner_fln.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(foo);
+    ASSERT_TRUE(other);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(foo_assigner), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_EQ(ymType_Parcel(other_assigner), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(foo_assigner), "p:foo$assigner");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_STREQ(ymType_Fullname(other_assigner), other_assigner_fln.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(foo_assigner), YmKind_VarAssigner);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(other_assigner), YmKind_VarAssigner);
+    EXPECT_EQ(ymType_Owner(foo), nullptr);
+    EXPECT_EQ(ymType_Owner(foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Owner(other), nullptr);
+    EXPECT_EQ(ymType_Owner(other_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(foo), A);
+    EXPECT_EQ(ymType_Type(foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(other), A);
+    EXPECT_EQ(ymType_Type(other_assigner), nullptr);
+    EXPECT_EQ(ymType_ReturnType(foo), A);
+    EXPECT_EQ(ymType_ReturnType(foo_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_ReturnType(other), A);
+    EXPECT_EQ(ymType_ReturnType(other_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_Params(foo, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(foo_assigner, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(other, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other_assigner, YM_FALSE), 1);
+    EXPECT_EQ(ymType_ParamType(foo_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(other_assigner, 0), A);
+
+    auto foo_init = ymCtx_Load(ctx, "p:foo$init");
+    auto other_init = ymCtx_Load(ctx, nonASCIIFullname_init.c_str());
+    ASSERT_TRUE(foo_init);
+    ASSERT_TRUE(other_init);
+    EXPECT_STREQ(ymType_Fullname(foo_init), "p:foo$init");
+    EXPECT_STREQ(ymType_Fullname(other_init), nonASCIIFullname_init.c_str());
+    EXPECT_EQ(ymType_Kind(foo_init), YmKind_Fn);
+    EXPECT_EQ(ymType_Kind(other_init), YmKind_Fn);
+    EXPECT_EQ(ymType_ReturnType(foo_init), A);
+    EXPECT_EQ(ymType_ReturnType(other_init), A);
+    EXPECT_EQ(ymType_Params(foo_init, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other_init, YM_FALSE), 0);
+}
+
+TEST(ParcelDefs, AddStoredVar_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddStoredVar(p_def, "B", "  p  : \n\n A  ", ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    ASSERT_EQ(ymType_Type(B), A);
+}
+
+TEST(ParcelDefs, AddStoredVar_NameConflict) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddStoredVar(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_TRUE);
+    ASSERT_EQ(ymParcelDef_AddStoredVar(p_def, "A", "p:B", ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddStoredVar_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            EXPECT_EQ(
+                ymParcelDef_AddStoredVar(parceldef, name.c_str(), "yama:None", ymInertCallBhvrFn, nullptr),
+                shouldSucceed ? YM_TRUE : YM_FALSE);
+            return std::format("p:{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddStoredVar_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddStoredVar(p_def, "A", "/", ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedVar) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
+    ymParcelDef_AddStruct(p_def, "A");
+
+    ymParcelDef_AddReadOnlyComputedVar(p_def, "foo", "p:A",
+        ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddReadOnlyComputedVar(p_def, nonASCIIName.c_str(), "p:A",
+        ymInertCallBhvrFn, nullptr);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto foo = ymCtx_Load(ctx, "p:foo");
+    auto other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(foo);
+    ASSERT_TRUE(other);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Var);
+    EXPECT_EQ(ymType_Owner(foo), nullptr);
+    EXPECT_EQ(ymType_Owner(other), nullptr);
+    EXPECT_EQ(ymType_Type(foo), A);
+    EXPECT_EQ(ymType_Type(other), A);
+    EXPECT_EQ(ymType_ReturnType(foo), A);
+    EXPECT_EQ(ymType_ReturnType(other), A);
+    EXPECT_EQ(ymType_Params(foo, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other, YM_FALSE), 0);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedVar_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddReadOnlyComputedVar(p_def, "B", "  p  : \n\n A  ",
+        ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    ASSERT_EQ(ymType_Type(B), A);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedVar_NameConflict) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedVar(p_def, "A", "p:B",
+        ymInertCallBhvrFn, nullptr), YM_TRUE);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedVar(p_def, "A", "p:B",
+        ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedVar_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            EXPECT_EQ(
+                ymParcelDef_AddReadOnlyComputedVar(parceldef, name.c_str(), "yama:None",
+                    ymInertCallBhvrFn, nullptr),
+                shouldSucceed ? YM_TRUE : YM_FALSE);
+            return std::format("p:{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddReadOnlyComputedVar_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddReadOnlyComputedVar(p_def, "A", "/",
+        ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddComputedVar) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    std::string nonASCIIName = taul::utf8_s(u8"ab魂💩cd"); // Ensure can handle UTF-8.
+    std::string nonASCIIFullname = taul::utf8_s(u8"p:ab魂💩cd"); // Ensure can handle UTF-8.
+    auto other_assigner_fln = std::format("{}$assigner", nonASCIIFullname);
+    ymParcelDef_AddStruct(p_def, "A");
+
+    ymParcelDef_AddComputedVar(p_def, "foo", "p:A",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddComputedVar(p_def, nonASCIIName.c_str(), "p:A",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+
+    BIND_AND_IMPORT(ctx, parcel, p_def, "p");
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto foo = ymCtx_Load(ctx, "p:foo");
+    auto foo_assigner = ymCtx_Load(ctx, "p:foo$assigner");
+    auto other = ymCtx_Load(ctx, nonASCIIFullname.c_str());
+    auto other_assigner = ymCtx_Load(ctx, other_assigner_fln.c_str());
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(foo);
+    ASSERT_TRUE(other);
+    EXPECT_EQ(ymType_Parcel(foo), parcel);
+    EXPECT_EQ(ymType_Parcel(foo_assigner), parcel);
+    EXPECT_EQ(ymType_Parcel(other), parcel);
+    EXPECT_EQ(ymType_Parcel(other_assigner), parcel);
+    EXPECT_STREQ(ymType_Fullname(foo), "p:foo");
+    EXPECT_STREQ(ymType_Fullname(foo_assigner), "p:foo$assigner");
+    EXPECT_STREQ(ymType_Fullname(other), nonASCIIFullname.c_str());
+    EXPECT_STREQ(ymType_Fullname(other_assigner), other_assigner_fln.c_str());
+    EXPECT_EQ(ymType_Kind(foo), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(foo_assigner), YmKind_VarAssigner);
+    EXPECT_EQ(ymType_Kind(other), YmKind_Var);
+    EXPECT_EQ(ymType_Kind(other_assigner), YmKind_VarAssigner);
+    EXPECT_EQ(ymType_Owner(foo), nullptr);
+    EXPECT_EQ(ymType_Owner(foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Owner(other), nullptr);
+    EXPECT_EQ(ymType_Owner(other_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(foo), A);
+    EXPECT_EQ(ymType_Type(foo_assigner), nullptr);
+    EXPECT_EQ(ymType_Type(other), A);
+    EXPECT_EQ(ymType_Type(other_assigner), nullptr);
+    EXPECT_EQ(ymType_ReturnType(foo), A);
+    EXPECT_EQ(ymType_ReturnType(foo_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_ReturnType(other), A);
+    EXPECT_EQ(ymType_ReturnType(other_assigner), ymCtx_LdNone(ctx));
+    EXPECT_EQ(ymType_Params(foo, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(foo_assigner, YM_FALSE), 1);
+    EXPECT_EQ(ymType_Params(other, YM_FALSE), 0);
+    EXPECT_EQ(ymType_Params(other_assigner, YM_FALSE), 1);
+    EXPECT_EQ(ymType_ParamType(foo_assigner, 0), A);
+    EXPECT_EQ(ymType_ParamType(other_assigner, 0), A);
+}
+
+TEST(ParcelDefs, AddComputedVar_Normalizes_Type) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+
+    ymParcelDef_AddStruct(p_def, "A");
+    ymParcelDef_AddComputedVar(p_def, "B", "  p  : \n\n A  ",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+
+    ymDm_BindParcelDef(dm, "p", p_def);
+    auto A = ymCtx_Load(ctx, "p:A");
+    auto B = ymCtx_Load(ctx, "p:B");
+    ASSERT_TRUE(A);
+    ASSERT_TRUE(B);
+
+    ASSERT_EQ(ymType_Type(B), A);
+}
+
+TEST(ParcelDefs, AddComputedVar_NameConflict) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddComputedVar(p_def, "A", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_TRUE);
+    ASSERT_EQ(ymParcelDef_AddComputedVar(p_def, "A", "p:B",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_NameConflict], 1);
+}
+
+TEST(ParcelDefs, AddComputedVar_IllegalName) {
+    testNameLegality(
+        [](std::string name, YmParcelDef* parceldef, bool shouldSucceed) -> std::string {
+            EXPECT_EQ(
+                ymParcelDef_AddComputedVar(parceldef, name.c_str(), "yama:None",
+                    ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr),
+                shouldSucceed ? YM_TRUE : YM_FALSE);
+            return std::format("p:{}", name);
+        });
+}
+
+TEST(ParcelDefs, AddComputedVar_IllegalSpecifier_InvalidTypeSymbol) {
+    SETUP_ERRCOUNTER;
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddComputedVar(p_def, "A", "/",
+        ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
 TEST(ParcelDefs, AddMethod) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -1238,7 +1614,7 @@ TEST(ParcelDefs, AddTypeParam_TypeNotFound) {
     EXPECT_EQ(err[YmErrCode_TypeNotFound], 1);
 }
 
-TEST(ParcelDefs, AddTypeParam_MemberType) {
+TEST(ParcelDefs, AddTypeParam_TypeCannotHaveTypeParams) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddProtocol(p_def, "Any");
@@ -1246,7 +1622,7 @@ TEST(ParcelDefs, AddTypeParam_MemberType) {
     ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddMethod(p_def, "A", "m", "p:Int", ymInertCallBhvrFn, nullptr);
     EXPECT_EQ(ymParcelDef_AddTypeParam(p_def, "A::m", "T", "p:Any"), YM_NO_TYPE_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_MemberType], 1);
+    EXPECT_EQ(err[YmErrCode_TypeCannotHaveTypeParams], 1);
 }
 
 TEST(ParcelDefs, AddTypeParam_NameConflict_MemberType) {
@@ -1478,22 +1854,13 @@ TEST(ParcelDefs, AddParam_CallSigNotFound) {
     EXPECT_EQ(err[YmErrCode_CallSigNotFound], 1);
 }
 
-TEST(ParcelDefs, AddParam_PropertyType) {
+TEST(ParcelDefs, AddParam_CallSigNotUserDefined) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     ymParcelDef_AddStruct(p_def, "A");
     ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "p", "yama:Int");
     EXPECT_EQ(ymParcelDef_AddParam(p_def, "A::p", "x", "p:B"), YM_NO_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_PropertyType], 1);
-}
-
-TEST(ParcelDefs, AddParam_PropertyAssignerType) {
-    SETUP_ALL(ctx);
-    SETUP_PARCELDEF(p_def);
-    ymParcelDef_AddStruct(p_def, "A");
-    ymParcelDef_AddStoredProperty(p_def, "A", "p", "yama:Int");
-    EXPECT_EQ(ymParcelDef_AddParam(p_def, "A::p$assigner", "x", "p:B"), YM_NO_PARAM_INDEX);
-    EXPECT_EQ(err[YmErrCode_PropertyAssignerType], 1);
+    EXPECT_EQ(err[YmErrCode_CallSigNotUserDefined], 1);
 }
 
 TEST(ParcelDefs, AddParam_NameConflict_BetweenParams) {

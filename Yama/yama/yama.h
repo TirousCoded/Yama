@@ -319,6 +319,8 @@ extern "C" {
         YmKind_Struct = 0,
         YmKind_Protocol,
         YmKind_Fn,
+        YmKind_Var,
+        YmKind_VarAssigner,
         YmKind_Method,
         YmKind_Property,
         YmKind_PropertyAssigner,
@@ -341,6 +343,17 @@ extern "C" {
     /* Undefined Behaviour: */
     /*   - x is invalid. */
     YmBool ymKind_HasCallSig(YmKind x);
+
+    /* TODO: I'm not 100% sure about this one.
+    */
+    /* TODO: ymKind_HasUserDefinedCallSig hasn't been unit tested.
+    */
+
+    /* Returns if kind x is for kinds which (always) have user-defined call signatures. */
+    /* Having a call signature does not guarantee callability. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
+    YmBool ymKind_HasUserDefinedCallSig(YmKind x);
 
     /* TODO: ymKind_IsOwner hasn't been unit tested.
     */
@@ -365,6 +378,14 @@ extern "C" {
     /* Undefined Behaviour: */
     /*   - x is invalid. */
     YmBool ymKind_CanHaveMembers(YmKind x);
+
+    /* TODO: ymKind_CanHaveTypeParams hasn't been unit tested.
+    */
+
+    /* Returns if kind x is types which can have type params. */
+    /* Undefined Behaviour: */
+    /*   - x is invalid. */
+    YmBool ymKind_CanHaveTypeParams(YmKind x);
 
 
     /* NOTE: By default, Yama frontend API fns work w/ ref counts according to Python rules.
@@ -531,15 +552,21 @@ extern "C" {
 #define YM_DISCARD (YmLocal(YM_MIN_INT32 + 1))
 
 
+    /* TODO: Our unit tests currently don't cover whether ymCtx_Call and other API fns pass the correct
+    *        'type' arg value.
+    */
+
     /* A callback function used to perform call behaviour (ie. of a fn/method/etc.) */
     /* ctx is the context the call behaviour is to be executed with, and is guaranteed to not be YM_NIL. */
+    /* type is the type being called, and is guaranteed to not be YM_NIL. */
     /* user is a pointer used to expose callback function to external data. */
     typedef void(*YmCallBhvrCallbackFn)(
         struct YmCtx* ctx,
+        struct YmType* type,
         void* user);
 
     /* No-Op */
-    void ymInertCallBhvrFn(struct YmCtx*, void*);
+    void ymInertCallBhvrFn(struct YmCtx*, struct YmType*, void*);
 
 
     /* Domain API */
@@ -548,20 +575,20 @@ extern "C" {
     struct YmDm* ymDm_Create(void);
 
     /* Increments the ref count of domain dm. */
-    /* Returns old ref count value of dm. */
-    /* Undefined Behaviour: */
-    /*   - dm is invalid. */
+    /* Returns old ref count value of dm, or 0. */
+    /* Failure: */
+    /*   - dm == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymDm_Secure(struct YmDm* dm);
 
     /* Decrements the ref count of domain dm, destroying dm if it reaches 0. */
-    /* Returns old ref count value of dm. */
-    /* Undefined Behaviour: */
-    /*   - dm is invalid. */
+    /* Returns old ref count value of dm, or 0. */
+    /* Failure: */
+    /*   - dm == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymDm_Release(struct YmDm* dm);
 
-    /* Returns the ref count of domain dm. */
-    /* Undefined Behaviour: */
-    /*   - dm is invalid. */
+    /* Returns the ref count of domain dm, or 0. */
+    /* Failure: */
+    /*   - dm == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymDm_RefCount(struct YmDm* dm);
 
     /* TODO: I REALLY don't think our impl current prevents end-user from ammending parcel defs AFTER
@@ -677,20 +704,20 @@ extern "C" {
     struct YmCtx* ymCtx_Create(struct YmDm* dm);
 
     /* Increments the ref count of context ctx. */
-    /* Returns old ref count value of ctx. */
-    /* Undefined Behaviour: */
-    /*   - ctx is invalid. */
+    /* Returns old ref count value of ctx, or 0. */
+    /* Failure: */
+    /*   - ctx == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymCtx_Secure(struct YmCtx* ctx);
 
     /* Decrements the ref count of context ctx, destroying ctx if it reaches 0. */
-    /* Returns old ref count value of ctx. */
-    /* Undefined Behaviour: */
-    /*   - ctx is invalid. */
+    /* Returns old ref count value of ctx, or 0. */
+    /* Failure: */
+    /*   - ctx == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymCtx_Release(struct YmCtx* ctx);
 
-    /* Returns the ref count of context ctx. */
-    /* Undefined Behaviour: */
-    /*   - ctx is invalid. */
+    /* Returns the ref count of context ctx, or 0. */
+    /* Failure: */
+    /*   - ctx == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymCtx_RefCount(struct YmCtx* ctx);
 
     /* Returns the domain associated with ctx. */
@@ -904,9 +931,9 @@ extern "C" {
     /* Failure: */
     /*   - In the user call frame. (Quiet) */
     /*   - which is out-of-bounds. */
+    /*   - newArg == YM_NIL. (Quiet) (UNTESTED) */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - newArg is invalid. */
     YmBool ymCtx_SetArg(struct YmCtx* ctx, YmUInt16 which, struct YmObj* newArg, YmRefPolicy newArgPolicy);
 
     /* Returns the type at reference in the type reference array of the current call, or YM_NIL on failure. */
@@ -946,7 +973,9 @@ extern "C" {
     *        w/ <what> being the object, and <where> being the var specifying where to write it.
     *           * This syntax also implies YM_[NEWTOP|DISCARD] can be used.
     */
-
+    /* NOTE: For stack effects, the form 'StkFx: A | B -- C' means that A participates
+    *        in the operation, but it is not consumed, only B is consumed.
+    */
     /* NOTE: API fns w/ stack effects by default do NOT modify the stack, at all, in the event
     *        of the API fn failing.
     */
@@ -975,7 +1004,7 @@ extern "C" {
     /* TODO: ymCtx_Copy hasn't been unit tested yet!
     */
 
-    /* StkFx: ...objs -- result->to */
+    /* StkFx: ...objs | -- result->to */
     /* Copies object at from in objs into to, returning if successful. */
     /* Failure: */
     /*   - from is out-of-bounds. */
@@ -988,16 +1017,16 @@ extern "C" {
     *        or of the global stack all call frame object stacks are allocated w/.)
     * 
     *        To this end, we'll need ymCtx_Put and other fns to have checks for this stuff.
-    *        (eg. ymCtx_ExplicitInit w/ empty argNames param will need to check.)
+    *        (eg. ymCtx_StructInit w/ empty argNames param will need to check.)
     */
 
     /* StkFx: -- what->where */
     /* Loads what into where, returning if successful. */
     /* Failure: */
     /*   - where is out-of-bounds. */
+    /*   - what == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - what is invalid. */
     YmBool ymCtx_Put(struct YmCtx* ctx, YmLocal where, struct YmObj* what, YmRefPolicy whatPolicy);
 
     YmBool ymCtx_PutNone(struct YmCtx* ctx, YmLocal where);
@@ -1030,18 +1059,19 @@ extern "C" {
     /* Failure: */
     /*   - where is out-of-bounds. */
     /*   - type has no default value. */
+    /*   - type == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - type is invalid. */
-    YmBool ymCtx_DefaultInit(struct YmCtx* ctx, YmLocal where, struct YmType* type);
+    YmBool ymCtx_DefaultInit(struct YmCtx* ctx, struct YmType* type, YmLocal where);
 
     /* StkFx: ...storedPropertyVals -- result->where */
-    /* Loads explicitly init object of type into where, returning if successful. */
+    /* Loads struct of type into where, returning if successful. */
     /* storedPropertyVals are used to init each stored property of type. */
     /* argNames is a comma-seperated string specifying which property each object in storedPropertyVals inits. */
     /* Failure: */
     /*   - where is out-of-bounds. */
     /*   - type is not a struct type. */
+    /*   - type == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - argNames doesn't specify every stored property of type. */
     /*   - argNames specifies a property more than once. */
     /*   - argNames specifies a name which doesn't name a stored property. */
@@ -1049,9 +1079,14 @@ extern "C" {
     /*   - Arg objects are the wrong types. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - type is invalid. */
     /*   - argNames (pointer) is invalid. */
-    YmBool ymCtx_ExplicitInit(struct YmCtx* ctx, YmLocal where, struct YmType* type, const YmChar* argNames);
+    YmBool ymCtx_StructInit(struct YmCtx* ctx, struct YmType* type, const YmChar* argNames, YmLocal where);
+
+    /* NOTE: API fns which can perform indirect Yama fn calls (eg. var init calls, computed
+    *        var/property get calls, etc.) will be, regarding these tests, unit tested such that
+    *        it being invoked by ymCtx_Call (or equiv) will be largely presumed and tested in
+    *        summary.
+    */
 
     /* NOTE: ymCtx_Call is passed positional args and named args together. The positional ones
     *        always come first, and any after that are named param ones.
@@ -1070,7 +1105,6 @@ extern "C" {
     /* TODO: Our unit tests currently don't really cover the nuances above regarding argNames
     *        formatting rules.
     */
-
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
 
@@ -1080,7 +1114,8 @@ extern "C" {
     /* argNames is a comma-seperated string specifying the size(namedArgs), and which named param each specifies. */
     /* Failure: */
     /*   - returnTo is out-of-bounds. */
-    /*   - fn is not a callable type. */
+    /*   - fn is not a callable type. (TODO: Needs updating?) */
+    /*   - fn == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - argsN exceeds the height of the local object stack. */
     /*   - Wrong number of positional args are provided. */
     /*   - argNames specifies an identifier multiple times. */
@@ -1093,7 +1128,6 @@ extern "C" {
     /*   - Call stack overflow. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - fn is invalid. */
     /*   - argNames (pointer) is invalid. */
     YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo);
 
@@ -1106,16 +1140,50 @@ extern "C" {
     /*   - ctx is invalid. */
     void ymCtx_Ret(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
 
+    /* TODO: Should below init behaviour tests be more comprehensive due to how init behaviour
+    *        is not a real Yama fn ymCtx_Call, and so may not be appropriate to summarize?
+    */
+
+    /* StkFx: -- result->where */
+    /* Loads value from varType into where, returning if successful. */
+    /* Lazy initializes stored var if needed. */
+    /* Failure: */
+    /*   - where is out-of-bounds. (UNTESTED) */
+    /*   - varType is not a var type. (UNTESTED) */
+    /*   - varType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
+    /*   - Stored var init call fails. (UNTESTED) */
+    /*   - Stored var accessed in the middle of initializing. (UNTESTED) */
+    /*   - Computed var get call fails. (UNTESTED) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    YmBool ymCtx_GetVar(struct YmCtx* ctx, struct YmType* varType, YmLocal where);
+
+    /* StkFx: value -- */
+    /* Stores value into varType, returning if successful. */
+    /* Lazy initializes stored var if needed. */
+    /* Failure: */
+    /*   - where is out-of-bounds. (UNTESTED) */
+    /*   - varType is not a var type. (UNTESTED) */
+    /*   - varType is read-only. (UNTESTED) */
+    /*   - varType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
+    /*   - Object stack is empty. (UNTESTED) */
+    /*   - value object is the wrong type. (UNTESTED) */
+    /*   - Stored var init call fails. (UNTESTED) */
+    /*   - Stored var accessed in the middle of initializing. (UNTESTED) */
+    /*   - Computed var set call fails. (UNTESTED) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    YmBool ymCtx_SetVar(struct YmCtx* ctx, struct YmType* varType);
+
     /* StkFx: subject -- result->where */
     /* Loads propertyType in subject into where, returning if successful. */
     /* Failure: */
     /*   - where is out-of-bounds. */
     /*   - propertyType is not a property type. */
+    /*   - propertyType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - Object stack is empty. */
     /*   - subject object is the wrong type. */
-    /*   - No return value object bound (by call behaviour, for computed properties.) */
-    /*   - Return value object is the wrong type (for computed properties.) */
-    /*   - Call stack overflow (for computed properties.) */
+    /*   - Computed property get call fails. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
     /*   - propertyType is invalid. */
@@ -1126,15 +1194,13 @@ extern "C" {
     /* Failure: */
     /*   - propertyType is not a property type. */
     /*   - propertyType is read-only. */
+    /*   - propertyType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - Object stack height is less than two. */
     /*   - subject object is the wrong type. */
     /*   - value object is the wrong type. */
-    /*   - No return value object bound (by call behaviour, for computed properties.) */
-    /*   - Return value object is the wrong type (for computed properties.) */
-    /*   - Call stack overflow (for computed properties.) */
+    /*   - Computed property set call fails. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    /*   - propertyType is invalid. */
     YmBool ymCtx_SetProperty(struct YmCtx* ctx, struct YmType* propertyType);
 
     /* NOTE: Due to coercions only really being important to Yama during compilation, I've excluded the
@@ -1163,24 +1229,24 @@ extern "C" {
     struct YmParcelDef* ymParcelDef_Create(void);
 
     /* Increments the ref count of parcel def. parceldef. */
-    /* Returns old ref count value of parceldef. */
-    /* Undefined Behaviour: */
-    /*   - parceldef is invalid. */
+    /* Returns old ref count value of parceldef, or 0. */
+    /* Failure: */
+    /*   - parceldef == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymParcelDef_Secure(struct YmParcelDef* parceldef);
 
     /* Decrements the ref count of parcel def. parceldef, destroying parceldef if it reaches 0. */
-    /* Returns old ref count value of parceldef. */
-    /* Undefined Behaviour: */
-    /*   - parceldef is invalid. */
+    /* Returns old ref count value of parceldef, or 0. */
+    /* Failure: */
+    /*   - parceldef == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymParcelDef_Release(struct YmParcelDef* parceldef);
 
-    /* Returns the ref count of parcel def. parceldef. */
-    /* Undefined Behaviour: */
-    /*   - parceldef is invalid. */
+    /* Returns the ref count of parcel def. parceldef, or 0. */
+    /* Failure: */
+    /*   - parceldef == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymParcelDef_RefCount(struct YmParcelDef* parceldef);
 
 #if __cplusplus
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
 #endif
 
     /* NOTE: Currently, 'legal names' below are names w/ only alphanumeric ASCII chars, and
@@ -1236,6 +1302,79 @@ extern "C" {
         YmRefSym returnType,
         YmCallBhvrCallbackFn callBehaviour,
         void* callBehaviourData);
+
+    /* Adds a new read-only stored variable to parceldef, returning if successful. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - initBehaviour (pointer) is invalid. */
+    YmBool ymParcelDef_AddReadOnlyStoredVar(
+        struct YmParcelDef* parceldef,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn initBehaviour,
+        void* initBehaviourData);
+
+    /* Adds a new stored variable to parceldef, returning if successful. */
+    /* A corresponding var assigner type is added. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - initBehaviour (pointer) is invalid. */
+    YmBool ymParcelDef_AddStoredVar(
+        struct YmParcelDef* parceldef,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn initBehaviour,
+        void* initBehaviourData);
+
+    /* Adds a new read-only computed variable to parceldef, returning if successful. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - getBehaviour (pointer) is invalid. */
+    YmBool ymParcelDef_AddReadOnlyComputedVar(
+        struct YmParcelDef* parceldef,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn getBehaviour,
+        void* getBehaviourData);
+
+    /* Adds a new computed variable to parceldef, returning if successful. */
+    /* A corresponding var assigner type is added. */
+    /* Failure: */
+    /*   - New type's fullname conflicts with an existing declaration. */
+    /*   - name is illegal. */
+    /*   - type is illegal. */
+    /* Undefined Behaviour: */
+    /*   - parceldef is invalid. */
+    /*   - name (pointer) is invalid. */
+    /*   - type (pointer) is invalid. */
+    /*   - getBehaviour (pointer) is invalid. */
+    /*   - setCehaviour (pointer) is invalid. */
+    YmBool ymParcelDef_AddComputedVar(
+        struct YmParcelDef* parceldef,
+        const YmChar* name,
+        YmRefSym type,
+        YmCallBhvrCallbackFn getBehaviour,
+        void* getBehaviourData,
+        YmCallBhvrCallbackFn setBehaviour,
+        void* setBehaviourData);
 
     /* TODO: For now, we'll forbid protocols from having regular methods, but we may change this in the future,
     *        in which case the description for below will need to be updated.
@@ -1308,7 +1447,7 @@ extern "C" {
         YmRefSym type);
 
     /* Adds a new stored property to parceldef, returning if successful. */
-    /* A corresponding property assigner type is added immediately after the property type. */
+    /* A corresponding property assigner type is added. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1340,17 +1479,17 @@ extern "C" {
     /*   - ownerName (pointer) is invalid. */
     /*   - name (pointer) is invalid. */
     /*   - type (pointer) is invalid. */
-    /*   - getCallBehaviour (pointer) is invalid. */
+    /*   - getBehaviour (pointer) is invalid. */
     YmBool ymParcelDef_AddReadOnlyComputedProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym type,
-        YmCallBhvrCallbackFn getCallBehaviour,
-        void* getCallBehaviourData);
+        YmCallBhvrCallbackFn getBehaviour,
+        void* getBehaviourData);
 
     /* Adds a new computed property to parceldef, returning if successful. */
-    /* A corresponding property assigner type is added immediately after the property type. */
+    /* A corresponding property assigner type is added. */
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under ownerName. */
@@ -1363,17 +1502,17 @@ extern "C" {
     /*   - ownerName (pointer) is invalid. */
     /*   - name (pointer) is invalid. */
     /*   - type (pointer) is invalid. */
-    /*   - getCallBehaviour (pointer) is invalid. */
-    /*   - setCallBehaviour (pointer) is invalid. */
+    /*   - getBehaviour (pointer) is invalid. */
+    /*   - setBehaviour (pointer) is invalid. */
     YmBool ymParcelDef_AddComputedProperty(
         struct YmParcelDef* parceldef,
         const YmChar* ownerName,
         const YmChar* name,
         YmRefSym type,
-        YmCallBhvrCallbackFn getCallBehaviour,
-        void* getCallBehaviourData,
-        YmCallBhvrCallbackFn setCallBehaviour,
-        void* setCallBehaviourData);
+        YmCallBhvrCallbackFn getBehaviour,
+        void* getBehaviourData,
+        YmCallBhvrCallbackFn setBehaviour,
+        void* setBehaviourData);
 
     /* NOTE: Right now type params are treated as pseudo-types, w/ them having certain characteristics
     *        of types (ie. they can have name conflicts w/ them,) while not having others (ie. they're
@@ -1390,7 +1529,7 @@ extern "C" {
     /* Failure: */
     /*   - New type has a name conflict with an existing type, type parameter, or 'Self'. */
     /*   - No type under typeName. */
-    /*   - typeName is a member. */
+    /*   - typeName cannot have type parameters. */
     /*   - name is illegal. */
     /*   - constraintType is illegal. */
     /*   - Adding new type parameter would exceed YM_MAX_TYPE_PARAMS. */
@@ -1408,8 +1547,8 @@ extern "C" {
     /* Adds a new positional/named parameter to the specified type, returning its index, or YM_NO_PARAM_INDEX on failure. */
     /* Failure: */
     /*   - No type under typeName. */
-    /*   - typeName is not callable. */
-    /*   - typeName is a property. */
+    /*   - typeName has no call signature. */
+    /*   - typeName call signature isn't user-defined. */
     /*   - name conflicts with an existing parameter. */
     /*   - name is illegal. */
     /*   - paramType is illegal. */
@@ -1429,8 +1568,8 @@ extern "C" {
     /* Makes it so parameters added to the specified type will hereafter be named parameters, not positional ones. */
     /* Failure: */
     /*   - No type under typeName. */
-    /*   - typeName is not callable. */
-    /*   - typeName is a property. */
+    /*   - typeName has no call signature. */
+    /*   - typeName call signature isn't user-defined. */
     /*   - typeName is a protocol member type. */
     /* Undefined Behaviour: */
     /*   - parceldef is invalid. */
@@ -1589,20 +1728,20 @@ extern "C" {
     */
 
     /* Increments the ref count of object obj. */
-    /* Returns old ref count value of obj. */
-    /* Undefined Behaviour: */
-    /*   - obj is invalid. */
+    /* Returns old ref count value of obj, or 0. */
+    /* Failure: */
+    /*   - obj == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymObj_Secure(struct YmObj* obj);
 
     /* Decrements the ref count of object obj, destroying obj if it reaches 0. */
-    /* Returns old ref count value of obj. */
-    /* Undefined Behaviour: */
-    /*   - obj is invalid. */
+    /* Returns old ref count value of obj, or 0. */
+    /* Failure: */
+    /*   - obj == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymObj_Release(struct YmObj* obj);
 
-    /* Returns the ref count of object obj. */
-    /* Undefined Behaviour: */
-    /*   - obj is invalid. */
+    /* Returns the ref count of object obj, or 0. */
+    /* Failure: */
+    /*   - obj == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymObj_RefCount(struct YmObj* obj);
 
     /* Returns the type of object obj. */

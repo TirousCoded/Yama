@@ -42,7 +42,7 @@ static std::optional<std::vector<YmType*>> mkTypesVec(YmCtx* ctx, std::vector<st
 
 
 TEST(Conversions, Identity_IncludeGenerics) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -60,6 +60,8 @@ TEST(Conversions, Identity_IncludeGenerics) {
     ymParcelDef_AddFn(p_def, "f", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddTypeParam(p_def, "g", "T", "p:Any");
+
+    ymParcelDef_AddStoredVar(p_def, "V", "yama:Int", ymInertCallBhvrFn, nullptr);
     
     ymParcelDef_AddMethod(p_def, "A", "m", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddStoredProperty(p_def, "A", "abc", "yama:Int");
@@ -80,6 +82,8 @@ TEST(Conversions, Identity_IncludeGenerics) {
         "p:f",
         "p:g[p:A]",
         "p:g[p:B]",
+        "p:V",
+        "p:V$assigner",
         "p:A::m",
         "p:C[p:A]::m",
         "p:C[p:B]::m",
@@ -111,7 +115,7 @@ TEST(Conversions, Identity_IncludeGenerics) {
 // TODO: Maybe we exclude protocols, but what about their methods?
 
 TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -126,6 +130,9 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
     ymParcelDef_AddFn(p_def, "g", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "h", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddTypeParam(p_def, "h", "T", "p:Any");
+
+    ymParcelDef_AddStoredVar(p_def, "V", "yama:Int", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredVar(p_def, "W", "yama:Int", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddMethod(p_def, "A", "m1", "p:A", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "A", "m2", "p:A", ymInertCallBhvrFn, nullptr);
@@ -148,6 +155,10 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
         "p:g",
         "p:h[p:A]",
         "p:h[p:B]",
+        "p:V",
+        "p:W",
+        "p:V$assigner",
+        "p:W$assigner",
         "p:A::m1",
         "p:A::m2",
         "p:B::m1",
@@ -177,7 +188,7 @@ TEST(Conversions, NonIdentity_IncludeGenerics_ExcludeProtocols) {
 // TODO: Add tests for the nuances of when a type conforms to a protocol.
 
 TEST(Conversions, NonProtocolToProtocol) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
     
@@ -225,7 +236,7 @@ TEST(Conversions, NonProtocolToProtocol) {
 // to P, the conversion is illegal (as no value of P could be a legal A.)
 
 TEST(Conversions, ProtocolToNonProtocol) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -275,7 +286,7 @@ TEST(Conversions, ProtocolToNonProtocol) {
 // could conform to both P and Q.)
 
 TEST(Conversions, ProtocolToProtocol) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 

@@ -12,7 +12,7 @@ lexer section:
     # TODO: The below defining of IDENTIFIER as allowing for '$assigner' on the end feels SUPER
     #       HACKY, and I REALLY want to find a better way of dealing w/ it.
     IDENTIFIER                      : [%$]? [a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff] [0-9a-zA-Z_\x80-\ud7ff\ue000-\U0010ffff]*
-                                      '$assigner'?
+                                      ( '$' ( 'init' | 'assigner' ) )?
                                     ;
 
     R_ARROW                         : '->' ;

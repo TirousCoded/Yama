@@ -64,8 +64,6 @@ namespace {
 		ErrCounter& err;
 		YmType* type = nullptr, *objType = nullptr;
 
-		// TODO: How do we go about testing fns like ymCtx_[Get|Set]Property?
-
 		Unit(
 			YmDm* dm,
 			YmCtx* ctx,
@@ -78,22 +76,54 @@ namespace {
 			YmMembers members,
 			YmTypeParams typeParams,
 			std::function<void(Safe<YmType> type)> testDefaultInit,
-			std::function<void(Safe<YmType> type)> testExplicitInit,
+			std::function<void(Safe<YmType> type)> testStructInit,
 			std::function<void(Safe<YmType> type)> testCall,
+			std::function<void(Safe<YmType> type)> testGetVar,
+			std::function<void(Safe<YmType> type)> testSetVar,
 			std::function<void(Safe<YmType> type)> testGetProperty,
 			std::function<void(Safe<YmType> type)> testSetProperty) :
 			dm(dm),
 			ctx(ctx),
 			err(err) {
-			_setup(
-				dm, ctx, err,
-				fullname, objectTypeFullname,
-				kind, members, typeParams,
-				testDefaultInit,
-				testExplicitInit,
-				testCall,
-				testGetProperty,
-				testSetProperty);
+			// Need this lambda so we can *abort* ctor if assert fails.
+			[&, this]() {
+				ym::println("testing {}", fullname);
+
+				type = ymCtx_Load(ctx, fullname.c_str());
+				ASSERT_TRUE(type);
+
+				if (objectTypeFullname) {
+					auto fln = objectTypeFullname.value();
+					objType = ymCtx_Load(ctx, fln.c_str());
+					ASSERT_TRUE(objType);
+				}
+
+				ASSERT_STREQ(ymType_Fullname(type), fullname.c_str());
+				ASSERT_EQ(ymType_Kind(type), kind)
+					<< "ymType_Kind(t) == " << ymKind_Fmt(ymType_Kind(type))
+					<< "\nkind == " << ymKind_Fmt(kind);
+				ASSERT_EQ(ymType_Members(type), members);
+				ASSERT_EQ(ymType_TypeParams(type), typeParams);
+
+				std::array<std::function<void(Safe<YmType> type)>, 7> tests{
+					testDefaultInit,
+					testStructInit,
+					testCall,
+					testGetVar,
+					testSetVar,
+					testGetProperty,
+					testSetProperty,
+				};
+				for (const auto& test : tests) {
+					ymCtx_PopAll(ctx);
+					ASSERT_EQ(ymCtx_Locals(ctx), 0);
+					err.reset();
+					test(Safe(type));
+				}
+
+				// Now we can declare this Test object valid.
+				valid = true;
+				}();
 		}
 
 		void object(
@@ -175,69 +205,6 @@ namespace {
 				ASSERT_EQ(ymType_Converts(objType, target, YM_TRUE), YM_FALSE);
 			}
 		}
-
-
-	private:
-		void _setup(
-			YmDm* dm,
-			YmCtx* ctx,
-			ErrCounter& err,
-			const std::string& fullname,
-			const std::optional<std::string>& objectTypeFullname,
-			YmKind kind,
-			YmMembers members,
-			YmTypeParams typeParams,
-			std::function<void(Safe<YmType> type)> testDefaultInit,
-			std::function<void(Safe<YmType> type)> testExplicitInit,
-			std::function<void(Safe<YmType> type)> testCall,
-			std::function<void(Safe<YmType> type)> testGetProperty,
-			std::function<void(Safe<YmType> type)> testSetProperty) {
-			ym::println("testing {}", fullname);
-
-			type = ymCtx_Load(ctx, fullname.c_str());
-			ASSERT_TRUE(type);
-
-			if (objectTypeFullname) {
-				auto fln = objectTypeFullname.value();
-				objType = ymCtx_Load(ctx, fln.c_str());
-				ASSERT_TRUE(objType);
-			}
-
-			ASSERT_STREQ(ymType_Fullname(type), fullname.c_str());
-			ASSERT_EQ(ymType_Kind(type), kind)
-				<< "ymType_Kind(t) == " << ymKind_Fmt(ymType_Kind(type))
-				<< "\nkind == " << ymKind_Fmt(kind);
-			ASSERT_EQ(ymType_Members(type), members);
-			ASSERT_EQ(ymType_TypeParams(type), typeParams);
-
-			ymCtx_PopAll(ctx);
-			ASSERT_EQ(ymCtx_Locals(ctx), 0);
-			err.reset();
-			testDefaultInit(Safe(type));
-
-			ymCtx_PopAll(ctx);
-			ASSERT_EQ(ymCtx_Locals(ctx), 0);
-			err.reset();
-			testExplicitInit(Safe(type));
-
-			ymCtx_PopAll(ctx);
-			ASSERT_EQ(ymCtx_Locals(ctx), 0);
-			err.reset();
-			testCall(Safe(type));
-
-			ymCtx_PopAll(ctx);
-			ASSERT_EQ(ymCtx_Locals(ctx), 0);
-			err.reset();
-			testGetProperty(Safe(type));
-
-			ymCtx_PopAll(ctx);
-			ASSERT_EQ(ymCtx_Locals(ctx), 0);
-			err.reset();
-			testSetProperty(Safe(type));
-
-			// Now we can declare this Test object valid.
-			valid = true;
-		}
 	};
 }
 
@@ -251,14 +218,14 @@ TEST(TypeCharacteristics, YamaNone) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{});
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -267,6 +234,12 @@ TEST(TypeCharacteristics, YamaNone) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -302,14 +275,14 @@ TEST(TypeCharacteristics, YamaInt) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .i = 0 });
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -318,6 +291,12 @@ TEST(TypeCharacteristics, YamaInt) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -421,14 +400,14 @@ TEST(TypeCharacteristics, YamaUInt) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .ui = 0 });
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -437,6 +416,12 @@ TEST(TypeCharacteristics, YamaUInt) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -520,14 +505,14 @@ TEST(TypeCharacteristics, YamaFloat) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .f = 0 });
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -536,6 +521,12 @@ TEST(TypeCharacteristics, YamaFloat) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -655,14 +646,14 @@ TEST(TypeCharacteristics, YamaBool) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .b = YM_FALSE });
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -671,6 +662,12 @@ TEST(TypeCharacteristics, YamaBool) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -725,14 +722,14 @@ TEST(TypeCharacteristics, YamaRune) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .r = U'\0'});
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -741,6 +738,12 @@ TEST(TypeCharacteristics, YamaRune) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -821,14 +824,14 @@ TEST(TypeCharacteristics, YamaType) {
 		0,
 		0,
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
 			testExtracts(result, Extracts{ .t = ymCtx_LdNone(ctx) });
 		},
 		[&ctx](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 			auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 			ASSERT_TRUE(result);
 			EXPECT_EQ(ymObj_Type(result), type);
@@ -837,6 +840,12 @@ TEST(TypeCharacteristics, YamaType) {
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -873,16 +882,22 @@ TEST(TypeCharacteristics, YamaAny) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -915,14 +930,14 @@ TEST(TypeCharacteristics, Structs) {
 			2,
 			0,
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
 				testExtracts(result, Extracts{});
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
@@ -937,11 +952,17 @@ TEST(TypeCharacteristics, Structs) {
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			});
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
-				ymCtx_DefaultInit(ctx, YM_PUSH, type) == YM_TRUE
+				ymCtx_DefaultInit(ctx, type, YM_PUSH) == YM_TRUE
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -960,14 +981,14 @@ TEST(TypeCharacteristics, Structs) {
 			8,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				ymCtx_PutInt(ctx, YM_PUSH, 10);
 				ymCtx_PutInt(ctx, YM_PUSH, 11);
 				ymCtx_PutInt(ctx, YM_PUSH, 12);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, "x,y,z"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "x,y,z", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Locals(ctx), 1);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
@@ -993,6 +1014,12 @@ TEST(TypeCharacteristics, Structs) {
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			});
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
@@ -1000,7 +1027,7 @@ TEST(TypeCharacteristics, Structs) {
 				ymCtx_PutInt(ctx, YM_PUSH, 3) &&
 				ymCtx_PutInt(ctx, YM_PUSH, 1) &&
 				ymCtx_PutInt(ctx, YM_PUSH, 2) &&
-				ymCtx_ExplicitInit(ctx, YM_PUSH, type, "x,y,z")
+				ymCtx_StructInit(ctx, type, "x,y,z", YM_PUSH)
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -1036,14 +1063,14 @@ TEST(TypeCharacteristics, GenericStructs) {
 			2,
 			1,
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
 				testExtracts(result, Extracts{});
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
@@ -1058,11 +1085,17 @@ TEST(TypeCharacteristics, GenericStructs) {
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			});
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
-				ymCtx_DefaultInit(ctx, YM_PUSH, type) == YM_TRUE
+				ymCtx_DefaultInit(ctx, type, YM_PUSH) == YM_TRUE
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -1081,14 +1114,14 @@ TEST(TypeCharacteristics, GenericStructs) {
 			2,
 			1,
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_PUSH, type), YM_TRUE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
 				testExtracts(result, Extracts{});
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_PUSH), YM_TRUE);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
 				EXPECT_EQ(ymObj_Type(result), type);
@@ -1103,11 +1136,17 @@ TEST(TypeCharacteristics, GenericStructs) {
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			});
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
 			return
-				ymCtx_DefaultInit(ctx, YM_PUSH, type) == YM_TRUE
+				ymCtx_DefaultInit(ctx, type, YM_PUSH) == YM_TRUE
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -1126,14 +1165,14 @@ TEST(TypeCharacteristics, GenericStructs) {
 			8,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				ymCtx_PutInt(ctx, YM_PUSH, 10);
 				ymCtx_PutInt(ctx, YM_PUSH, 11);
 				ymCtx_PutInt(ctx, YM_PUSH, 12);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, type, "x,y,z"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "x,y,z", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Locals(ctx), 1);
 				auto result = ymCtx_Local(ctx, 0, YM_BORROW);
 				ASSERT_TRUE(result);
@@ -1159,6 +1198,12 @@ TEST(TypeCharacteristics, GenericStructs) {
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			});
 		auto mkObject =
 			[&ctx](Safe<YmType> type) -> YmObj* {
@@ -1166,7 +1211,7 @@ TEST(TypeCharacteristics, GenericStructs) {
 				ymCtx_PutInt(ctx, YM_PUSH, 3) &&
 				ymCtx_PutInt(ctx, YM_PUSH, 1) &&
 				ymCtx_PutInt(ctx, YM_PUSH, 2) &&
-				ymCtx_ExplicitInit(ctx, YM_PUSH, type, "x,y,z")
+				ymCtx_StructInit(ctx, type, "x,y,z", YM_PUSH)
 				? ymCtx_Pull(ctx)
 				: nullptr;
 			};
@@ -1193,16 +1238,22 @@ TEST(TypeCharacteristics, Protocols) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
@@ -1229,16 +1280,22 @@ TEST(TypeCharacteristics, GenericProtocols) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
@@ -1256,16 +1313,22 @@ TEST(TypeCharacteristics, GenericProtocols) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				EXPECT_EQ(ymCtx_Call(ctx, type, 0, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonCallableType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
@@ -1282,7 +1345,7 @@ TEST(TypeCharacteristics, Fns) {
 	ymParcelDef_AddFn(p_def,
 		"identity",
 		"yama:Int",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
@@ -1296,11 +1359,11 @@ TEST(TypeCharacteristics, Fns) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx](Safe<YmType> type) {
@@ -1316,6 +1379,12 @@ TEST(TypeCharacteristics, Fns) {
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		});
 }
 
@@ -1325,7 +1394,7 @@ TEST(TypeCharacteristics, GenericFns) {
 	ymParcelDef_AddFn(p_def,
 		"identity",
 		"$T",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
@@ -1341,11 +1410,11 @@ TEST(TypeCharacteristics, GenericFns) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
@@ -1355,6 +1424,12 @@ TEST(TypeCharacteristics, GenericFns) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
 				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
@@ -1372,11 +1447,11 @@ TEST(TypeCharacteristics, GenericFns) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
@@ -1386,6 +1461,331 @@ TEST(TypeCharacteristics, GenericFns) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdFloat(ctx));
 					EXPECT_DOUBLE_EQ(ymObj_ToFloat(top, nullptr), 3.14159);
 				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+}
+
+TEST(TypeCharacteristics, StoredVars_IncludingReadOnlyOnesAndAssigners) {
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ymParcelDef_AddStoredVar(p_def, "V", "yama:Int",
+		[](YmCtx* ctx, YmType* type, void*) {
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+		},
+		nullptr);
+	ymParcelDef_AddReadOnlyStoredVar(p_def, "W", "yama:Int",
+		[](YmCtx* ctx, YmType* type, void*) {
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+		},
+		nullptr);
+	ymDm_BindParcelDef(dm, "p", p_def);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:V",
+			std::nullopt,
+			YmKind_Var,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_Call(ctx, type, 0, "", YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 500), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 500);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:V$assigner",
+			std::nullopt,
+			YmKind_VarAssigner,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 500), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
+
+				auto V = load(ctx, "p:V");
+				ASSERT_EQ(ymCtx_GetVar(ctx, V, YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, -1, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 500);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:W",
+			std::nullopt,
+			YmKind_Var,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_Call(ctx, type, 0, "", YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_PUSH), YM_TRUE);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 500), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_ReadOnlyVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+}
+
+static size_t computedVarGets = 0, computedVarSets = 0;
+
+TEST(TypeCharacteristics, ComputedVars_IncludingReadOnlyOnesAndAssigners) {
+	SETUP_ALL(ctx);
+	SETUP_PARCELDEF(p_def);
+	ymParcelDef_AddComputedVar(p_def, "V", "yama:Int",
+		[](YmCtx* ctx, YmType* type, void*) {
+			computedVarGets++;
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+		},
+		nullptr,
+		[](YmCtx* ctx, YmType* type, void*) {
+			computedVarSets++;
+			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+			if (auto top = ymCtx_Arg(ctx, 0, YM_BORROW)) {
+				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+				EXPECT_EQ(ymObj_ToInt(top, nullptr), 22);
+			}
+		},
+		nullptr);
+	ymParcelDef_AddReadOnlyComputedVar(p_def, "W", "yama:Int",
+		[](YmCtx* ctx, YmType* type, void*) {
+			computedVarGets++;
+			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+		},
+		nullptr);
+	ymDm_BindParcelDef(dm, "p", p_def);
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:V",
+			std::nullopt,
+			YmKind_Var,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_Call(ctx, type, 0, "", YM_PUSH), YM_TRUE);
+				EXPECT_EQ(computedVarGets, 1);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_PUSH), YM_TRUE);
+				EXPECT_EQ(computedVarGets, 1);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				computedVarSets = 0;
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_TRUE);
+				EXPECT_EQ(computedVarSets, 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:V$assigner",
+			std::nullopt,
+			YmKind_VarAssigner,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
+				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
+
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_GetVar(ctx, load(ctx, "p:V"), YM_PUSH), YM_TRUE);
+				EXPECT_EQ(computedVarGets, 1);
+				if (auto top = ymCtx_Local(ctx, -1, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+				EXPECT_EQ(computedVarGets, 0);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				computedVarSets = 0;
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+				EXPECT_EQ(computedVarSets, 0);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			});
+	}
+	{
+		Unit unit(
+			dm, ctx, err,
+			"p:W",
+			std::nullopt,
+			YmKind_Var,
+			0,
+			0,
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonStructType], 1);
+			},
+			[&ctx](Safe<YmType> type) {
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_Call(ctx, type, 0, "", YM_PUSH), YM_TRUE);
+				EXPECT_EQ(computedVarGets, 1);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				computedVarGets = 0;
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_PUSH), YM_TRUE);
+				EXPECT_EQ(computedVarGets, 1);
+				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
+					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
+					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
+				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 500), YM_TRUE);
+				computedVarSets = 0;
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_ReadOnlyVarType], 1);
+				EXPECT_EQ(computedVarSets, 0);
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// n/a
@@ -1407,7 +1807,7 @@ TEST(TypeCharacteristics, Methods) {
 		"A",
 		"m",
 		"yama:Int",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
@@ -1421,11 +1821,11 @@ TEST(TypeCharacteristics, Methods) {
 		0,
 		0,
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+			EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 		},
 		[&ctx, &err](Safe<YmType> type) {
-			EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+			EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 			EXPECT_GE(err[YmErrCode_NonStructType], 1);
 		},
 		[&ctx](Safe<YmType> type) {
@@ -1435,6 +1835,12 @@ TEST(TypeCharacteristics, Methods) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 				EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
 			}
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
+		},
+		[&ctx, &err](Safe<YmType> type) {
+			// n/a
 		},
 		[&ctx, &err](Safe<YmType> type) {
 			// TODO: Should we have code here?
@@ -1453,7 +1859,7 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 		"A",
 		"m",
 		"$T",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
@@ -1468,11 +1874,11 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
@@ -1482,6 +1888,12 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 					EXPECT_EQ(ymObj_ToInt(top, nullptr), 101);
 				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// TODO: Should we have code here?
@@ -1499,11 +1911,11 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
@@ -1513,6 +1925,12 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdFloat(ctx));
 					EXPECT_DOUBLE_EQ(ymObj_ToFloat(top, nullptr), 3.14159);
 				}
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				// n/a
 			},
 			[&ctx, &err](Safe<YmType> type) {
 				// TODO: Should we have code here?
@@ -1539,17 +1957,17 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1558,9 +1976,18 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1571,7 +1998,7 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1594,19 +2021,18 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				auto A_a = ymCtx_Load(ctx, "p:A::a");
-				ASSERT_TRUE(A_a);
+				auto A_a = load(ctx, "p:A::a");
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				ASSERT_EQ(ymCtx_Call(ctx, type, 2, "", YM_DISCARD), YM_TRUE);
@@ -1618,9 +2044,18 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_FALSE);
 				ASSERT_GE(err[YmErrCode_NonPropertyType], 1);
@@ -1628,7 +2063,7 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1645,17 +2080,17 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 1, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
@@ -1663,9 +2098,18 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1676,7 +2120,7 @@ TEST(TypeCharacteristics, StoredProperties_IncludingReadOnlyOnesAndAssigners) {
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1703,17 +2147,17 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1722,9 +2166,18 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1735,7 +2188,7 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1758,11 +2211,11 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
@@ -1770,7 +2223,7 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 				ASSERT_TRUE(A_a);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				ASSERT_EQ(ymCtx_Call(ctx, type, 2, "", YM_DISCARD), YM_TRUE);
@@ -1782,9 +2235,18 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_FALSE);
 				ASSERT_GE(err[YmErrCode_NonPropertyType], 1);
@@ -1792,7 +2254,7 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1809,17 +2271,17 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 1, YM_BORROW)) {
 					EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
@@ -1827,9 +2289,18 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				if (auto top = ymCtx_Local(ctx, 0, YM_BORROW)) {
@@ -1840,7 +2311,7 @@ TEST(TypeCharacteristics, GenericTypeStoredProperties_IncludingReadOnlyOnesAndAs
 			[&ctx, &err](Safe<YmType> type) {
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 10), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 11), YM_TRUE);
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), "a,b"), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "a,b", YM_PUSH), YM_TRUE);
 
 				ASSERT_EQ(ymCtx_Copy(ctx, 0, YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
@@ -1857,12 +2328,12 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 	SETUP_PARCELDEF(p_def);
 	ymParcelDef_AddStruct(p_def, "A");
 	ymParcelDef_AddComputedProperty(p_def, "A", "a", "yama:Int",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr,
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 			// Getter tests in-part by asserting 
@@ -1873,7 +2344,7 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 		},
 		nullptr);
 	ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "b", "yama:Int",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
 		},
@@ -1888,15 +2359,15 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -1906,7 +2377,16 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -1916,7 +2396,7 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -1933,15 +2413,15 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -1949,14 +2429,23 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 				EXPECT_EQ(computedPropertyCalls, 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonPropertyType], 1);
 				EXPECT_EQ(computedPropertyCalls, 0);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -1974,15 +2463,15 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 			0,
 			0,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -1992,7 +2481,16 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -2002,7 +2500,7 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -2019,12 +2517,12 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 	ymParcelDef_AddStruct(p_def, "A");
 	ymParcelDef_AddTypeParam(p_def, "A", "T", "yama:Any");
 	ymParcelDef_AddComputedProperty(p_def, "A", "a", "$T",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr,
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 			// Getter tests in-part by asserting 
@@ -2035,7 +2533,7 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 		},
 		nullptr);
 	ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "b", "$T",
-		[](YmCtx* ctx, void*) {
+		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
 			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
 		},
@@ -2050,15 +2548,15 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -2068,7 +2566,16 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -2078,7 +2585,7 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -2095,15 +2602,15 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -2111,14 +2618,23 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 				EXPECT_EQ(computedPropertyCalls, 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonPropertyType], 1);
 				EXPECT_EQ(computedPropertyCalls, 0);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;
@@ -2136,15 +2652,15 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 			0,
 			1,
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_DefaultInit(ctx, YM_DISCARD, type), YM_FALSE);
+				EXPECT_EQ(ymCtx_DefaultInit(ctx, type, YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NoDefaultValue], 1);
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_DISCARD, type, ""), YM_FALSE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, type, "", YM_DISCARD), YM_FALSE);
 				EXPECT_GE(err[YmErrCode_NonStructType], 1);
 			},
 			[&ctx](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_Call(ctx, type, 1, "", YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -2154,7 +2670,16 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				ASSERT_EQ(ymCtx_GetVar(ctx, type, YM_DISCARD), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 50), YM_TRUE);
+				ASSERT_EQ(ymCtx_SetVar(ctx, type), YM_FALSE);
+				EXPECT_GE(err[YmErrCode_NonVarType], 1);
+			},
+			[&ctx, &err](Safe<YmType> type) {
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				computedPropertyCalls = 0;
 				ASSERT_EQ(ymCtx_GetProperty(ctx, type, YM_PUSH), YM_TRUE);
 				EXPECT_EQ(computedPropertyCalls, 1);
@@ -2164,7 +2689,7 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 				}
 			},
 			[&ctx, &err](Safe<YmType> type) {
-				EXPECT_EQ(ymCtx_ExplicitInit(ctx, YM_PUSH, ymType_Owner(type), ""), YM_TRUE);
+				EXPECT_EQ(ymCtx_StructInit(ctx, ymType_Owner(type), "", YM_PUSH), YM_TRUE);
 				ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, ymCtx_Local(ctx, 0, YM_BORROW), YM_BORROW), YM_TRUE);
 				ASSERT_EQ(ymCtx_PutInt(ctx, YM_PUSH, 22), YM_TRUE);
 				computedPropertyCalls = 0;

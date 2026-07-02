@@ -44,6 +44,7 @@ namespace _ym {
 		static std::optional<Spec> path(const std::string& path);
 		static std::optional<Spec> type(const std::string& fullname, SpecSolver& solver);
 		static std::optional<Spec> type(const std::string& fullname);
+		static std::optional<Spec> type(const std::optional<std::string>& fullname); // TODO: Make more overloads.
 		static std::optional<Spec> either(const std::string& specifier, SpecSolver& solver);
 		static std::optional<Spec> either(const std::string& specifier);
 

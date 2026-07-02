@@ -31,6 +31,13 @@ std::optional<_ym::Spec> _ym::Spec::type(const std::string& fullname) {
 	return Spec::type(fullname, s);
 }
 
+std::optional<_ym::Spec> _ym::Spec::type(const std::optional<std::string>& fullname) {
+	return
+		fullname
+		? type(*fullname)
+		: std::nullopt;
+}
+
 std::optional<_ym::Spec> _ym::Spec::either(const std::string& specifier, SpecSolver& solver) {
 	SpecSolver::Type t{};
 	if (auto s = solver(specifier, t)) {

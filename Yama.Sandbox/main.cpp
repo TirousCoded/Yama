@@ -26,7 +26,7 @@ int32_t main(int32_t argc, char** argv) {
         "yama:None",
         { { "level", "yama:UInt" } },
         { "p:recurse" },
-        [](YmCtx* ctx_, void*) {
+        [](YmCtx* ctx_, YmType* type, void*) {
             auto ctx = ym::Context(ym::Safe<YmCtx>(ctx_), true);
             ctx.ret(ctx.newNone());
             auto n = ctx.arg(0).value().toUInt().value();
@@ -42,7 +42,7 @@ int32_t main(int32_t argc, char** argv) {
         "yama:None",
         { { "x", "$T" } },
         { "$T" },
-        [](YmCtx* ctx_, void*) {
+        [](YmCtx* ctx_, YmType* type, void*) {
             auto ctx = ym::Context(*ctx_, true);
             auto T = ctx.ref(0).value();
             auto x = ctx.arg(0).value();

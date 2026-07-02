@@ -32,6 +32,7 @@ extern "C" {
         YmErrCode_TypeNotFound,             /* Type not found. */
         YmErrCode_ParamNotFound,            /* Parameter not found. */
         YmErrCode_CallSigNotFound,          /* Call signature not found. */
+        YmErrCode_CallSigNotUserDefined,    /* Call signature is not user-defined. */
         YmErrCode_IllegalName,              /* Illegal name. */
         YmErrCode_NameConflict,             /* Name conflict detected. */
         YmErrCode_LimitReached,             /* Known limit reached. */
@@ -42,10 +43,13 @@ extern "C" {
         YmErrCode_MemberType,               /* Type is a member. */
         YmErrCode_NonCallableType,          /* Type is non-callable. */
         YmErrCode_TypeCannotHaveMembers,    /* Type cannot have members. */
+        YmErrCode_TypeCannotHaveTypeParams, /* Type cannot have type parameters. */
         YmErrCode_NonStructType,            /* Type is a non-struct. */
         YmErrCode_ProtocolType,             /* Type is a protocol. */
         YmErrCode_NonProtocolType,          /* Type is a non-protocol. */
         YmErrCode_ProtocolMemberType,       /* Type is member of protocol type. */
+        YmErrCode_ReadOnlyVarType,          /* Type is a read-only var. */
+        YmErrCode_NonVarType,               /* Type is a non-var. */
         YmErrCode_ReadOnlyPropertyType,     /* Type is a read-only property. */
         YmErrCode_PropertyType,             /* Type is a property. */
         YmErrCode_NonPropertyType,          /* Type is a non-property. */

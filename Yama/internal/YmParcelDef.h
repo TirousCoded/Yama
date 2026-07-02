@@ -42,6 +42,23 @@ public:
         const std::string& name,
         std::string returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
+    bool addReadOnlyStoredVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour);
+    bool addStoredVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour);
+    bool addReadOnlyComputedVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getBehaviour);
+    bool addComputedVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::CallBhvrCallbackInfo setBehaviour);
     bool addMethod(
         const std::string& ownerName,
         const std::string& name,
@@ -63,13 +80,13 @@ public:
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getCallBehaviour);
+        _ym::CallBhvrCallbackInfo getBehaviour);
     bool addComputedProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getCallBehaviour,
-        _ym::CallBhvrCallbackInfo setCallBehaviour);
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::CallBhvrCallbackInfo setBehaviour);
 
     std::optional<YmTypeParamIndex> addTypeParam(
         std::string typeName,
@@ -87,6 +104,20 @@ public:
 
 
 private:
+    bool _addReadOnlyVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::KindEx getK);
+    bool _addVar(
+        const std::string& name,
+        std::string typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::CallBhvrCallbackInfo setBehaviour,
+        _ym::KindEx getK,
+        _ym::KindEx setK);
     bool _addMethod(
         const std::string& ownerName,
         const std::string& name,
@@ -97,14 +128,14 @@ private:
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getCallBehaviour,
+        _ym::CallBhvrCallbackInfo getBehaviour,
         _ym::KindEx getK);
     bool _addProperty(
         const std::string& ownerName,
         const std::string& name,
         std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getCallBehaviour,
-        _ym::CallBhvrCallbackInfo setCallBehaviour,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::CallBhvrCallbackInfo setBehaviour,
         _ym::KindEx getK,
         _ym::KindEx setK);
 };

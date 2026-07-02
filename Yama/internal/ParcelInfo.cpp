@@ -59,26 +59,35 @@ bool _ym::checkNonProtocolMember(const TypeInfo& type, std::string_view msg) {
     return result;
 }
 
-void _ym::methodReqCallBhvr(YmCtx* ctx, void* user) {
+void _ym::methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     YM_DEADEND;
 }
 
-void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, void* user) {
-    // TODO: This code semi-duplicates code in YmCtx::getProperty.
-    auto slotInd = (uintptr_t)user;
-    auto& subject = ym::deref(ctx->arg(0));
-    ctx->ret(subject.slot(slotInd).ref, YM_BORROW);
+void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
+    ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
+    ctx->getProperty(type, YM_PUSH);
+    ctx->ret(ctx->pull());
 }
 
-void _ym::storedPropertySetCallBhvr(YmCtx* ctx, void* user) {
+void _ym::storedPropertySetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     // TODO: This code semi-duplicates code in YmCtx::setProperty.
-    auto slotInd = (uintptr_t)user;
     auto& subject = ym::deref(ctx->arg(0));
     auto& value = ym::deref(ctx->arg(1));
-    auto& target = subject.slot(slotInd).ref;
+    auto& target = subject.slot(type->info->storedPropertySlot().value()).ref;
     ctx->release(ym::deref(target));
     target = &value;
     ctx->secure(value);
+    ctx->ret(ctx->newNone());
+}
+
+void _ym::storedVarGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
+    ctx->getVar(type, YM_PUSH);
+    ctx->ret(ctx->pull());
+}
+
+void _ym::storedVarSetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
+    ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
+    ctx->setVar(type->var());
     ctx->ret(ctx->newNone());
 }
 
@@ -89,6 +98,7 @@ _ym::TypeInfo::TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localNa
     _initMembership();
     _initTypeParams();
     _initMembers();
+    _initVarAssigner();
 }
 
 _ym::ParcelInfo& _ym::TypeInfo::parcel() const noexcept {
@@ -139,6 +149,10 @@ bool _ym::TypeInfo::hasCallSig() const noexcept {
     return ymKind_HasCallSig(kind());
 }
 
+bool _ym::TypeInfo::hasUserDefinedCallSig() const noexcept {
+    return ymKind_HasUserDefinedCallSig(kind());
+}
+
 bool _ym::TypeInfo::isOwner() const noexcept {
     return ymKind_IsOwner(kind());
 }
@@ -149,6 +163,10 @@ bool _ym::TypeInfo::isMember() const noexcept {
 
 bool _ym::TypeInfo::canHaveMembers() const noexcept {
     return ymKind_CanHaveMembers(kind());
+}
+
+bool _ym::TypeInfo::canHaveTypeParams() const noexcept {
+    return ymKind_CanHaveTypeParams(kind());
 }
 
 bool _ym::TypeInfo::hasDefaultValue() const noexcept {
@@ -173,6 +191,14 @@ bool _ym::TypeInfo::isFn() const noexcept {
     return kind() == YmKind_Fn;
 }
 
+bool _ym::TypeInfo::isVar() const noexcept {
+    return kind() == YmKind_Var;
+}
+
+bool _ym::TypeInfo::isVarAssigner() const noexcept {
+    return kind() == YmKind_VarAssigner;
+}
+
 bool _ym::TypeInfo::isMethod() const noexcept {
     return kind() == YmKind_Method;
 }
@@ -195,6 +221,14 @@ bool _ym::TypeInfo::isRegularProtocol() const noexcept {
 
 bool _ym::TypeInfo::isRegularFn() const noexcept {
     return kindEx() == KindEx::Fn;
+}
+
+bool _ym::TypeInfo::isRegularVar() const noexcept {
+    return kindEx() == KindEx::Var;
+}
+
+bool _ym::TypeInfo::isRegularVarAssigner() const noexcept {
+    return kindEx() == KindEx::VarAssigner;
 }
 
 bool _ym::TypeInfo::isRegularMethod() const noexcept {
@@ -241,12 +275,27 @@ bool _ym::TypeInfo::isMethodReq() const noexcept {
     return kindEx() == KindEx::MethodReq;
 }
 
+bool _ym::TypeInfo::isStoredVarGet() const noexcept {
+    return kindEx() == KindEx::StoredVarGet;
+}
+
+bool _ym::TypeInfo::isStoredVarSet() const noexcept {
+    return kindEx() == KindEx::StoredVarSet;
+}
+
 bool _ym::TypeInfo::isStoredPropertyGet() const noexcept {
     return kindEx() == KindEx::StoredPropertyGet;
 }
 
 bool _ym::TypeInfo::isStoredPropertySet() const noexcept {
     return kindEx() == KindEx::StoredPropertySet;
+}
+
+std::optional<_ym::ConstIndex> _ym::TypeInfo::varConst() const noexcept {
+    return
+        _varAssigner
+        ? std::make_optional(_varAssigner->varConst)
+        : std::nullopt;
 }
 
 _ym::TypeInfo* _ym::TypeInfo::owner() const noexcept {
@@ -380,7 +429,15 @@ std::optional<_ym::ConstIndex> _ym::TypeInfo::assignerConst() const noexcept {
         : std::nullopt;
 }
 
+std::optional<_ym::ConstIndex> _ym::TypeInfo::initializerConst() const noexcept {
+    return
+        _var
+        ? _var->initializerConst
+        : std::nullopt;
+}
+
 std::optional<YmUInt16> _ym::TypeInfo::storedPropertySlot() const noexcept {
+    // TODO: Figure out an alternative to below, this is SUPER HACKY!!!
     return
         (callBehaviour() && (isStoredPropertyGet() || isStoredPropertySet()))
         ? std::make_optional((YmUInt16)(std::uintptr_t)callBehaviour()->user)
@@ -500,6 +557,14 @@ void _ym::TypeInfo::setupCall(
     }
 }
 
+void _ym::TypeInfo::setupVar(std::optional<ConstIndex> initializerConst) {
+    if (!_var) {
+        _var = std::unique_ptr<_Var>(new _Var{
+            .initializerConst = initializerConst,
+            });
+    }
+}
+
 std::string _ym::TypeInfo::fullnameForRef() const {
     return std::format("%here:{}", localName());
 }
@@ -528,6 +593,14 @@ void _ym::TypeInfo::_initMembers() {
     // TODO: Could we defer initializing _members upon first member register?
     if (canHaveMembers()) {
         _members = std::unique_ptr<_Members>(new _Members{});
+    }
+}
+
+void _ym::TypeInfo::_initVarAssigner() {
+    if (isVarAssigner()) {
+        _varAssigner = std::unique_ptr<_VarAssigner>(new _VarAssigner{
+            .varConst = consts.pullRef(Spec::typeFast(parcel().type((std::string)split_s<char>(localName(), "$assigner", true).first)->fullnameForRef())).value(),
+            });
     }
 }
 
@@ -742,6 +815,22 @@ bool _ym::ParcelInfo::addType(
         _registerType(std::move(*t));
 }
 
+bool _ym::ParcelInfo::addVarType(
+    KindEx k,
+    const std::string& localName,
+    CallBhvrCallbackInfo callBehaviour,
+    std::string returnTypeSymbol,
+    std::optional<std::string> assignerSymbol,
+    std::optional<std::string> initializerSymbol,
+    bool skipLocalNameLegalityCheck) {
+    auto t = _makeType(mustBe<YmKind_Var>(k), localName, skipLocalNameLegalityCheck);
+    return
+        t &&
+        _setupCall(*t, callBehaviour, std::move(returnTypeSymbol), std::move(assignerSymbol)) &&
+        _setupVar(*t, std::move(initializerSymbol)) &&
+        _registerType(std::move(*t));
+}
+
 bool _ym::ParcelInfo::addType(
     KindEx k,
     const std::string& ownerName,
@@ -768,6 +857,9 @@ std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(
         if (!_checkNoMemberLevelNameConflict(*info, name, "Cannot add type parameter")) {
             return std::nullopt;
         }
+        if (!_checkCanHaveTypeParams(*info, "Cannot add type parameter")) {
+            return std::nullopt;
+        }
         return info->addTypeParam(std::move(name), std::move(constraintTypeSymbol));
     }
     return std::nullopt;
@@ -777,15 +869,18 @@ std::optional<YmParamIndex> _ym::ParcelInfo::addParam(
     std::string typeName,
     std::string name,
     std::string paramTypeSymbol,
-    bool skipCallabilityAndOtherRelatedCheck) {
+    bool skipCallSigChecks) {
     if (auto info = _expectType(typeName, "Cannot add parameter")) {
         if (!_checkNameLegality(name, "Cannot add parameter")) {
             return std::nullopt;
         }
-        if (!skipCallabilityAndOtherRelatedCheck && !_checkIsntPropertyOrAssigner(*info, "Cannot add parameter")) {
+        if (!skipCallSigChecks && !_checkHasCallSig(*info, "Cannot add parameter")) {
             return std::nullopt;
         }
-        return info->addParam(std::move(name), std::move(paramTypeSymbol), skipCallabilityAndOtherRelatedCheck);
+        if (!skipCallSigChecks && !_checkHasUserDefinedCallSig(*info, "Cannot add parameter")) {
+            return std::nullopt;
+        }
+        return info->addParam(std::move(name), std::move(paramTypeSymbol), skipCallSigChecks);
     }
     return std::nullopt;
 }
@@ -898,7 +993,7 @@ bool _ym::ParcelInfo::_checkNoMemberLevelNameConflict(
 }
 
 bool _ym::ParcelInfo::_checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg) {
-    if (t.kind() == YmKind_Property) {
+    if (t.isProperty()) {
         Global::raiseErr(
             YmErrCode_PropertyType,
             "{}; {} is a property type!",
@@ -906,10 +1001,46 @@ bool _ym::ParcelInfo::_checkIsntPropertyOrAssigner(const TypeInfo& t, std::strin
             t.localName());
         return false;
     }
-    if (t.kind() == YmKind_PropertyAssigner) {
+    if (t.isPropertyAssigner()) {
         Global::raiseErr(
             YmErrCode_PropertyAssignerType,
             "{}; {} is a property assigner type!",
+            (std::string)msg,
+            t.localName());
+        return false;
+    }
+    return true;
+}
+
+bool _ym::ParcelInfo::_checkHasCallSig(const TypeInfo& t, std::string_view msg) {
+    if (!t.hasCallSig()) {
+        Global::raiseErr(
+            YmErrCode_CallSigNotFound,
+            "{}; {} call signature not found!",
+            (std::string)msg,
+            t.localName());
+        return false;
+    }
+    return true;
+}
+
+bool _ym::ParcelInfo::_checkHasUserDefinedCallSig(const TypeInfo& t, std::string_view msg) {
+    if (!t.hasUserDefinedCallSig()) {
+        Global::raiseErr(
+            YmErrCode_CallSigNotUserDefined,
+            "{}; {} call signature not user-defined!",
+            (std::string)msg,
+            t.localName());
+        return false;
+    }
+    return true;
+}
+
+bool _ym::ParcelInfo::_checkCanHaveTypeParams(const TypeInfo& t, std::string_view msg) {
+    if (!t.canHaveTypeParams()) {
+        Global::raiseErr(
+            YmErrCode_TypeCannotHaveTypeParams,
+            "{}; {} cannot have type parameters!",
             (std::string)msg,
             t.localName());
         return false;
@@ -1026,6 +1157,16 @@ bool _ym::ParcelInfo::_setupCall(
         callBehaviour,
         assignerConst,
         t.consts.pullRef(std::move(*normalizedReturnTypeSym)).value());
+    return true;
+}
+
+bool _ym::ParcelInfo::_setupVar(TypeInfo& t, std::optional<std::string> initializerSymbol) {
+    bool hasInit = initializerSymbol.has_value();
+    t.setupVar(
+        hasInit
+        // If initializerSymbol.has_value(), then Spec::type shouldn't be able to fail.
+        ? t.consts.pullRef(Spec::type(std::move(*initializerSymbol)).value())
+        : std::nullopt);
     return true;
 }
 

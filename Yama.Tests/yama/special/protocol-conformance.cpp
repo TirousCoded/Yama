@@ -15,7 +15,7 @@
 
 
 TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -25,6 +25,8 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     ymParcelDef_AddFn(p_def, "FN1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddFn(p_def, "FN2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddParam(p_def, "FN2", "param", "p:STRUCT1");
+
+    ymParcelDef_AddStoredVar(p_def, "VAR1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
 
     ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD1", "p:STRUCT1", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "STRUCT1", "METHOD2", "p:STRUCT2", ymInertCallBhvrFn, nullptr);
@@ -38,6 +40,8 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     auto STRUCT2 = load(ctx, "p:STRUCT2");
     auto FN1 = load(ctx, "p:FN1");
     auto FN2 = load(ctx, "p:FN2");
+    auto VAR1 = load(ctx, "p:VAR1");
+    auto VAR1_assigner = load(ctx, "p:VAR1$assigner");
     auto METHOD1 = load(ctx, "p:STRUCT1::METHOD1");
     auto METHOD2 = load(ctx, "p:STRUCT1::METHOD2");
     auto PROPERTY1 = load(ctx, "p:STRUCT1::PROPERTY1");
@@ -48,6 +52,8 @@ TEST(ProtocolConformance, EmptyProtocol_IsATopType) {
     success(STRUCT2, Any);
     failure(FN1, Any);
     failure(FN2, Any);
+    failure(VAR1, Any);
+    failure(VAR1_assigner, Any);
     failure(METHOD1, Any);
     failure(METHOD2, Any);
     failure(PROPERTY1, Any);
@@ -101,7 +107,7 @@ TEST(ProtocolConformance, NonEmptyProtocol) {
 //       correctly for ALL kinds.
 
 TEST(ProtocolConformance, AllKindsGenerallyFailAsExpected) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
@@ -109,6 +115,7 @@ TEST(ProtocolConformance, AllKindsGenerallyFailAsExpected) {
 
     ymParcelDef_AddStruct(p_def, "STRUCT");
     ymParcelDef_AddFn(p_def, "FN", "p:STRUCT", ymInertCallBhvrFn, nullptr);
+    ymParcelDef_AddStoredVar(p_def, "VAR", "p:STRUCT", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddMethod(p_def, "STRUCT", "METHOD", "p:STRUCT", ymInertCallBhvrFn, nullptr);
     ymParcelDef_AddStoredProperty(p_def, "STRUCT", "PROPERTY", "p:STRUCT");
 
@@ -118,12 +125,14 @@ TEST(ProtocolConformance, AllKindsGenerallyFailAsExpected) {
     ymDm_BindParcelDef(dm, "p", p_def);
     auto STRUCT = load(ctx, "p:STRUCT");
     auto FN = load(ctx, "p:FN");
+    auto VAR = load(ctx, "p:VAR");
     auto METHOD = load(ctx, "p:STRUCT::METHOD");
     auto PROPERTY = load(ctx, "p:STRUCT::PROPERTY");
     auto P = load(ctx, "p:P");
 
     failure(STRUCT, P);
     failure(FN, P);
+    failure(VAR, P);
     failure(METHOD, P);
     failure(PROPERTY, P);
 }

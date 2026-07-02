@@ -145,18 +145,22 @@ public:
 
     bool hasDefaultValue() const noexcept;
 
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     bool isStruct() const noexcept;
     bool isProtocol() const noexcept;
     bool isFn() const noexcept;
+    bool isVar() const noexcept;
+    bool isVarAssigner() const noexcept;
     bool isMethod() const noexcept;
     bool isProperty() const noexcept;
     bool isPropertyAssigner() const noexcept;
 
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     bool isRegularStruct() const noexcept;
     bool isRegularProtocol() const noexcept;
     bool isRegularFn() const noexcept;
+    bool isRegularVar() const noexcept;
+    bool isRegularVarAssigner() const noexcept;
     bool isRegularMethod() const noexcept;
     bool isRegularProperty() const noexcept;
     bool isRegularPropertyAssigner() const noexcept;
@@ -171,6 +175,8 @@ public:
 
     bool isMethodReq() const noexcept;
 
+    bool isStoredVarGet() const noexcept;
+    bool isStoredVarSet() const noexcept;
     bool isStoredPropertyGet() const noexcept;
     bool isStoredPropertySet() const noexcept;
 
@@ -187,6 +193,9 @@ public:
     bool checkCallSuff(std::string_view callsuff) const;
     // Succeeds by default if callsuff is empty.
     bool checkCallSuff(std::optional<std::string_view> callsuff) const;
+
+    YmType* var() noexcept;
+    const YmType* var() const noexcept;
 
     YmType* owner() noexcept;
     const YmType* owner() const noexcept;
@@ -210,6 +219,7 @@ public:
     bool hasSelfParam() const noexcept;
 
     YmType* assigner() const noexcept;
+    YmType* initializer() const noexcept;
 
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;

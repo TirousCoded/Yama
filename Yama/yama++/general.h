@@ -12,6 +12,14 @@
 namespace ym {
 
 
+    template<typename T>
+    inline T* pointer(const std::optional<T>& x) noexcept {
+        return
+            x
+            ? &*x
+            : nullptr;
+    }
+
     template<Dereferenceable T>
     inline auto&& deref(T&& x) noexcept {
         ymAssert((bool)x);

@@ -79,6 +79,20 @@ inline bool setup_fn(
         refs,
         typeParams);
 }
+inline bool setup_var_and_assigner(
+    YmParcelDef* def,
+    const std::string& localName,
+    const std::string& typeSymbol,
+    std::initializer_list<std::string> refs) {
+    return setup_helper(
+        def,
+        localName,
+        [def, localName, typeSymbol]() -> bool {
+            return ymParcelDef_AddStoredVar(def, localName.c_str(), typeSymbol.c_str(), ymInertCallBhvrFn, nullptr);
+        },
+        refs,
+        {});
+}
 inline bool setup_method(
     YmParcelDef* def,
     const std::string& ownerName,
@@ -157,6 +171,22 @@ inline void test_fn(
     ym::println("-- testing {}", fullname);
     ASSERT_NE(type, nullptr);
     test_type_basics(type, fullname, YmKind_Fn, refs, typeArgs);
+}
+inline void test_var(
+    YmType* type,
+    const std::string& fullname,
+    std::initializer_list<YmType*> refs) {
+    ym::println("-- testing {}", fullname);
+    ASSERT_NE(type, nullptr);
+    test_type_basics(type, fullname, YmKind_Var, refs, {});
+}
+inline void test_var_assigner(
+    YmType* type,
+    const std::string& fullname,
+    std::initializer_list<YmType*> refs) {
+    ym::println("-- testing {}", fullname);
+    ASSERT_NE(type, nullptr);
+    test_type_basics(type, fullname, YmKind_VarAssigner, refs, {});
 }
 inline void test_method(
     YmType* type,

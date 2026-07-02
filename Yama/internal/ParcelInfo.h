@@ -13,6 +13,7 @@
 #include "../yama++/scalar.h"
 #include "../yama++/Variant.h"
 
+#include "kinds.h"
 #include "ConstTableInfo.h"
 #include "SpecSolver.h"
 
@@ -29,105 +30,11 @@ namespace _ym {
     bool checkNonMember(const TypeInfo& type, std::string_view msg);
     bool checkNonProtocolMember(const TypeInfo& type, std::string_view msg);
 
-    void methodReqCallBhvr(YmCtx* ctx, void* user);
-    void storedPropertyGetCallBhvr(YmCtx* ctx, void* user);
-    void storedPropertySetCallBhvr(YmCtx* ctx, void* user);
-
-
-    static_assert(YmKind_Num == 6);
-
-    // Extends YmKind w/ new consts for types w/ irregular semantics.
-    enum class KindEx : YmUInt8 {
-        // Regular
-
-        Struct = 0,
-        Protocol,
-        Fn,
-        Method,
-        Property,
-        PropertyAssigner,
-
-        // Special
-
-        None,
-        Int,
-        UInt,
-        Float,
-        Bool,
-        Rune,
-        Type,
-
-        MethodReq,
-
-        StoredPropertyGet,
-        StoredPropertySet,
-
-        Num, // Enum Size
-    };
-
-    constexpr size_t KindExSize = (size_t)KindEx::Num;
-
-    constexpr KindEx kindExOf(YmKind k) noexcept {
-        return KindEx(k);
-    }
-    constexpr YmKind kindOf(KindEx x) noexcept {
-        static_assert(KindExSize == 16);
-        switch (x) {
-        case KindEx::Struct:                return YmKind_Struct;
-        case KindEx::Protocol:              return YmKind_Protocol;
-        case KindEx::Fn:                    return YmKind_Fn;
-        case KindEx::Method:                return YmKind_Method;
-        case KindEx::Property:              return YmKind_Property;
-        case KindEx::PropertyAssigner:      return YmKind_PropertyAssigner;
-
-        case KindEx::None:                  return YmKind_Struct;
-        case KindEx::Int:                   return YmKind_Struct;
-        case KindEx::UInt:                  return YmKind_Struct;
-        case KindEx::Float:                 return YmKind_Struct;
-        case KindEx::Bool:                  return YmKind_Struct;
-        case KindEx::Rune:                  return YmKind_Struct;
-        case KindEx::Type:                  return YmKind_Struct;
-
-        case KindEx::MethodReq:             return YmKind_Method;
-
-        case KindEx::StoredPropertyGet:     return YmKind_Property;
-        case KindEx::StoredPropertySet:     return YmKind_PropertyAssigner;
-
-        default:                            return YmKind{};
-        }
-    }
-    template<YmKind MustBe>
-    inline KindEx mustBe(KindEx x) noexcept {
-        ymAssert(kindOf(x) == MustBe);
-        return x;
-    }
-
-    constexpr bool isRegular(KindEx x) noexcept {
-        return size_t(x) < YmKind_Num;
-    }
-    constexpr bool isIrregular(KindEx x) noexcept {
-        return !isRegular(x);
-    }
-    constexpr bool isPrimitive(KindEx x) noexcept {
-        return
-            x >= KindEx::None &&
-            x <= KindEx::Type;
-    }
-    constexpr bool isGetter(KindEx x) noexcept {
-        // TODO: Update later when we add parcel variables.
-        return kindOf(x) == YmKind_Property;
-    }
-    constexpr bool isSetter(KindEx x) noexcept {
-        // TODO: Update later when we add parcel variables.
-        return kindOf(x) == YmKind_PropertyAssigner;
-    }
-    constexpr bool isVarLike(KindEx x) noexcept {
-        return isGetter(x) || isSetter(x);
-    }
-    constexpr bool isProtocolReq(KindEx x) noexcept {
-        // TODO: Update whenever we add new protocol req. types.
-        return x == KindEx::MethodReq;
-    }
+    void methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user);
+    void storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user);
+    void storedPropertySetCallBhvr(YmCtx* ctx, YmType* type, void* user);
+    void storedVarGetCallBhvr(YmCtx* ctx, YmType* type, void* user);
+    void storedVarSetCallBhvr(YmCtx* ctx, YmType* type, void* user);
 
 
     class TypeInfo final {
@@ -177,25 +84,31 @@ namespace _ym {
         bool isProtocolReq() const noexcept;
 
         bool hasCallSig() const noexcept;
+        bool hasUserDefinedCallSig() const noexcept;
         bool isOwner() const noexcept;
         bool isMember() const noexcept;
         bool canHaveMembers() const noexcept;
+        bool canHaveTypeParams() const noexcept;
 
         bool hasDefaultValue() const noexcept;
 
         // NOTE: These don't differentiate regular from irregular.
-        static_assert(YmKind_Num == 6);
+        static_assert(YmKind_Num == 8);
         bool isStruct() const noexcept;
         bool isProtocol() const noexcept;
         bool isFn() const noexcept;
+        bool isVar() const noexcept;
+        bool isVarAssigner() const noexcept;
         bool isMethod() const noexcept;
         bool isProperty() const noexcept;
         bool isPropertyAssigner() const noexcept;
 
-        static_assert(YmKind_Num == 6);
+        static_assert(YmKind_Num == 8);
         bool isRegularStruct() const noexcept;
         bool isRegularProtocol() const noexcept;
         bool isRegularFn() const noexcept;
+        bool isRegularVar() const noexcept;
+        bool isRegularVarAssigner() const noexcept;
         bool isRegularMethod() const noexcept;
         bool isRegularProperty() const noexcept;
         bool isRegularPropertyAssigner() const noexcept;
@@ -210,8 +123,12 @@ namespace _ym {
 
         bool isMethodReq() const noexcept;
 
+        bool isStoredVarGet() const noexcept;
+        bool isStoredVarSet() const noexcept;
         bool isStoredPropertyGet() const noexcept;
         bool isStoredPropertySet() const noexcept;
+
+        std::optional<ConstIndex> varConst() const noexcept;
 
         TypeInfo* owner() const noexcept;
         std::optional<ConstIndex> ownerConst() const noexcept;
@@ -246,6 +163,7 @@ namespace _ym {
         const CallBhvrCallbackInfo* callBehaviour() const noexcept;
 
         std::optional<ConstIndex> assignerConst() const noexcept;
+        std::optional<ConstIndex> initializerConst() const noexcept;
 
         std::optional<YmUInt16> storedPropertySlot() const noexcept;
 
@@ -269,6 +187,7 @@ namespace _ym {
             CallBhvrCallbackInfo callBehaviour,
             std::optional<ConstIndex> assignerConst,
             ConstIndex returnTypeConst);
+        void setupVar(std::optional<ConstIndex> initializerConst);
 
         std::string fullnameForRef() const;
 
@@ -320,6 +239,12 @@ namespace _ym {
             bool addParam(const std::string& name, ConstIndex typeConst);
             void beginNamedParams() noexcept;
         };
+        struct _Var final {
+            std::optional<ConstIndex> initializerConst;
+        };
+        struct _VarAssigner final {
+            ConstIndex varConst;
+        };
 
 
         ParcelInfo* _parcel;
@@ -329,11 +254,14 @@ namespace _ym {
         std::unique_ptr<_TypeParams> _typeParams;
         std::unique_ptr<_Members> _members;
         std::unique_ptr<_Call> _call;
+        std::unique_ptr<_Var> _var;
+        std::unique_ptr<_VarAssigner> _varAssigner;
 
 
         void _initMembership();
         void _initTypeParams();
         void _initMembers();
+        void _initVarAssigner();
 
         static std::string _extractOwnerName(const std::string& localName) noexcept;
         static std::string _extractMemberName(const std::string& localName) noexcept;
@@ -375,6 +303,16 @@ namespace _ym {
             bool skipLocalNameLegalityCheck = false);
         // Fails if name conflict arises.
         // Invalidates type pointers.
+        bool addVarType(
+            KindEx k,
+            const std::string& localName,
+            CallBhvrCallbackInfo callBehaviour,
+            std::string returnTypeSymbol,
+            std::optional<std::string> assignerSymbol = std::nullopt,
+            std::optional<std::string> initializerSymbol = std::nullopt,
+            bool skipLocalNameLegalityCheck = false);
+        // Fails if name conflict arises.
+        // Invalidates type pointers.
         bool addType(
             KindEx k,
             const std::string& ownerName,
@@ -392,7 +330,7 @@ namespace _ym {
             std::string typeName,
             std::string name,
             std::string paramTypeSymbol,
-            bool skipCallabilityAndOtherRelatedCheck = false);
+            bool skipCallSigChecks = false);
         void beginNamedParams(
             const std::string& typeName);
         std::optional<YmRef> addRef(
@@ -409,6 +347,9 @@ namespace _ym {
         bool _checkNameLegality(const std::string& name, std::string_view msg);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
         bool _checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg);
+        bool _checkHasCallSig(const TypeInfo& t, std::string_view msg);
+        bool _checkHasUserDefinedCallSig(const TypeInfo& t, std::string_view msg);
+        bool _checkCanHaveTypeParams(const TypeInfo& t, std::string_view msg);
 
         std::optional<_ym::TypeInfo> _makeType(
             KindEx k,
@@ -424,6 +365,9 @@ namespace _ym {
             CallBhvrCallbackInfo callBehaviour,
             std::string returnTypeSymbol,
             std::optional<std::string> assignerSymbol);
+        bool _setupVar(
+            TypeInfo& t,
+            std::optional<std::string> initializerSymbol);
         bool _registerType(TypeInfo t);
         bool _registerType(std::optional<TypeInfo> t);
     };

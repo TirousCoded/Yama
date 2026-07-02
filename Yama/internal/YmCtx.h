@@ -18,6 +18,7 @@
 #include "PTableManager.h"
 #include "RefCounter.h"
 #include "YmDm.h"
+#include "VarStorage.h"
 
 
 struct YmCtx final {
@@ -58,7 +59,7 @@ public:
 	ym::Safe<YmObj> newBool(YmBool v);
 	ym::Safe<YmObj> newRune(YmRune v);
 	ym::Safe<YmObj> newType(YmType& v);
-	YmObj* newDefault(YmType& type);
+	YmObj* newDefault(YmType* type);
 
 	YmCallStackHeight callStkHeight() const noexcept;
 	std::string fmtCallStk(YmCallStackHeight skip = 0) const;
@@ -67,21 +68,23 @@ public:
 	YmUInt16 args() const noexcept;
 	YmLocals locals() const noexcept;
 	YmObj* arg(YmUInt16 which, YmRefPolicy returnPolicy = YM_BORROW);
-	bool setArg(YmUInt16 which, YmObj& newArg, YmRefPolicy newArgPolicy = YM_TAKE);
+	bool setArg(YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy = YM_TAKE);
 	YmType* ref(YmRef reference);
 	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
 
 	YmObj* pull() noexcept; // Returns taken ref.
 	// releaseObjs == false when we want to *steal* ownership from the object stack.
 	void pop(YmLocals n, bool releaseObjs = true);
-	bool put(YmLocal where, YmObj& what, YmRefPolicy whatPolicy = YM_TAKE);
+	bool put(YmLocal where, YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool swap(YmLocal a, YmLocal b);
-	bool defaultInit(YmLocal where, YmType& type);
-	bool explicitInit(YmLocal where, YmType& type, std::string_view argNames);
-	bool call(YmType& fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
+	bool defaultInit(YmType* type, YmLocal where);
+	bool structInit(YmType* type, std::string_view argNames, YmLocal where);
+	bool call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
 	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
-	bool getProperty(YmType& propertyType, YmLocal where);
-	bool setProperty(YmType& propertyType);
+	bool getVar(YmType* varType, YmLocal where);
+	bool setVar(YmType* varType);
+	bool getProperty(YmType* propertyType, YmLocal where);
+	bool setProperty(YmType* propertyType);
 	bool convert(YmType& type, YmLocal returnTo);
 
 
@@ -129,12 +132,13 @@ private:
 	std::vector<_CallFrame> _callStk;
 
 	_ym::PTableManager _ptables;
+	_ym::VarStorage _vars;
 
 
 	void _beginUserPseudoCall();
-	bool _beginCall(YmType& fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo);
+	bool _beginCall(YmType* fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo);
 	bool _endCall() noexcept;
-	void _dispatchCall(YmType& fn);
+	void _dispatchCall(YmType* fn);
 
 	// Transforms negative indices into positive absolute ones, and fails if out-of-bounds.
 	std::optional<YmLocal> _absIndex(YmLocal x) const noexcept;

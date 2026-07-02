@@ -155,6 +155,12 @@ namespace _ym {
         inline auto pullRef(Spec symbol, size_t sizeLimit = size_t(-1)) {
             return pull(ConstInfo(RefInfo{ .sym = std::move(symbol) }), sizeLimit);
         }
+        inline auto pullRef(std::optional<Spec> symbol, size_t sizeLimit = size_t(-1)) {
+            return
+                symbol
+                ? pullRef(std::move(*symbol), sizeLimit)
+                : std::nullopt;
+        }
 
 
     private:

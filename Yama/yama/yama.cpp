@@ -14,11 +14,13 @@ using namespace _ym;
 
 
 const YmChar* ymKind_Fmt(YmKind x) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     static constexpr std::array<const YmChar*, YmKind_Num> names{
         "Struct",
         "Protocol",
         "Fn",
+        "Var",
+        "VarAssigner",
         "Method",
         "Property",
         "PropertyAssigner",
@@ -31,7 +33,7 @@ const YmChar* ymKind_Fmt(YmKind x) {
 
 YmBool ymKind_HasCallSig(YmKind x) {
     ymAssert(x < YmKind_Num);
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     static constexpr std::array<bool, YmKind_Num> values{
         false,
         false,
@@ -39,6 +41,24 @@ YmBool ymKind_HasCallSig(YmKind x) {
         true,
         true,
         true,
+        true,
+        true,
+    };
+    return values[size_t(x)];
+}
+
+YmBool ymKind_HasUserDefinedCallSig(YmKind x) {
+    ymAssert(x < YmKind_Num);
+    static_assert(YmKind_Num == 8);
+    static constexpr std::array<bool, YmKind_Num> values{
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false,
     };
     return values[size_t(x)];
 }
@@ -49,8 +69,10 @@ YmBool ymKind_IsOwner(YmKind x) {
 
 YmBool ymKind_IsMember(YmKind x) {
     ymAssert(x < YmKind_Num);
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     static constexpr std::array<bool, YmKind_Num> values{
+        false,
+        false,
         false,
         false,
         false,
@@ -63,10 +85,12 @@ YmBool ymKind_IsMember(YmKind x) {
 
 YmBool ymKind_CanHaveMembers(YmKind x) {
     ymAssert(x < YmKind_Num);
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     static constexpr std::array<bool, YmKind_Num> values{
         true,
         true,
+        false,
+        false,
         false,
         false,
         false,
@@ -75,7 +99,23 @@ YmBool ymKind_CanHaveMembers(YmKind x) {
     return values[size_t(x)];
 }
 
-void ymInertCallBhvrFn(YmCtx*, void*) {
+YmBool ymKind_CanHaveTypeParams(YmKind x) {
+    ymAssert(x < YmKind_Num);
+    static_assert(YmKind_Num == 8);
+    static constexpr std::array<bool, YmKind_Num> values{
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+    };
+    return values[size_t(x)];
+}
+
+void ymInertCallBhvrFn(YmCtx*, YmType*, void*) {
     // Do nothing.
 }
 
@@ -86,10 +126,13 @@ YmDm* ymDm_Create(void) {
 }
 
 YmRefCount ymDm_Secure(YmDm* dm) {
-    return Safe(dm)->refs.addRef();
+    return dm ? Safe(dm)->refs.addRef() : 0;
 }
 
 YmRefCount ymDm_Release(YmDm* dm) {
+    if (!dm) {
+        return 0;
+    }
     auto old = Safe(dm)->refs.drop();
     if (old == 1) {
         delete Safe(dm).get();
@@ -98,7 +141,7 @@ YmRefCount ymDm_Release(YmDm* dm) {
 }
 
 YmRefCount ymDm_RefCount(YmDm* dm) {
-    return Safe(dm)->refs.count();
+    return dm ? Safe(dm)->refs.count() : 0;
 }
 
 YmBool ymDm_BindParcelDef(YmDm* dm, YmPath path, YmParcelDef* parceldef) {
@@ -121,10 +164,13 @@ YmCtx* ymCtx_Create(YmDm* dm) {
 }
 
 YmRefCount ymCtx_Secure(YmCtx* ctx) {
-    return Safe(ctx)->refs.addRef();
+    return ctx ? Safe(ctx)->refs.addRef() : 0;
 }
 
 YmRefCount ymCtx_Release(YmCtx* ctx) {
+    if (!ctx) {
+        return 0;
+    }
     auto old = Safe(ctx)->refs.drop();
     if (old == 1) {
         delete Safe(ctx).get();
@@ -133,7 +179,7 @@ YmRefCount ymCtx_Release(YmCtx* ctx) {
 }
 
 YmRefCount ymCtx_RefCount(YmCtx* ctx) {
-    return Safe(ctx)->refs.count();
+    return ctx ? Safe(ctx)->refs.count() : 0;
 }
 
 YmDm* ymCtx_Dm(YmCtx* ctx, YmRefPolicy returnPolicy) {
@@ -249,7 +295,7 @@ YmObj* ymCtx_Arg(YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy) {
 }
 
 YmBool ymCtx_SetArg(YmCtx* ctx, YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy) {
-    return Safe(ctx)->setArg(which, deref(newArg), newArgPolicy);
+    return Safe(ctx)->setArg(which, newArg, newArgPolicy);
 }
 
 YmType* ymCtx_Ref(YmCtx* ctx, YmRef reference) {
@@ -277,16 +323,11 @@ YmObj* ymCtx_Pull(YmCtx* ctx) {
 }
 
 YmBool ymCtx_Copy(YmCtx* ctx, YmLocal from, YmLocal to) {
-    // TODO: Simplify later.
-    auto fromVal = ymCtx_Local(ctx, from, YM_BORROW);
-    return
-        fromVal
-        ? ymCtx_Put(ctx, to, fromVal, YM_BORROW)
-        : YM_FALSE;
+    return ymCtx_Put(ctx, to, ymCtx_Local(ctx, from, YM_BORROW), YM_BORROW);
 }
 
 YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {
-    return Safe(ctx)->put(where, deref(what), whatPolicy);
+    return Safe(ctx)->put(where, what, whatPolicy);
 }
 
 YmBool ymCtx_PutNone(YmCtx* ctx, YmLocal where) {
@@ -317,31 +358,36 @@ YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
     return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
 }
 
-YmBool ymCtx_DefaultInit(YmCtx* ctx, YmLocal where, YmType* type) {
-    if (auto obj = Safe(ctx)->newDefault(deref(type))) {
-        return ymCtx_Put(ctx, where, obj, YM_TAKE);
-    }
-    return YM_FALSE;
+YmBool ymCtx_DefaultInit(YmCtx* ctx, YmType* type, YmLocal where) {
+    return Safe(ctx)->defaultInit(type, where);
 }
 
-YmBool ymCtx_ExplicitInit(YmCtx* ctx, YmLocal where, YmType* type, const YmChar* argNames) {
-    return Safe(ctx)->explicitInit(where, deref(type), std::string_view(Safe(argNames)));
+YmBool ymCtx_StructInit(YmCtx* ctx, YmType* type, const YmChar* argNames, YmLocal where) {
+    return Safe(ctx)->structInit(type, std::string_view(Safe(argNames)), where);
 }
 
 YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo) {
-    return Safe(ctx)->call(deref(fn), argsN, std::string_view(Safe(argNames)), returnTo);
+    return Safe(ctx)->call(fn, argsN, std::string_view(Safe(argNames)), returnTo);
 }
 
 void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
     Safe(ctx)->ret(what, whatPolicy);
 }
 
+YmBool ymCtx_GetVar(YmCtx* ctx, YmType* varType, YmLocal where) {
+    return Safe(ctx)->getVar(varType, where);
+}
+
+YmBool ymCtx_SetVar(YmCtx* ctx, YmType* varType) {
+    return Safe(ctx)->setVar(varType);
+}
+
 YmBool ymCtx_GetProperty(YmCtx* ctx, YmType* property, YmLocal where) {
-    return Safe(ctx)->getProperty(deref(property), where);
+    return Safe(ctx)->getProperty(property, where);
 }
 
 YmBool ymCtx_SetProperty(YmCtx* ctx, YmType* property) {
-    return Safe(ctx)->setProperty(deref(property));
+    return Safe(ctx)->setProperty(property);
 }
 
 YmBool ymCtx_Convert(YmCtx* ctx, YmType* type, YmLocal returnTo) {
@@ -355,10 +401,13 @@ YmParcelDef* ymParcelDef_Create(void) {
 }
 
 YmRefCount ymParcelDef_Secure(YmParcelDef* parceldef) {
-    return Safe(parceldef)->refs.addRef();
+    return parceldef ? Safe(parceldef)->refs.addRef() : 0;
 }
 
 YmRefCount ymParcelDef_Release(YmParcelDef* parceldef) {
+    if (!parceldef) {
+        return 0;
+    }
     auto old = Safe(parceldef)->refs.drop();
     if (old == 1) {
         delete Safe(parceldef).get();
@@ -367,7 +416,7 @@ YmRefCount ymParcelDef_Release(YmParcelDef* parceldef) {
 }
 
 YmRefCount ymParcelDef_RefCount(YmParcelDef* parceldef) {
-    return Safe(parceldef)->refs.count();
+    return parceldef ? Safe(parceldef)->refs.count() : 0;
 }
 
 YmBool ymParcelDef_AddStruct(
@@ -394,6 +443,57 @@ YmBool ymParcelDef_AddFn(
         std::string(Safe(name)),
         std::string(Safe(returnType)),
         _ym::CallBhvrCallbackInfo::mk(callBehaviour, callBehaviourData));
+}
+
+YmBool ymParcelDef_AddReadOnlyStoredVar(
+    YmParcelDef* parceldef,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn initBehaviour,
+    void* initBehaviourData) {
+    return Safe(parceldef)->addReadOnlyStoredVar(
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(initBehaviour, initBehaviourData));
+}
+
+YmBool ymParcelDef_AddStoredVar(
+    YmParcelDef* parceldef,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn initBehaviour,
+    void* initBehaviourData) {
+    return Safe(parceldef)->addStoredVar(
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(initBehaviour, initBehaviourData));
+}
+
+YmBool ymParcelDef_AddReadOnlyComputedVar(
+    YmParcelDef* parceldef,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn getBehaviour,
+    void* getBehaviourData) {
+    return Safe(parceldef)->addReadOnlyComputedVar(
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(getBehaviour, getBehaviourData));
+}
+
+YmBool ymParcelDef_AddComputedVar(
+    YmParcelDef* parceldef,
+    const YmChar* name,
+    YmRefSym type,
+    YmCallBhvrCallbackFn getBehaviour,
+    void* getBehaviourData,
+    YmCallBhvrCallbackFn setBehaviour,
+    void* setBehaviourData) {
+    return Safe(parceldef)->addComputedVar(
+        std::string(Safe(name)),
+        std::string(Safe(type)),
+        _ym::CallBhvrCallbackInfo::mk(getBehaviour, getBehaviourData),
+        _ym::CallBhvrCallbackInfo::mk(setBehaviour, setBehaviourData));
 }
 
 YmBool ymParcelDef_AddMethod(
@@ -448,13 +548,13 @@ YmBool ymParcelDef_AddReadOnlyComputedProperty(
     const YmChar* ownerName,
     const YmChar* name,
     YmRefSym type,
-    YmCallBhvrCallbackFn getCallBehaviour,
-    void* getCallBehaviourData) {
+    YmCallBhvrCallbackFn getBehaviour,
+    void* getBehaviourData) {
     return Safe(parceldef)->addReadOnlyComputedProperty(
         std::string(Safe(ownerName)),
         std::string(Safe(name)),
         std::string(Safe(type)),
-        _ym::CallBhvrCallbackInfo::mk(getCallBehaviour, getCallBehaviourData));
+        _ym::CallBhvrCallbackInfo::mk(getBehaviour, getBehaviourData));
 }
 
 YmBool ymParcelDef_AddComputedProperty(
@@ -462,16 +562,16 @@ YmBool ymParcelDef_AddComputedProperty(
     const YmChar* ownerName,
     const YmChar* name,
     YmRefSym type,
-    YmCallBhvrCallbackFn getCallBehaviour,
-    void* getCallBehaviourData,
-    YmCallBhvrCallbackFn setCallBehaviour,
-    void* setCallBehaviourData) {
+    YmCallBhvrCallbackFn getBehaviour,
+    void* getBehaviourData,
+    YmCallBhvrCallbackFn setBehaviour,
+    void* setBehaviourData) {
     return Safe(parceldef)->addComputedProperty(
         std::string(Safe(ownerName)),
         std::string(Safe(name)),
         std::string(Safe(type)),
-        _ym::CallBhvrCallbackInfo::mk(getCallBehaviour, getCallBehaviourData),
-        _ym::CallBhvrCallbackInfo::mk(setCallBehaviour, setCallBehaviourData));
+        _ym::CallBhvrCallbackInfo::mk(getBehaviour, getBehaviourData),
+        _ym::CallBhvrCallbackInfo::mk(setBehaviour, setBehaviourData));
 }
 
 YmTypeParamIndex ymParcelDef_AddTypeParam(
@@ -557,7 +657,7 @@ YmType* ymType_MemberByName(YmType* type, const YmChar* name) {
 
 YmType* ymType_Type(YmType* type) {
     return
-        Safe(type)->isProperty()
+        Safe(type)->isGetter()
         ? Safe(type)->returnType()
         : nullptr;
 }
@@ -652,15 +752,15 @@ YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
 }
 
 YmRefCount ymObj_Secure(YmObj* obj) {
-    return Safe(obj)->ctx->secure(deref(obj));
+    return obj ? Safe(obj)->ctx->secure(deref(obj)) : 0;
 }
 
 YmRefCount ymObj_Release(YmObj* obj) {
-    return Safe(obj)->ctx->release(deref(obj));
+    return obj ? Safe(obj)->ctx->release(deref(obj)) : 0;
 }
 
 YmRefCount ymObj_RefCount(YmObj* obj) {
-    return Safe(obj)->refs.count();
+    return obj ? Safe(obj)->refs.count() : 0;
 }
 
 YmType* ymObj_Type(YmObj* obj) {
@@ -675,6 +775,7 @@ const YmChar* ymObj_Fmt(YmObj* obj) {
     else if (_obj->isFloat())   return ymFloat_Fmt(_obj->toFloat().value(), nullptr);
     else if (_obj->isBool())    return mkCStr(ymBool_Fmt(_obj->toBool().value()));
     else if (_obj->isRune())    return ymRune_Fmt(_obj->toRune().value(), YM_TRUE, YM_TRUE, YM_TRUE, YM_TRUE, nullptr);
+    else if (_obj->isType())    return ymType_Fullname(_obj->toType());
     else                        YM_DEADEND;
     return nullptr;
 }

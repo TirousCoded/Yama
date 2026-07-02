@@ -89,6 +89,14 @@ bool YmType::isFn() const noexcept {
     return info->isFn();
 }
 
+bool YmType::isVar() const noexcept {
+    return info->isVar();
+}
+
+bool YmType::isVarAssigner() const noexcept {
+    return info->isVarAssigner();
+}
+
 bool YmType::isMethod() const noexcept {
     return info->isMethod();
 }
@@ -111,6 +119,14 @@ bool YmType::isRegularProtocol() const noexcept {
 
 bool YmType::isRegularFn() const noexcept {
     return info->isRegularFn();
+}
+
+bool YmType::isRegularVar() const noexcept {
+    return info->isRegularVar();
+}
+
+bool YmType::isRegularVarAssigner() const noexcept {
+    return info->isRegularVarAssigner();
 }
 
 bool YmType::isRegularMethod() const noexcept {
@@ -155,6 +171,14 @@ bool YmType::isType() const noexcept {
 
 bool YmType::isMethodReq() const noexcept {
     return info->isMethodReq();
+}
+
+bool YmType::isStoredVarGet() const noexcept {
+    return info->isStoredVarGet();
+}
+
+bool YmType::isStoredVarSet() const noexcept {
+    return info->isStoredVarSet();
 }
 
 bool YmType::isStoredPropertyGet() const noexcept {
@@ -217,6 +241,14 @@ bool YmType::checkCallSuff(std::optional<std::string_view> callsuff) const {
         callsuff
         ? checkCallSuff(*callsuff)
         : true;
+}
+
+YmType* YmType::var() noexcept {
+    return constAsRef(info->varConst());
+}
+
+const YmType* YmType::var() const noexcept {
+    return constAsRef(info->varConst());
 }
 
 YmType* YmType::owner() noexcept {
@@ -300,6 +332,10 @@ bool YmType::hasSelfParam() const noexcept {
 
 YmType* YmType::assigner() const noexcept {
     return constAsRef(info->assignerConst());
+}
+
+YmType* YmType::initializer() const noexcept {
+    return constAsRef(info->initializerConst());
 }
 
 YmType* YmType::ref(YmRef reference) const noexcept {

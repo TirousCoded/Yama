@@ -14,11 +14,13 @@
 
 
 TEST(Loading, WorksWithAllTypeKinds) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     // Dep Graph:
     //      p:A                                 (Struct)
     //      p:B                                 (Protocol)
     //      p:C                 -> p:Int        (Function)
+    //      p:V                 -> p:Int        (Variable)
+    //      p:V$assigner        -> p:Int        (Variable Assigner)
     //      p:A::m              -> p:A          (Method)
     //                          -> p:Int
     //      p:A::x              -> p:A          (Property)
@@ -37,6 +39,7 @@ TEST(Loading, WorksWithAllTypeKinds) {
     setup_struct(p_def, "A", {});
     setup_protocol(p_def, "B", {});
     setup_fn(p_def, "C", "p:Int", {});
+    setup_var_and_assigner(p_def, "V", "p:Int", {});
     setup_method(p_def, "A", "m", "p:Int", {});
     setup_property_and_assigner(p_def, "A", "x", "p:Int", {});
     ymParcelDef_AddMethodReq(p_def, "B", "m", "p:Int");
@@ -46,6 +49,8 @@ TEST(Loading, WorksWithAllTypeKinds) {
     YmType* A = load(ctx, "p:A");
     YmType* B = load(ctx, "p:B");
     YmType* C = load(ctx, "p:C");
+    YmType* V = load(ctx, "p:V");
+    YmType* V_assigner = load(ctx, "p:V$assigner");
     YmType* A_m = load(ctx, "p:A::m");
     YmType* A_x = load(ctx, "p:A::x");
     YmType* A_x_assigner = load(ctx, "p:A::x$assigner");
@@ -55,6 +60,8 @@ TEST(Loading, WorksWithAllTypeKinds) {
     test_struct(A, "p:A", { A_m });
     test_protocol(B, "p:B", { B_m });
     test_fn(C, "p:C", { Int });
+    test_var(V, "p:V", { Int });
+    test_var_assigner(V_assigner, "p:V$assigner", { Int });
     test_method(A_m, "p:A::m", { A, Int });
     test_property(A_x, "p:A::x", { A, Int });
     test_property_assigner(A_x_assigner, "p:A::x$assigner", { A, Int });
@@ -62,7 +69,7 @@ TEST(Loading, WorksWithAllTypeKinds) {
 }
 
 TEST(Loading, WorksWithAllTypeKinds_Generics) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     // Generics:
     //      A[X: Any]
     //      B[X: Any]
@@ -1296,12 +1303,13 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint) {
 }
 
 TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnLikeCallableTypesCannotConformToConstraints) {
-    static_assert(YmKind_Num == 6);
+    static_assert(YmKind_Num == 8);
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
 
     setup_fn(p_def, "f", "yama:None", {});
     setup_struct(p_def, "A", {});
+    setup_var_and_assigner(p_def, "V", "yama:None", {});
     setup_method(p_def, "A", "m", "yama:None", {});
     setup_property_and_assigner(p_def, "A", "x", "yama:None", {});
     setup_struct(p_def, "B", {}, { { "T", "yama:Any" } });
@@ -1309,6 +1317,16 @@ TEST(Loading, Fail_TypeArgsError_ArgDoesntConformToConstraint_FnLikeCallableType
     ymDm_BindParcelDef(dm, "p", p_def);
 
     EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:f]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:V]"), nullptr);
+    EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
+
+    err.reset();
+
+    EXPECT_EQ(ymCtx_Load(ctx, "p:B[p:V$assigner]"), nullptr);
     EXPECT_EQ(err[YmErrCode_TypeArgsError], 1);
 
     err.reset();
