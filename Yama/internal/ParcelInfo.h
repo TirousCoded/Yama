@@ -128,7 +128,7 @@ namespace _ym {
         bool isStoredPropertyGet() const noexcept;
         bool isStoredPropertySet() const noexcept;
 
-        std::optional<ConstIndex> varConst() const noexcept;
+        std::optional<ConstIndex> assigneeConst() const noexcept;
 
         TypeInfo* owner() const noexcept;
         std::optional<ConstIndex> ownerConst() const noexcept;
@@ -176,20 +176,32 @@ namespace _ym {
         void beginNamedParams();
         std::optional<YmRef> addRef(std::string symbol);
 
+        std::optional<size_t> checkedRef(const std::string& symbol);
+        size_t uncheckedRef(std::string normalizedSymbol);
+        std::optional<size_t> uncheckedRefOpt(std::string normalizedSymbol);
+        template<typename... Args>
+        inline auto checkedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
+            return checkedRef(std::format(fmt, std::forward<Args>(args)...));
+        }
+        template<typename... Args>
+        inline auto uncheckedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
+            return uncheckedRef(std::format(fmt, std::forward<Args>(args)...));
+        }
+
+        bool setupCall(
+            CallBhvrCallbackInfo callBehaviour,
+            const std::string& returnTypeSymbol,
+            YmUInt16 slot,
+            bool hasAssigner);
+        bool setupVar(
+            bool hasInitializer);
+
         void registerMember(const std::string& name);
 
         // This isn't performed up-front in _initMembership, as if addType thereafter
         // fails, that would leave the owner TypeInfo w/ a member registered which
         // never actually got added to parcel.
         void registerMembershipWithOwner();
-
-        void setupCall(
-            CallBhvrCallbackInfo callBehaviour,
-            std::optional<ConstIndex> assignerConst,
-            ConstIndex returnTypeConst);
-        void setupVar(std::optional<ConstIndex> initializerConst);
-
-        std::string fullnameForRef() const;
 
 
     private:
@@ -228,6 +240,7 @@ namespace _ym {
             std::vector<Param> params;
             YmParams positionalParamsN = 0;
             bool definingNamed = false;
+            YmUInt16 slot = -1;
 
 
             YmParams count() const noexcept;
@@ -242,29 +255,39 @@ namespace _ym {
         struct _Var final {
             std::optional<ConstIndex> initializerConst;
         };
-        struct _VarAssigner final {
-            ConstIndex varConst;
+        struct _Assigner final {
+            ConstIndex assigneeConst;
         };
 
 
         ParcelInfo* _parcel;
         KindEx _k;
         std::string _localName;
+
         std::unique_ptr<_Membership> _membership;
         std::unique_ptr<_TypeParams> _typeParams;
         std::unique_ptr<_Members> _members;
         std::unique_ptr<_Call> _call;
         std::unique_ptr<_Var> _var;
-        std::unique_ptr<_VarAssigner> _varAssigner;
+        std::unique_ptr<_Assigner> _assigner;
 
 
         void _initMembership();
         void _initTypeParams();
         void _initMembers();
-        void _initVarAssigner();
+        void _initAssigner();
+
+        void _initCall(
+            CallBhvrCallbackInfo callBehaviour,
+            std::optional<ConstIndex> assignerConst,
+            ConstIndex returnTypeConst,
+            YmUInt16 slot);
+        void _initVar(
+            std::optional<ConstIndex> initializerConst);
 
         static std::string _extractOwnerName(const std::string& localName) noexcept;
         static std::string _extractMemberName(const std::string& localName) noexcept;
+        static std::string _extractAssigneeLocalName(const std::string& localName) noexcept;
     };
 
     // Encapsulates static parcel data in the absence of linkage.
@@ -279,48 +302,18 @@ namespace _ym {
         TypeInfo* type(const std::string& localName) noexcept;
         const TypeInfo* type(const std::string& localName) const noexcept;
 
-        // Fails if name conflict arises.
-        // Invalidates type pointers.
-        bool addType(
+        std::unique_ptr<TypeInfo> mkNonMember(
             KindEx k,
             const std::string& localName,
-            bool skipLocalNameLegalityCheck = false);
-        // Fails if name conflict arises.
-        // Invalidates type pointers.
-        bool addType(
+            bool skipLocalNameLegalityCheck);
+        std::unique_ptr<TypeInfo> mkMember(
             KindEx k,
             const std::string& ownerName,
             const std::string& memberName,
-            bool skipLocalNameLegalityCheck = false);
-        // Fails if name conflict arises.
-        // Invalidates type pointers.
-        bool addType(
-            KindEx k,
-            const std::string& localName,
-            CallBhvrCallbackInfo callBehaviour,
-            std::string returnTypeSymbol,
-            std::optional<std::string> assignerSymbol = std::nullopt,
-            bool skipLocalNameLegalityCheck = false);
-        // Fails if name conflict arises.
-        // Invalidates type pointers.
-        bool addVarType(
-            KindEx k,
-            const std::string& localName,
-            CallBhvrCallbackInfo callBehaviour,
-            std::string returnTypeSymbol,
-            std::optional<std::string> assignerSymbol = std::nullopt,
-            std::optional<std::string> initializerSymbol = std::nullopt,
-            bool skipLocalNameLegalityCheck = false);
-        // Fails if name conflict arises.
-        // Invalidates type pointers.
-        bool addType(
-            KindEx k,
-            const std::string& ownerName,
-            const std::string& memberName,
-            CallBhvrCallbackInfo callBehaviour,
-            std::string returnTypeSymbol,
-            std::optional<std::string> assignerSymbol = std::nullopt,
-            bool skipLocalNameLegalityCheck = false);
+            bool skipLocalNameLegalityCheck);
+        bool registerType(
+            std::unique_ptr<TypeInfo> t,
+            bool assertSucceeds = false);
 
         std::optional<YmTypeParamIndex> addTypeParam(
             std::string typeName,
@@ -344,32 +337,12 @@ namespace _ym {
 
 
         _ym::TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
-        bool _checkNameLegality(const std::string& name, std::string_view msg);
+        bool _checkNameLegality(const std::string& name, std::string_view msg, bool skipLocalNameLegalityCheck = false);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
         bool _checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg);
         bool _checkHasCallSig(const TypeInfo& t, std::string_view msg);
         bool _checkHasUserDefinedCallSig(const TypeInfo& t, std::string_view msg);
         bool _checkCanHaveTypeParams(const TypeInfo& t, std::string_view msg);
-
-        std::optional<_ym::TypeInfo> _makeType(
-            KindEx k,
-            const std::string& localName,
-            bool skipLocalNameLegalityCheck);
-        std::optional<_ym::TypeInfo> _makeType(
-            KindEx k,
-            const std::string& ownerName,
-            const std::string& memberName,
-            bool skipLocalNameLegalityCheck);
-        bool _setupCall(
-            TypeInfo& t,
-            CallBhvrCallbackInfo callBehaviour,
-            std::string returnTypeSymbol,
-            std::optional<std::string> assignerSymbol);
-        bool _setupVar(
-            TypeInfo& t,
-            std::optional<std::string> initializerSymbol);
-        bool _registerType(TypeInfo t);
-        bool _registerType(std::optional<TypeInfo> t);
     };
 }
 

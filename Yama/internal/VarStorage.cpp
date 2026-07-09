@@ -20,7 +20,7 @@ bool _ym::VarStorage::isInit(YmType& varType) const noexcept {
 
 YmObj* _ym::VarStorage::fetch(YmType& varType, YmRefPolicy returnPolicy) const noexcept {
 	ymAssert(varType.isStoredVarGet());
-	if (auto it = _storage.find(varType.info); it != _storage.end()) {
+	if (auto it = _storage.find(&varType); it != _storage.end()) {
 		auto& [var, obj] = *it;
 		// If end-user wants to own a ref to *obj, we gotta secure one for them.
 		if (returnPolicy != YM_BORROW) {
@@ -49,7 +49,7 @@ bool _ym::VarStorage::push(YmType& varType, YmObj* what, YmRefPolicy whatPolicy,
 	if (initVar) {
 		initialize(varType);
 	}
-	_storage[varType.info] = what;
+	_storage[&varType] = what;
 	// If end-user passed a borrowed ref, we gotta secure new ref for storage to own.
 	if (whatPolicy == YM_BORROW) {
 		ymObj_Secure(what);

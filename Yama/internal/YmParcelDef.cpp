@@ -3,6 +3,7 @@
 #include "YmParcelDef.h"
 
 #include "../internal/general.h"
+#include "../yama++/general.h"
 
 
 bool YmParcelDef::verify() const {
@@ -12,19 +13,23 @@ bool YmParcelDef::verify() const {
 bool YmParcelDef::addStruct(
     const std::string& name,
     _ym::KindEx k) {
-    return info->addType(_ym::mustBe<YmKind_Struct>(k), name);
+    return info->registerType(info->mkNonMember(_ym::mustBe<YmKind_Struct>(k), name, false));
 }
 
 bool YmParcelDef::addProtocol(
     const std::string& name) {
-    return info->addType(_ym::KindEx::Protocol, name);
+    return info->registerType(info->mkNonMember(_ym::KindEx::Protocol, name, false));
 }
 
 bool YmParcelDef::addFn(
     const std::string& name,
-    std::string returnTypeSymbol,
+    const std::string& returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour) {
-    return info->addType(_ym::KindEx::Fn, name, callBehaviour, std::move(returnTypeSymbol));
+    auto t = info->mkNonMember(_ym::KindEx::Fn, name, false);
+    return
+        t &&
+        t->setupCall(callBehaviour, returnTypeSymbol, -1, false) &&
+        info->registerType(std::move(t));
 }
 
 bool YmParcelDef::addReadOnlyStoredVar(
@@ -112,48 +117,26 @@ bool YmParcelDef::addReadOnlyStoredProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol) {
-    // TODO: Refactor to remove need for below comment.
-    // NOTE: info->type(~) failing CANNOT prevent addReadOnlyProperty from being
-    //       called, as otherwise we won't get proper error msgs.
-    auto ownerType = info->type(ownerName);
-    uint16_t slot = ownerType ? ownerType->nextSlot() : 0;
-    if (auto result = _addReadOnlyProperty(
+    return _addReadOnlyProperty(
         ownerName,
         name,
         std::move(typeSymbol),
-        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertyGetCallBhvr, (void*)slot),
-        _ym::KindEx::StoredPropertyGet)) {
-        return result;
-    }
-    if (ownerType) {
-        ownerType->unwindSlots(); // If fails.
-    }
-    return false;
+        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertyGetCallBhvr),
+        _ym::KindEx::StoredPropertyGet);
 }
 
 bool YmParcelDef::addStoredProperty(
     const std::string& ownerName,
     const std::string& name,
     std::string typeSymbol) {
-    // TODO: Refactor to remove need for below comment.
-    // NOTE: info->type(~) failing CANNOT prevent addProperty from being
-    //       called, as otherwise we won't get proper error msgs.
-    auto ownerType = info->type(ownerName);
-    uint16_t slot = ownerType ? ownerType->nextSlot() : 0;
-    if (_addProperty(
+    return _addProperty(
         ownerName,
         name,
         std::move(typeSymbol),
-        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertyGetCallBhvr, (void*)slot),
-        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertySetCallBhvr, (void*)slot),
+        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertyGetCallBhvr),
+        _ym::CallBhvrCallbackInfo::mk(_ym::storedPropertySetCallBhvr),
         _ym::KindEx::StoredPropertyGet,
-        _ym::KindEx::StoredPropertySet)) {
-        return true;
-    }
-    if (ownerType) {
-        ownerType->unwindSlots(); // If fails.
-    }
-    return false;
+        _ym::KindEx::StoredPropertySet);
 }
 
 bool YmParcelDef::addReadOnlyComputedProperty(
@@ -225,21 +208,16 @@ bool YmParcelDef::_addReadOnlyVar(
     _ym::CallBhvrCallbackInfo getBehaviour,
     _ym::KindEx getK) {
     auto isStoredVarGet = getK == _ym::KindEx::StoredVarGet;
-    if (info->addVarType(
-        _ym::mustBe<YmKind_Var>(getK),
-        name,
-        getBehaviour,
-        typeSymbol,
-        std::nullopt,
-        isStoredVarGet ? std::make_optional(std::format("%here:{}$init", name)) : std::nullopt)) {
+    if (auto var = info->mkNonMember(_ym::mustBe<YmKind_Var>(getK), name, false);
+        var &&
+        var->setupCall(getBehaviour, typeSymbol, -1, false) &&
+        var->setupVar(isStoredVarGet) &&
+        info->registerType(std::move(var))) {
         if (isStoredVarGet) {
-            (void)info->addType(
-                _ym::KindEx::Fn,
-                std::format("{}$init", name),
-                initBehaviour,
-                typeSymbol,
-                std::nullopt,
-                true);
+            auto init = info->mkNonMember(_ym::KindEx::Fn, std::format("{}$init", name), true);
+            ymAssert((bool)init);
+            init->setupCall(initBehaviour, typeSymbol, -1, false);
+            info->registerType(std::move(init), true);
         }
         return true;
     }
@@ -255,26 +233,21 @@ bool YmParcelDef::_addVar(
     _ym::KindEx getK,
     _ym::KindEx setK) {
     auto isStoredVarGet = getK == _ym::KindEx::StoredVarGet;
-    if (info->addVarType(
-        _ym::mustBe<YmKind_Var>(getK),
-        name,
-        getBehaviour,
-        typeSymbol,
-        std::format("%here:{}$assigner", name),
-        isStoredVarGet ? std::make_optional(std::format("%here:{}$init", name)) : std::nullopt)) {
-        auto assignerLocalName = std::format("{}$assigner", name);
-        (void)info->addType(
-            _ym::mustBe<YmKind_VarAssigner>(setK),
-            assignerLocalName, setBehaviour, "yama:None", std::nullopt, true);
-        (void)info->addParam(assignerLocalName, "x", typeSymbol, true).value();
+    if (auto var = info->mkNonMember(_ym::mustBe<YmKind_Var>(getK), name, false);
+        var &&
+        var->setupCall(getBehaviour, typeSymbol, -1, true) &&
+        var->setupVar(isStoredVarGet) &&
+        info->registerType(std::move(var))) {
+        auto assigner = info->mkNonMember(_ym::mustBe<YmKind_VarAssigner>(setK), std::format("{}$assigner", name), true);
+        ymAssert((bool)assigner);
+        assigner->setupCall(setBehaviour, "yama:None", -1, false);
+        (void)assigner->addParam("x", typeSymbol, true).value();
+        info->registerType(std::move(assigner), true);
         if (isStoredVarGet) {
-            (void)info->addType(
-                _ym::KindEx::Fn,
-                std::format("{}$init", name),
-                initBehaviour,
-                typeSymbol,
-                std::nullopt,
-                true);
+            auto init = info->mkNonMember(_ym::KindEx::Fn, std::format("{}$init", name), true);
+            ymAssert((bool)init);
+            init->setupCall(initBehaviour, typeSymbol, -1, false);
+            info->registerType(std::move(init), true);
         }
         return true;
     }
@@ -287,7 +260,11 @@ bool YmParcelDef::_addMethod(
     std::string returnTypeSymbol,
     _ym::CallBhvrCallbackInfo callBehaviour,
     _ym::KindEx k) {
-    return info->addType(_ym::mustBe<YmKind_Method>(k), ownerName, name, callBehaviour, std::move(returnTypeSymbol));
+    auto t = info->mkMember(_ym::mustBe<YmKind_Method>(k), ownerName, name, false);
+    return
+        t &&
+        t->setupCall(callBehaviour, returnTypeSymbol, -1, false) &&
+        info->registerType(std::move(t));
 }
 
 bool YmParcelDef::_addReadOnlyProperty(
@@ -296,9 +273,18 @@ bool YmParcelDef::_addReadOnlyProperty(
     std::string typeSymbol,
     _ym::CallBhvrCallbackInfo getBehaviour,
     _ym::KindEx getK) {
-    if (info->addType(_ym::mustBe<YmKind_Property>(getK), ownerName, name, getBehaviour, std::move(typeSymbol))) {
-        (void)info->addParam(std::format("{}::{}", ownerName, name), "self", "$Self", true).value();
-        return true;
+    bool isStoredProperty = getK == _ym::KindEx::StoredPropertyGet;
+    if (auto t = info->mkMember(_ym::mustBe<YmKind_Property>(getK), ownerName, name, false)) {
+        auto& owner = ym::deref(t->owner());
+        auto slot = isStoredProperty ? owner.nextSlot() : -1;
+        if (t->setupCall(getBehaviour, typeSymbol, slot, false) &&
+            t->addParam("self", "$Self", true) &&
+            info->registerType(std::move(t))) {
+            return true;
+        }
+        if (isStoredProperty) {
+            owner.unwindSlots(); // If fails.
+        }
     }
     return false;
 }
@@ -311,17 +297,26 @@ bool YmParcelDef::_addProperty(
     _ym::CallBhvrCallbackInfo setBehaviour,
     _ym::KindEx getK,
     _ym::KindEx setK) {
-    if (info->addType(
-        _ym::mustBe<YmKind_Property>(getK),
-        ownerName, name, getBehaviour, typeSymbol, std::format("$Self::{}$assigner", name))) {
-        (void)info->addParam(std::format("{}::{}", ownerName, name), "self", "$Self", true).value();
-        auto assignerName = std::format("{}$assigner", name);
-        (void)info->addType(
-            _ym::mustBe<YmKind_PropertyAssigner>(setK),
-            ownerName, assignerName, setBehaviour, "yama:None", std::nullopt, true);
-        auto assignerLocalName = std::format("{}::{}", ownerName, assignerName);
-        (void)info->addParam(assignerLocalName, "self", "$Self", true).value();
-        (void)info->addParam(assignerLocalName, "x", typeSymbol, true).value();
+    bool isStoredProperty = getK == _ym::KindEx::StoredPropertyGet;
+    if (auto property = info->mkMember(_ym::mustBe<YmKind_Property>(getK), ownerName, name, false)) {
+        auto& owner = ym::deref(property->owner());
+        auto slot = isStoredProperty ? owner.nextSlot() : -1;
+        if (!(
+            property->setupCall(getBehaviour, typeSymbol, slot, true) &&
+            property->addParam("self", "$Self", true) &&
+            info->registerType(std::move(property)))) {
+            if (isStoredProperty) {
+                owner.unwindSlots(); // If fails.
+            }
+            return false;
+        }
+        auto assigner = info->mkMember(_ym::mustBe<YmKind_PropertyAssigner>(setK), ownerName,
+            std::format("{}$assigner", name), true);
+        ymAssert((bool)assigner);
+        assigner->setupCall(setBehaviour, "yama:None", -1, false);
+        (void)assigner->addParam("self", "$Self", true).value();
+        (void)assigner->addParam("x", typeSymbol, true).value();
+        info->registerType(std::move(assigner), true);
         return true;
     }
     return false;

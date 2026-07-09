@@ -161,6 +161,18 @@ namespace _ym {
                 ? pullRef(std::move(*symbol), sizeLimit)
                 : std::nullopt;
         }
+        inline auto pullRef(std::string normalizedSymbol, size_t sizeLimit = size_t(-1)) {
+            return pullRef(Spec::typeFast(std::move(normalizedSymbol)), sizeLimit);
+        }
+        inline auto pullRef(const YmChar* normalizedSymbol, size_t sizeLimit = size_t(-1)) {
+            return pullRef(std::string(ym::Safe(normalizedSymbol)), sizeLimit);
+        }
+        inline auto pullRef(std::optional<std::string> normalizedSymbol, size_t sizeLimit = size_t(-1)) {
+            return
+                normalizedSymbol
+                ? pullRef(std::move(*normalizedSymbol), sizeLimit)
+                : std::nullopt;
+        }
 
 
     private:

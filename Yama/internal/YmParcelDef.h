@@ -40,7 +40,7 @@ public:
         const std::string& name);
     bool addFn(
         const std::string& name,
-        std::string returnTypeSymbol,
+        const std::string& returnTypeSymbol,
         _ym::CallBhvrCallbackInfo callBehaviour);
     bool addReadOnlyStoredVar(
         const std::string& name,

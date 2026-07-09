@@ -243,12 +243,12 @@ bool YmType::checkCallSuff(std::optional<std::string_view> callsuff) const {
         : true;
 }
 
-YmType* YmType::var() noexcept {
-    return constAsRef(info->varConst());
+YmType* YmType::assignee() noexcept {
+    return constAsRef(info->assigneeConst());
 }
 
-const YmType* YmType::var() const noexcept {
-    return constAsRef(info->varConst());
+const YmType* YmType::assignee() const noexcept {
+    return constAsRef(info->assigneeConst());
 }
 
 YmType* YmType::owner() noexcept {
@@ -336,6 +336,10 @@ YmType* YmType::assigner() const noexcept {
 
 YmType* YmType::initializer() const noexcept {
     return constAsRef(info->initializerConst());
+}
+
+std::optional<YmUInt16> YmType::storedPropertySlot() const noexcept {
+    return info->storedPropertySlot();
 }
 
 YmType* YmType::ref(YmRef reference) const noexcept {

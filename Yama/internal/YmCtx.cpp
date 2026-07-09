@@ -649,7 +649,7 @@ bool YmCtx::getProperty(YmType* propertyType, YmLocal where) {
         return false;
     }
     if (_propertyType.isStoredPropertyGet()) { // Stored
-        auto result = ym::Safe(subject.slot(_propertyType.info->storedPropertySlot().value()).ref);
+        auto result = ym::Safe(subject.slot(_propertyType.storedPropertySlot().value()).ref);
         secure(*result);
         pop(1);
         put(where, result);
@@ -712,7 +712,7 @@ bool YmCtx::setProperty(YmType* propertyType) {
         return false;
     }
     if (assigner.isStoredPropertySet()) { // Stored
-        auto& target = subject.slot(assigner.info->storedPropertySlot().value()).ref;
+        auto& target = subject.slot(_propertyType.storedPropertySlot().value()).ref;
         // Release slot's current ref.
         release(ym::deref(target));
         // Assign new ref, stealing it from stack.

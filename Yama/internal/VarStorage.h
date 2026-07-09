@@ -6,7 +6,6 @@
 #include <unordered_map>
 
 #include "../yama/yama.h"
-#include "ParcelInfo.h"
 
 
 namespace _ym {
@@ -28,7 +27,7 @@ namespace _ym {
 
 	private:
 		YmCtx* _ctx;
-		std::unordered_map<const TypeInfo*, YmObj*> _storage;
+		std::unordered_map<const YmType*, YmObj*> _storage;
 	};
 }
 

@@ -194,8 +194,8 @@ public:
     // Succeeds by default if callsuff is empty.
     bool checkCallSuff(std::optional<std::string_view> callsuff) const;
 
-    YmType* var() noexcept;
-    const YmType* var() const noexcept;
+    YmType* assignee() noexcept;
+    const YmType* assignee() const noexcept;
 
     YmType* owner() noexcept;
     const YmType* owner() const noexcept;
@@ -220,6 +220,8 @@ public:
 
     YmType* assigner() const noexcept;
     YmType* initializer() const noexcept;
+
+    std::optional<YmUInt16> storedPropertySlot() const noexcept;
 
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;
