@@ -80,7 +80,7 @@ public:
 	bool defaultInit(YmType* type, YmLocal where);
 	bool structInit(YmType* type, std::string_view argNames, YmLocal where);
 	bool call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
-	bool ret(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
+	bool retObj(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
 	bool getVar(YmType* varType, YmLocal where);
 	bool setVar(YmType* varType);
 	bool getProperty(YmType* propertyType, YmLocal where);

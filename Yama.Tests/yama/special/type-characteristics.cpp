@@ -1346,7 +1346,7 @@ TEST(TypeCharacteristics, Fns) {
 		"identity",
 		"yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
 	ymParcelDef_AddParam(p_def, "identity", "x", "yama:Int");
@@ -1395,7 +1395,7 @@ TEST(TypeCharacteristics, GenericFns) {
 		"identity",
 		"$T",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
 	ymParcelDef_AddTypeParam(p_def, "identity", "T", "yama:Any");
@@ -1482,12 +1482,12 @@ TEST(TypeCharacteristics, StoredVars_IncludingReadOnlyOnesAndAssigners) {
 	SETUP_PARCELDEF(p_def);
 	ymParcelDef_AddStoredVar(p_def, "V", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr);
 	ymParcelDef_AddReadOnlyStoredVar(p_def, "W", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr);
 	ymDm_BindParcelDef(dm, "p", p_def);
@@ -1632,12 +1632,12 @@ TEST(TypeCharacteristics, ComputedVars_IncludingReadOnlyOnesAndAssigners) {
 	ymParcelDef_AddComputedVar(p_def, "V", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedVarGets++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr,
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedVarSets++;
-			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 			if (auto top = ymCtx_Arg(ctx, 0, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
 				EXPECT_EQ(ymObj_ToInt(top, nullptr), 22);
@@ -1647,7 +1647,7 @@ TEST(TypeCharacteristics, ComputedVars_IncludingReadOnlyOnesAndAssigners) {
 	ymParcelDef_AddReadOnlyComputedVar(p_def, "W", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedVarGets++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr);
 	ymDm_BindParcelDef(dm, "p", p_def);
@@ -1808,7 +1808,7 @@ TEST(TypeCharacteristics, Methods) {
 		"m",
 		"yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
 	ymParcelDef_AddParam(p_def, "A::m", "x", "yama:Int");
@@ -1860,7 +1860,7 @@ TEST(TypeCharacteristics, GenericTypeMethods) {
 		"m",
 		"$T",
 		[](YmCtx* ctx, YmType* type, void*) {
-			ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 0, YM_TAKE), YM_TAKE);
 		},
 		nullptr);
 	ymParcelDef_AddParam(p_def, "A::m", "x", "$T");
@@ -2330,12 +2330,12 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 	ymParcelDef_AddComputedProperty(p_def, "A", "a", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr,
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 			// Getter tests in-part by asserting 
 			if (auto top = ymCtx_Arg(ctx, 1, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
@@ -2346,7 +2346,7 @@ TEST(TypeCharacteristics, ComputedProperties_IncludingReadOnlyOnesAndAssigners) 
 	ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "b", "yama:Int",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
 		},
 		nullptr);
 	ymDm_BindParcelDef(dm, "p", p_def);
@@ -2519,12 +2519,12 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 	ymParcelDef_AddComputedProperty(p_def, "A", "a", "$T",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 101), YM_TAKE);
 		},
 		nullptr,
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 			// Getter tests in-part by asserting 
 			if (auto top = ymCtx_Arg(ctx, 1, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(top), ymCtx_LdInt(ctx));
@@ -2535,7 +2535,7 @@ TEST(TypeCharacteristics, GenericTypeComputedProperties_IncludingReadOnlyOnesAnd
 	ymParcelDef_AddReadOnlyComputedProperty(p_def, "A", "b", "$T",
 		[](YmCtx* ctx, YmType* type, void*) {
 			computedPropertyCalls++;
-			ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
+			ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 202), YM_TAKE);
 		},
 		nullptr);
 	ymDm_BindParcelDef(dm, "p", p_def);

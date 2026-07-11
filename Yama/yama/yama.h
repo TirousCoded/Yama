@@ -973,9 +973,6 @@ extern "C" {
     *        w/ <what> being the object, and <where> being the var specifying where to write it.
     *           * This syntax also implies YM_[NEWTOP|DISCARD] can be used.
     */
-    /* NOTE: For stack effects, the form 'StkFx: A | B -- C' means that A participates
-    *        in the operation, but it is not consumed, only B is consumed.
-    */
     /* NOTE: API fns w/ stack effects by default do NOT modify the stack, at all, in the event
     *        of the API fn failing.
     */
@@ -1004,7 +1001,7 @@ extern "C" {
     /* TODO: ymCtx_Copy hasn't been unit tested yet!
     */
 
-    /* StkFx: ...objs | -- result->to */
+    /* StkFx: ...objs -- ...objs result->to */
     /* Copies object at from in objs into to, returning if successful. */
     /* Failure: */
     /*   - from is out-of-bounds. */
@@ -1138,7 +1135,19 @@ extern "C" {
     /*   - what == YM_NIL. (Quiet) */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
-    void ymCtx_Ret(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
+    void ymCtx_RetObj(struct YmCtx* ctx, struct YmObj* what, YmRefPolicy whatPolicy);
+
+    /* TODO: ymCtx_Ret has not been unit tested.
+    */
+
+    /* StkFx: result -- */
+    /* Binds result as the return value of the current call, overwriting existing bindings. */
+    /* Failure: */
+    /*   - In the user call frame. (Quiet) (UNTESTED) */
+    /*   - Object stack is empty. (Quiet) (UNTESTED) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    void ymCtx_Ret(struct YmCtx* ctx);
 
     /* TODO: Should below init behaviour tests be more comprehensive due to how init behaviour
     *        is not a real Yama fn ymCtx_Call, and so may not be appropriate to summarize?

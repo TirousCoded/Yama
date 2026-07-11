@@ -173,7 +173,7 @@ static void objsys_test(
             observedCalls = 0; // Reset
             _body(ctx, true);
 
-            ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+            ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
         },
         (void*)&body);
     ymParcelDef_AddParam(p_def, "f", "x", "yama:Int");
@@ -1977,7 +1977,7 @@ TEST(Contexts, Call_WithReturnValuePuttingPushingAndDiscard) {
             "yama:Int",
             [](YmCtx* ctx, YmType* type, void* user) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 // Just passing observedCalls ptr via user so we can properly test that
                 // impl passes correct ptr.
                 EXPECT_EQ(user, (void*)&observedCalls);
@@ -2108,7 +2108,7 @@ TEST(Contexts, Call_WithNamedArgs) {
                 if (ymObj_ToBool(timesTen, nullptr) == YM_TRUE) { // YM_FALSE on fail.
                     v *= 10;
                 }
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, v), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, v), YM_TAKE);
             },
             nullptr);
         ymParcelDef_AddParam(parceldef, "g", "x", "yama:Int");
@@ -2150,7 +2150,7 @@ TEST(Contexts, Call_WithNamedArgs) {
                 if (ymObj_ToBool(timesTen, nullptr) == YM_TRUE) { // YM_FALSE on fail.
                     v *= 10;
                 }
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, v), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, v), YM_TAKE);
             },
             nullptr);
         ymParcelDef_AddParam(parceldef, "A::m", "x", "yama:Int");
@@ -2393,7 +2393,7 @@ TEST(Contexts, Call_WithDiffKindsOfCallableTypes) {
         [](YmParcelDef* parceldef) {
             EXPECT_EQ(ymParcelDef_AddFn(parceldef, "g", "yama:Int",
                 [](YmCtx* ctx, YmType* type, void*) {
-                    ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 21), YM_TAKE);
+                    ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 21), YM_TAKE);
                     observedCalls++;
                 },
                 nullptr),
@@ -2402,7 +2402,7 @@ TEST(Contexts, Call_WithDiffKindsOfCallableTypes) {
                 YM_TRUE);
             EXPECT_EQ(ymParcelDef_AddMethod(parceldef, "A", "m", "yama:Int",
                 [](YmCtx* ctx, YmType* type, void*) {
-                    ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 13), YM_TAKE);
+                    ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 13), YM_TAKE);
                     observedCalls++;
                 },
                 nullptr),
@@ -2435,7 +2435,7 @@ TEST(Contexts, Call_MultipleLevelsOfCalls) {
                 "yama:None",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
                     auto g = load(ctx, "p:g");
                     auto n_arg = ymCtx_Arg(ctx, 0, YM_BORROW);
                     ASSERT_TRUE(n_arg);
@@ -2464,7 +2464,7 @@ TEST(Contexts, Call_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
             "yama:Int",
             [](YmCtx* ctx, YmType* type, void* user) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
             },
             nullptr);
         ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2547,7 +2547,7 @@ TEST(Contexts, Call_Fail_LocalNotFound_ArgsExceedsLocalObjectStackHeight) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2580,7 +2580,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooManyPositionalArgs) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2619,7 +2619,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2652,7 +2652,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_TooFewPositionalArgs_DueToNamedArgs)
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2696,7 +2696,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameIdentifierMultipleTimes) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2740,7 +2740,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNameUnknownIdentifier) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2784,7 +2784,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2828,7 +2828,7 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2863,7 +2863,7 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_BeginNamedParams(parceldef, "g");
@@ -2899,7 +2899,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_NoReturnValueObjectBound) {
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    //ymCtx_Ret(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                    //ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2939,7 +2939,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongType) {
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
                     // Arg #1 is the Float, not the Int.
-                    ymCtx_Ret(ctx, ymCtx_Arg(ctx, 0, YM_BORROW), YM_BORROW);
+                    ymCtx_RetObj(ctx, ymCtx_Arg(ctx, 0, YM_BORROW), YM_BORROW);
                 },
                 nullptr);
             ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
@@ -2978,7 +2978,7 @@ TEST(Contexts, Call_Fail_CallStackOverflow) {
                 "yama:None",
                 [](YmCtx* ctx, YmType* type, void* user) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
                     auto g = load(ctx, "p:g");
                     if (ymCtx_CallStackHeight(ctx) < YM_MAX_CALL_STACK_HEIGHT) {
                         ASSERT_EQ(ymCtx_Call(ctx, g, 0, "", YM_DISCARD), YM_TRUE);
@@ -3002,7 +3002,7 @@ TEST(Contexts, Call_Fail_CallStackOverflow) {
         });
 }
 
-TEST(Contexts, Ret_Borrow) {
+TEST(Contexts, RetObj_Borrow) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3013,8 +3013,8 @@ TEST(Contexts, Ret_Borrow) {
                     SETUP_OBJ(x, ymCtx_NewInt(ctx, 100));
 
                     // The full call procedure is tested in ymCtx_Call tests, w/ us
-                    // here only caring about ymCtx_Ret's immediate behaviour.
-                    ymCtx_Ret(ctx, x, YM_BORROW);
+                    // here only caring about ymCtx_RetObj's immediate behaviour.
+                    ymCtx_RetObj(ctx, x, YM_BORROW);
 
                     EXPECT_EQ(ymObj_RefCount(x), 2);
                 },
@@ -3030,7 +3030,7 @@ TEST(Contexts, Ret_Borrow) {
         });
 }
 
-TEST(Contexts, Ret_Take) {
+TEST(Contexts, RetObj_Take) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3041,8 +3041,8 @@ TEST(Contexts, Ret_Take) {
                     auto x = ymCtx_NewInt(ctx, 100);
 
                     // The full call procedure is tested in ymCtx_Call tests, w/ us
-                    // here only caring about ymCtx_Ret's immediate behaviour.
-                    ymCtx_Ret(ctx, x, YM_TAKE);
+                    // here only caring about ymCtx_RetObj's immediate behaviour.
+                    ymCtx_RetObj(ctx, x, YM_TAKE);
 
                     // x's single ref is owned by API internals.
                     EXPECT_EQ(ymObj_RefCount(x), 1);
@@ -3059,7 +3059,7 @@ TEST(Contexts, Ret_Take) {
         });
 }
 
-TEST(Contexts, Ret_TakeIfOk) {
+TEST(Contexts, RetObj_TakeIfOk) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3070,8 +3070,8 @@ TEST(Contexts, Ret_TakeIfOk) {
                     auto x = ymCtx_NewInt(ctx, 100);
 
                     // The full call procedure is tested in ymCtx_Call tests, w/ us
-                    // here only caring about ymCtx_Ret's immediate behaviour.
-                    ymCtx_Ret(ctx, x, YM_TAKE_IF_OK);
+                    // here only caring about ymCtx_RetObj's immediate behaviour.
+                    ymCtx_RetObj(ctx, x, YM_TAKE_IF_OK);
 
                     // x's single ref is owned by API internals.
                     EXPECT_EQ(ymObj_RefCount(x), 1);
@@ -3088,7 +3088,7 @@ TEST(Contexts, Ret_TakeIfOk) {
         });
 }
 
-TEST(Contexts, Ret_Overwrite) {
+TEST(Contexts, RetObj_Overwrite) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3101,18 +3101,18 @@ TEST(Contexts, Ret_Overwrite) {
                     SETUP_OBJ(z, ymCtx_NewInt(ctx, 300));
 
                     // The full call procedure is tested in ymCtx_Call tests, w/ us
-                    // here only caring about ymCtx_Ret's immediate behaviour.
-                    ymCtx_Ret(ctx, x, YM_BORROW);
+                    // here only caring about ymCtx_RetObj's immediate behaviour.
+                    ymCtx_RetObj(ctx, x, YM_BORROW);
                     EXPECT_EQ(ymObj_RefCount(x), 2);
                     EXPECT_EQ(ymObj_RefCount(y), 1);
                     EXPECT_EQ(ymObj_RefCount(z), 1);
 
-                    ymCtx_Ret(ctx, y, YM_BORROW);
+                    ymCtx_RetObj(ctx, y, YM_BORROW);
                     EXPECT_EQ(ymObj_RefCount(x), 1);
                     EXPECT_EQ(ymObj_RefCount(y), 2);
                     EXPECT_EQ(ymObj_RefCount(z), 1);
 
-                    ymCtx_Ret(ctx, z, YM_BORROW);
+                    ymCtx_RetObj(ctx, z, YM_BORROW);
                     EXPECT_EQ(ymObj_RefCount(x), 1);
                     EXPECT_EQ(ymObj_RefCount(y), 1);
                     EXPECT_EQ(ymObj_RefCount(z), 2);
@@ -3129,7 +3129,7 @@ TEST(Contexts, Ret_Overwrite) {
         });
 }
 
-TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
+TEST(Contexts, RetObj_FailQuietly_InUserCallFrame) {
     objsys_test(
         [](YmCtx* ctx, bool called_in_fn_body) {
             if (called_in_fn_body) {
@@ -3137,7 +3137,7 @@ TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
             }
             SETUP_OBJ(a, ymCtx_NewInt(ctx, 10));
 
-            ymCtx_Ret(ctx, a, YM_BORROW);
+            ymCtx_RetObj(ctx, a, YM_BORROW);
             EXPECT_EQ(ymObj_RefCount(a), 1);
         });
     objsys_test(
@@ -3148,7 +3148,7 @@ TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
             SETUP_OBJ(a, ymCtx_NewInt(ctx, 10));
             ymObj_Secure(a); // Ref will be consumed by API.
 
-            ymCtx_Ret(ctx, a, YM_TAKE);
+            ymCtx_RetObj(ctx, a, YM_TAKE);
             EXPECT_EQ(ymObj_RefCount(a), 1);
         });
     objsys_test(
@@ -3158,12 +3158,12 @@ TEST(Contexts, Ret_FailQuietly_InUserCallFrame) {
             }
             SETUP_OBJ(a, ymCtx_NewInt(ctx, 10));
 
-            ymCtx_Ret(ctx, a, YM_TAKE_IF_OK);
+            ymCtx_RetObj(ctx, a, YM_TAKE_IF_OK);
             EXPECT_EQ(ymObj_RefCount(a), 1);
         });
 }
 
-TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
+TEST(Contexts, RetObj_FailQuietly_WhatIsNullptr) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3171,9 +3171,9 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
                 "g",
                 "yama:Int",
                 [](YmCtx* ctx, YmType* type, void*) {
-                    ymCtx_Ret(ctx, YM_NIL, YM_BORROW);
-                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE);
-                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE_IF_OK);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_BORROW);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_TAKE);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_TAKE_IF_OK);
                 },
                 nullptr);
         },
@@ -3195,13 +3195,13 @@ TEST(Contexts, Ret_FailQuietly_WhatIsNullptr) {
                     SETUP_OBJ(x, ymCtx_NewInt(ctx, 100));
 
                     EXPECT_EQ(ymObj_RefCount(x), 1);
-                    ymCtx_Ret(ctx, x, YM_BORROW);
+                    ymCtx_RetObj(ctx, x, YM_BORROW);
                     EXPECT_EQ(ymObj_RefCount(x), 2);
 
                     // Test that impl can handle w/ already existing binding.
-                    ymCtx_Ret(ctx, YM_NIL, YM_BORROW);
-                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE);
-                    ymCtx_Ret(ctx, YM_NIL, YM_TAKE_IF_OK);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_BORROW);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_TAKE);
+                    ymCtx_RetObj(ctx, YM_NIL, YM_TAKE_IF_OK);
 
                     EXPECT_EQ(ymObj_RefCount(x), 2);
                 },
@@ -3222,7 +3222,7 @@ TEST(Contexts, GetVar_StoredVar) {
         ymParcelDef_AddReadOnlyStoredVar(parceldef, "V", "yama:Int",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
             },
             nullptr);
         };
@@ -3312,7 +3312,7 @@ TEST(Contexts, GetVar_StoredVarLazyInits) {
         ymParcelDef_AddReadOnlyStoredVar(parceldef, "V", "yama:Int",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
             },
             nullptr);
         };
@@ -3354,7 +3354,7 @@ TEST(Contexts, GetVar_ComputedVar) {
                 observedCalls++;
                 auto result = ymCtx_NewInt(ctx, 113);
                 compVar_obj = result;
-                ymCtx_Ret(ctx, result, YM_TAKE);
+                ymCtx_RetObj(ctx, result, YM_TAKE);
             },
             nullptr);
         };
@@ -3465,7 +3465,7 @@ TEST(Contexts, SetVar_StoredVar) {
         ymParcelDef_AddStoredVar(parceldef, "V", "yama:Int",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
             },
             nullptr);
         };
@@ -3495,7 +3495,7 @@ TEST(Contexts, SetVar_StoredVarLazyInits) {
         ymParcelDef_AddStoredVar(parceldef, "V", "yama:Int",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 113), YM_TAKE);
             },
             nullptr);
         };
@@ -3532,7 +3532,7 @@ TEST(Contexts, SetVar_ComputedVar) {
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
                 EXPECT_EQ(ymCtx_Arg(ctx, 0, YM_BORROW), compVar_obj);
-                ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
             },
             nullptr);
         };
@@ -3779,13 +3779,13 @@ TEST(Contexts, GetProperty_ComputedProperty) {
         ymParcelDef_AddReadOnlyComputedProperty(parceldef, "A", "a", "yama:Int",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, compProp_A_a_obj, YM_BORROW);
+                ymCtx_RetObj(ctx, compProp_A_a_obj, YM_BORROW);
             },
             nullptr);
         ymParcelDef_AddComputedProperty(parceldef, "A", "b", "yama:Rune",
             [](YmCtx* ctx, YmType* type, void*) {
                 observedCalls++;
-                ymCtx_Ret(ctx, compProp_A_b_obj, YM_BORROW);
+                ymCtx_RetObj(ctx, compProp_A_b_obj, YM_BORROW);
             },
             nullptr,
             [](YmCtx* ctx, YmType* type, void*) {
@@ -4116,7 +4116,7 @@ TEST(Contexts, SetProperty_ComputedProperty) {
                 nullptr,
                 [](YmCtx* ctx, YmType* type, void*) {
                     observedCalls++;
-                    ymCtx_Ret(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+                    ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
                     EXPECT_EQ(ymCtx_Arg(ctx, 1, YM_BORROW), compProp_expected_by_setter);
                 },
                 nullptr);

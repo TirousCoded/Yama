@@ -525,7 +525,7 @@ bool YmCtx::call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal 
     return false;
 }
 
-bool YmCtx::ret(YmObj* what, YmRefPolicy whatPolicy) {
+bool YmCtx::retObj(YmObj* what, YmRefPolicy whatPolicy) {
     if (!what) {
         return false;
     }

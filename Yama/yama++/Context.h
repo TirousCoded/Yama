@@ -39,9 +39,7 @@ namespace ym {
 
             inline YmCallStackHeight height() const noexcept { return ymCtx_CallStackHeight(_ctx); }
             inline std::string fmt(YmCallStackHeight skip = 0) const {
-                // TODO: Figure out how to remove this extra round of heap alloc.
-                auto temp = ymCtx_FmtCallStack(_ctx, skip);
-                ym::assertSafe(temp);
+                auto temp = ym::Safe(ymCtx_FmtCallStack(_ctx, skip));
                 std::string result(temp);
                 // TODO: This cleanup won't occur if any above throws.
                 std::free((void*)temp);
@@ -142,6 +140,7 @@ namespace ym {
         inline bool putType(YmLocal where, const Type& v) noexcept { return ymCtx_PutType(get(), where, v.get()) == YM_TRUE; }
 
         inline bool push(const Object& what) noexcept { return put(YM_PUSH, what); }
+        inline bool push(const std::optional<Object>& what) noexcept { return what && put(YM_PUSH, *what); }
         inline bool pushNone() noexcept { return putNone(YM_PUSH); }
         inline bool pushInt(YmInt v) noexcept { return putInt(YM_PUSH, v); }
         inline bool pushUInt(YmUInt v) noexcept { return putUInt(YM_PUSH, v); }
@@ -161,18 +160,18 @@ namespace ym {
             return type && defaultInit(*type, where);
         }
         // argNames is expected to be null-terminated.
-        inline bool explicitInit(
+        inline bool structInit(
             const Type& type,
             std::convertible_to<std::string_view> auto const& argNames,
             YmLocal where = YM_PUSH) noexcept {
             return ymCtx_StructInit(get(), type.get(), std::string_view(argNames).data(), where) == YM_TRUE;
         }
         // argNames is expected to be null-terminated.
-        inline bool explicitInit(
+        inline bool structInit(
             const std::optional<Type>& type,
             std::convertible_to<std::string_view> auto const& argNames,
             YmLocal where = YM_PUSH) noexcept {
-            return type && explicitInit(*type, argNames, where);
+            return type && structInit(*type, argNames, where);
         }
 
         // argNames is expected to be null-terminated.
@@ -207,8 +206,22 @@ namespace ym {
             std::convertible_to<std::string_view> auto const& argNames) noexcept {
             return call(fn, argsN, argNames, YM_DISCARD);
         }
-        inline void ret(const Object& what) noexcept { ymCtx_Ret(get(), what.get(), YM_BORROW); }
-        inline void ret(const std::optional<Object>& what) noexcept { if (what) ret(*what); }
+        inline void retObj(const Object& what) noexcept { ymCtx_RetObj(get(), what.get(), YM_BORROW); }
+        inline void retObj(const std::optional<Object>& what) noexcept { if (what) retObj(*what); }
+        inline void ret() noexcept { ymCtx_Ret(get()); }
+
+        inline bool getVar(const Type& var, YmLocal where = YM_PUSH) noexcept {
+            return ymCtx_GetVar(get(), var.get(), where) == YM_TRUE;
+        }
+        inline bool getVar(const std::optional<Type>& var, YmLocal where = YM_PUSH) noexcept {
+            return var && getVar(*var, where);
+        }
+        inline bool setVar(const Type& var) noexcept {
+            return ymCtx_SetVar(get(), var.get()) == YM_TRUE;
+        }
+        inline bool setVar(const std::optional<Type>& var) noexcept {
+            return var && setVar(*var);
+        }
 
         inline bool getProperty(const Type& property, YmLocal where = YM_PUSH) noexcept {
             return ymCtx_GetProperty(get(), property.get(), where) == YM_TRUE;

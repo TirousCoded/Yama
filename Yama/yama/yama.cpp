@@ -370,8 +370,12 @@ YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames
     return Safe(ctx)->call(fn, argsN, std::string_view(Safe(argNames)), returnTo);
 }
 
-void ymCtx_Ret(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
-    Safe(ctx)->ret(what, whatPolicy);
+void ymCtx_RetObj(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
+    Safe(ctx)->retObj(what, whatPolicy);
+}
+
+void ymCtx_Ret(YmCtx* ctx) {
+    ymCtx_RetObj(ctx, ymCtx_Pull(ctx), YM_TAKE);
 }
 
 YmBool ymCtx_GetVar(YmCtx* ctx, YmType* varType, YmLocal where) {

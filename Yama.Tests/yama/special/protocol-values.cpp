@@ -326,11 +326,11 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 			if (auto arg = ymCtx_Arg(ctx, 1, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(arg), ymCtx_Ref(ctx, 0));
 				// A::m will double the input value.
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, ymObj_ToInt(arg, nullptr) * 2), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, ymObj_ToInt(arg, nullptr) * 2), YM_TAKE);
 			}
 			else {
 				ADD_FAILURE();
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
 			}
 		},
 		nullptr);
@@ -360,11 +360,11 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndPerformSpecialDyna
 			if (auto arg = ymCtx_Arg(ctx, 1, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(arg), ymCtx_Ref(ctx, 0));
 				// B::m will negate the input value.
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, -ymObj_ToInt(arg, nullptr)), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, -ymObj_ToInt(arg, nullptr)), YM_TAKE);
 			}
 			else {
 				ADD_FAILURE();
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
 			}
 		},
 		nullptr);
@@ -486,11 +486,11 @@ TEST_F(ProtocolValues, ObjectMethodsOfProtocolsCanBeCalled_AndCanProperlyDispatc
 			if (auto arg = ymCtx_Arg(ctx, 1, YM_BORROW)) {
 				EXPECT_EQ(ymObj_Type(arg), ymCtx_Ref(ctx, 0));
 				// A::m will double the input value.
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, ymObj_ToInt(arg, nullptr) * 2), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, ymObj_ToInt(arg, nullptr) * 2), YM_TAKE);
 			}
 			else {
 				ADD_FAILURE();
-				ymCtx_Ret(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
+				ymCtx_RetObj(ctx, ymCtx_NewInt(ctx, 0), YM_TAKE);
 			}
 
 			// Named args (ie. arg #3 and #4) are as expected.

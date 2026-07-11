@@ -66,25 +66,25 @@ void _ym::methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user) {
 void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
     ctx->getProperty(type, YM_PUSH);
-    ctx->ret(ctx->pull());
+    ctx->retObj(ctx->pull());
 }
 
 void _ym::storedPropertySetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
     ctx->put(YM_PUSH, ctx->arg(1), YM_BORROW);
     ctx->setProperty(type->assignee());
-    ctx->ret(ctx->newNone());
+    ctx->retObj(ctx->newNone());
 }
 
 void _ym::storedVarGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->getVar(type, YM_PUSH);
-    ctx->ret(ctx->pull());
+    ctx->retObj(ctx->pull());
 }
 
 void _ym::storedVarSetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
     ctx->setVar(type->assignee());
-    ctx->ret(ctx->newNone());
+    ctx->retObj(ctx->newNone());
 }
 
 _ym::TypeInfo::TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localName) :

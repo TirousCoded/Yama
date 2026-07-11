@@ -28,7 +28,7 @@ int32_t main(int32_t argc, char** argv) {
         { "p:recurse" },
         [](YmCtx* ctx_, YmType* type, void*) {
             auto ctx = ym::Context(ym::Safe<YmCtx>(ctx_), true);
-            ctx.ret(ctx.newNone());
+            ctx.retObj(ctx.newNone());
             auto n = ctx.arg(0).value().toUInt().value();
             ym::println("recurse({})\n{}", n, ctx.callStack());
             if (n > 1) {
@@ -46,7 +46,7 @@ int32_t main(int32_t argc, char** argv) {
             auto ctx = ym::Context(*ctx_, true);
             auto T = ctx.ref(0).value();
             auto x = ctx.arg(0).value();
-            ctx.ret(ctx.newNone());
+            ctx.retObj(ctx.newNone());
             if (T == ctx.ldInt())           ym::println("yama:Int {}", ym::fmt(x.toInt().value()));
             else if (T == ctx.ldUInt())     ym::println("yama:UInt {}", ym::fmt(x.toUInt().value()));
             else if (T == ctx.ldFloat())    ym::println("yama:Float {}", ym::fmt(x.toFloat().value()));
