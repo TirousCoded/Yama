@@ -8,142 +8,99 @@
 #endif
 
 
-#include <unordered_map>
-
 #include "../yama/yama.h"
 #include "../yama++/Safe.h"
-#include "ArgPackInfo.h"
 #include "Loader.h"
-#include "MAS.h"
+#include "ObjManager.h"
 #include "PTableManager.h"
 #include "RefCounter.h"
-#include "YmDm.h"
+#include "StkState.h"
 #include "VarStorage.h"
+#include "YmDm.h"
 
 
 struct YmCtx final {
 public:
     // refs is not managed internally by this class.
-    _ym::AtomicRefCounter<YmRefCount> refs;
+    _ym::AtomicRefCounter refs;
 
     const ym::Safe<YmDm> domain;
     const std::shared_ptr<_ym::CtxLoader> loader;
-	_ym::HeapMAS mas; // TODO: Replace later.
 
 
     YmCtx(ym::Safe<YmDm> domain);
-	~YmCtx() noexcept;
+    ~YmCtx() noexcept;
 
 
     std::shared_ptr<YmParcel> import(const std::string& path);
     std::shared_ptr<YmType> load(const std::string& fullname);
 
-	YmType& ldNone() const noexcept;
-	YmType& ldInt() const noexcept;
-	YmType& ldUInt() const noexcept;
-	YmType& ldFloat() const noexcept;
-	YmType& ldBool() const noexcept;
-	YmType& ldRune() const noexcept;
-	YmType& ldType() const noexcept;
+    YmType& ldNone() const noexcept;
+    YmType& ldInt() const noexcept;
+    YmType& ldUInt() const noexcept;
+    YmType& ldFloat() const noexcept;
+    YmType& ldBool() const noexcept;
+    YmType& ldRune() const noexcept;
+    YmType& ldType() const noexcept;
 
-	// Creates an uninitialized object of type.
-	YmObj* create(YmType& type);
-	YmRefCount secure(YmObj& obj);
-	YmRefCount release(YmObj& obj);
-	void reset();
+    // A given root object may be traversed multiple times.
+    inline void forEachRoot(ym::Callable<void, YmObj&> auto&& visitor) const {
+        _objs.forEachRoot(visitor);
+    }
 
-	ym::Safe<YmObj> newNone();
-	ym::Safe<YmObj> newInt(YmInt v);
-	ym::Safe<YmObj> newUInt(YmUInt v);
-	ym::Safe<YmObj> newFloat(YmFloat v);
-	ym::Safe<YmObj> newBool(YmBool v);
-	ym::Safe<YmObj> newRune(YmRune v);
-	ym::Safe<YmObj> newType(YmType& v);
-	YmObj* newDefault(YmType* type);
+    void setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* user) noexcept;
 
-	YmCallStackHeight callStkHeight() const noexcept;
-	std::string fmtCallStk(YmCallStackHeight skip = 0) const;
+    void reset();
+    // Slots will be nullptr or 0.
+    _ym::TempRef create(YmType& type, bool frontend);
+    YmRefCount secure(YmObj& obj, bool frontend);
+    YmRefCount release(YmObj& obj, bool frontend);
 
-	bool isUser() const noexcept; // Returns if in user pseudo-call.
-	YmUInt16 args() const noexcept;
-	YmLocals locals() const noexcept;
-	YmObj* arg(YmUInt16 which, YmRefPolicy returnPolicy = YM_BORROW);
-	bool setArg(YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy = YM_TAKE);
-	YmType* ref(YmRef reference);
-	YmObj* local(YmLocal where, YmRefPolicy returnPolicy = YM_BORROW);
+    _ym::TempRef newNone(bool frontendRef);
+    _ym::TempRef newInt(YmInt v, bool frontendRef);
+    _ym::TempRef newUInt(YmUInt v, bool frontendRef);
+    _ym::TempRef newFloat(YmFloat v, bool frontendRef);
+    _ym::TempRef newBool(YmBool v, bool frontendRef);
+    _ym::TempRef newRune(YmRune v, bool frontendRef);
+    _ym::TempRef newType(YmType& v, bool frontendRef);
+    _ym::TempRef newDefault(YmType* type, bool frontendRef);
 
-	YmObj* pull() noexcept; // Returns taken ref.
-	// releaseObjs == false when we want to *steal* ownership from the object stack.
-	void pop(YmLocals n, bool releaseObjs = true);
-	bool put(YmLocal where, YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
-	bool swap(YmLocal a, YmLocal b);
-	bool defaultInit(YmType* type, YmLocal where);
-	bool structInit(YmType* type, std::string_view argNames, YmLocal where);
-	bool call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
-	bool retObj(YmObj* what, YmRefPolicy whatPolicy = YM_TAKE);
-	bool getVar(YmType* varType, YmLocal where);
-	bool setVar(YmType* varType);
-	bool getProperty(YmType* propertyType, YmLocal where);
-	bool setProperty(YmType* propertyType);
-	bool convert(YmType& type, YmLocal returnTo);
+    void gcCollect();
+
+    YmCallStackHeight callStkHeight() const noexcept;
+    std::string fmtCallStk(YmCallStackHeight skip = 0) const;
+
+    bool isUser() const noexcept; // Returns if in user pseudo-call.
+    YmUInt16 args() const noexcept;
+    YmLocals locals() const noexcept;
+
+    _ym::TempRef arg(YmUInt16 which); // Returns borrowed ref.
+    bool setArg(YmUInt16 which, _ym::TempRef newArg);
+    YmType* ref(YmRef reference);
+    _ym::TempRef local(YmLocal where); // Returns borrowed ref.
+    // Returns taken ref to local at where, stealing it, and likewise leaving its
+    // stack entry w/ an empty InternalRef (so be careful using this method.)
+    _ym::TempRef stealLocal(YmLocal where, bool frontendRef);
+
+    _ym::TempRef pull(bool frontendRef) noexcept; // Returns taken ref.
+    void pop(YmLocals n);
+    bool put(YmLocal where, _ym::TempRef what);
+    bool swap(YmLocal a, YmLocal b);
+    bool defaultInit(YmType* type, YmLocal where);
+    bool structInit(YmType* type, std::string_view argNames, YmLocal where);
+    bool call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo);
+    bool retObj(_ym::TempRef what);
+    bool getVar(YmType* varType, YmLocal where);
+    bool setVar(YmType* varType);
+    bool getProperty(YmType* propertyType, YmLocal where);
+    bool setProperty(YmType* propertyType);
+    bool convert(YmType& type, YmLocal returnTo, bool coercion);
 
 
 private:
-	struct _CallFrame final {
-		// Fn being called (or nullptr for user call frame.)
-		YmType* fn;
-		_ym::ArgPackInfo<> argPack;
-		// Where to put return value.
-		YmLocal returnTo;
-		// Where in _globalObjStk this call frame's local object stack begins (and below that are its args.)
-		YmUInt32 localsOffset;
-		// When protocol methods are called, they never appear on call stack, instead forwarding
-		// directly to the method gotten from their ptable. This flag indicates if this call frame
-		// is for one of these forwarded calls.
-		bool fwdFromProto = false;
-		// The bound return value object.
-		YmObj* returnValue = nullptr;
-
-
-		inline YmParams args() const noexcept { return argPack.args(); }
-		inline YmParams positionalArgs() const noexcept { return argPack.positionalArgs(); }
-		inline YmParams namedArgs() const noexcept { return argPack.namedArgs(); }
-		inline YmParams dummies() const noexcept { return argPack.dummies(); }
-		inline YmUInt32 localOffset(YmLocal where) const noexcept { return localsOffset + where; }
-		inline std::optional<YmUInt32> argOffset(YmUInt16 which) const noexcept {
-			ymAssert(which == YmUInt8(which));
-			if (auto offset = argPack.argOffset(YmUInt8(which))) {
-				return localsOffset - args() + *offset;
-			}
-			return std::nullopt;
-		}
-	};
-
-
-	// TODO: This field is used to ensure all objects are released upon deinit, and
-	//		 should be removed later when a more appropriate way to guarantee this.
-	std::unordered_set<YmObj*> _objects;
-
-	// The global stack of objects inside of which we alloc the data for each individual
-	// call frame's local object stack, allocated in a linear fashion.
-	std::vector<ym::Safe<YmObj>> _globalObjStk;
-
-	// The call stack.
-	std::vector<_CallFrame> _callStk;
-
-	_ym::PTableManager _ptables;
-	_ym::VarStorage _vars;
-
-
-	void _beginUserPseudoCall();
-	bool _beginCall(YmType* fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo);
-	bool _endCall() noexcept;
-	void _dispatchCall(YmType* fn);
-
-	// Transforms negative indices into positive absolute ones, and fails if out-of-bounds.
-	std::optional<YmLocal> _absIndex(YmLocal x) const noexcept;
-	std::optional<YmLocal> _absIndexForRead(YmLocal x) const noexcept;
-
-	static YmRune _uint2rune(YmUInt x) noexcept;
+    _ym::StkState _stk;
+    _ym::ObjManager _objs;
+    _ym::PTableManager _ptables;
+    _ym::VarStorage _vars;
 };
 

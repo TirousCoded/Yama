@@ -37,12 +37,19 @@ namespace ym {
     {
         { f(std::forward<Args>(args)...) } -> std::convertible_to<Returns>;
     };
+    // Models noexcept callable types T with signature Returns(Args...).
+    template<typename T, typename Returns, typename... Args>
+    concept NoexceptCallable =
+        requires (std::remove_reference_t<T> f, Args&&... args)
+    {
+        { f(std::forward<Args>(args)...) } noexcept -> std::convertible_to<Returns>;
+    };
 
 
     // Models dereferenceable types T.
     template<typename T>
     concept Dereferenceable =
-        requires (T v)
+        requires (std::remove_reference_t<T> v)
     {
         // We don't care what *v dereferences to.
         *v;

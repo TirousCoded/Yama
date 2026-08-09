@@ -29,6 +29,12 @@ namespace _ym {
     constexpr size_t enumSize = size_t(T::Num);
 
 
+    constexpr YmRune uint2rune(YmUInt x) noexcept {
+        // TODO: Is there a bitwise trick we can use to avoid modulus?
+        return x % 0x110000;
+    }
+
+
     struct CallBhvrCallbackInfo final {
         YmCallBhvrCallbackFn fn = ymInertCallBhvrFn;
         void* user = nullptr;

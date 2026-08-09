@@ -9,111 +9,87 @@ YmObj::YmObj(YmCtx& ctx, YmType& type) :
 	type(type) {
 }
 
-void YmObj::cleanup() noexcept {
-	if (isRegularStruct()) {
-		// Cleanup each stored property subobject.
-		for (size_t i = 0; i < type->info->slots; i++) {
-			ctx->release(ym::deref(slot(i).ref)); // Can't forget!
-		}
-	}
-	else if (isProtocol()) {
-		ctx->release(ym::deref(boxed())); // Can't forget!
-	}
+_ym::Slots YmObj::slots() const noexcept {
+	return type->slots();
 }
 
-YmObj::Slot& YmObj::slot(size_t index) noexcept {
+YmObj::Slot& YmObj::slot(_ym::Slots index) noexcept {
+	ymAssert(index < slots());
 	return _ym::ObjHAL::element(*this, index);
 }
 
-const YmObj::Slot& YmObj::slot(size_t index) const noexcept {
+const YmObj::Slot& YmObj::slot(_ym::Slots index) const noexcept {
+	ymAssert(index < slots());
 	return _ym::ObjHAL::element(*this, index);
 }
 
-bool YmObj::isPrimitive() const noexcept {
-	return isNone() || isInt() || isUInt() || isFloat() || isBool() || isRune() || isType();
+const _ym::LiteInternalRef& YmObj::refSlot(_ym::Slots index) const noexcept {
+	ymAssert(type->checkIsRefSlot(index));
+	return slot(index).ref;
 }
 
-bool YmObj::isStruct() const noexcept {
-	return type->kind() == YmKind_Struct;
+void YmObj::dropRefSlot(_ym::Slots index) noexcept {
+	ymAssert(type->checkIsRefSlot(index));
+	slot(index).ref.drop();
 }
 
-bool YmObj::isRegularStruct() const noexcept {
-	return isStruct() && !isPrimitive();
+void YmObj::dropAllRefSlots() noexcept {
+	forEachRefSlotIndex([this](_ym::Slots index) {
+		dropRefSlot(index);
+		});
 }
 
-bool YmObj::isProtocol() const noexcept {
-	return type->kind() == YmKind_Protocol;
+void YmObj::assignRefSlot(_ym::Slots index, _ym::TempRef value) noexcept {
+	ymAssert(type->checkIsRefSlot(index));
+	slot(index).ref.assign(std::move(value));
 }
 
-bool YmObj::isNone() const noexcept {
-	return type == ctx->loader->ldNone();
-}
-
-bool YmObj::isInt() const noexcept {
-	return type == ctx->loader->ldInt();
-}
-
-bool YmObj::isUInt() const noexcept {
-	return type == ctx->loader->ldUInt();
-}
-
-bool YmObj::isFloat() const noexcept {
-	return type == ctx->loader->ldFloat();
-}
-
-bool YmObj::isBool() const noexcept {
-	return type == ctx->loader->ldBool();
-}
-
-bool YmObj::isRune() const noexcept {
-	return type == ctx->loader->ldRune();
-}
-
-bool YmObj::isType() const noexcept {
-	return type == ctx->loader->ldType();
+_ym::TempRef YmObj::stealRefSlot(_ym::Slots index, bool frontendRef) noexcept {
+	ymAssert(type->checkIsRefSlot(index));
+	return slot(index).ref.steal(frontendRef);
 }
 
 std::optional<YmInt> YmObj::toInt() const noexcept {
-	return isInt() ? std::make_optional(slot(0).i) : std::nullopt;
+	return type->isInt() ? std::make_optional(slot(0).i) : std::nullopt;
 }
 
 std::optional<YmUInt> YmObj::toUInt() const noexcept {
-	return isUInt() ? std::make_optional(slot(0).ui) : std::nullopt;
+	return type->isUInt() ? std::make_optional(slot(0).ui) : std::nullopt;
 }
 
 std::optional<YmFloat> YmObj::toFloat() const noexcept {
-	return isFloat() ? std::make_optional(slot(0).f) : std::nullopt;
+	return type->isFloat() ? std::make_optional(slot(0).f) : std::nullopt;
 }
 
 std::optional<YmBool> YmObj::toBool() const noexcept {
-	return isBool() ? std::make_optional(slot(0).b) : std::nullopt;
+	return type->isBool() ? std::make_optional(slot(0).b) : std::nullopt;
 }
 
 std::optional<YmRune> YmObj::toRune() const noexcept {
-	return isRune() ? std::make_optional(slot(0).r) : std::nullopt;
+	return type->isRune() ? std::make_optional(slot(0).r) : std::nullopt;
 }
 
 YmType* YmObj::toType() const noexcept {
-	return isType() ? slot(0).type : nullptr;
+	return type->isType() ? slot(0).type : nullptr;
 }
 
-void YmObj::box(ym::Safe<YmObj> value, const ym::Safe<YmType>* ptable) noexcept {
-	if (isProtocol()) {
-		slot(0) = Slot{ .ref = value }; // We don't incr refs, instead stealing one.
+void YmObj::box(_ym::TempRef value, const ym::Safe<YmType>* ptable) noexcept {
+	if (type->isProtocol()) {
+		assignRefSlot(0, std::move(value));
 		slot(1) = Slot{ .ptable = ptable };
 	}
 }
 
-YmObj* YmObj::boxed() const noexcept {
+_ym::TempRef YmObj::boxed() const noexcept {
 	return
-		isProtocol()
-		? slot(0).ref
+		type->isProtocol()
+		? refSlot(0).borrow()
 		: nullptr;
 }
 
 const ym::Safe<YmType>* YmObj::ptable() const noexcept {
 	return
-		isProtocol()
+		type->isProtocol()
 		? slot(1).ptable
 		: nullptr;
 }

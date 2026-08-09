@@ -19,7 +19,7 @@
 struct YmDm final {
 public:
     // refs is not managed internally by this class.
-    _ym::AtomicRefCounter<YmRefCount> refs;
+    _ym::AtomicRefCounter refs;
 
     const std::shared_ptr<_ym::DmLoader> loader;
 

@@ -37,8 +37,7 @@ namespace ym {
         }
         inline std::string fmt() const {
             // TODO: Figure out how to remove this extra round of heap alloc.
-            auto temp = ymObj_Fmt(get());
-            assertSafe(temp);
+            auto temp = ym::Safe(ymObj_Fmt(get()));
             std::string result(temp);
             // TODO: This cleanup won't occur if any above throws.
             std::free((void*)temp);
@@ -86,12 +85,7 @@ namespace ym {
                 : std::nullopt;
         }
         inline std::optional<Type> toType() const noexcept {
-            YmBool success{};
-            auto result = ymObj_ToType(get(), &success);
-            return
-                success == YM_TRUE
-                ? std::make_optional(Type(Safe(result)))
-                : std::nullopt;
+            return Type::maybe(ymObj_ToType(get(), nullptr));
         }
     };
 }

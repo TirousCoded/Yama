@@ -15,11 +15,17 @@
 #include "HAL.h"
 #include "RefCounter.h"
 #include "YmCtx.h"
+#include "obj-ref-helpers.h"
+#include "FRootTracker.h"
 
 
 struct YmObj final {
 public:
     struct Slot final {
+        // NOTE: 'ref' dtor won't automatically drop (how could it, the union wouldn't
+        //       know to call the dtor anyway), and so ref slot dropping (aka. deinit)
+        //       must be done MANUALLY!
+        //          * See YmObj::dropAllRefSlots.
         union {
             YmInt i = 0;
             YmUInt ui;
@@ -27,71 +33,43 @@ public:
             YmBool b;
             YmRune r;
             YmType* type;
-            YmObj* ref;
+            _ym::LiteInternalRef ref;
             const ym::Safe<YmType>* ptable;
         };
     };
 
 
     // refs is not managed internally by this class.
-    _ym::RefCounter<YmRefCount> refs;
-
-    // TODO: I don't 100% like having YmObj carry a 'ctx' field, and I kinda wanna make ymObj_***
-    //       frontend fns instead be passed a YmCtx* explicitly instead.
-    //
-    //       However, in order to do this we'll need to do a major revision to our ym::*** frontend,
-    //       in particular ym::Handle, ym::RefCountedRes, and ym::Scoped would all need to be revised.
-    //          * Template specializations?
+    _ym::DualRefCounter refs;
 
     ym::Safe<YmCtx> ctx;
     ym::Safe<YmType> type;
+    _ym::FRootID froot = _ym::NO_FROOT;
+    _ym::GCCycleID lastSurvivedCycle = _ym::GCNoCycle;
 
 
     YmObj(YmCtx& ctx, YmType& type);
 
 
-    // Governs object cleanup behaviour.
-    void cleanup() noexcept;
+    // NOTE: See kinds.h for info about static slot layouts.
 
+    _ym::Slots slots() const noexcept;
+    inline _ym::Slots size() const noexcept { return slots(); }
+    Slot& slot(_ym::Slots index) noexcept;
+    const Slot& slot(_ym::Slots index) const noexcept;
 
-    // Returns the number of slots this object has.
-    inline size_t size() const noexcept {
-        if (isPrimitive()) {
-            return isNone() ? 0 : 1;
-        }
-        else if (isStruct()) {
-            return type->info->slots; // One slot per stored property.
-        }
-        else if (isProtocol()) {
-            return 2; // Slot #1 is boxed value, slot #2 is ptable ptr.
-        }
-        else return 0;
+    // NOTE: Due to dangers involving move-assigning LiteInternalRef, we'll restrict
+    //       end-user in terms of how they assign/drop ref slots, for safety.
+
+    const _ym::LiteInternalRef& refSlot(_ym::Slots index) const noexcept;
+    void dropRefSlot(_ym::Slots index) noexcept;
+    void dropAllRefSlots() noexcept;
+    void assignRefSlot(_ym::Slots index, _ym::TempRef value) noexcept;
+    _ym::TempRef stealRefSlot(_ym::Slots index, bool frontendRef) noexcept;
+
+    inline void forEachRefSlotIndex(ym::Callable<void, _ym::Slots> auto&& visitor) const {
+        type->forEachRefSlotIndex(std::forward<decltype(visitor)>(visitor));
     }
-
-    Slot& slot(size_t index) noexcept;
-    const Slot& slot(size_t index) const noexcept;
-
-    bool isPrimitive() const noexcept;
-    bool isStruct() const noexcept;
-    bool isRegularStruct() const noexcept;
-    bool isProtocol() const noexcept;
-
-    // NOTE: Certain internal code expects is*** and to*** methods to operate
-    //       such that they require the object's type to be SPECIFICALLY the
-    //       primitive type in question (ie. no conversion should be required.)
-    //
-    //       To this end, when we add in things like frontend being able to
-    //       implicit convert an object into a primitive as part of querying
-    //       its value as a specific primitive type, the below methods should
-    //       NOT be where we impl this.
-
-    bool isNone() const noexcept;
-    bool isInt() const noexcept;
-    bool isUInt() const noexcept;
-    bool isFloat() const noexcept;
-    bool isBool() const noexcept;
-    bool isRune() const noexcept;
-    bool isType() const noexcept;
 
     std::optional<YmInt> toInt() const noexcept;
     std::optional<YmUInt> toUInt() const noexcept;
@@ -101,15 +79,14 @@ public:
     YmType* toType() const noexcept;
 
 
-    // Sets up a boxed value.
-    // Does not do anything to ref count of value.
-    // A ref count incr of value is stolen by the protocol value.
-    // Notice that ptable != nullptr is a valid ptable ptr in this context (ie. for yama:Any.)
-    void box(ym::Safe<YmObj> value, const ym::Safe<YmType>* ptable) noexcept;
+    // TODO: What does 'ptable != nullptr' below mean? I don't remember, lol.
 
-    // Queries the boxed value if this is a protocol value.
-    // Does not do anything to ref count of boxed value.
-    YmObj* boxed() const noexcept;
+    // Sets up a boxed value.
+    // Notice that ptable != nullptr is a valid ptable ptr in this context (ie. for yama:Any.)
+    void box(_ym::TempRef value, const ym::Safe<YmType>* ptable) noexcept;
+
+    // Returns borrowed ref to the boxed value.
+    _ym::TempRef boxed() const noexcept;
 
     // Queries the ptable if this is a protocol value.
     // Notice that nullptr is a valid ptable ptr in this context (ie. for yama:Any.)

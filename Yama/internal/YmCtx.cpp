@@ -12,18 +12,19 @@
 
 #include "../yama++/resources.h"
 #include "../yama++/print.h"
+#include "StkState.h"
 
 
 YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     domain(domain),
     loader(std::make_shared<_ym::CtxLoader>(domain->loader)),
+    _stk(this),
+    _objs(this, [this](YmUInt32 index) -> YmObj* { return _stk.global(index); }),
     _vars(*this) {
-    _beginUserPseudoCall();
 }
 
 YmCtx::~YmCtx() noexcept {
-    reset(); // Cleanup
-    _endCall(); // End user pseudo-call.
+    reset();
 }
 
 std::shared_ptr<YmParcel> YmCtx::import(const std::string& path) {
@@ -80,331 +81,123 @@ YmType& YmCtx::ldType() const noexcept {
     return loader->ldType();
 }
 
-YmObj* YmCtx::create(YmType& type) {
-    auto al = mas.allocator<int>();
-    ym::Safe result(_ym::ObjHAL::create(YmObj(*this, type), al));
-    result->refs.addRef();
-    ymAssert(result->refs.count() == 1);
-    _objects.insert(result);
-    return result;
-}
-
-#define _DUMP_REFCOUNT_CHANGES 0
-
-YmRefCount YmCtx::secure(YmObj& obj) {
-#if _DUMP_REFCOUNT_CHANGES
-    ym::println("-- YmCtx::secure {}: {} -> {}", (void*)&obj, obj.refs.count(), obj.refs.count() + 1);
-#endif
-    return obj.refs.addRef();
-}
-
-YmRefCount YmCtx::release(YmObj& obj) {
-#if _DUMP_REFCOUNT_CHANGES
-    ym::println("-- YmCtx::release {}: {} -> {}", (void*)&obj, obj.refs.count(), obj.refs.count() - 1);
-#endif
-    auto old = obj.refs.drop();
-    if (old == 1) {
-#if _DUMP_REFCOUNT_CHANGES
-        ym::println("-- YmCtx::release {}: Release!", (void*)&obj);
-#endif
-        obj.cleanup(); // Can't forget!
-        _objects.erase(&obj);
-        auto al = mas.allocator<int>();
-        _ym::ObjHAL::destroy(obj, al);
-    }
-    return old;
+void YmCtx::setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* user) noexcept {
+    _objs.setObjDestroyCallback(fn, user);
 }
 
 void YmCtx::reset() {
-    ymAssert(callStkHeight() == 1);
-    // End current user pseudo-call.
-    _endCall();
-    // Reset our vars.
+    ymAssert(isUser());
+    _stk.reset(); // Do this first.
+    _objs.reset();
     _vars.reset();
-    // Copy _objects and iterate over the copy as otherwise we'd be modifying
-    // objects as we iterate over it.
-    auto objects = _objects;
-    for (auto& object : objects) {
-        while (release(*object) > 1) {}
-    }
-    ymAssert(_objects.empty());
-    // Begin new user pseudo-call.
-    _beginUserPseudoCall();
 }
 
-ym::Safe<YmObj> YmCtx::newNone() {
-    return ym::Safe(create(loader->ldNone()));
+_ym::TempRef YmCtx::create(YmType& type, bool frontend) {
+    return _objs.create(type, frontend);
 }
 
-ym::Safe<YmObj> YmCtx::newInt(YmInt v) {
-    auto result = ym::Safe(create(loader->ldInt()));
-    result->slot(0).i = v;
-    return result;
+YmRefCount YmCtx::secure(YmObj& obj, bool frontend) {
+    return _objs.secure(obj, frontend);
 }
 
-ym::Safe<YmObj> YmCtx::newUInt(YmUInt v) {
-    auto result = ym::Safe(create(loader->ldUInt()));
-    result->slot(0).ui = v;
-    return result;
+YmRefCount YmCtx::release(YmObj& obj, bool frontend) {
+    return _objs.release(obj, frontend);
 }
 
-ym::Safe<YmObj> YmCtx::newFloat(YmFloat v) {
-    auto result = ym::Safe(create(loader->ldFloat()));
-    result->slot(0).f = v;
-    return result;
+_ym::TempRef YmCtx::newNone(bool frontendRef) {
+    return _objs.newNone(frontendRef);
 }
 
-ym::Safe<YmObj> YmCtx::newBool(YmBool v) {
-    auto result = ym::Safe(create(loader->ldBool()));
-    result->slot(0).b = v;
-    return result;
+_ym::TempRef YmCtx::newInt(YmInt v, bool frontendRef) {
+    return _objs.newInt(v, frontendRef);
 }
 
-ym::Safe<YmObj> YmCtx::newRune(YmRune v) {
-    auto result = ym::Safe(create(loader->ldRune()));
-    result->slot(0).r = _uint2rune((YmUInt)v);
-    return result;
+_ym::TempRef YmCtx::newUInt(YmUInt v, bool frontendRef) {
+    return _objs.newUInt(v, frontendRef);
 }
 
-ym::Safe<YmObj> YmCtx::newType(YmType& v) {
-    auto result = ym::Safe(create(loader->ldType()));
-    result->slot(0).type = &v;
-    return result;
+_ym::TempRef YmCtx::newFloat(YmFloat v, bool frontendRef) {
+    return _objs.newFloat(v, frontendRef);
 }
 
-YmObj* YmCtx::newDefault(YmType* type) {
-    if (!type) {
-        return nullptr;
-    }
-    auto& _type = ym::deref(type);
-    static_assert(YmKind_Num == 8);
-    if (_type.sameAs(ldNone()))         return newNone();
-    else if (_type.sameAs(ldInt()))     return newInt(0);
-    else if (_type.sameAs(ldUInt()))    return newUInt(0);
-    else if (_type.sameAs(ldFloat()))   return newFloat(0.0);
-    else if (_type.sameAs(ldBool()))    return newBool(YM_FALSE);
-    else if (_type.sameAs(ldRune()))    return newRune(U'\0');
-    else if (_type.sameAs(ldType()))    return newType(loader->ldNone());
-    else if (_type.isStruct() && _type.hasDefaultValue()) {
-        // TODO: Add ctor calls + handle panics.
-        return create(_type);
-    }
-    else {
-        ymAssert(!_type.hasDefaultValue());
-        _ym::Global::raiseErr(
-            YmErrCode_NoDefaultValue,
-            "{} has no default value!",
-            _type.fullname());
-        return nullptr;
-    }
+_ym::TempRef YmCtx::newBool(YmBool v, bool frontendRef) {
+    return _objs.newBool(v, frontendRef);
+}
+
+_ym::TempRef YmCtx::newRune(YmRune v, bool frontendRef) {
+    return _objs.newRune(v, frontendRef);
+}
+
+_ym::TempRef YmCtx::newType(YmType& v, bool frontendRef) {
+    return _objs.newType(v, frontendRef);
+}
+
+_ym::TempRef YmCtx::newDefault(YmType* type, bool frontendRef) {
+    return _objs.newDefault(type, frontendRef);
+}
+
+void YmCtx::gcCollect() {
+    _objs.gcCollect();
 }
 
 YmCallStackHeight YmCtx::callStkHeight() const noexcept {
-    return (YmCallStackHeight)_callStk.size();
+    return _stk.callStkHeight();
 }
 
 std::string YmCtx::fmtCallStk(YmCallStackHeight skip) const {
-    std::string result{};
-    result += std::format("Yama Stack Trace ({} frames)", callStkHeight() - std::min(skip, callStkHeight()));
-    YmCallStackHeight number = callStkHeight() - 1;
-    const auto begin = std::next(_callStk.crbegin(), std::min(skip, callStkHeight()));
-    const auto end = _callStk.crend();
-    for (auto it = begin; it != end; std::advance(it, 1)) {
-        const auto& frame = *it;
-        if (number >= 10) {
-            result +=
-                frame.fn
-                ? std::format("\n    [{}] {}", number, frame.fn->fullname())
-                : std::format("\n    [{}] <user>", number);
-        }
-        else {
-            result +=
-                frame.fn
-                ? std::format("\n    [0{}] {}", number, frame.fn->fullname())
-                : std::format("\n    [0{}] <user>", number);
-        }
-        // Check for symbol info, and if so, add it to result.
-        if (frame.fn) {
-            // TODO: Add when we add bcode.
-        }
-        number--;
-    }
-    return result;
+    return _stk.fmtCallStk(skip);
 }
 
 bool YmCtx::isUser() const noexcept {
-    return _callStk.size() == 1;
+    return _stk.isUser();
 }
 
 YmUInt16 YmCtx::args() const noexcept {
-    ymAssert(!_callStk.empty());
-    return _callStk.back().args();
+    return _stk.args();
 }
 
 YmLocals YmCtx::locals() const noexcept {
-    ymAssert(!_callStk.empty());
-    return YmLocals(_globalObjStk.size()) - _callStk.back().localsOffset;
+    return _stk.locals();
 }
 
-YmObj* YmCtx::arg(YmUInt16 which, YmRefPolicy returnPolicy) {
-    auto& cf = _callStk.back();
-    auto result =
-        which < args()
-        ? _globalObjStk[cf.argOffset(which).value()].get()
-        : nullptr;
-    // If current call is one forwarded from protocol method call, then that means that
-    // the first arg is the call object, which'll be a boxed value. In this circumstance,
-    // we specially need to return the unboxed call object, as that's the object the
-    // forwarded-to method call actually expects to be its call object.
-    if (result && which == 0 && cf.fwdFromProto) {
-        result = result->boxed();
-    }
-    if (result && returnPolicy != YM_BORROW) {
-        secure(*result);
-    }
-    return result;
+_ym::TempRef YmCtx::arg(YmUInt16 which) {
+    return _stk.arg(which);
 }
 
-bool YmCtx::setArg(YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy) {
-    if (newArg) {
-        if (isUser()) {
-            if (newArgPolicy == YM_TAKE) {
-                release(*newArg);
-            }
-            return false;
-        }
-        if (which >= args()) {
-            _ym::Global::raiseErr(
-                YmErrCode_ArgNotFound,
-                "Set arg failed; arg index {} out-of-bounds!",
-                which);
-            if (newArgPolicy == YM_TAKE) {
-                release(*newArg);
-            }
-            return false;
-        }
-        auto& cf = _callStk.back();
-        auto& target = _globalObjStk[cf.argOffset(which).value()];
-        // NOTE: It's theoretically possible that target == newArg. In that case, it's
-        //       important to incr newArg's ref count BEFORE releasing target's incr.
-        if (newArgPolicy == YM_BORROW) {
-            secure(*newArg);
-        }
-        release(*target);
-        target = *newArg;
-        return true;
-    }
-    return false;
+bool YmCtx::setArg(YmUInt16 which, _ym::TempRef newArg) {
+    return _stk.setArg(which, std::move(newArg));
 }
 
 YmType* YmCtx::ref(YmRef reference) {
-    auto& cf = _callStk.back();
-    return
-        cf.fn
-        ? cf.fn->ref(reference)
-        : nullptr;
+    return _stk.ref(reference);
 }
 
-YmObj* YmCtx::local(YmLocal where, YmRefPolicy returnPolicy) {
-    auto& cf = _callStk.back();
-    auto local = _absIndexForRead(where);
-    auto result =
-        local
-        ? _globalObjStk[cf.localOffset(*local)].get()
-        : nullptr;
-    if (result && returnPolicy != YM_BORROW) {
-        secure(*result);
-    }
-    return result;
+_ym::TempRef YmCtx::local(YmLocal where) {
+    return _stk.local(where);
 }
 
-YmObj* YmCtx::pull() noexcept {
-    if (auto result = local(-1)) {
-        _globalObjStk.pop_back();
-        return result;
-    }
-    else {
-        return nullptr;
-    }
+_ym::TempRef YmCtx::stealLocal(YmLocal where, bool frontendRef) {
+    return _stk.stealLocal(where, frontendRef);
 }
 
-void YmCtx::pop(YmLocals n, bool releaseObjs) {
-    if (n < 0) {
-        return;
-    }
-    if (n > locals()) {
-        n = locals();
-    }
-    if (releaseObjs) {
-        for (YmLocal i = 0; i < n; i++) {
-            release(ym::deref(pull()));
-        }
-    }
-    else {
-        // Can't use resize here as C++ doesn't know at compile-time if
-        // it'll grow/shrink vector, and growing can't happen due to ym::Safe
-        // not having a null value.
-        _globalObjStk.erase(std::prev(_globalObjStk.end(), n), _globalObjStk.end());
-    }
+_ym::TempRef YmCtx::pull(bool frontendRef) noexcept {
+    return _stk.pull(frontendRef);
 }
 
-bool YmCtx::put(YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {
-    if (!what) {
-        return false;
-    }
-    auto& _what = ym::deref(what);
-    if (where == YM_DISCARD) {
-        if (whatPolicy != YM_BORROW) {
-            release(_what);
-        }
-        return true;
-    }
-    if (where == YM_PUSH) {
-        _globalObjStk.push_back(_what);
-        if (whatPolicy == YM_BORROW) {
-            secure(_what);
-        }
-        return true;
-    }
-    if (auto whereAbs = _absIndex(where)) {
-        release(ym::deref(local(*whereAbs)));
-        auto& cf = _callStk.back();
-        _globalObjStk[cf.localOffset(*whereAbs)] = _what;
-        if (whatPolicy == YM_BORROW) {
-            secure(_what);
-        }
-        return true;
-    }
-    else {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Put failed; local object index {} out-of-bounds!",
-            where);
-        if (whatPolicy == YM_TAKE) {
-            release(_what);
-        }
-        return false;
-    }
+void YmCtx::pop(YmLocals n) {
+    _stk.pop(n);
+}
+
+bool YmCtx::put(YmLocal where, _ym::TempRef what) {
+    return _stk.put(where, std::move(what));
 }
 
 bool YmCtx::swap(YmLocal a, YmLocal b) {
-    auto aLocal = _absIndex(a);
-    auto bLocal = _absIndex(b);
-    if (aLocal && bLocal) {
-        auto& cf = _callStk.back();
-        std::swap(
-            _globalObjStk[cf.localOffset(*aLocal)],
-            _globalObjStk[cf.localOffset(*bLocal)]);
-        return true;
-    }
-    else {
-        // TODO: Maybe error msg?
-        return false;
-    }
+    return _stk.swap(a, b);
 }
 
 bool YmCtx::defaultInit(YmType* type, YmLocal where) {
-    return put(where, newDefault(type), YM_TAKE);
+    return put(where, newDefault(type, false));
 }
 
 bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
@@ -412,11 +205,7 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
         return false;
     }
     auto& _type = ym::deref(type);
-    if (!_absIndex(where)) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Struct init failed; local object index {} out-of-bounds!",
-            where);
+    if (!_stk.checkLocalIsInBounds(where, "Struct init failed")) {
         return false;
     }
     if (_type.kind() != YmKind_Struct) {
@@ -454,7 +243,7 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
             argNameCount);
         return false;
     }
-    const auto& storedProperties = _type.info->slots;
+    const auto& storedProperties = _type.slots();
     // TODO: We need to figure out how we'll handle the notion of a max number of
     //       stored properties, as right now we don't properly account for that.
     _ym::ArgPackInfo<> argPack(0, uint8_t(storedProperties));
@@ -501,49 +290,26 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
             "Struct init failed; not all stored properties specified!");
         return false;
     }
-    auto result = ym::Safe(create(_type));
+    auto result = create(_type, false);
     for (uint16_t storedPropertyInd = 0; storedPropertyInd < storedProperties; storedPropertyInd++) {
         // TODO: But what if storedProperties exceeds 8-bit max?
         uint8_t argOffset = argPack.argOffset(YmUInt8(storedPropertyInd), true).value();
-        auto arg = ym::Safe(local(locals() - YmLocals(argNameCount) + argOffset));
-        // Copy raw ptr of arg object over to result's slot, w/out incr object's
-        // ref count, as result's gonna *steal* arg objects from stack.
-        result->slot(storedPropertyInd) = YmObj::Slot{ .ref = arg };
+        YmLocal argInd = locals() - YmLocals(argNameCount) + argOffset;
+        // *Steal* the arg object's refs, putting them in the slots, nullifying InternalRef(s).
+        result->assignRefSlot(storedPropertyInd, stealLocal(argInd, false));
     }
-    // Pop arg objects w/out decr object ref counts such that result thus *steals*
-    // them from stack.
-    pop(argPack.specifiedArgs(), false);
-    put(where, result);
+    // Pop all the nullified InternalRef(s).
+    pop(argPack.specifiedArgs());
+    put(where, std::move(result));
     return true;
 }
 
 bool YmCtx::call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo) {
-    if (_beginCall(fn, argsN, argNames, returnTo)) {
-        _dispatchCall(fn);
-        return _endCall();
-    }
-    return false;
+    return _stk.call(fn, argsN, argNames, returnTo);
 }
 
-bool YmCtx::retObj(YmObj* what, YmRefPolicy whatPolicy) {
-    if (!what) {
-        return false;
-    }
-    if (isUser()) {
-        if (what && whatPolicy == YM_TAKE) {
-            release(*what);
-        }
-        return false;
-    }
-    ymAssert(!_callStk.empty());
-    if (_callStk.back().returnValue) {
-        release(*_callStk.back().returnValue);
-    }
-    _callStk.back().returnValue = what;
-    if (what && whatPolicy == YM_BORROW) {
-        secure(*what);
-    }
-    return true;
+bool YmCtx::retObj(_ym::TempRef what) {
+    return _stk.retObj(std::move(what));
 }
 
 bool YmCtx::getVar(YmType* varType, YmLocal where) {
@@ -558,15 +324,11 @@ bool YmCtx::getVar(YmType* varType, YmLocal where) {
             _varType.fullname());
         return false;
     }
-    if (!_absIndex(where)) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Var get failed; local object index {} out-of-bounds!",
-            where);
+    if (!_stk.checkLocalIsInBounds(where, "Var get failed")) {
         return false;
     }
     if (_varType.isStoredVarGet()) { // Stored
-        return put(where, _vars.pull(_varType, YM_TAKE), YM_TAKE);
+        return put(where, _vars.pull(_varType));
     }
     else { // Computed
         return call(varType, 0, "", where);
@@ -607,7 +369,7 @@ bool YmCtx::setVar(YmType* varType) {
         return false;
     }
     if (_varType.isStoredVarGet()) { // Stored
-        return _vars.push(_varType, pull(), YM_TAKE, true);
+        return _vars.push(_varType, pull(false), true);
     }
     else { // Computed
         return call(_varType.assigner(), 1, "", YM_DISCARD);
@@ -626,11 +388,7 @@ bool YmCtx::getProperty(YmType* propertyType, YmLocal where) {
             _propertyType.fullname());
         return false;
     }
-    if (!_absIndex(where)) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Property get failed; local object index {} out-of-bounds!",
-            where);
+    if (!_stk.checkLocalIsInBounds(where, "Property get failed")) {
         return false;
     }
     if (locals() == 0) {
@@ -649,10 +407,9 @@ bool YmCtx::getProperty(YmType* propertyType, YmLocal where) {
         return false;
     }
     if (_propertyType.isStoredPropertyGet()) { // Stored
-        auto result = ym::Safe(subject.slot(_propertyType.storedPropertySlot().value()).ref);
-        secure(*result);
+        auto result = subject.refSlot(_propertyType.storedPropertySlot().value()).take(false);
         pop(1);
-        put(where, result);
+        put(where, std::move(result));
         return true;
     }
     else { // Computed
@@ -712,13 +469,8 @@ bool YmCtx::setProperty(YmType* propertyType) {
         return false;
     }
     if (assigner.isStoredPropertySet()) { // Stored
-        auto& target = subject.slot(_propertyType.storedPropertySlot().value()).ref;
-        // Release slot's current ref.
-        release(ym::deref(target));
-        // Assign new ref, stealing it from stack.
-        target = pull();
-        // Pop subject.
-        pop(1);
+        subject.assignRefSlot(_propertyType.storedPropertySlot().value(), pull(false));
+        pop(1); // Pop subject.
         return true;
     }
     else { // Computed
@@ -726,12 +478,8 @@ bool YmCtx::setProperty(YmType* propertyType) {
     }
 }
 
-bool YmCtx::convert(YmType& type, YmLocal returnTo) {
-    if (!_absIndex(returnTo)) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Conversion failed; local object index {} out-of-bounds!",
-            returnTo);
+bool YmCtx::convert(YmType& type, YmLocal returnTo, bool coercion) {
+    if (!_stk.checkLocalIsInBounds(returnTo, "Conversion failed")) {
         return false;
     }
     if (locals() == 0) {
@@ -749,10 +497,18 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
             type.fullname());
         return false;
     }
+    if (coercion && ymType_Converts(input.type, &type, YM_TRUE) == YM_FALSE) {
+        _ym::Global::raiseErr(
+            YmErrCode_IllegalConversion,
+            "Conversion failed; {} -> {} is not implicit!",
+            input.type->fullname(),
+            type.fullname());
+        return false;
+    }
     auto inIsP = input.type->kind() == YmKind_Protocol;
     auto outIsP = type.kind() == YmKind_Protocol;
     if (input.type == &type) {
-        return put(returnTo, ym::Safe(pull()), YM_TAKE);
+        return put(returnTo, pull(false));
     }
     else if (&type == ymCtx_LdNone(this)) {
         pop(1);
@@ -760,10 +516,10 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
     }
     else if (!inIsP && outIsP) { // Box T -> P
         if (auto ptable = _ptables.load(type, *input.type)) {
-            auto protoVal = ym::Safe(create(type));
+            auto protoVal = create(type, false);
             // Transfer object into box (ie. moving ownership of it.)
-            protoVal->box(ym::Safe(pull()), *ptable);
-            return put(returnTo, protoVal, YM_TAKE);
+            protoVal->box(pull(false), *ptable);
+            return put(returnTo, std::move(protoVal));
         }
         else {
             _ym::Global::raiseErr(
@@ -784,20 +540,17 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
                 type.fullname());
             return false;
         }
-        auto old = ym::bindScoped(ym::Safe(pull())); // RAII
+        auto old = pull(false); // RAII
         // The old protocol value might be referenced elsewhere, so it's ref can't
         // be stolen from it, so we pass YM_BORROW to copy the ref.
-        return put(returnTo, old->boxed(), YM_BORROW);
+        return put(returnTo, old->boxed());
     }
     else if (inIsP && outIsP) { // P -> P
         if (auto ptable = _ptables.load(type, *input.boxed()->type)) {
-            auto old = ym::bindScoped(ym::Safe(pull())); // RAII
-            auto protoVal = ym::Safe(create(type));
-            // The old protocol value might be referenced elsewhere, so it's ref can't
-            // be stolen from it, so we add an incr for the new protocol value to own.
-            secure(*old->boxed());
-            protoVal->box(ym::Safe(old->boxed()), *ptable);
-            return put(returnTo, protoVal, YM_TAKE);
+            auto old = pull(false); // RAII
+            auto protoVal = create(type, false);
+            protoVal->box(old->boxed(), *ptable);
+            return put(returnTo, std::move(protoVal));
         }
         else {
             _ym::Global::raiseErr(
@@ -820,7 +573,7 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
         }
         else if (&type == ymCtx_LdRune(this)) {
             pop(1);
-            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+            return ymCtx_PutRune(this, returnTo, _ym::uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
@@ -835,7 +588,7 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
         }
         else if (&type == ymCtx_LdRune(this)) {
             pop(1);
-            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+            return ymCtx_PutRune(this, returnTo, _ym::uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
@@ -850,7 +603,7 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
         }
         else if (&type == ymCtx_LdRune(this)) {
             pop(1);
-            return ymCtx_PutRune(this, returnTo, _uint2rune((YmUInt)*v)) == YM_TRUE;
+            return ymCtx_PutRune(this, returnTo, _ym::uint2rune((YmUInt)*v)) == YM_TRUE;
         }
         else return false;
     }
@@ -888,216 +641,5 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo) {
             type.fullname());
         return false;
     }
-}
-
-void YmCtx::_beginUserPseudoCall() {
-    ymAssert(_callStk.empty());
-    _callStk.push_back(_CallFrame{
-        .fn = nullptr,
-        .returnTo = YmLocal{},
-        .localsOffset = 0,
-        });
-}
-
-bool YmCtx::_beginCall(YmType* fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo) {
-    if (!fn) {
-        return false;
-    }
-    auto& _fn = ym::deref(fn);
-    ymAssert(!_callStk.empty());
-    if (!_fn.isCallable()) {
-        _ym::Global::raiseErr(
-            YmErrCode_NonCallableType,
-            "Call to {} failed; {} is non-callable!",
-            _fn.fullname(),
-            _fn.fullname());
-        return false;
-    }
-    if (!_absIndex(returnTo)) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Call to {} failed; local object index {} out-of-bounds!",
-            _fn.fullname(),
-            returnTo);
-        return false;
-    }
-    if (YmLocals(args) > locals()) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Call to {} failed; {} args provided, but local object stack height is {}!",
-            _fn.fullname(),
-            args,
-            locals());
-        return false;
-    }
-    if (callStkHeight() == YM_MAX_CALL_STACK_HEIGHT) {
-        _ym::Global::raiseErr(
-            YmErrCode_CallStackOverflow,
-            "Call to {} failed; call stack overflow!",
-            _fn.fullname());
-        return false;
-    }
-    _ym::ArgPackInfo argPack(_fn);
-    for (const auto& it : argNames | std::views::split(',')) {
-        std::string_view argName(it.begin(), it.end());
-        // TODO: Optimize out this std::string heap alloc.
-        if (auto tparam = _fn.param((std::string)argName)) {
-            if (tparam->isPositional()) {
-                _ym::Global::raiseErr(
-                    YmErrCode_IllegalNameList,
-                    "Call to {} failed; {} is a positional param, not a named one!",
-                    _fn.fullname(),
-                    tparam->name());
-                return false;
-            }
-            if (!argPack.specifyNextNamedArg(tparam->index())) {
-                _ym::Global::raiseErr(
-                    YmErrCode_IllegalNameList,
-                    "Call to {} failed; named param {} specified multiple times!",
-                    _fn.fullname(),
-                    tparam->name());
-                return false;
-            }
-        }
-        else {
-            _ym::Global::raiseErr(
-                YmErrCode_IllegalNameList,
-                "Call to {} failed; unknown named param \"{}\"!",
-                _fn.fullname(),
-                (std::string)argName);
-            return false;
-        }
-    }
-    argPack.done(); // Don't forget!
-    if (args != argPack.specifiedArgs()) {
-        _ym::Global::raiseErr(
-            YmErrCode_CallProcedureError,
-            "Call to {} failed; {} args provided, but expected {}! ({} positional + {} named)",
-            _fn.fullname(),
-            args,
-            argPack.specifiedArgs(),
-            argPack.positionalArgs(),
-            argPack.namedArgs());
-        return false;
-    }
-    for (YmParamIndex param = 0; param < argPack.paramCount(); param++) {
-        // Quietly skip unspecified named args.
-        if (auto argOffset = argPack.argOffset(param, true)) {
-            auto t = ym::deref(local(locals() - args + *argOffset)).type;
-            if (auto p = _fn.param(param); !p->type().sameAs(t)) {
-                _ym::Global::raiseErr(
-                    YmErrCode_TypeMismatch,
-                    "Call to {} failed; arg #{} (for {} param {}) is {}, but expected {}!",
-                    _fn.fullname(),
-                    *argOffset + 1,
-                    p->isPositional() ? "positional" : "named",
-                    p->name(),
-                    t->fullname(),
-                    p->type().fullname());
-                return false;
-            }
-        }
-    }
-    // Append arg pack w/ dummy objects, then push call frame, and return.
-    for (YmParams i = 0; i < argPack.dummies(); i++) {
-        ymCtx_PutNone(this, YM_PUSH);
-    }
-    _callStk.push_back(_CallFrame{
-        .fn = &_fn,
-        .argPack = std::move(argPack),
-        .returnTo = returnTo,
-        .localsOffset = YmUInt32(_globalObjStk.size()),
-        });
-    return true;
-}
-
-bool YmCtx::_endCall() noexcept {
-    ymAssert(!_callStk.empty());
-    _CallFrame cf = _callStk.back();
-    pop(locals());
-    _callStk.pop_back();
-    if (!cf.fn) {
-        // This is user pseudo-call.
-        return true;
-    }
-    else if (!cf.returnValue) {
-        _ym::Global::raiseErr(
-            YmErrCode_CallProcedureError,
-            "Call to {} failed; didn't bind a return value!",
-            cf.fn->fullname());
-        pop(cf.dummies());
-        return false;
-    }
-    else if (cf.returnValue->type != cf.fn->returnType()) {
-        _ym::Global::raiseErr(
-            YmErrCode_CallProcedureError,
-            "Call to {} failed; returned {}, but expected {}!",
-            cf.fn->fullname(),
-            cf.returnValue->type->fullname(),
-            cf.fn->returnType()->fullname());
-        pop(cf.dummies());
-        release(*cf.returnValue);
-        return false;
-    }
-    else {
-        pop(cf.args());
-        return put(cf.returnTo, cf.returnValue);
-    }
-}
-
-void YmCtx::_dispatchCall(YmType* fn) {
-    if (!fn) {
-        return;
-    }
-    auto& _fn = ym::deref(fn);
-    auto& cf = _callStk.back();
-    if (_fn.isMethodReq()) { // Protocol Method Dispatch
-        // NOTE: Prior to changing fwdFromProto, arg(0) shouldn't see through boxing.
-        auto callobj = arg(0);
-        auto ptableInd = (uintptr_t)ym::deref(_fn.info->callBehaviour()).user;
-        auto forwardedTo = callobj->ptable()[ptableInd];
-        cf.fn = forwardedTo;
-        cf.fwdFromProto = true;
-        // If indirectly called method has named params, we gotta add proper number
-        // of dummies to cf.argPack, and we gotta push dummy objects for each.
-        if (auto named = forwardedTo->namedParams(); named >= 1) {
-            for (YmParams i = 0; i < named; i++) {
-                ymCtx_PutNone(this, YM_PUSH);
-            }
-            cf.argPack.addDummies(named);
-            cf.localsOffset += named;
-        }
-    }
-    auto& callBhvrInfo = ym::deref(cf.fn->info->callBehaviour());
-    callBhvrInfo.fn(this, fn, callBhvrInfo.user);
-}
-
-std::optional<YmLocal> YmCtx::_absIndex(YmLocal x) const noexcept {
-    if (x == YM_PUSH || x == YM_DISCARD) {
-        return x;
-    }
-    if (x >= locals()) {
-        return std::nullopt;
-    }
-    // The 'x < 0' part is to avoid the potential overflow related edge cases.
-    if (x < 0 && locals() + x < 0) {
-        return std::nullopt;
-    }
-    return
-        x >= 0
-        ? x
-        : locals() + x;
-}
-
-std::optional<YmLocal> YmCtx::_absIndexForRead(YmLocal x) const noexcept {
-    if (x == YM_PUSH || x == YM_DISCARD) {
-        return std::nullopt;
-    }
-    return _absIndex(x);
-}
-
-YmRune YmCtx::_uint2rune(YmUInt x) noexcept {
-    // TODO: Is there a bitwise trick we can use to avoid modulus?
-    return x % 0x110000;
 }
 

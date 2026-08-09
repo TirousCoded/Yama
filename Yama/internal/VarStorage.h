@@ -7,6 +7,8 @@
 
 #include "../yama/yama.h"
 
+#include "obj-ref-helpers.h"
+
 
 namespace _ym {
 
@@ -18,16 +20,16 @@ namespace _ym {
 		
 
 		bool isInit(YmType& varType) const noexcept;
-		YmObj* fetch(YmType& varType, YmRefPolicy returnPolicy) const noexcept;
-		YmObj* pull(YmType& varType, YmRefPolicy returnPolicy);
-		bool push(YmType& varType, YmObj* what, YmRefPolicy whatPolicy, bool initVar);
+		_ym::TempRef fetch(YmType& varType) const noexcept; // Returns borrowed ref.
+		_ym::TempRef pull(YmType& varType); // Returns borrowed ref.
+		bool push(YmType& varType, _ym::TempRef what, bool initVar);
 		void initialize(YmType& varType);
 		void reset() noexcept;
 
 
 	private:
 		YmCtx* _ctx;
-		std::unordered_map<const YmType*, YmObj*> _storage;
+		std::unordered_map<const YmType*, _ym::InternalRef> _storage;
 	};
 }
 

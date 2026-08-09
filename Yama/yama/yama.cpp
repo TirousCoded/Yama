@@ -121,19 +121,19 @@ void ymInertCallBhvrFn(YmCtx*, YmType*, void*) {
 
 YmDm* ymDm_Create(void) {
     auto result = new YmDm();
-    result->refs.addRef();
+    result->refs.secure();
     return result;
 }
 
 YmRefCount ymDm_Secure(YmDm* dm) {
-    return dm ? Safe(dm)->refs.addRef() : 0;
+    return dm ? Safe(dm)->refs.secure() : 0;
 }
 
 YmRefCount ymDm_Release(YmDm* dm) {
     if (!dm) {
         return 0;
     }
-    auto old = Safe(dm)->refs.drop();
+    auto old = Safe(dm)->refs.release();
     if (old == 1) {
         delete Safe(dm).get();
     }
@@ -159,19 +159,19 @@ size_t ymDm_ForEachParcel(YmDm* dm, YmForEachParcelCallbackFn callback, void* us
 
 YmCtx* ymCtx_Create(YmDm* dm) {
     auto result = new YmCtx(Safe(dm));
-    result->refs.addRef();
+    result->refs.secure();
     return result;
 }
 
 YmRefCount ymCtx_Secure(YmCtx* ctx) {
-    return ctx ? Safe(ctx)->refs.addRef() : 0;
+    return ctx ? Safe(ctx)->refs.secure() : 0;
 }
 
 YmRefCount ymCtx_Release(YmCtx* ctx) {
     if (!ctx) {
         return 0;
     }
-    auto old = Safe(ctx)->refs.drop();
+    auto old = Safe(ctx)->refs.release();
     if (old == 1) {
         delete Safe(ctx).get();
     }
@@ -225,56 +225,40 @@ YmType* ymCtx_LdType(YmCtx* ctx) {
     return &Safe(ctx)->loader->ldType();
 }
 
-void ymCtx_NaturalizeParcel(YmCtx* ctx, YmParcel* parcel) {
-    assertSafe(ctx);
-    assertSafe(parcel);
-    // TODO
+void ymCtx_SetObjDestroyCallback(YmCtx* ctx, YmObjDestroyCallbackFn fn, void* user) {
+    Safe(ctx)->setObjDestroyCallback(fn, user);
 }
 
-void ymCtx_NaturalizeType(YmCtx* ctx, YmType* type) {
-    assertSafe(ctx);
-    assertSafe(type);
-    // TODO
-}
-
-void ymCtx_Panic(YmCtx* ctx, const YmChar* fmt, ...) {
-    // TODO
-}
-
-void ymCtx_Recover(YmCtx* ctx) {
-    // TODO
-}
-
-const YmChar* ymCtx_GetPanic(YmCtx* ctx) {
-    return nullptr;
+void ymCtx_GCCollect(YmCtx* ctx) {
+    Safe(ctx)->gcCollect();
 }
 
 YmObj* ymCtx_NewNone(YmCtx* ctx) {
-    return Safe(ctx)->newNone();
+    return Safe(ctx)->newNone(true).consume();
 }
 
 YmObj* ymCtx_NewInt(YmCtx* ctx, YmInt v) {
-    return Safe(ctx)->newInt(v);
+    return Safe(ctx)->newInt(v, true).consume();
 }
 
 YmObj* ymCtx_NewUInt(YmCtx* ctx, YmUInt v) {
-    return Safe(ctx)->newUInt(v);
+    return Safe(ctx)->newUInt(v, true).consume();
 }
 
 YmObj* ymCtx_NewFloat(YmCtx* ctx, YmFloat v) {
-    return Safe(ctx)->newFloat(v);
+    return Safe(ctx)->newFloat(v, true).consume();
 }
 
 YmObj* ymCtx_NewBool(YmCtx* ctx, YmBool v) {
-    return Safe(ctx)->newBool(v);
+    return Safe(ctx)->newBool(v, true).consume();
 }
 
 YmObj* ymCtx_NewRune(YmCtx* ctx, YmRune v) {
-    return Safe(ctx)->newRune(v);
+    return Safe(ctx)->newRune(v, true).consume();
 }
 
 YmObj* ymCtx_NewType(YmCtx* ctx, YmType* v) {
-    return Safe(ctx)->newType(deref(v));
+    return Safe(ctx)->newType(deref(v), true).consume();
 }
 
 YmCallStackHeight ymCtx_CallStackHeight(YmCtx* ctx) {
@@ -291,11 +275,11 @@ YmUInt16 ymCtx_Args(YmCtx* ctx) {
 }
 
 YmObj* ymCtx_Arg(YmCtx* ctx, YmUInt16 which, YmRefPolicy returnPolicy) {
-    return Safe(ctx)->arg(which, returnPolicy);
+    return _ym::TempRef::borrowOrTake(Safe(ctx)->arg(which), true, true, returnPolicy).consume();
 }
 
 YmBool ymCtx_SetArg(YmCtx* ctx, YmUInt16 which, YmObj* newArg, YmRefPolicy newArgPolicy) {
-    return Safe(ctx)->setArg(which, newArg, newArgPolicy);
+    return Safe(ctx)->setArg(which, _ym::TempRef(newArg, newArgPolicy, true));
 }
 
 YmType* ymCtx_Ref(YmCtx* ctx, YmRef reference) {
@@ -307,7 +291,7 @@ YmLocals ymCtx_Locals(YmCtx* ctx) {
 }
 
 YmObj* ymCtx_Local(YmCtx* ctx, YmLocal where, YmRefPolicy returnPolicy) {
-    return Safe(ctx)->local(where, returnPolicy);
+    return _ym::TempRef::borrowOrTake(Safe(ctx)->local(where), true, true, returnPolicy).consume();
 }
 
 void ymCtx_Pop(YmCtx* ctx, YmLocals n) {
@@ -319,7 +303,7 @@ void ymCtx_PopAll(YmCtx* ctx) {
 }
 
 YmObj* ymCtx_Pull(YmCtx* ctx) {
-    return Safe(ctx)->pull();
+    return Safe(ctx)->pull(true).consume();
 }
 
 YmBool ymCtx_Copy(YmCtx* ctx, YmLocal from, YmLocal to) {
@@ -327,7 +311,7 @@ YmBool ymCtx_Copy(YmCtx* ctx, YmLocal from, YmLocal to) {
 }
 
 YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {
-    return Safe(ctx)->put(where, what, whatPolicy);
+    return Safe(ctx)->put(where, _ym::TempRef(what, whatPolicy, true));
 }
 
 YmBool ymCtx_PutNone(YmCtx* ctx, YmLocal where) {
@@ -358,6 +342,10 @@ YmBool ymCtx_PutType(YmCtx* ctx, YmLocal where, YmType* v) {
     return ymCtx_Put(ctx, where, ymCtx_NewType(ctx, v), YM_TAKE);
 }
 
+YmBool ymCtx_Swap(YmCtx* ctx, YmLocal a, YmLocal b) {
+    return Safe(ctx)->swap(a, b);
+}
+
 YmBool ymCtx_DefaultInit(YmCtx* ctx, YmType* type, YmLocal where) {
     return Safe(ctx)->defaultInit(type, where);
 }
@@ -371,11 +359,11 @@ YmBool ymCtx_Call(YmCtx* ctx, YmType* fn, YmUInt16 argsN, const YmChar* argNames
 }
 
 void ymCtx_RetObj(YmCtx* ctx, YmObj* what, YmRefPolicy whatPolicy) {
-    Safe(ctx)->retObj(what, whatPolicy);
+    Safe(ctx)->retObj(_ym::TempRef(what, whatPolicy, true));
 }
 
 void ymCtx_Ret(YmCtx* ctx) {
-    ymCtx_RetObj(ctx, ymCtx_Pull(ctx), YM_TAKE);
+    Safe(ctx)->retObj(Safe(ctx)->pull(false));
 }
 
 YmBool ymCtx_GetVar(YmCtx* ctx, YmType* varType, YmLocal where) {
@@ -395,24 +383,28 @@ YmBool ymCtx_SetProperty(YmCtx* ctx, YmType* property) {
 }
 
 YmBool ymCtx_Convert(YmCtx* ctx, YmType* type, YmLocal returnTo) {
-    return Safe(ctx)->convert(deref(type), returnTo);
+    return Safe(ctx)->convert(deref(type), returnTo, false);
+}
+
+YmBool ymCtx_Coerce(YmCtx* ctx, YmType* type, YmLocal returnTo) {
+    return Safe(ctx)->convert(deref(type), returnTo, true);
 }
 
 YmParcelDef* ymParcelDef_Create(void) {
     auto result = new YmParcelDef();
-    result->refs.addRef();
+    result->refs.secure();
     return result;
 }
 
 YmRefCount ymParcelDef_Secure(YmParcelDef* parceldef) {
-    return parceldef ? Safe(parceldef)->refs.addRef() : 0;
+    return parceldef ? Safe(parceldef)->refs.secure() : 0;
 }
 
 YmRefCount ymParcelDef_Release(YmParcelDef* parceldef) {
     if (!parceldef) {
         return 0;
     }
-    auto old = Safe(parceldef)->refs.drop();
+    auto old = Safe(parceldef)->refs.release();
     if (old == 1) {
         delete Safe(parceldef).get();
     }
@@ -756,15 +748,15 @@ YmBool ymType_Converts(YmType* from, YmType* to, YmBool coercion) {
 }
 
 YmRefCount ymObj_Secure(YmObj* obj) {
-    return obj ? Safe(obj)->ctx->secure(deref(obj)) : 0;
+    return obj ? Safe(obj)->ctx->secure(deref(obj), true) : 0;
 }
 
 YmRefCount ymObj_Release(YmObj* obj) {
-    return obj ? Safe(obj)->ctx->release(deref(obj)) : 0;
+    return obj ? Safe(obj)->ctx->release(deref(obj), true) : 0;
 }
 
 YmRefCount ymObj_RefCount(YmObj* obj) {
-    return obj ? Safe(obj)->refs.count() : 0;
+    return obj ? Safe(obj)->refs.total() : 0;
 }
 
 YmType* ymObj_Type(YmObj* obj) {
@@ -773,14 +765,17 @@ YmType* ymObj_Type(YmObj* obj) {
 
 const YmChar* ymObj_Fmt(YmObj* obj) {
     auto _obj = Safe(obj);
-    if (_obj->isNone())         return mkCStr("n/a");
-    else if (_obj->isInt())     return ymInt_Fmt(_obj->toInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
-    else if (_obj->isUInt())    return ymUInt_Fmt(_obj->toUInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
-    else if (_obj->isFloat())   return ymFloat_Fmt(_obj->toFloat().value(), nullptr);
-    else if (_obj->isBool())    return mkCStr(ymBool_Fmt(_obj->toBool().value()));
-    else if (_obj->isRune())    return ymRune_Fmt(_obj->toRune().value(), YM_TRUE, YM_TRUE, YM_TRUE, YM_TRUE, nullptr);
-    else if (_obj->isType())    return ymType_Fullname(_obj->toType());
-    else                        YM_DEADEND;
+    static_assert(YmKind_Num == 8);
+    if (_obj->type->isNone())           return mkCStr("n/a");
+    else if (_obj->type->isInt())       return ymInt_Fmt(_obj->toInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
+    else if (_obj->type->isUInt())      return ymUInt_Fmt(_obj->toUInt().value(), YM_TRUE, YmIntFmt_Dec, nullptr);
+    else if (_obj->type->isFloat())     return ymFloat_Fmt(_obj->toFloat().value(), nullptr);
+    else if (_obj->type->isBool())      return mkCStr(ymBool_Fmt(_obj->toBool().value()));
+    else if (_obj->type->isRune())      return ymRune_Fmt(_obj->toRune().value(), YM_TRUE, YM_TRUE, YM_TRUE, YM_TRUE, nullptr);
+    else if (_obj->type->isType())      return ymType_Fullname(_obj->toType());
+    else if (_obj->type->isStruct())    return mkCStr("n/a");
+    else if (_obj->type->isProtocol())  return Safe(ymObj_Fmt(_obj->boxed())); // TODO: Maybe change later.
+    else                                YM_DEADEND;
     return nullptr;
 }
 

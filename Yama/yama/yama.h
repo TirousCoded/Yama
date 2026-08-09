@@ -797,40 +797,27 @@ extern "C" {
     /*   - type is invalid. */
     void ymCtx_NaturalizeType(struct YmCtx* ctx, struct YmType* type);
 
-    /* TODO: When we add finalizers, we'll need to account for the fact that they can arise from, for
-    *        example, API fns like ymCtx_NewInt. This means that we'd likely be best to do something
-    *        like having finalizer calls behave as 'try-calls', meaning that panics arising therein
-    *        do not propagate outside the finalizer call.
-    *           * Still not 100% sure about this, but w/ finalizers being something where a Javascript
-    *             cross-compilation of Yama would likely have them flat-out disabled, this seems like
-    *             a reasonable compromise to me.
-    *           * If we do this, perhaps it'd be best to let end-user bind a special finalizer panic
-    *             handler callback to let them do something in response to a finalizer panicking.
-    */
-    /* TODO: Also, when we add things like finalizers, we'll need unit tests for things like context
-    *        deinitialization/reset, w/ these testing that finalization behaviour is observed for all
-    *        existing objects at the point of deinit/reset to confirm their destruction.
-    */
-    /* TODO: When we add panicking, we'll need to update API fns which can invoke Yama code and panic,
-    *        so that their doc comments describe this and tell end-user to check for panic.
-    */
-    /* TODO: Finish adding panic stuff later.
+    /* A callback function called each time an object is destroyed. */
+    /* This gets called immediately before the obj pointer is invalidated. */
+    /* This cannot be used for object resurrection. */
+    typedef void(*YmObjDestroyCallbackFn)(struct YmObj* obj, void* user);
+
+    /* TODO: ymCtx_SetObjDestroyCallback hasn't been unit tested.
     */
 
-    /* TODO: For ABI, maybe it's better not to use C variadics here.
+    /* Sets the callback called whenever ctx destroys an object. */
+    /* callback == YM_NIL unsets the callback. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    void ymCtx_SetObjDestroyCallback(struct YmCtx* ctx, YmObjDestroyCallbackFn fn, void* user);
+
+    /* TODO: ymCtx_GCCollect hasn't been unit tested.
     */
 
-    /* TODO */
-    void ymCtx_Panic(struct YmCtx* ctx, const YmChar* fmt, ...);
-
-    /* TODO */
-    void ymCtx_Recover(struct YmCtx* ctx);
-
-    /* TODO: This'll both check for panic, and query error msg.
-    */
-
-    /* TODO */
-    const YmChar* ymCtx_GetPanic(struct YmCtx* ctx);
+    /* Forces GC collection cycle to run, or an ongoing one to finish. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    void ymCtx_GCCollect(struct YmCtx* ctx);
 
     /* TODO: Right now we're having an issue where it's not clear what should go into
     *        ymCtx_*** and what into ymObj_***.
@@ -1034,6 +1021,20 @@ extern "C" {
     YmBool ymCtx_PutRune(struct YmCtx* ctx, YmLocal where, YmRune v);
     YmBool ymCtx_PutType(struct YmCtx* ctx, YmLocal where, struct YmType* v);
 
+    /* TODO: Also, do we have proper tests/docs for API fns w/ regards to YmLocal params
+    *        which CANNOT be YM_[PUSH|DISCARD]?
+    */
+    /* TODO: ymCtx_Swap hasn't been unit tested.
+    */
+
+    /* Swaps the contents of locals a and b, returning if successful. */
+    /* Failure: */
+    /*   - a is out-of-bounds. */
+    /*   - b is out-of-bounds. */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    YmBool ymCtx_Swap(struct YmCtx* ctx, YmLocal a, YmLocal b);
+
     /* TODO: Below, 'default value' encapsulates a notion which encompasses both default initialized
     *        objects via ctors, and other default init processes which don't involve this usual way.
     */
@@ -1149,6 +1150,70 @@ extern "C" {
     /*   - ctx is invalid. */
     void ymCtx_Ret(struct YmCtx* ctx);
 
+    /* TODO: When we add finalizers, we'll need to account for the fact that they can arise from, for
+    *        example, API fns like ymCtx_NewInt. This means that we'd likely be best to do something
+    *        like having finalizer calls behave as 'try-calls', meaning that panics arising therein
+    *        do not propagate outside the finalizer call.
+    *           * Still not 100% sure about this, but w/ finalizers being something where a Javascript
+    *             cross-compilation of Yama would likely have them flat-out disabled, this seems like
+    *             a reasonable compromise to me.
+    *           * If we do this, perhaps it'd be best to let end-user bind a special finalizer panic
+    *             handler callback to let them do something in response to a finalizer panicking.
+    *
+    *        Also, when we add things like finalizers, we'll need unit tests for things like context
+    *        deinitialization/reset, w/ these testing that finalization behaviour is observed for all
+    *        existing objects at the point of deinit/reset to confirm their destruction.
+    */
+    /* TODO: When we add defer/errdefer behaviour, we'll need to unit test when a fn panics w/ a certain
+    *        error obj, and it has defer/errdefer which panic w/ others, w/ the test ensuring that the
+    *        ladder panics do not overwrite the former after the defer/errdefer calls finish.
+    */
+    /* TODO: Right now we'll let ANY object be used as error objects. Later on, however, we should
+    *        restrict it so that only objects which conform to a 'yama:Error' protocol (which'll have
+    *        a method for getting an error msg) can be used for this.
+    * 
+    *        For objects which aren't yama:Error, maybe have a yama:ErrorProxy which can box non-yama:Error
+    *        objects so that ymCtx_Panic[Obj] can accept them too.
+    *           * Alternatively, we could replace yama:Error w/ something else (not sure what.)
+    */
+
+    /* NOTE: The way Yama errors work at the C API level is that fns like ymCtx_Call operate as Yama
+    *        language 'try-calls', meaning that they effectively *catch* whatever panic error occurs
+    *        during their execution, and likewise recover from it.
+    * 
+    *        The way that error propagation works is that while by default errors are immediately
+    *        recovered from, the end-user can 'propagate' errors, meaning that whatever the last
+    *        panic's error was becomes the error for the current fn call.
+    * 
+    *        Fn calls have two bound errors: (1) the error of the last downstream call, and (2) the
+    *        error for that fn call itself (ie. if this one is bound, the fn is panicking.)
+    */
+
+    /* TODO */
+    void ymCtx_PanicObj(struct YmCtx* ctx, struct YmObj* error, YmRefPolicy errorPolicy);
+
+    /* StkFx: error -- */
+    /* TODO */
+    void ymCtx_Panic(struct YmCtx* ctx);
+
+    /* TODO */
+    void ymCtx_PropagatePanic(struct YmCtx* ctx);
+
+    /* TODO: autopropagate means that the panic being explicitly forwarded is done
+    *        automatically if one is detected.
+    *
+    *        I'm not 100% sure yet, but one idea is to have panics be implicitly
+    *        'recovered from' when ymCtx_Call returns, w/ end-user having to explicitly
+    *        'propagate' the panic for the outer call to itself panic.
+    *           * This also has the benefit of having the top-level of the call stack
+    *             not have to have the concept of being able to crash.
+    *           * This also has the benefit of not having to worry about what should
+    *             happen if API fns are used while the system is panicking.
+    */
+
+    /* TODO */
+    struct YmObj* ymCtx_CheckPanic(struct YmCtx* ctx, YmBool autopropagate, YmRefPolicy returnPolicy);
+
     /* TODO: Should below init behaviour tests be more comprehensive due to how init behaviour
     *        is not a real Yama fn ymCtx_Call, and so may not be appropriate to summarize?
     */
@@ -1216,8 +1281,8 @@ extern "C" {
     *        distinction from ymCtx_Convert, which thus always explicitly converts.
     */
 
-    /* StkFx: top -- result */
-    /* Converts top object to type, returning if successful. */
+    /* StkFx: top -- result->returnTo */
+    /* Converts top to type, returning if successful. */
     /* Failure: */
     /*   - returnTo is out-of-bounds. */
     /*   - Object stack is empty. */
@@ -1226,6 +1291,21 @@ extern "C" {
     /*   - ctx is invalid. */
     /*   - type is invalid. */
     YmBool ymCtx_Convert(struct YmCtx* ctx, struct YmType* type, YmLocal returnTo);
+
+    /* TODO: ymCtx_Coerce hasn't been unit tested.
+    */
+
+    /* StkFx: top -- result->returnTo */
+    /* Coerces top to type, returning if successful. */
+    /* Failure: */
+    /*   - returnTo is out-of-bounds. (UNTESTED) */
+    /*   - Object stack is empty. (UNTESTED) */
+    /*   - The conversion is illegal. (UNTESTED) */
+    /*   - The conversion is not implicit. (UNTESTED) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    /*   - type is invalid. */
+    YmBool ymCtx_Coerce(struct YmCtx* ctx, struct YmType* type, YmLocal returnTo);
 
 
     /* Parcel Def. API */
@@ -1747,6 +1827,10 @@ extern "C" {
     /* Failure: */
     /*   - obj == YM_NIL. (Quiet) (UNTESTED) */
     YmRefCount ymObj_Release(struct YmObj* obj);
+
+    /* TODO: Currently, ymObj_RefCount return value includes backend refs, which we may want
+    *        to instead exclude, so as to not leak impl details.
+    */
 
     /* Returns the ref count of object obj, or 0. */
     /* Failure: */

@@ -39,6 +39,7 @@ namespace ym {
 
             inline YmCallStackHeight height() const noexcept { return ymCtx_CallStackHeight(_ctx); }
             inline std::string fmt(YmCallStackHeight skip = 0) const {
+                // TODO: Figure out how to remove this extra round of heap alloc.
                 auto temp = ym::Safe(ymCtx_FmtCallStack(_ctx, skip));
                 std::string result(temp);
                 // TODO: This cleanup won't occur if any above throws.
@@ -234,6 +235,13 @@ namespace ym {
         }
         inline bool setProperty(const std::optional<Type>& property) noexcept {
             return property && setProperty(*property);
+        }
+
+        inline bool convert(const Type& type, YmLocal returnTo = YM_PUSH) noexcept {
+            return ymCtx_Convert(get(), type.get(), returnTo) == YM_TRUE;
+        }
+        inline bool coerce(const Type& type, YmLocal returnTo = YM_PUSH) noexcept {
+            return ymCtx_Coerce(get(), type.get(), returnTo) == YM_TRUE;
         }
     };
 }

@@ -64,27 +64,27 @@ void _ym::methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user) {
 }
 
 void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
-    ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
+    ctx->put(YM_PUSH, ctx->arg(0));
     ctx->getProperty(type, YM_PUSH);
-    ctx->retObj(ctx->pull());
+    ctx->retObj(ctx->pull(false));
 }
 
 void _ym::storedPropertySetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
-    ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
-    ctx->put(YM_PUSH, ctx->arg(1), YM_BORROW);
+    ctx->put(YM_PUSH, ctx->arg(0));
+    ctx->put(YM_PUSH, ctx->arg(1));
     ctx->setProperty(type->assignee());
-    ctx->retObj(ctx->newNone());
+    ctx->retObj(ctx->newNone(false));
 }
 
 void _ym::storedVarGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->getVar(type, YM_PUSH);
-    ctx->retObj(ctx->pull());
+    ctx->retObj(ctx->pull(false));
 }
 
 void _ym::storedVarSetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
-    ctx->put(YM_PUSH, ctx->arg(0), YM_BORROW);
+    ctx->put(YM_PUSH, ctx->arg(0));
     ctx->setVar(type->assignee());
-    ctx->retObj(ctx->newNone());
+    ctx->retObj(ctx->newNone(false));
 }
 
 _ym::TypeInfo::TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localName) :
@@ -111,6 +111,10 @@ YmKind _ym::TypeInfo::kind() const noexcept {
 
 const std::string& _ym::TypeInfo::localName() const noexcept {
     return _localName;
+}
+
+bool _ym::TypeInfo::isRefCarrier() const noexcept {
+    return _ym::isRefCarrier(kindEx(), slots());
 }
 
 bool _ym::TypeInfo::isRegular() const noexcept {
@@ -170,7 +174,7 @@ bool _ym::TypeInfo::hasDefaultValue() const noexcept {
         return true;
     }
     else if (isRegularStruct()) {
-        return slots == 0;
+        return slots() == 0;
     }
     else return false;
 }
@@ -432,21 +436,35 @@ std::optional<_ym::ConstIndex> _ym::TypeInfo::initializerConst() const noexcept 
         : std::nullopt;
 }
 
-std::optional<YmUInt16> _ym::TypeInfo::storedPropertySlot() const noexcept {
+_ym::Slots _ym::TypeInfo::slots() const noexcept {
+    return slotsOf(kindEx()).value_or(_slots);
+}
+
+bool _ym::TypeInfo::checkIsRefSlot(Slots index) const noexcept {
+    bool result = false;
+    forEachRefSlotIndex([&result, &index](Slots i) {
+        if (i == index) result = true;
+        });
+    return result;
+}
+
+std::optional<_ym::Slots> _ym::TypeInfo::storedPropertySlot() const noexcept {
     return
         _call
         ? std::make_optional(_call->slot)
         : std::nullopt;
 }
 
-uint16_t _ym::TypeInfo::nextSlot() noexcept {
-    ymAssert(slots < decltype(slots)(-1));
-    slots++;
-    return slots - 1;
+_ym::Slots _ym::TypeInfo::nextSlot() noexcept {
+    ymAssert(!slotsOf(kindEx()).has_value());
+    ymAssert(slots() < decltype(slots())(-1));
+    _slots++;
+    return _slots - 1;
 }
 
-void _ym::TypeInfo::unwindSlots(uint16_t n) noexcept {
-    slots -= (n <= slots) ? n : slots;
+void _ym::TypeInfo::unwindSlots(Slots n) noexcept {
+    ymAssert(!slotsOf(kindEx()).has_value());
+    _slots -= (n <= _slots) ? n : _slots;
 }
 
 std::optional<YmTypeParamIndex> _ym::TypeInfo::addTypeParam(std::string name, std::string constraintTypeSymbol) {
@@ -542,7 +560,7 @@ std::optional<size_t> _ym::TypeInfo::uncheckedRefOpt(std::string normalizedSymbo
 bool _ym::TypeInfo::setupCall(
     CallBhvrCallbackInfo callBehaviour,
     const std::string& returnTypeSymbol,
-    YmUInt16 slot,
+    Slots slot,
     bool hasAssigner) {
     ymAssert(hasCallSig());
     auto returnType = checkedRef(returnTypeSymbol);
@@ -628,7 +646,7 @@ void _ym::TypeInfo::_initCall(
     CallBhvrCallbackInfo callBehaviour,
     std::optional<ConstIndex> assignerConst,
     ConstIndex returnTypeConst,
-    YmUInt16 slot) {
+    Slots slot) {
     if (!_call) {
         _call = std::unique_ptr<_Call>(new _Call{
             .callBehaviour = callBehaviour,

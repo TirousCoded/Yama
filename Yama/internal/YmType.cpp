@@ -29,6 +29,10 @@ const std::string& YmType::localName() const noexcept {
     return info->localName();
 }
 
+bool YmType::isRefCarrier() const noexcept {
+    return info->isRefCarrier();
+}
+
 bool YmType::isRegular() const noexcept {
     return info->isRegular();
 }
@@ -338,7 +342,15 @@ YmType* YmType::initializer() const noexcept {
     return constAsRef(info->initializerConst());
 }
 
-std::optional<YmUInt16> YmType::storedPropertySlot() const noexcept {
+_ym::Slots YmType::slots() const noexcept {
+    return info->slots();
+}
+
+bool YmType::checkIsRefSlot(_ym::Slots index) const noexcept {
+    return info->checkIsRefSlot(index);
+}
+
+std::optional<_ym::Slots> YmType::storedPropertySlot() const noexcept {
     return info->storedPropertySlot();
 }
 

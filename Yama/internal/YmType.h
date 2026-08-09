@@ -130,6 +130,8 @@ public:
     const _ym::Spec& fullname() const noexcept;
     const std::string& localName() const noexcept;
 
+    bool isRefCarrier() const noexcept;
+
     bool isRegular() const noexcept;
     bool isIrregular() const noexcept;
     bool isPrimitive() const noexcept;
@@ -221,7 +223,12 @@ public:
     YmType* assigner() const noexcept;
     YmType* initializer() const noexcept;
 
-    std::optional<YmUInt16> storedPropertySlot() const noexcept;
+    _ym::Slots slots() const noexcept;
+    inline void forEachRefSlotIndex(ym::Callable<void, _ym::Slots> auto&& visitor) const {
+        info->forEachRefSlotIndex(std::forward<decltype(visitor)>(visitor));
+    }
+    bool checkIsRefSlot(_ym::Slots index) const noexcept;
+    std::optional<_ym::Slots> storedPropertySlot() const noexcept;
 
     YmType* ref(YmRef reference) const noexcept;
     bool depends(ym::Safe<YmType> other) const noexcept;

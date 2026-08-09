@@ -62,7 +62,6 @@ namespace _ym {
         };
 
 
-        uint16_t slots = 0;
         ConstTableInfo consts;
         std::vector<ConstIndex> refs;
 
@@ -74,6 +73,8 @@ namespace _ym {
         KindEx kindEx() const noexcept;
         YmKind kind() const noexcept;
         const std::string& localName() const noexcept;
+
+        bool isRefCarrier() const noexcept;
 
         bool isRegular() const noexcept;
         bool isIrregular() const noexcept;
@@ -165,11 +166,17 @@ namespace _ym {
         std::optional<ConstIndex> assignerConst() const noexcept;
         std::optional<ConstIndex> initializerConst() const noexcept;
 
-        std::optional<YmUInt16> storedPropertySlot() const noexcept;
+        Slots slots() const noexcept;
+        inline void forEachRefSlotIndex(ym::Callable<void, Slots> auto&& visitor) const {
+            forEachRefSlotIndexOf(kindEx(), slots(), std::forward<decltype(visitor)>(visitor));
+        }
+        bool checkIsRefSlot(Slots index) const noexcept;
+        std::optional<Slots> storedPropertySlot() const noexcept;
 
-        uint16_t nextSlot() noexcept;
+
+        Slots nextSlot() noexcept;
         // Unwinds nextSlot incrs.
-        void unwindSlots(uint16_t n = 1) noexcept;
+        void unwindSlots(Slots n = 1) noexcept;
 
         std::optional<YmTypeParamIndex> addTypeParam(std::string name, std::string constraintTypeSymbol);
         std::optional<YmParamIndex> addParam(std::string name, std::string paramTypeSymbol, bool skipHasCallSigCheck = false);
@@ -191,7 +198,7 @@ namespace _ym {
         bool setupCall(
             CallBhvrCallbackInfo callBehaviour,
             const std::string& returnTypeSymbol,
-            YmUInt16 slot,
+            Slots slot,
             bool hasAssigner);
         bool setupVar(
             bool hasInitializer);
@@ -240,7 +247,7 @@ namespace _ym {
             std::vector<Param> params;
             YmParams positionalParamsN = 0;
             bool definingNamed = false;
-            YmUInt16 slot = -1;
+            Slots slot = -1;
 
 
             YmParams count() const noexcept;
@@ -263,6 +270,7 @@ namespace _ym {
         ParcelInfo* _parcel;
         KindEx _k;
         std::string _localName;
+        Slots _slots = 0; // Ignored for KindEx(s) w/ static slot counts.
 
         std::unique_ptr<_Membership> _membership;
         std::unique_ptr<_TypeParams> _typeParams;
@@ -281,7 +289,7 @@ namespace _ym {
             CallBhvrCallbackInfo callBehaviour,
             std::optional<ConstIndex> assignerConst,
             ConstIndex returnTypeConst,
-            YmUInt16 slot);
+            Slots slot);
         void _initVar(
             std::optional<ConstIndex> initializerConst);
 

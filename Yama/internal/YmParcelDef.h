@@ -21,7 +21,7 @@
 struct YmParcelDef final {
 public:
     // refs is not managed internally by this class.
-    _ym::AtomicRefCounter<YmRefCount> refs;
+    _ym::AtomicRefCounter refs;
 
     std::shared_ptr<_ym::ParcelInfo> info;
 

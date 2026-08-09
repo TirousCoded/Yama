@@ -15,7 +15,8 @@ namespace ym {
 
 
     // An inert lock which does nothing.
-    // For generic systems parameterized with regards to the lock types used, DummyLock can be used to make the system unsynchronized.
+    // For generic systems parameterized with regards to the lock types used, DummyLock can be
+    // used to make the system unsynchronized.
     class DummyLock final {
     public:
         constexpr DummyLock() = default;
