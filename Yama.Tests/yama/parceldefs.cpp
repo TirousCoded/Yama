@@ -1086,6 +1086,18 @@ TEST(ParcelDefs, AddReadOnlyStoredProperty_IllegalSpecifier_InvalidTypeSymbol) {
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
 }
 
+TEST(ParcelDefs, AddReadOnlyStoredProperty_LimitReached_MaxStoredProperties) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddStruct(p_def, "A"), YM_TRUE);
+    for (YmUInt8 i = 0; i < YM_MAX_STORED_PROPERTIES; i++) {
+        std::string name = std::format("sp{}", i);
+        ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", name.c_str(), "yama:None"), YM_TRUE);
+    }
+    ASSERT_EQ(ymParcelDef_AddReadOnlyStoredProperty(p_def, "A", "bad", "yama:None"), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_LimitReached], 1);
+}
+
 TEST(ParcelDefs, AddStoredProperty) {
     SETUP_ALL(ctx);
     SETUP_PARCELDEF(p_def);
@@ -1238,6 +1250,18 @@ TEST(ParcelDefs, AddStoredProperty_IllegalSpecifier_InvalidTypeSymbol) {
     ASSERT_EQ(ymParcelDef_AddStruct(p_def, "A"), YM_TRUE);
     ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "p", "/"), YM_FALSE);
     EXPECT_EQ(err[YmErrCode_IllegalSpecifier], 1);
+}
+
+TEST(ParcelDefs, AddStoredProperty_LimitReached_MaxStoredProperties) {
+    SETUP_ALL(ctx);
+    SETUP_PARCELDEF(p_def);
+    ASSERT_EQ(ymParcelDef_AddStruct(p_def, "A"), YM_TRUE);
+    for (YmUInt8 i = 0; i < YM_MAX_STORED_PROPERTIES; i++) {
+        std::string name = std::format("sp{}", i);
+        ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", name.c_str(), "yama:None"), YM_TRUE);
+    }
+    ASSERT_EQ(ymParcelDef_AddStoredProperty(p_def, "A", "bad", "yama:None"), YM_FALSE);
+    EXPECT_EQ(err[YmErrCode_LimitReached], 1);
 }
 
 TEST(ParcelDefs, AddReadOnlyComputedProperty) {

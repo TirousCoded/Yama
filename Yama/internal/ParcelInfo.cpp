@@ -567,6 +567,10 @@ bool _ym::TypeInfo::setupCall(
     if (!returnType) {
         return false;
     }
+    // TODO: Refactor how we check max stored properties.
+    if (isStoredPropertyGet() && slot > YM_MAX_STORED_PROPERTIES) {
+
+    }
     _initCall(
         callBehaviour,
         hasAssigner
@@ -926,6 +930,15 @@ std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::mkMember(
                 "Cannot add regular property to {} type {}!",
                 ymKind_Fmt(ownerType.kind()),
                 ownerType.localName());
+            return nullptr;
+        }
+        if (k == KindEx::StoredPropertyGet && ownerType.slots() >= YM_MAX_STORED_PROPERTIES) {
+            Global::raiseErr(
+                YmErrCode_LimitReached,
+                "Cannot add stored property to {} type {}; would exceed {} limit!",
+                ymKind_Fmt(ownerType.kind()),
+                ownerType.localName(),
+                YM_MAX_STORED_PROPERTIES);
             return nullptr;
         }
     }

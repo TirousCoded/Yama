@@ -13,6 +13,14 @@
 namespace _ym {
 
 
+	// TODO: StructInitArgPackInfo is suboptimal in that it stores an array of ~200,
+	//		 on the off chance that a struct somehow ends up w/ that many stored properties.
+	//
+	//		 Look into ways to make ArgPackInfo be able to maybe switch between static/inline
+	//		 storage, and dynamic storage, of its internal named arg array, so as to let us
+	//		 reduce the struct's size.
+
+
 	// NOTE: While originally just for calls w/ named args, ArgPackInfo has since been
 	//		 generalized to also be used for things w/ explicit inits, in which case
 	//		 the descriptions below don't 100% line up w/ the actual use case.
@@ -35,9 +43,7 @@ namespace _ym {
 	// These dummy args correspond to special dummy arg objects which get appended to the
 	// original input arg pack before the call begins to provide bindings for unspecified
 	// named params.
-	template<
-		YmParams MAX_POSITIONAL = YM_MAX_POSITIONAL_PARAMS,
-		YmParams MAX_NAMED = YM_MAX_NAMED_PARAMS>
+	template<YmParams MAX_POSITIONAL, YmParams MAX_NAMED>
 	class ArgPackInfo final {
 	public:
 		inline ArgPackInfo(YmParams positionalParams, YmParams namedParams) :
@@ -158,5 +164,9 @@ namespace _ym {
 #endif
 		}
 	};
+
+
+	using CallArgPackInfo = ArgPackInfo<YM_MAX_POSITIONAL_PARAMS, YM_MAX_NAMED_PARAMS>;
+	using StructInitArgPackInfo = ArgPackInfo<0, YM_MAX_STORED_PROPERTIES>;
 }
 

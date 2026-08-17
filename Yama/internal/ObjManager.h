@@ -12,16 +12,10 @@
 #include "FRootTracker.h"
 #include "MAS.h"
 #include "obj-ref-helpers.h"
+#include "GC.h"
 
 
 namespace _ym {
-
-
-	// TODO: If we ever wanna make GCCycleID 8-bit, we gotta account for overflow
-	//		 making the current ID equal to GCNoCycle.
-
-	using GCCycleID = YmUInt32;
-	static constexpr GCCycleID GCNoCycle = 0;
 
 
 	class ObjManager final {
@@ -30,11 +24,10 @@ namespace _ym {
 		using GetGlobalObj = std::function<YmObj*(YmUInt32)>;
 
 
-		ObjManager(YmCtx* ctx, GetGlobalObj getGlobalObj);
+		ObjManager(YmCtx* ctx, GetGlobalObj getGlobalObj, std::unique_ptr<GC> gc);
 
 
 		size_t count() const noexcept;
-		bool exists(YmObj& obj) const noexcept;
 
 		// A given root object may be traversed multiple times.
 		inline void forEachRoot(ym::Callable<void, YmObj&> auto&& visitor) const {
@@ -65,49 +58,28 @@ namespace _ym {
 
 		void gcCollect();
 
+		// NOTE: These are for use by GC impl.
+
+		const std::unordered_set<YmObj*>& objects() const noexcept;
+		void reportDestroy(YmObj& obj);
+		void deinitObj(YmObj& obj, bool releaseOutgoingRefs);
+		void deallocObj(YmObj& obj) noexcept;
+
 
 	private:
-		YmObjDestroyCallbackFn _objDestroyCallback = nullptr;
-		void* _objDestroyCallbackUser = nullptr;
 		YmCtx* _ctx = nullptr;
 		GetGlobalObj _getGlobalObj;
+		std::unique_ptr<GC> _gc;
+		YmObjDestroyCallbackFn _objDestroyCallback = nullptr;
+		void* _objDestroyCallbackUser = nullptr;
 		std::unordered_set<YmObj*> _allocatedObjs; // TODO: Replace this.
 		FRootTracker _froots;
 		HeapMAS _mas;
-
-		// TODO: For now, we'll use a 'threshold' number of objs to determine when
-		//		 to trigger our simple stop-the-world collector, w/ us making this
-		//		 number 150% of the obj count after the collection cycle.
-
-		size_t _gcThreshold = size_t{};
-		size_t _gcThresholdInitial = 100;
-		double _gcThresholdGrowthFactor = 1.5;
-		GCCycleID _gcCurrentCycle = GCNoCycle;
 
 
 		// Not appropriate for destroying objs in ref cycles.
 		void _destroy(YmObj& obj);
 		void _destroyAll();
-		void _reportDestroy(YmObj& obj);
-		void _deinitObj(YmObj& obj, bool releaseOutgoingRefs);
-		void _deallocObj(YmObj& obj) noexcept;
-
-		// TODO: Our current impl uses a quick-n'-dirty stop-the-world mark-and-sweep
-		//		 GC, which is super rough, and can be GREATLY improved.
-
-		void _gcReset();
-		void _gcAcknowledgeNewObj(YmObj& obj);
-		void _gcCollect(YmObj* triggerObj);
-		bool _gcIsReachable(YmObj& obj);
-		void _gcBeginCycle();
-		void _gcMarkPhase(YmObj* triggerObj);
-		void _gcMark(YmObj& obj);
-		void _gcMarkObjCycleID(YmObj& obj) noexcept;
-		void _gcMarkOutgoingRefs(YmObj& obj);
-		void _gcSweepPhase();
-		void _gcDropOutgoingRefsToReachableObjs(YmObj& obj);
-		void _gcEndCycle();
-		void _gcUpdateThreshold() noexcept;
 	};
 }
 

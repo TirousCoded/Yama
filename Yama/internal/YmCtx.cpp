@@ -18,8 +18,10 @@
 YmCtx::YmCtx(ym::Safe<YmDm> domain) :
     domain(domain),
     loader(std::make_shared<_ym::CtxLoader>(domain->loader)),
-    _stk(this),
-    _objs(this, [this](YmUInt32 index) -> YmObj* { return _stk.global(index); }),
+    _stk(),
+    _objs(this,
+        [this](YmUInt32 index) -> YmObj* { return _stk.global(index); },
+        std::make_unique<_ym::StopTheWorldGC>(_objs)),
     _vars(*this) {
 }
 
@@ -180,12 +182,19 @@ _ym::TempRef YmCtx::stealLocal(YmLocal where, bool frontendRef) {
     return _stk.stealLocal(where, frontendRef);
 }
 
+void YmCtx::pop(YmLocals n) {
+    _stk.pop(n);
+}
+
+void YmCtx::popUntil(YmLocals n) {
+    _stk.popUntil(n);
+}
+
 _ym::TempRef YmCtx::pull(bool frontendRef) noexcept {
     return _stk.pull(frontendRef);
 }
-
-void YmCtx::pop(YmLocals n) {
-    _stk.pop(n);
+bool YmCtx::copy(YmLocal from, YmLocal to) {
+    return _stk.copy(from, to);
 }
 
 bool YmCtx::put(YmLocal where, _ym::TempRef what) {
@@ -205,7 +214,11 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
         return false;
     }
     auto& _type = ym::deref(type);
-    if (!_stk.checkLocalIsInBounds(where, "Struct init failed")) {
+    if (!_stk.writeIsInBounds(where)) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Struct init failed; local object index {} out-of-bounds!",
+            where);
         return false;
     }
     if (_type.kind() != YmKind_Struct) {
@@ -215,14 +228,7 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
             _type.fullname());
         return false;
     }
-    // TODO: Find a better way to do this!
-    if (_type.sameAs(ldNone()) ||
-        _type.sameAs(ldInt()) ||
-        _type.sameAs(ldUInt()) ||
-        _type.sameAs(ldFloat()) ||
-        _type.sameAs(ldBool()) ||
-        _type.sameAs(ldRune()) ||
-        _type.sameAs(ldType())) {
+    if (_type.isPrimitive()) {
         if (!argNames.empty()) {
             _ym::Global::raiseErr(
                 YmErrCode_IllegalNameList,
@@ -232,80 +238,15 @@ bool YmCtx::structInit(YmType* type, std::string_view argNames, YmLocal where) {
         }
         return defaultInit(type, where);
     }
-    // TODO: What happens if argNameCount exceeds 255 due to user input?
-    //       YmParams and YmLocals are only 8- and 32-bit, respectively.
-    size_t argNameCount = std::ranges::distance(argNames | std::views::split(','));
-    if (argNameCount > locals()) {
-        _ym::Global::raiseErr(
-            YmErrCode_LocalNotFound,
-            "Struct init failed; object stack has {} objects, but expected {}!",
-            locals(),
-            argNameCount);
-        return false;
-    }
-    const auto& storedProperties = _type.slots();
-    // TODO: We need to figure out how we'll handle the notion of a max number of
-    //       stored properties, as right now we don't properly account for that.
-    _ym::ArgPackInfo<> argPack(0, uint8_t(storedProperties));
-    for (const auto& it : argNames | std::views::split(',')) {
-        std::string_view argName(it.begin(), it.end());
-        // TODO: Optimize out this std::string heap alloc.
-        if (auto getter = _type.member((std::string)argName);
-            getter && getter->info->type->isStoredPropertyGet()) {
-            // TODO: When we figure out max stored properties, be sure to account for
-            //       the 'YmUInt8(~)' here too.
-            YmUInt8 storedPropertySlot = YmUInt8(getter->info->type->storedPropertySlot().value());
-            if (!argPack.specifyNextNamedArg(storedPropertySlot)) {
-                _ym::Global::raiseErr(
-                    YmErrCode_IllegalNameList,
-                    "Struct init failed; stored property {} specified multiple times!",
-                    (std::string)argName);
-                return false;
-            }
-            uint8_t argOffset = argPack.argOffset(storedPropertySlot, true).value();
-            auto& arg = ym::deref(local(locals() - YmLocals(argNameCount) + argOffset));
-            if (arg.type != getter->type().returnType()) {
-                _ym::Global::raiseErr(
-                    YmErrCode_TypeMismatch,
-                    "Struct init failed; arg #{} (for stored property {}) is {}, but expected {}!",
-                    argOffset + 1,
-                    (std::string)argName,
-                    arg.type->fullname(),
-                    getter->type().fullname());
-                return false;
-            }
-        }
-        else {
-            _ym::Global::raiseErr(
-                YmErrCode_IllegalNameList,
-                "Struct init failed; unknown stored property {}!",
-                (std::string)argName);
-            return false;
-        }
-    }
-    argPack.done();
-    if (argPack.dummies() > 0) {
-        _ym::Global::raiseErr(
-            YmErrCode_IllegalNameList,
-            "Struct init failed; not all stored properties specified!");
-        return false;
-    }
-    auto result = create(_type, false);
-    for (uint16_t storedPropertyInd = 0; storedPropertyInd < storedProperties; storedPropertyInd++) {
-        // TODO: But what if storedProperties exceeds 8-bit max?
-        uint8_t argOffset = argPack.argOffset(YmUInt8(storedPropertyInd), true).value();
-        YmLocal argInd = locals() - YmLocals(argNameCount) + argOffset;
-        // *Steal* the arg object's refs, putting them in the slots, nullifying InternalRef(s).
-        result->assignRefSlot(storedPropertyInd, stealLocal(argInd, false));
-    }
-    // Pop all the nullified InternalRef(s).
-    pop(argPack.specifiedArgs());
-    put(where, std::move(result));
-    return true;
+    return put(where, _doStructInit(_type, _resolveStructInitArgPackAndCoerceArgs(_type, argNames)));
 }
 
 bool YmCtx::call(YmType* fn, YmUInt16 argsN, std::string_view argNames, YmLocal returnTo) {
-    return _stk.call(fn, argsN, argNames, returnTo);
+    if (_beginCall(fn, argsN, argNames, returnTo)) {
+        _dispatchCall(fn);
+        return _endCall();
+    }
+    return false;
 }
 
 bool YmCtx::retObj(_ym::TempRef what) {
@@ -324,7 +265,11 @@ bool YmCtx::getVar(YmType* varType, YmLocal where) {
             _varType.fullname());
         return false;
     }
-    if (!_stk.checkLocalIsInBounds(where, "Var get failed")) {
+    if (!_stk.writeIsInBounds(where)) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Var get failed; local object index {} out-of-bounds!",
+            where);
         return false;
     }
     if (_varType.isStoredVarGet()) { // Stored
@@ -360,11 +305,11 @@ bool YmCtx::setVar(YmType* varType) {
             "Var set failed; value not found!");
         return false;
     }
-    if (auto value = local(-1); value && value->type != _varType.returnType()) {
+    if (!_coerce(-1, ym::deref(_varType.returnType()))) {
         _ym::Global::raiseErr(
             YmErrCode_TypeMismatch,
             "Var set failed; value is {}, but expected {}!",
-            value->type->fullname(),
+            local(-1)->type->fullname(),
             _varType.returnType()->fullname());
         return false;
     }
@@ -388,7 +333,11 @@ bool YmCtx::getProperty(YmType* propertyType, YmLocal where) {
             _propertyType.fullname());
         return false;
     }
-    if (!_stk.checkLocalIsInBounds(where, "Property get failed")) {
+    if (!_stk.writeIsInBounds(where)) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Property get failed; local object index {} out-of-bounds!",
+            where);
         return false;
     }
     if (locals() == 0) {
@@ -451,7 +400,6 @@ bool YmCtx::setProperty(YmType* propertyType) {
         return false;
     }
     auto& subject = ym::deref(local(-2));
-    auto& value = ym::deref(local(-1));
     if (subject.type != _propertyType.owner()) {
         _ym::Global::raiseErr(
             YmErrCode_TypeMismatch,
@@ -460,11 +408,11 @@ bool YmCtx::setProperty(YmType* propertyType) {
             _propertyType.owner()->fullname());
         return false;
     }
-    if (value.type != _propertyType.returnType()) {
+    if (!_coerce(-1, ym::deref(_propertyType.returnType()))) {
         _ym::Global::raiseErr(
             YmErrCode_TypeMismatch,
             "Property set failed; value is {}, but expected {}!",
-            value.type->fullname(),
+            local(-1)->type->fullname(),
             _propertyType.returnType()->fullname());
         return false;
     }
@@ -479,7 +427,11 @@ bool YmCtx::setProperty(YmType* propertyType) {
 }
 
 bool YmCtx::convert(YmType& type, YmLocal returnTo, bool coercion) {
-    if (!_stk.checkLocalIsInBounds(returnTo, "Conversion failed")) {
+    if (!_stk.writeIsInBounds(returnTo)) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Conversion failed; local object index {} out-of-bounds!",
+            returnTo);
         return false;
     }
     if (locals() == 0) {
@@ -641,5 +593,281 @@ bool YmCtx::convert(YmType& type, YmLocal returnTo, bool coercion) {
             type.fullname());
         return false;
     }
+}
+
+std::optional<_ym::StructInitArgPackInfo> YmCtx::_resolveStructInitArgPackAndCoerceArgs(YmType& type, std::string_view argNames) {
+    const auto storedProperties = YmUInt8(type.slots());
+    size_t argNameCount = std::ranges::distance(argNames | std::views::split(','));
+    if (argNameCount > locals()) {
+        _ym::Global::raiseErr(
+            YmErrCode_LocalNotFound,
+            "Struct init failed; object stack has {} objects, but expected {}!",
+            locals(),
+            argNameCount);
+        return std::nullopt;
+    }
+    _ym::StructInitArgPackInfo argPack(0, storedProperties);
+    for (const auto& it : argNames | std::views::split(',')) {
+        std::string_view argName(it.begin(), it.end());
+        // TODO: Optimize out this std::string heap alloc.
+        if (auto getter = type.member((std::string)argName);
+            getter && getter->info->type->isStoredPropertyGet()) {
+            YmUInt8 storedPropertySlot = YmUInt8(getter->info->type->storedPropertySlot().value());
+            if (!argPack.specifyNextNamedArg(storedPropertySlot)) {
+                _ym::Global::raiseErr(
+                    YmErrCode_IllegalNameList,
+                    "Struct init failed; stored property {} specified multiple times!",
+                    (std::string)argName);
+                return std::nullopt;
+            }
+            YmUInt8 argOffset = argPack.argOffset(storedPropertySlot, true).value();
+            YmLocal argLocal = locals() - YmLocals(argNameCount) + argOffset;
+            auto& expectedArgType = ym::deref(getter->type().returnType());
+            if (!_coerce(argLocal, expectedArgType)) {
+                _ym::Global::raiseErr(
+                    YmErrCode_TypeMismatch,
+                    "Struct init failed; arg #{} (for stored property {}) is {}, but expected {}!",
+                    argOffset + 1,
+                    (std::string)argName,
+                    local(argLocal)->type->fullname(),
+                    expectedArgType.fullname());
+                return std::nullopt;
+            }
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalNameList,
+                "Struct init failed; unknown stored property {}!",
+                (std::string)argName);
+            return std::nullopt;
+        }
+    }
+    argPack.done();
+    if (argPack.dummies() > 0) {
+        _ym::Global::raiseErr(
+            YmErrCode_IllegalNameList,
+            "Struct init failed; not all stored properties specified!");
+        return std::nullopt;
+    }
+    return ym::retopt(argPack);
+}
+
+_ym::TempRef YmCtx::_doStructInit(YmType& type, const std::optional<_ym::StructInitArgPackInfo>& argPack) {
+    if (!argPack) {
+        return nullptr;
+    }
+    const auto storedProperties = YmUInt8(type.slots());
+    const YmLocals argCount = (YmLocals)argPack->specifiedArgs();
+    auto result = create(type, false);
+    for (YmUInt8 storedPropertyInd = 0; storedPropertyInd < storedProperties; storedPropertyInd++) {
+        YmUInt8 argOffset = argPack->argOffset(storedPropertyInd, true).value();
+        YmLocal argInd = locals() - argCount + argOffset;
+        // *Steal* the arg object's refs, putting them in the slots, nullifying InternalRef(s).
+        result->assignRefSlot(storedPropertyInd, stealLocal(argInd, false));
+    }
+    // Pop all the nullified InternalRef(s).
+    pop(argCount);
+    return result;
+}
+
+bool YmCtx::_beginCall(YmType* fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo) {
+    if (fn) {
+        if (!fn->isCallable()) {
+            _ym::Global::raiseErr(
+                YmErrCode_NonCallableType,
+                "Call to {} failed; {} is non-callable!",
+                fn->fullname(),
+                fn->fullname());
+            return false;
+        }
+        if (!_stk.writeIsInBounds(returnTo)) {
+            _ym::Global::raiseErr(
+                YmErrCode_LocalNotFound,
+                "Call to {} failed; local object index {} out-of-bounds!",
+                fn->fullname(),
+                returnTo);
+            return false;
+        }
+        if (YmLocals(args) > locals()) {
+            _ym::Global::raiseErr(
+                YmErrCode_LocalNotFound,
+                "Call to {} failed; {} args provided, but local object stack height is {}!",
+                fn->fullname(),
+                args,
+                locals());
+            return false;
+        }
+        if (callStkHeight() == YM_MAX_CALL_STACK_HEIGHT) {
+            _ym::Global::raiseErr(
+                YmErrCode_CallStackOverflow,
+                "Call to {} failed; call stack overflow!",
+                fn->fullname());
+            return false;
+        }
+        if (auto argPack = _resolveArgPackCoerceArgsAndPushDummies(*fn, args, argNames)) {
+            _stk.pushCF(fn, returnTo, std::move(*argPack));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool YmCtx::_endCall() noexcept {
+    auto cf = _stk.pullCF().value();
+    if (!cf.fn) {
+        // This is user pseudo-call.
+        return true;
+    }
+    if (!cf.returnVal) {
+        _ym::Global::raiseErr(
+            YmErrCode_CallProcedureError,
+            "Call to {} failed; didn't bind a return value!",
+            cf.fn->fullname());
+        pop(cf.dummies());
+        return false;
+    }
+    // TODO: The below usage of a temporary stk value used as a middle-man
+    //       for our return value coercion feels super hacky.
+    put(YM_PUSH, cf.returnVal.borrow());
+    if (!_coerce(-1, *cf.fn->returnType())) {
+        _ym::Global::raiseErr(
+            YmErrCode_CallProcedureError,
+            "Call to {} failed; returned {}, but expected {}!",
+            cf.fn->fullname(),
+            cf.returnVal->type->fullname(),
+            cf.fn->returnType()->fullname());
+        pop(1); // Pop our quick-n'-dirty temp.
+        pop(cf.dummies());
+        return false;
+    }
+    cf.returnVal = pull(false);
+    pop(cf.args());
+    return put(cf.returnTo, cf.returnVal.steal(false));
+}
+
+void YmCtx::_dispatchCall(YmType* fn) {
+    if (fn) {
+        _fwdIfProtocolMethodDispatch(*fn);
+        auto& callBhvrInfo = ym::deref(_stk.cf().fn->info->callBehaviour());
+        callBhvrInfo.fn(this, fn, callBhvrInfo.user);
+    }
+}
+
+void YmCtx::_fwdIfProtocolMethodDispatch(YmType& fn) {
+    if (!fn.isMethodReq()) {
+        return;
+    }
+    // Prior to changing fwdFromProto, arg(0) shouldn't see through boxing.
+    auto callobj = arg(0);
+    auto ptableInd = (uintptr_t)ym::deref(fn.info->callBehaviour()).user;
+    auto forwardedTo = callobj->ptable()[ptableInd];
+    auto& cf = _stk.cf();
+    cf.fn = forwardedTo;
+    cf.fwdFromProto = true;
+    // If indirectly called method has named params, we gotta add proper number
+    // of dummies to cf().argPack, and we gotta push dummy objects for each.
+    if (auto named = forwardedTo->namedParams(); named >= 1) {
+        for (YmParams i = 0; i < named; i++) {
+            put(YM_PUSH, newNone(false));
+        }
+        cf.argPack.addDummies(named);
+        cf.localsOffset += named;
+    }
+}
+
+std::optional<_ym::CallArgPackInfo> YmCtx::_resolveArgPackCoerceArgsAndPushDummies(YmType& fn, YmUInt16 args, std::string_view argNames) {
+    if (auto result = _parseArgPack(fn, argNames); result && _checkArgPackAndCoerceArgs(fn, args, *result)) {
+        _appendArgPackDummyObjs(*result);
+        return result;
+    }
+    return std::nullopt;
+}
+
+std::optional<_ym::CallArgPackInfo> YmCtx::_parseArgPack(YmType& fn, std::string_view argNames) const {
+    _ym::CallArgPackInfo argPack(fn);
+    for (const auto& it : argNames | std::views::split(',')) {
+        std::string_view argName(it.begin(), it.end());
+        // TODO: Optimize out this std::string heap alloc.
+        if (auto tparam = fn.param((std::string)argName)) {
+            if (tparam->isPositional()) {
+                _ym::Global::raiseErr(
+                    YmErrCode_IllegalNameList,
+                    "Call to {} failed; {} is a positional param, not a named one!",
+                    fn.fullname(),
+                    tparam->name());
+                return std::nullopt;
+            }
+            if (!argPack.specifyNextNamedArg(tparam->index())) {
+                _ym::Global::raiseErr(
+                    YmErrCode_IllegalNameList,
+                    "Call to {} failed; named param {} specified multiple times!",
+                    fn.fullname(),
+                    tparam->name());
+                return std::nullopt;
+            }
+        }
+        else {
+            _ym::Global::raiseErr(
+                YmErrCode_IllegalNameList,
+                "Call to {} failed; unknown named param \"{}\"!",
+                fn.fullname(),
+                (std::string)argName);
+            return std::nullopt;
+        }
+    }
+    argPack.done(); // Don't forget!
+    return ym::retopt(argPack);
+}
+
+bool YmCtx::_checkArgPackAndCoerceArgs(YmType& fn, YmUInt16 args, const _ym::CallArgPackInfo& argPack) {
+    if (args != argPack.specifiedArgs()) {
+        _ym::Global::raiseErr(
+            YmErrCode_CallProcedureError,
+            "Call to {} failed; {} args provided, but expected {}! ({} positional + {} named)",
+            fn.fullname(),
+            args,
+            argPack.specifiedArgs(),
+            argPack.positionalArgs(),
+            argPack.namedArgs());
+        return false;
+    }
+    for (YmParamIndex param = 0; param < argPack.paramCount(); param++) {
+        // Quietly skip unspecified named args.
+        if (auto argOffset = argPack.argOffset(param, true)) {
+            auto argLocal = locals() - args + *argOffset;
+            if (auto p = fn.param(param); !_coerce(argLocal, fn.param(param)->type())) {
+                _ym::Global::raiseErr(
+                    YmErrCode_TypeMismatch,
+                    "Call to {} failed; arg #{} (for {} param {}) is {}, but expected {}!",
+                    fn.fullname(),
+                    *argOffset + 1,
+                    p->isPositional() ? "positional" : "named",
+                    p->name(),
+                    local(argLocal)->type->fullname(),
+                    p->type().fullname());
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void YmCtx::_appendArgPackDummyObjs(const _ym::CallArgPackInfo& argPack) {
+    for (YmParams i = 0; i < argPack.dummies(); i++) {
+        put(YM_PUSH, newNone(false));
+    }
+}
+
+bool YmCtx::_coerce(YmLocal where, YmType& newType) {
+    ymAssert(_stk.readIsInBounds(where));
+    if (local(where)->type->sameAs(newType)) {
+        return true;
+    }
+    copy(where, YM_PUSH);
+    if (!convert(newType, where, true)) {
+        pop(1); // TODO: Remove this if we make convert always consume inputs.
+        return false;
+    }
+    return true;
 }
 

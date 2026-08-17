@@ -495,6 +495,13 @@ extern "C" {
 #define YM_MAX_TYPE_PARAMS (YmTypeParams(25))
 
 
+    /* NOTE: YM_MAX_STORED_PROPERTIES should always fit in 8-bit uint.
+    */
+
+    /* Max number of stored properties a type may have. */
+#define YM_MAX_STORED_PROPERTIES (YmUInt8(200))
+
+
     /* Index of a callable type's parameter. */
     typedef YmUInt8 YmParamIndex;
 
@@ -972,6 +979,17 @@ extern "C" {
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
     void ymCtx_Pop(struct YmCtx* ctx, YmLocals n);
+
+    /* TODO: ymCtx_PopUntil hasn't been unit tested.
+    */
+
+    /* StkFx: ...topN ...extra -- ...topN */
+    /* Pops objects until no more than n remain. */
+    /* Failure: */
+    /*   - n <= -1. (Quiet) */
+    /* Undefined Behaviour: */
+    /*   - ctx is invalid. */
+    void ymCtx_PopUntil(struct YmCtx* ctx, YmLocals n);
     
     /* StkFx: ...all -- */
     /* Pops all objects from the local object stack. */
@@ -1062,10 +1080,15 @@ extern "C" {
     /*   - ctx is invalid. */
     YmBool ymCtx_DefaultInit(struct YmCtx* ctx, struct YmType* type, YmLocal where);
 
+    /* TODO: Gonna need more unit tests when we add custom coercions.
+    */
+
     /* StkFx: ...storedPropertyVals -- result->where */
     /* Loads struct of type into where, returning if successful. */
     /* storedPropertyVals are used to init each stored property of type. */
     /* argNames is a comma-seperated string specifying which property each object in storedPropertyVals inits. */
+    /* Args will be coerced to expected types. */
+    /* Arg coercions may remain on stack after fail. */
     /* Failure: */
     /*   - where is out-of-bounds. */
     /*   - type is not a struct type. */
@@ -1074,7 +1097,7 @@ extern "C" {
     /*   - argNames specifies a property more than once. */
     /*   - argNames specifies a name which doesn't name a stored property. */
     /*   - Arg objects needed exceeds object stack height. */
-    /*   - Arg objects are the wrong types. */
+    /*   - Arg objects are the wrong types, and can't be coerced. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
     /*   - argNames (pointer) is invalid. */
@@ -1105,11 +1128,16 @@ extern "C" {
     */
     /* TODO: Maybe make fn == nullptr not UB for ymCtx_Call.
     */
+    /* TODO: Gonna need more unit tests when we add custom coercions.
+    */
 
     /* StkFx: ...positionalArgs ...namedArgs -- result->returnTo */
     /* Calls fn, loading result into returnTo, returning if successful. */
     /* argsN specifies size(positionalArgs) + size(namedArgs). */
     /* argNames is a comma-seperated string specifying the size(namedArgs), and which named param each specifies. */
+    /* Args will be coerced to expected types. */
+    /* Arg coercions may remain on stack after fail. */
+    /* Result will be coerced to expected types. */
     /* Failure: */
     /*   - returnTo is out-of-bounds. */
     /*   - fn is not a callable type. (TODO: Needs updating?) */
@@ -1119,10 +1147,10 @@ extern "C" {
     /*   - argNames specifies an identifier multiple times. */
     /*   - argNames specifies an unknown identifier. */
     /*   - argNames specifies a positional param identifier. */
-    /*   - positionalArgs are the wrong types. */
-    /*   - namedArgs are the wrong types. */
+    /*   - positionalArgs are the wrong types, and can't be coerced. */
+    /*   - namedArgs are the wrong types, and can't be coerced. */
     /*   - No return value object bound (by call behaviour.) */
-    /*   - Return value object is the wrong type. */
+    /*   - Return value object is the wrong type, and can't be coerced. */
     /*   - Call stack overflow. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
@@ -1130,7 +1158,6 @@ extern "C" {
     YmBool ymCtx_Call(struct YmCtx* ctx, struct YmType* fn, YmUInt16 argsN, const YmChar* argNames, YmLocal returnTo);
 
     /* Binds what as the return value of the current call, overwriting existing bindings. */
-    /* whatPolicy dictates if what ref is borrowed or taken from end-user. */
     /* Failure: */
     /*   - In the user call frame. (Quiet) */
     /*   - what == YM_NIL. (Quiet) */
@@ -1234,6 +1261,7 @@ extern "C" {
 
     /* StkFx: value -- */
     /* Stores value into varType, returning if successful. */
+    /* value will be coerced if needed. */
     /* Lazy initializes stored var if needed. */
     /* Failure: */
     /*   - where is out-of-bounds. (UNTESTED) */
@@ -1241,7 +1269,7 @@ extern "C" {
     /*   - varType is read-only. (UNTESTED) */
     /*   - varType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - Object stack is empty. (UNTESTED) */
-    /*   - value object is the wrong type. (UNTESTED) */
+    /*   - value object is the wrong type, and can't be coerced. */
     /*   - Stored var init call fails. (UNTESTED) */
     /*   - Stored var accessed in the middle of initializing. (UNTESTED) */
     /*   - Computed var set call fails. (UNTESTED) */
@@ -1265,13 +1293,14 @@ extern "C" {
 
     /* StkFx: subject value -- */
     /* Stores value into propertyType in subject, returning if successful. */
+    /* value will be coerced if needed. */
     /* Failure: */
     /*   - propertyType is not a property type. */
     /*   - propertyType is read-only. */
     /*   - propertyType == YM_NIL. (Quiet) (UNTESTED; should be quiet?) */
     /*   - Object stack height is less than two. */
     /*   - subject object is the wrong type. */
-    /*   - value object is the wrong type. */
+    /*   - value object is the wrong type, and can't be coerced. */
     /*   - Computed property set call fails. */
     /* Undefined Behaviour: */
     /*   - ctx is invalid. */
@@ -1524,6 +1553,7 @@ extern "C" {
     /*   - ownerName is a protocol. */
     /*   - name is illegal. */
     /*   - type is illegal. */
+    /*   - Adding new stored property would exceed YM_MAX_STORED_PROPERTIES. */
     /* Undefined Behaviour: */
     /*   - parceldef is invalid. */
     /*   - ownerName (pointer) is invalid. */
@@ -1544,6 +1574,7 @@ extern "C" {
     /*   - ownerName is a protocol. */
     /*   - name is illegal. */
     /*   - type is illegal. */
+    /*   - Adding new stored property would exceed YM_MAX_STORED_PROPERTIES. */
     /* Undefined Behaviour: */
     /*   - parceldef is invalid. */
     /*   - ownerName (pointer) is invalid. */
@@ -1666,6 +1697,11 @@ extern "C" {
     void ymParcelDef_BeginNamedParams(
         struct YmParcelDef* parceldef,
         const YmChar* typeName);
+
+    /* TODO: When we write docs, be sure to mention that for var/property setters, the end-user
+    *        has to remember to append $assigner or $init for ymParcelDef_AddRef to put the
+    *        ref into the assigner/initializer.
+    */
 
     /* Adds to a type in parceldef a reference to the type specified by symbol, returning a reference ID, or YM_NO_REF on failure. */
     /* Reference IDs are sequential, incrementing from 0. */

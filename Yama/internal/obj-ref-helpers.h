@@ -61,7 +61,7 @@ namespace _ym {
 	};
 
 	// A version of InternalRef which specifically has a trivial dtor, meaning
-	// that it can safely be used in untagged unions.
+	// that it can be used in untagged unions.
 	// The catch w/ LiteInternalRef is the the dtor, being trivial, DOES NOT
 	// call 'drop', meaning the end-user of the class has to do that MANUALLY.
 	// This also extends to move-assign which will NOT CALL DROP FOR THE OLD VALUE.

@@ -82,8 +82,10 @@ public:
     // stack entry w/ an empty InternalRef (so be careful using this method.)
     _ym::TempRef stealLocal(YmLocal where, bool frontendRef);
 
-    _ym::TempRef pull(bool frontendRef) noexcept; // Returns taken ref.
     void pop(YmLocals n);
+    void popUntil(YmLocals n);
+    _ym::TempRef pull(bool frontendRef) noexcept; // Returns taken ref.
+    bool copy(YmLocal from, YmLocal to);
     bool put(YmLocal where, _ym::TempRef what);
     bool swap(YmLocal a, YmLocal b);
     bool defaultInit(YmType* type, YmLocal where);
@@ -102,5 +104,23 @@ private:
     _ym::ObjManager _objs;
     _ym::PTableManager _ptables;
     _ym::VarStorage _vars;
+
+
+    std::optional<_ym::StructInitArgPackInfo> _resolveStructInitArgPackAndCoerceArgs(YmType& type, std::string_view argNames);
+    // Fails quietly if argPack is empty.
+    // Pops args from stack.
+    _ym::TempRef _doStructInit(YmType& type, const std::optional<_ym::StructInitArgPackInfo>& argPack);
+
+    bool _beginCall(YmType* fn, YmUInt16 args, std::string_view argNames, YmLocal returnTo);
+    bool _endCall() noexcept;
+    void _dispatchCall(YmType* fn);
+    void _fwdIfProtocolMethodDispatch(YmType& fn);
+    std::optional<_ym::CallArgPackInfo> _resolveArgPackCoerceArgsAndPushDummies(YmType& fn, YmUInt16 args, std::string_view argNames);
+    std::optional<_ym::CallArgPackInfo> _parseArgPack(YmType& fn, std::string_view argNames) const;
+    bool _checkArgPackAndCoerceArgs(YmType& fn, YmUInt16 args, const _ym::CallArgPackInfo& argPack);
+    void _appendArgPackDummyObjs(const _ym::CallArgPackInfo& argPack);
+
+    // Fails quietly.
+    bool _coerce(YmLocal where, YmType& newType);
 };
 

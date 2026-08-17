@@ -298,6 +298,10 @@ void ymCtx_Pop(YmCtx* ctx, YmLocals n) {
     Safe(ctx)->pop(n);
 }
 
+void ymCtx_PopUntil(YmCtx* ctx, YmLocals n) {
+    Safe(ctx)->popUntil(n);
+}
+
 void ymCtx_PopAll(YmCtx* ctx) {
     Safe(ctx)->pop(Safe(ctx)->locals());
 }
@@ -307,7 +311,7 @@ YmObj* ymCtx_Pull(YmCtx* ctx) {
 }
 
 YmBool ymCtx_Copy(YmCtx* ctx, YmLocal from, YmLocal to) {
-    return ymCtx_Put(ctx, to, ymCtx_Local(ctx, from, YM_BORROW), YM_BORROW);
+    return Safe(ctx)->copy(from, to);
 }
 
 YmBool ymCtx_Put(YmCtx* ctx, YmLocal where, YmObj* what, YmRefPolicy whatPolicy) {

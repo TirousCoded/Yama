@@ -5,26 +5,23 @@
 #include "YmObj.h"
 
 
-#define _TRACE_RC 0
-#define _TRACE_GC 0
-#define _DEBUGBREAK_AT_DESTROYS 0
+#define _TRACE_RC false
+#define _DEBUGBREAK_AT_DESTROYS false
 
-#if _TRACE_RC || _TRACE_GC
+#if _TRACE_RC
 #include "../yama++/print.h"
 #endif
 
 
-_ym::ObjManager::ObjManager(YmCtx* ctx, GetGlobalObj getGlobalObj) :
+_ym::ObjManager::ObjManager(YmCtx* ctx, GetGlobalObj getGlobalObj, std::unique_ptr<GC> gc) :
     _ctx(ym::Safe(ctx)),
-    _getGlobalObj(std::move(getGlobalObj)) {
+    _getGlobalObj(std::move(getGlobalObj)),
+    _gc(std::move(gc)) {
+    ymAssert((bool)_gc);
 }
 
 size_t _ym::ObjManager::count() const noexcept {
     return _allocatedObjs.size();
-}
-
-bool _ym::ObjManager::exists(YmObj& obj) const noexcept {
-    return _allocatedObjs.contains(&obj);
 }
 
 void _ym::ObjManager::setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* user) noexcept {
@@ -35,7 +32,7 @@ void _ym::ObjManager::setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* use
 void _ym::ObjManager::reset() {
     _destroyAll();
     _froots.untrackAll();
-    _gcReset();
+    _gc->reset();
 }
 
 _ym::TempRef _ym::ObjManager::create(YmType& type, bool frontend) {
@@ -51,7 +48,7 @@ _ym::TempRef _ym::ObjManager::create(YmType& type, bool frontend) {
     result->forEachRefSlotIndex([&result](_ym::Slots index) {
         ymAssert(!(bool)result->refSlot(index));
         });
-    _gcAcknowledgeNewObj(*result);
+    _gc->ack(*result);
     return result;
 }
 
@@ -155,7 +152,32 @@ _ym::TempRef _ym::ObjManager::newDefault(YmType* type, bool frontendRef) {
 }
 
 void _ym::ObjManager::gcCollect() {
-    _gcCollect(nullptr);
+    _gc->collect();
+}
+
+const std::unordered_set<YmObj*>& _ym::ObjManager::objects() const noexcept {
+    return _allocatedObjs;
+}
+
+void _ym::ObjManager::reportDestroy(YmObj& obj) {
+    if (_objDestroyCallback) {
+        _objDestroyCallback(&obj, _objDestroyCallbackUser);
+    }
+}
+
+void _ym::ObjManager::deinitObj(YmObj& obj, bool releaseOutgoingRefs) {
+    if (releaseOutgoingRefs) {
+        obj.dropAllRefSlots(); // Can't forget!
+    }
+    _froots.untrack(obj);
+}
+
+void _ym::ObjManager::deallocObj(YmObj& obj) noexcept {
+    // Calling untrack here in case deinitObj doesn't get called.
+    _froots.untrack(obj);
+    _allocatedObjs.erase(&obj);
+    auto al = _mas.allocator<int>();
+    _ym::ObjHAL::destroy(obj, al);
 }
 
 void _ym::ObjManager::_destroy(YmObj& obj) {
@@ -165,9 +187,9 @@ void _ym::ObjManager::_destroy(YmObj& obj) {
 #if _DEBUGBREAK_AT_DESTROYS
     __debugbreak();
 #endif
-    _reportDestroy(obj);
-    _deinitObj(obj, true);
-    _deallocObj(obj);
+    reportDestroy(obj);
+    deinitObj(obj, true);
+    deallocObj(obj);
 }
 
 void _ym::ObjManager::_destroyAll() {
@@ -175,150 +197,15 @@ void _ym::ObjManager::_destroyAll() {
     ym::println("-- Destroy All");
 #endif
     for (auto& obj : _allocatedObjs) {
-        _reportDestroy(*obj);
+        reportDestroy(*obj);
     }
     for (auto& obj : _allocatedObjs) {
-        _deinitObj(*obj, false);
+        deinitObj(*obj, false);
     }
     // Gotta iter differently here as we're gonna be constantly
     // modifying _objects.
     while (!_allocatedObjs.empty()) {
-        _deallocObj(**_allocatedObjs.begin());
+        deallocObj(**_allocatedObjs.begin());
     }
-}
-
-void _ym::ObjManager::_reportDestroy(YmObj& obj) {
-    if (_objDestroyCallback) {
-        _objDestroyCallback(&obj, _objDestroyCallbackUser);
-    }
-}
-
-void _ym::ObjManager::_deinitObj(YmObj& obj, bool releaseOutgoingRefs) {
-    if (releaseOutgoingRefs) {
-        obj.dropAllRefSlots(); // Can't forget!
-    }
-    _froots.untrack(obj);
-}
-
-void _ym::ObjManager::_deallocObj(YmObj& obj) noexcept {
-    _allocatedObjs.erase(&obj);
-    auto al = _mas.allocator<int>();
-    _ym::ObjHAL::destroy(obj, al);
-}
-
-void _ym::ObjManager::_gcReset() {
-    _gcThreshold = _gcThresholdInitial;
-}
-
-void _ym::ObjManager::_gcAcknowledgeNewObj(YmObj& obj) {
-    if (count() == _gcThreshold) {
-        _gcCollect(&obj);
-    }
-}
-
-void _ym::ObjManager::_gcCollect(YmObj* triggerObj) {
-    _gcBeginCycle();
-    _gcMarkPhase(triggerObj);
-    _gcSweepPhase();
-    _gcEndCycle();
-}
-
-bool _ym::ObjManager::_gcIsReachable(YmObj& obj) {
-    // NOTE: Using '==' instead of '<' on the off chance cycle ID overflow needs to
-    //       be accounted for.
-    //          * This could let us make the ID 8-bit.
-    return obj.lastSurvivedCycle == _gcCurrentCycle;
-}
-
-void _ym::ObjManager::_gcBeginCycle() {
-    _gcCurrentCycle++;
-#if _TRACE_GC
-    ym::println("-- GC Collection Cycle (ID={})", _gcCurrentCycle);
-#endif
-}
-
-void _ym::ObjManager::_gcMarkPhase(YmObj* triggerObj) {
-#if _TRACE_GC
-    ym::println("-- GC Marking");
-#endif
-    if (triggerObj) {
-        // As it's possible for this to trigger while obj hasn't been given a
-        // frontend ref, nor pushed to obj stack, we'll just let obj survive
-        // the collection cycle no matter what, so that other parts of our code
-        // needn't worry about GC nuances.
-        _gcMark(*triggerObj);
-    }
-    forEachRoot([this](YmObj& root) {
-        _gcMark(root);
-        });
-}
-
-void _ym::ObjManager::_gcMark(YmObj& obj) {
-    if (_gcIsReachable(obj)) {
-        return;
-    }
-#if _TRACE_GC
-    ym::println("-- GC Mark: {} @ {}", obj.type->fullname(), (void*)&obj);
-#endif
-    _gcMarkObjCycleID(obj);
-    _gcMarkOutgoingRefs(obj);
-}
-
-void _ym::ObjManager::_gcMarkObjCycleID(YmObj& obj) noexcept {
-    obj.lastSurvivedCycle = _gcCurrentCycle;
-}
-
-void _ym::ObjManager::_gcMarkOutgoingRefs(YmObj& obj) {
-    ymAssert(_gcIsReachable(obj));
-    obj.forEachRefSlotIndex([this, &obj](_ym::Slots index) {
-        _gcMark(*obj.refSlot(index));
-        });
-}
-
-void _ym::ObjManager::_gcSweepPhase() {
-#if _TRACE_GC
-    ym::println("-- GC Sweeping");
-#endif
-    // TODO: This copy and us looping over ALL YmObj* is suboptimal.
-    // Gotta copy _allocatedObjs, as we're gonna be constantly modifying it
-    // while we loop, which means our iters would become invalidated.
-    auto objs = _allocatedObjs;
-    for (auto& obj : objs) {
-        if (_gcIsReachable(*obj)) continue;
-#if _TRACE_GC
-        ym::println("-- GC Sweep: {} @ {}", obj->type->fullname(), (void*)&obj);
-#endif
-        _reportDestroy(*obj);
-    }
-    // Perform a second loop for the deallocs, as _reportDestroy breaks easily
-    // if we try to merge the loops together.
-    for (auto& obj : objs) {
-        if (_gcIsReachable(*obj)) continue;
-        _gcDropOutgoingRefsToReachableObjs(*obj);
-        _deallocObj(*obj);
-    }
-}
-
-void _ym::ObjManager::_gcDropOutgoingRefsToReachableObjs(YmObj& obj) {
-    // Release refs to reachable objs, but NOT refs to unreachable objs,
-    // as we don't want _destroy called on those objs.
-    obj.forEachRefSlotIndex([this, &obj](_ym::Slots index) {
-        // If an outgoing ref is REACHABLE, that means that there MUST be AT LEAST
-        // two refs to it. To this end, decr of said refs CANNOT cause these reachable
-        // outgoing ref objs' ref counts to reach 0.
-        auto ref = obj.refSlot(index).borrow();
-        if (_gcIsReachable(*ref)) {
-            ymAssert(ref->refs.total() >= 2);
-            obj.dropRefSlot(index);
-        }
-        });
-}
-
-void _ym::ObjManager::_gcEndCycle() {
-    _gcUpdateThreshold();
-}
-
-void _ym::ObjManager::_gcUpdateThreshold() noexcept {
-    _gcThreshold = size_t(double(std::max(count(), _gcThresholdInitial)) * _gcThresholdGrowthFactor);
 }
 

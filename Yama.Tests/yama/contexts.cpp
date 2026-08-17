@@ -1678,6 +1678,58 @@ TEST(Contexts, StructInit_NonEmptyStruct) {
         });
 }
 
+TEST(Contexts, StructInit_ArgCoercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        // a, b and c accept yama:Any to induce arg coercion.
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Any");
+        ymParcelDef_AddReadOnlyStoredProperty(parceldef, "A", "b", "yama:Any");
+        ymParcelDef_AddStoredProperty(parceldef, "A", "c", "yama:Any");
+        ymParcelDef_AddComputedProperty(parceldef, "A", "abc", "yama:Int",
+            ymInertCallBhvrFn, nullptr, ymInertCallBhvrFn, nullptr);
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = load(ctx, "p:A");
+            auto A_a = load(ctx, "p:A::a");
+            auto A_b = load(ctx, "p:A::b");
+            auto A_c = load(ctx, "p:A::c");
+
+            SETUP_OBJ(aa, ymCtx_NewInt(ctx, -4));
+            SETUP_OBJ(bb, ymCtx_NewFloat(ctx, 10.414));
+            SETUP_OBJ(cc, ymCtx_NewRune(ctx, U'y'));
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, cc, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, aa, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, bb, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_StructInit(ctx, A, "c,a,b", YM_PUSH), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_Locals(ctx), 1);
+            auto result = ymCtx_Local(ctx, 0, YM_BORROW);
+            EXPECT_EQ(ymObj_Type(result), A);
+            EXPECT_EQ(ymObj_RefCount(result), 1);
+
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_a, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_b, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, ymCtx_LdFloat(ctx), YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Put(ctx, YM_PUSH, result, YM_BORROW), YM_TRUE);
+            ASSERT_EQ(ymCtx_GetProperty(ctx, A_c, YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Convert(ctx, ymCtx_LdRune(ctx), YM_PUSH), YM_TRUE);
+            ASSERT_EQ(ymCtx_Locals(ctx), 4);
+            EXPECT_EQ(ymCtx_Local(ctx, 1, YM_BORROW), aa);
+            EXPECT_EQ(ymCtx_Local(ctx, 2, YM_BORROW), bb);
+            EXPECT_EQ(ymCtx_Local(ctx, 3, YM_BORROW), cc);
+
+            EXPECT_EQ(ymObj_RefCount(aa), 3);
+            EXPECT_EQ(ymObj_RefCount(bb), 3);
+            EXPECT_EQ(ymObj_RefCount(cc), 3);
+        });
+}
+
 TEST(Contexts, StructInit_Fail_LocalNotFound_WhereIsOutOfBounds) {
     auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddStruct(parceldef, "A");
@@ -1932,7 +1984,7 @@ TEST(Contexts, StructInit_Fail_LocalNotFound_ArgObjsNeededExceedsObjStkHeight) {
         });
 }
 
-TEST(Contexts, StructInit_Fail_TypeMismatch_ArgObjsAreTheWrongTypes) {
+TEST(Contexts, StructInit_Fail_TypeMismatch_ArgAreWrongTypesAndCantBeCoerced) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");
@@ -2456,6 +2508,98 @@ TEST(Contexts, Call_MultipleLevelsOfCalls) {
         });
 }
 
+namespace {
+    static YmObj* _call_coerced_arg_expected = nullptr;
+}
+
+TEST(Contexts, Call_ArgCoercion_PositionalArgs) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddFn(
+            parceldef,
+            "g",
+            "yama:None",
+            [](YmCtx* ctx, YmType* type, void* user) {
+                ymCtx_Put(ctx, YM_PUSH, ymCtx_Arg(ctx, 0, YM_BORROW), YM_BORROW);
+                ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH);
+                EXPECT_EQ(ymCtx_Local(ctx, -1, YM_BORROW), _call_coerced_arg_expected);
+                ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+            },
+            nullptr);
+        // yama:Any to force coercion.
+        ymParcelDef_AddParam(parceldef, "g", "x", "yama:Any");
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = load(ctx, "p:g");
+
+            SETUP_OBJ(x, ymCtx_NewInt(ctx, 50));
+            _call_coerced_arg_expected = x;
+
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_PUSH), YM_TRUE);
+        });
+}
+
+TEST(Contexts, Call_ArgCoercion_NamedArgs) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddFn(
+            parceldef,
+            "g",
+            "yama:None",
+            [](YmCtx* ctx, YmType* type, void* user) {
+                ymCtx_Put(ctx, YM_PUSH, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH);
+                EXPECT_EQ(ymCtx_Local(ctx, -1, YM_BORROW), _call_coerced_arg_expected);
+                ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
+            },
+            nullptr);
+        ymParcelDef_BeginNamedParams(parceldef, "g");
+        ymParcelDef_AddParam(parceldef, "g", "x", "yama:Float");
+        // yama:Any to force coercion.
+        ymParcelDef_AddParam(parceldef, "g", "y", "yama:Any");
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = load(ctx, "p:g");
+
+            SETUP_OBJ(x, ymCtx_NewInt(ctx, 50));
+            _call_coerced_arg_expected = x;
+
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 1, "y", YM_PUSH), YM_TRUE);
+        });
+}
+
+TEST(Contexts, Call_ResultCoercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddFn(
+            parceldef,
+            "g",
+            // yama:Any to force coercion.
+            "yama:Any",
+            [](YmCtx* ctx, YmType* type, void* user) {
+                ymCtx_Put(ctx, YM_PUSH, ymCtx_Arg(ctx, 0, YM_BORROW), YM_BORROW);
+                ymCtx_Ret(ctx);
+            },
+            nullptr);
+        ymParcelDef_AddParam(parceldef, "g", "x", "yama:Int");
+        };
+    objsys_test(
+        setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto g = load(ctx, "p:g");
+
+            SETUP_OBJ(x, ymCtx_NewInt(ctx, 50));
+
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            ASSERT_EQ(ymCtx_Call(ctx, g, 1, "", YM_PUSH), YM_TRUE);
+            ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH);
+            EXPECT_EQ(ymCtx_Local(ctx, -1, YM_BORROW), x);
+        });
+}
+
 TEST(Contexts, Call_Fail_LocalNotFound_ReturnToIsOutOfBounds) {
     auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddFn(
@@ -2819,7 +2963,7 @@ TEST(Contexts, Call_Fail_IllegalNameList_ArgNamePositionalParamIdentifier) {
         });
 }
 
-TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
+TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypesAndCantBeCoerced) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -2854,7 +2998,7 @@ TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes) {
         });
 }
 
-TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypes_DueToNamedArgs) {
+TEST(Contexts, Call_Fail_TypeMismatch_ArgsAreWrongTypesAndCantBeCoerced_DueToNamedArgs) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -2929,7 +3073,7 @@ TEST(Contexts, Call_Fail_CallProcedureError_NoReturnValueObjectBound) {
         });
 }
 
-TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongType) {
+TEST(Contexts, Call_Fail_CallProcedureError_ReturnValueIsWrongTypeAndCantBeCoerced) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddFn(
@@ -3490,6 +3634,33 @@ TEST(Contexts, SetVar_StoredVar) {
         });
 }
 
+TEST(Contexts, SetVar_StoredVar_Coercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        // yama:Any to have coercion occur.
+        ymParcelDef_AddStoredVar(parceldef, "V", "yama:Any",
+            [](YmCtx* ctx, YmType* type, void*) {
+                ymCtx_PutInt(ctx, YM_PUSH, 13);
+                ymCtx_Convert(ctx, ymType_ReturnType(type), YM_PUSH);
+                ymCtx_Ret(ctx);
+            },
+            nullptr);
+        };
+    objsys_test(setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto V = load(ctx, "p:V");
+
+            auto x = ymCtx_NewInt(ctx, 101);
+            ASSERT_TRUE(x);
+
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            EXPECT_EQ(ymCtx_SetVar(ctx, V), YM_TRUE);
+
+            ASSERT_EQ(ymCtx_GetVar(ctx, V, YM_PUSH), YM_TRUE);
+            ASSERT_TRUE(ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH));
+            EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), x) << ">> " << ymObj_Fmt(ymCtx_Local(ctx, 0, YM_BORROW));
+        });
+}
+
 TEST(Contexts, SetVar_StoredVarLazyInits) {
     auto setup = [](YmParcelDef* parceldef) {
         ymParcelDef_AddStoredVar(parceldef, "V", "yama:Int",
@@ -3573,6 +3744,56 @@ TEST(Contexts, SetVar_ComputedVar) {
 
             ASSERT_EQ(ymCtx_Locals(ctx), 0);
             EXPECT_EQ(observedCalls, 4);
+        });
+}
+
+TEST(Contexts, SetVar_ComputedVar_Coercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        // yama:Any to have coercion occur.
+        ymParcelDef_AddComputedVar(parceldef, "V", "yama:Any",
+            [](YmCtx* ctx, YmType* type, void*) {
+                ADD_FAILURE() << "Shouldn't reach!";
+            },
+            nullptr,
+            [](YmCtx* ctx, YmType* type, void*) {
+                EXPECT_EQ(ymObj_Type(ymCtx_Arg(ctx, 0, YM_BORROW)), ymCtx_Ref(ctx, 0));
+                ymCtx_Put(ctx, YM_PUSH, ymCtx_Arg(ctx, 0, YM_BORROW), YM_BORROW);
+                ymCtx_Convert(ctx, ymObj_Type(compVar_obj), YM_PUSH);
+                EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), compVar_obj);
+                ymCtx_PutNone(ctx, YM_PUSH);
+                ymCtx_Ret(ctx);
+            },
+            nullptr);
+        EXPECT_EQ(ymParcelDef_AddRef(parceldef, "V$assigner", "yama:Any"), 0);
+        };
+    objsys_test(setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto V = load(ctx, "p:V");
+
+            compVar_obj = ymCtx_NewInt(ctx, 101);
+            ymCtx_Put(ctx, YM_PUSH, compVar_obj, YM_BORROW);
+            EXPECT_EQ(ymCtx_SetVar(ctx, V), YM_TRUE);
+        });
+}
+
+TEST(Contexts, SetVar_Fail_TypeMismatch_ValueIsWrongTypeAndCantBeCoerced) {
+    objsys_test(
+        [](YmParcelDef* parceldef) {
+            ymParcelDef_AddStoredVar(parceldef, "V", "yama:Int",
+                [](YmCtx* ctx, YmType* type, void*) {
+                    ymCtx_PutInt(ctx, YM_PUSH, 13);
+                    ymCtx_Ret(ctx);
+                },
+                nullptr);
+        },
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto V = load(ctx, "p:V");
+
+            ymCtx_PutFloat(ctx, YM_PUSH, 1.041); // Wrong value type!
+            EXPECT_EQ(ymCtx_SetVar(ctx, V), YM_FALSE);
+            EXPECT_GE(getErr()[YmErrCode_TypeMismatch], 1);
+
+            // TODO: What about post-conditions?
         });
 }
 
@@ -4101,6 +4322,35 @@ TEST(Contexts, SetProperty_StoredProperty) {
         });
 }
 
+TEST(Contexts, SetProperty_StoredProperty_Coercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        // yama:Any to have coercion occur.
+        ymParcelDef_AddStoredProperty(parceldef, "A", "a", "yama:Any");
+        };
+    objsys_test(setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = load(ctx, "p:A");
+            auto A_a = load(ctx, "p:A::a");
+
+            auto x = ymCtx_NewInt(ctx, 101);
+            ASSERT_TRUE(x);
+
+            ymCtx_PutInt(ctx, YM_PUSH, 0);
+            ymCtx_Convert(ctx, ymType_ReturnType(A_a), YM_PUSH);
+            ymCtx_StructInit(ctx, A, "a", YM_PUSH);
+
+            ymCtx_Copy(ctx, 0, YM_PUSH);
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_TRUE);
+
+            ymCtx_Copy(ctx, 0, YM_PUSH);
+            ymCtx_GetProperty(ctx, A_a, YM_PUSH);
+            ymCtx_Convert(ctx, ymCtx_LdInt(ctx), YM_PUSH);
+            EXPECT_EQ(ymCtx_Local(ctx, -1, YM_BORROW), x);
+        });
+}
+
 namespace {
     inline YmObj* compProp_expected_by_setter = nullptr;
 }
@@ -4134,6 +4384,41 @@ TEST(Contexts, SetProperty_ComputedProperty) {
             EXPECT_EQ(ymCtx_Locals(ctx), 0);
 
             EXPECT_EQ(ymObj_RefCount(xx), 1);
+        });
+}
+
+TEST(Contexts, SetProperty_ComputedProperty_Coercion) {
+    auto setup = [](YmParcelDef* parceldef) {
+        ymParcelDef_AddStruct(parceldef, "A");
+        // yama:Any to have coercion occur.
+        ymParcelDef_AddComputedProperty(parceldef, "A", "a", "yama:Any",
+            [](YmCtx* ctx, YmType* type, void*) {
+                //
+            },
+            nullptr,
+            [](YmCtx* ctx, YmType* type, void*) {
+                EXPECT_EQ(ymObj_Type(ymCtx_Arg(ctx, 1, YM_BORROW)), ymCtx_Ref(ctx, 0));
+                ymCtx_Put(ctx, YM_PUSH, ymCtx_Arg(ctx, 1, YM_BORROW), YM_BORROW);
+                ymCtx_Convert(ctx, ymObj_Type(compProp_expected_by_setter), YM_PUSH);
+                EXPECT_EQ(ymCtx_Local(ctx, 0, YM_BORROW), compProp_expected_by_setter);
+                ymCtx_PutNone(ctx, YM_PUSH);
+                ymCtx_Ret(ctx);
+            },
+            nullptr);
+        ymParcelDef_AddRef(parceldef, "A::a$assigner", "yama:Any");
+        };
+    objsys_test(setup,
+        [](YmCtx* ctx, bool called_in_fn_body) {
+            auto A = load(ctx, "p:A");
+            auto A_a = load(ctx, "p:A::a");
+
+            auto x = ymCtx_NewInt(ctx, 101);
+            ASSERT_TRUE(x);
+            compProp_expected_by_setter = x;
+
+            ymCtx_StructInit(ctx, A, "", YM_PUSH);
+            ymCtx_Put(ctx, YM_PUSH, x, YM_BORROW);
+            EXPECT_EQ(ymCtx_SetProperty(ctx, A_a), YM_TRUE);
         });
 }
 
@@ -4215,7 +4500,7 @@ TEST(Contexts, SetProperty_Fail_TypeMismatch_SubjectIsWrongType) {
         });
 }
 
-TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongType) {
+TEST(Contexts, SetProperty_Fail_TypeMismatch_ValueIsWrongTypeAndCantBeCoerced) {
     objsys_test(
         [](YmParcelDef* parceldef) {
             ymParcelDef_AddStruct(parceldef, "A");

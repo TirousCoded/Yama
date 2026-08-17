@@ -97,6 +97,12 @@ namespace ym {
             ymCtx_NaturalizeType(get(), Safe<YmType>(x));
         }
 
+        inline void setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* user = nullptr) noexcept {
+            ymCtx_SetObjDestroyCallback(get(), fn, user);
+        }
+
+        inline void gcCollect() noexcept { ymCtx_GCCollect(get()); }
+
         inline Object newNone() noexcept { return Object(Safe(ymCtx_NewNone(get())), false); }
         inline Object newInt(YmInt v) noexcept { return Object(Safe(ymCtx_NewInt(get(), v)), false); }
         inline Object newUInt(YmUInt v) noexcept { return Object(Safe(ymCtx_NewUInt(get(), v)), false); }
