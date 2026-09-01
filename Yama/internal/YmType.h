@@ -39,6 +39,13 @@ namespace _ym {
     }
 }
 
+// NOTE: Type information is organized into three layers:
+//          - kinds.h contains info about types that is statically known from
+//            just things like type kinds.
+//          - TypeInfo contains info about specific types in the absence of
+//            linkage information.
+//          - YmType contains info about specific types in the presence of
+//            linkage information.
 
 // TODO: One issue w/ YmType is that its use of 'YmType*' vs. 'const YmType*' is inconsistent.
 
@@ -253,6 +260,18 @@ public:
             ? constAsRef(*index).get()
             : nullptr;
     }
+    // Returns false if index out-of-bounds.
+    inline bool isObjConst(size_t index) const noexcept {
+        // TODO: When we add Knl(X) consts, we'll need to update this as right
+        //       now it just assumes ANY constant can describe an object.
+        static_assert(_ym::Const::size == 6);
+        return index < consts().size(); // True for all in-bound indices.
+    }
+    // Returns false if index out-of-bounds.
+    inline bool isTypeConst(size_t index) const noexcept {
+        return index < consts().size() && consts()[index].is<ym::Safe<YmType>>();
+    }
+    std::string fmtConsts() const;
 
     void putValConst(size_t index);
     // Fails quietly if ref == nullptr.

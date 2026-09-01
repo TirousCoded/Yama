@@ -397,8 +397,7 @@ void _ym::LoadManager::_checkRefConstCallSigConformance() {
 #if _DUMP_LOG
                     ym::println("LoadManager:     {}", refSymAfterRedirects);
 #endif
-                    auto ref = type.constAsRef(i);
-                    if (ref && !ref->checkCallSuff(callsuff)) {
+                    if (auto ref = type.constAsRef(i); !ref->checkCallSuff(callsuff)) {
                         // TODO: Improve this error!
                         _err(
                             YmErrCode_TypeNotFound,

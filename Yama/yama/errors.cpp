@@ -7,7 +7,7 @@
 
 
 const YmChar* ymFmtYmErrCode(YmErrCode code) {
-    static_assert(YmErrCode_Num == 37);
+    static_assert(YmErrCode_Num == 38);
     switch (code) {
     case YmErrCode_IllegalSpecifier:            return "IllegalSpecifier";
     case YmErrCode_IllegalConstraint:           return "IllegalConstraint";
@@ -45,6 +45,7 @@ const YmChar* ymFmtYmErrCode(YmErrCode code) {
     case YmErrCode_CallStackOverflow:           return "CallStackOverflow";
     case YmErrCode_NoDefaultValue:              return "NoDefaultValue";
     case YmErrCode_IllegalConversion:           return "IllegalConversion";
+    case YmErrCode_SyntaxError:                 return "SyntaxError";
     case YmErrCode_InternalError:               return "InternalError";
     default:                                    return "???";
     }

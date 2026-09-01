@@ -13,6 +13,20 @@ namespace ym {
 
     // TODO: All of the below haven't been unit tested.
 
+    struct CallBhvrCallbackFn final {
+        YmCallBhvrCallbackFn fn;
+        void* data;
+
+
+        inline CallBhvrCallbackFn(
+            std::convertible_to<YmCallBhvrCallbackFn> auto const& fn,
+            void* data = nullptr) noexcept :
+            fn(YmCallBhvrCallbackFn(fn)),
+            data(data) {
+            assertSafe(this->fn);
+        }
+    };
+
     // A RAII handle wrapping a YmParcelDef.
     class ParcelDef final : public Handle<YmParcelDef> {
     public:
@@ -49,14 +63,13 @@ namespace ym {
             const std::string& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
             const std::vector<std::string>& refTypeSymbols,
-            YmCallBhvrCallbackFn callBehaviour,
-            void* callBehaviourData = nullptr) noexcept {
+            CallBhvrCallbackFn callBehaviour) noexcept {
             if (ymParcelDef_AddFn(
                 get(),
                 name.c_str(),
                 returnTypeSymbol.c_str(),
-                callBehaviour,
-                callBehaviourData)) {
+                callBehaviour.fn,
+                callBehaviour.data)) {
                 for (const auto& [paramName, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(name, paramName, typeSymbol);
                 }
@@ -67,21 +80,67 @@ namespace ym {
             }
             return false;
         }
+        inline bool addReadOnlyStoredVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn initBehaviour) noexcept {
+            return ymParcelDef_AddReadOnlyStoredVar(
+                get(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                initBehaviour.fn,
+                initBehaviour.data);
+        }
+        inline bool addStoredVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn initBehaviour) noexcept {
+            return ymParcelDef_AddStoredVar(
+                get(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                initBehaviour.fn,
+                initBehaviour.data);
+        }
+        inline bool addReadOnlyComputedVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn getBehaviour) noexcept {
+            return ymParcelDef_AddReadOnlyComputedVar(
+                get(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                getBehaviour.fn,
+                getBehaviour.data);
+        }
+        inline bool addComputedVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn getBehaviour,
+            CallBhvrCallbackFn setBehaviour) noexcept {
+            return ymParcelDef_AddComputedVar(
+                get(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                getBehaviour.fn,
+                getBehaviour.data,
+                setBehaviour.fn,
+                setBehaviour.data);
+        }
         inline bool addMethod(
             const std::string& ownerName,
             const std::string& name,
             const std::string& returnTypeSymbol,
             const std::vector<std::pair<std::string, std::string>>& paramNameAndTypeSymbols,
             const std::vector<std::string>& refTypeSymbols,
-            YmCallBhvrCallbackFn callBehaviour,
-            void* callBehaviourData = nullptr) noexcept {
+            CallBhvrCallbackFn callBehaviour) noexcept {
             if (ymParcelDef_AddMethod(
                 get(),
                 ownerName.c_str(),
                 name.c_str(),
                 returnTypeSymbol.c_str(),
-                callBehaviour,
-                callBehaviourData)) {
+                callBehaviour.fn,
+                callBehaviour.data)) {
                 auto methodName = std::format("{}::{}", ownerName, name);
                 for (const auto& [paramName, typeSymbol] : paramNameAndTypeSymbols) {
                     addParam(methodName, paramName, typeSymbol);
@@ -110,6 +169,55 @@ namespace ym {
                 return true;
             }
             return false;
+        }
+        inline bool addReadOnlyStoredProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol) noexcept {
+            return ymParcelDef_AddReadOnlyStoredProperty(
+                get(),
+                ownerName.c_str(),
+                name.c_str(),
+                typeSymbol.c_str());
+        }
+        inline bool addStoredProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol) noexcept {
+            return ymParcelDef_AddStoredProperty(
+                get(),
+                ownerName.c_str(),
+                name.c_str(),
+                typeSymbol.c_str());
+        }
+        inline bool addReadOnlyComputedProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn getBehaviour) noexcept {
+            return ymParcelDef_AddReadOnlyComputedProperty(
+                get(),
+                ownerName.c_str(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                getBehaviour.fn,
+                getBehaviour.data);
+        }
+        inline bool addComputedProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackFn getBehaviour,
+            CallBhvrCallbackFn setBehaviour) noexcept {
+            return ymParcelDef_AddComputedProperty(
+                get(),
+                ownerName.c_str(),
+                name.c_str(),
+                typeSymbol.c_str(),
+                getBehaviour.fn,
+                getBehaviour.data,
+                setBehaviour.fn,
+                setBehaviour.data);
         }
         inline std::optional<YmTypeParamIndex> addTypeParam(
             const std::string& typeName,

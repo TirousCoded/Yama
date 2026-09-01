@@ -183,6 +183,20 @@ TEST(Safe, ExplicitConvertToRawPointerOfDiffElemType) {
     ASSERT_EQ(b, &v);
 }
 
+//TEST(Safe, ImplicitConvertToLValueRefOfSameElemType) {
+//    Derived v{};
+//    Safe<Derived> a(v);
+//    Derived& b = a;
+//    ASSERT_EQ(b, &v);
+//}
+//
+//TEST(Safe, ExplicitConvertToLValueRefOfDiffElemType) {
+//    Derived v{};
+//    Safe<Base> a(v);
+//    Derived& b = (Derived&)a; // Convert Safe<Base> -> Derived&.
+//    ASSERT_EQ(b, &v);
+//}
+
 TEST(Safe, Into) {
     Derived v{};
     Safe<Base> a(v);

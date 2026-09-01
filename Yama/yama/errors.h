@@ -36,7 +36,7 @@ extern "C" {
         YmErrCode_IllegalName,              /* Illegal name. */
         YmErrCode_NameConflict,             /* Name conflict detected. */
         YmErrCode_LimitReached,             /* Known limit reached. */
-        YmErrCode_TypeMismatch,             /* Type not expected. */
+        YmErrCode_TypeMismatch,             /* Type wasn't the one expected. */
         YmErrCode_IllegalNameList,          /* Illegal named arg list. */
         YmErrCode_ConcreteType,             /* Type is concrete (ie. not generic.) */
         YmErrCode_GenericType,              /* Type is generic (ie. not concrete.) */
@@ -60,6 +60,7 @@ extern "C" {
         YmErrCode_CallStackOverflow,        /* Call stack overflow. */
         YmErrCode_NoDefaultValue,           /* No default value. */
         YmErrCode_IllegalConversion,        /* Illegal conversion. */
+        YmErrCode_SyntaxError,              /* (Compile) syntax error. */
         YmErrCode_InternalError,            /* Internal Error */
 
         YmErrCode_Num,                      /* Enum size. Not a valid error code. */

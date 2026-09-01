@@ -8,10 +8,31 @@
 #include <yama++/print.h>
 #include <yama++/scalar.h>
 
+#include <yama/../internal/bcode.h>
+
 
 int32_t main(int32_t argc, char** argv) {
     auto dm = ym::Domain{};
     auto ctx = ym::Context(dm);
+
+    _ym::BCodeWriter w{};
+    w.addNoop();
+    w.addPop(10);
+    w.addLabel(222);
+    w.addPutNone(6);
+    w.addPutConst(3, _ym::bPush);
+    w.addJump(111);
+    w.addPutArg(4, _ym::bDiscard);
+    w.addCopy(17, 81);
+    w.addLabel(111);
+    w.addDefaultInit(7, 14);
+    w.addPCall(7, 14);
+    w.addJumpTrue(222);
+    w.addRet();
+    auto bcode = w.done().value();
+    ym::println("{}", bcode.fmtDisassembly());
+
+    return 0;
 
     ym::ParcelDef p_def{};
     p_def.addFn(

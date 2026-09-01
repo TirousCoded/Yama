@@ -53,6 +53,10 @@ namespace _ym {
 
 
         bool operator==(const RefInfo&) const noexcept = default;
+
+        inline std::string fmt() const {
+            return sym.fmt();
+        }
     };
     using ConstInfo = ym::Variant<
         YmInt,
@@ -84,7 +88,7 @@ namespace _ym {
         case ConstType::Float:      return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmFloat>()));
         case ConstType::Bool:       return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmBool>()));
         case ConstType::Rune:       return std::format("{} ({})", fmt(t), ym::fmt(x.as<YmRune>()));
-        case ConstType::Ref:        return std::format("{} ({})", fmt(t), x.as<RefInfo>().sym);
+        case ConstType::Ref:        return std::format("{} ({})", fmt(t), x.as<RefInfo>().fmt());
         default:                    return std::format("{} (n/a)", fmt(t));
         }
     }
@@ -165,7 +169,7 @@ namespace _ym {
             return pullRef(Spec::typeFast(std::move(normalizedSymbol)), sizeLimit);
         }
         inline auto pullRef(const YmChar* normalizedSymbol, size_t sizeLimit = size_t(-1)) {
-            return pullRef(std::string(ym::Safe(normalizedSymbol)), sizeLimit);
+            return pullRef(std::string(ym::Safe(normalizedSymbol).get()), sizeLimit);
         }
         inline auto pullRef(std::optional<std::string> normalizedSymbol, size_t sizeLimit = size_t(-1)) {
             return

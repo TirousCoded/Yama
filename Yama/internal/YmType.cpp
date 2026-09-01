@@ -460,6 +460,17 @@ std::span<const _ym::Const> YmType::consts() const noexcept {
     return std::span(_consts);
 }
 
+std::string YmType::fmtConsts() const {
+    std::string result{};
+    result += std::format("YmType Consts ({}; {} Consts)", fullname(), consts().size());
+    size_t i = 0;
+    for (const auto& c : consts()) {
+        result += std::format("\n   [{}] {}", i, c);
+        i++;
+    }
+    return result;
+}
+
 void YmType::putValConst(size_t index) {
     ymAssert(index < info->consts.size());
     ymAssert(info->consts.isVal(index));

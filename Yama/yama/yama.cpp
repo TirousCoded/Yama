@@ -148,6 +148,10 @@ YmBool ymDm_BindParcelDef(YmDm* dm, YmPath path, YmParcelDef* parceldef) {
     return (YmBool)Safe(dm)->bindParcelDef(std::string(Safe(path)), Safe(parceldef));
 }
 
+YmBool ymDm_BindSourceCode(YmDm* dm, YmPath path, const YmChar* src, size_t srcLength) {
+    return (YmBool)Safe(dm)->bindSourceCode(std::string(Safe(path)), std::string(Safe(path).get(), srcLength));
+}
+
 YmBool ymDm_AddRedirect(YmDm* dm, YmPath subject, YmPath before, YmPath after) {
     return (YmBool)Safe(dm)->addRedirect(std::string(Safe(subject)), std::string(Safe(before)), std::string(Safe(after)));
 }
@@ -617,6 +621,10 @@ YmRef ymParcelDef_AddRef(
 
 YmPath ymParcel_Path(YmParcel* parcel) {
     return Safe(parcel)->path.string().c_str();
+}
+
+YmUInt32 ymParcel_Count(YmParcel* parcel) {
+    return (YmUInt32)Safe(parcel)->types();
 }
 
 YmParcel* ymType_Parcel(YmType* type) {

@@ -41,6 +41,16 @@ namespace ym {
                 std::string_view(path).data(),
                 Safe<YmParcelDef>(parceldef)) == YM_TRUE;
         }
+        // path is expected to be null-terminated.
+        inline bool bind(
+            std::convertible_to<std::string_view> auto const& path,
+            std::convertible_to<std::string_view> auto const& src) noexcept {
+            return ymDm_BindSourceCode(
+                get(),
+                std::string_view(path).data(),
+                std::string_view(src).data(),
+                std::string_view(src).length());
+        }
         // subject is expected to be null-terminated.
         // before is expected to be null-terminated.
         // after is expected to be null-terminated.

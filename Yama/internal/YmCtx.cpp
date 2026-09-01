@@ -863,6 +863,9 @@ bool YmCtx::_coerce(YmLocal where, YmType& newType) {
     if (local(where)->type->sameAs(newType)) {
         return true;
     }
+    // TODO: Maybe make it so that many obj stk affecting API fns ALWAYS consume
+    //       stk inputs, even in case of API fn error, in which case they just
+    //       consume inputs, but don't push anything.
     copy(where, YM_PUSH);
     if (!convert(newType, where, true)) {
         pop(1); // TODO: Remove this if we make convert always consume inputs.

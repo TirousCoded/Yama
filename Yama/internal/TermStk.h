@@ -63,11 +63,11 @@ namespace _ym {
 
         // For paths.
         inline explicit Term(std::string path) :
-            data(PathData(std::move(path))) {
+            data(PathData{ std::move(path) }) {
         }
         // For concrete types.
         inline explicit Term(ym::Safe<YmType> type) :
-            data(ConcreteData(type)) {
+            data(ConcreteData{ type }) {
         }
         // For generic types.
         inline Term(std::string path, ym::Safe<const TypeInfo> info) :

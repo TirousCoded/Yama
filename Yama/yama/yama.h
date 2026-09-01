@@ -614,6 +614,18 @@ extern "C" {
     /*   - parceldef is invalid. */
     YmBool ymDm_BindParcelDef(struct YmDm* dm, YmPath path, struct YmParcelDef* parceldef);
 
+    /* TODO: ymDm_BindSourceCode hasn't been unit tested.
+    */
+
+    /* Binds a parcel (defined by src and srcLength) to path, replacing any existing bindings, returning if successful. */
+    /* The validity of the parcel isn't known until importing attempts to compile it. */
+    /*   - path specified is illegal. (UNTESTED) */
+    /* Undefined Behaviour: */
+    /*   - dm is invalid. */
+    /*   - path (pointer) is invalid. */
+    /*   - src (pointer) is invalid. */
+    YmBool ymDm_BindSourceCode(struct YmDm* dm, YmPath path, const YmChar* src, size_t srcLength);
+
     /* NOTE: Imported parcels have a set of import paths depended-upon by its types. However, these paths
     *        may not always line up w/ the paths in the actual import environment needed to reach the desired
     *        parcels. In these situations 'redirects' are used to redirect part or all of a dependency path
@@ -738,6 +750,9 @@ extern "C" {
     /*   - ctx is invalid. */
     /*   - path (pointer) is invalid. */
     struct YmParcel* ymCtx_Import(struct YmCtx* ctx, YmPath path);
+
+    /* TODO: Unit test + impl having ymCtx_Load invoke compiling.
+    */
 
     /* Loads the type with fullname, returning a pointer to it, or YM_NIL on failure. */
     /* Loading may involve the importing of parcels or the loading of other types. */
@@ -1039,9 +1054,6 @@ extern "C" {
     YmBool ymCtx_PutRune(struct YmCtx* ctx, YmLocal where, YmRune v);
     YmBool ymCtx_PutType(struct YmCtx* ctx, YmLocal where, struct YmType* v);
 
-    /* TODO: Also, do we have proper tests/docs for API fns w/ regards to YmLocal params
-    *        which CANNOT be YM_[PUSH|DISCARD]?
-    */
     /* TODO: ymCtx_Swap hasn't been unit tested.
     */
 
@@ -1727,6 +1739,14 @@ extern "C" {
     /* Undefined Behaviour: */
     /*   - parcel is invalid. */
     YmPath ymParcel_Path(struct YmParcel* parcel);
+
+    /* TODO: ymParcel_Count hasn't been unit tested.
+    */
+
+    /* Returns the number of types in parcel. */
+    /* Undefined Behaviour: */
+    /*   - parcel is invalid. */
+    YmUInt32 ymParcel_Count(struct YmParcel* parcel);
 
 
     /* Type API */

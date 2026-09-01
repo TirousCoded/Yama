@@ -64,6 +64,11 @@ namespace ym {
         constexpr explicit operator void* () const noexcept { return (void*)get(); } // Explicit
         constexpr explicit operator const void* () const noexcept { return (void*)get(); } // Explicit
 
+        // TODO: Got rid of these as they made implicit convert to T* not work.
+        //constexpr operator T& () const noexcept { return value(); } // Implicit
+        //template<typename U>
+        //constexpr explicit operator U& () const noexcept { return *into<U>(); } // Explicit
+
         template<typename U>
         constexpr Safe<U> into() const noexcept { return Safe<U>(*this); }
         template<typename U>
