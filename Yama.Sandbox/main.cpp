@@ -9,30 +9,12 @@
 #include <yama++/scalar.h>
 
 #include <yama/../internal/bcode.h>
+#include <yama/../internal/YmParcelDef.h>
 
 
 int32_t main(int32_t argc, char** argv) {
     auto dm = ym::Domain{};
     auto ctx = ym::Context(dm);
-
-    _ym::BCodeWriter w{};
-    w.addNoop();
-    w.addPop(10);
-    w.addLabel(222);
-    w.addPutNone(6);
-    w.addPutConst(3, _ym::bPush);
-    w.addJump(111);
-    w.addPutArg(4, _ym::bDiscard);
-    w.addCopy(17, 81);
-    w.addLabel(111);
-    w.addDefaultInit(7, 14);
-    w.addPCall(7, 14);
-    w.addJumpTrue(222);
-    w.addRet();
-    auto bcode = w.done().value();
-    ym::println("{}", bcode.fmtDisassembly());
-
-    return 0;
 
     ym::ParcelDef p_def{};
     p_def.addFn(
@@ -115,7 +97,7 @@ int32_t main(int32_t argc, char** argv) {
         });
 
     ctx.pushUInt(10);
-    ctx.calld(ctx.load("p:recurse").value(), 1, "");
+    ctx.calld(ctx.load("p:recurse"), 1);
 
     ctx.pushNone();
     ctx.pushInt(-11);
@@ -124,13 +106,13 @@ int32_t main(int32_t argc, char** argv) {
     ctx.pushBool(true);
     ctx.pushRune(U'y');
     ctx.pushType(ctx.ldBool());
-    ctx.calld(ctx.load("p:printT[yama:Type]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:Rune]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:Bool]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:Float]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:UInt]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:Int]").value(), 1, "");
-    ctx.calld(ctx.load("p:printT[yama:None]").value(), 1, "");
+    ctx.calld(ctx.load("p:printT[yama:Type]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:Rune]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:Bool]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:Float]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:UInt]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:Int]"), 1);
+    ctx.calld(ctx.load("p:printT[yama:None]"), 1);
 
     (void)ctx.load("p:printT[p:printT[yama:Int]]");
 

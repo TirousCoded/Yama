@@ -59,16 +59,15 @@ namespace {
 	}
 
 	inline bool compare(const Val& lhs, const Val& rhs) {
-		bool bothAreFloatsAndTheyMismatch =
-			lhs.is<YmFloat>() &&
-			rhs.is<YmFloat>() &&
-			!compFloats(lhs.as<YmFloat>(), rhs.as<YmFloat>());
-		return bothAreFloatsAndTheyMismatch || lhs != rhs;
+		return
+			(lhs.is<YmFloat>() && rhs.is<YmFloat>())
+			? compFloats(lhs.as<YmFloat>(), rhs.as<YmFloat>())
+			: lhs == rhs;
 	}
 
 	inline Val toVal(YmObj* obj) {
 		if (obj) {
-			auto fln = ymType_Fullname(ymObj_Type(obj));
+			auto fln = std::string_view(ymType_Fullname(ymObj_Type(obj)));
 			if (fln == "yama:None")		return NoneVal{};
 			if (fln == "yama:Int")		return ymObj_ToInt(obj, nullptr);
 			if (fln == "yama:UInt")		return ymObj_ToUInt(obj, nullptr);
@@ -170,12 +169,14 @@ namespace {
 			ymParcelDef_AddFn(p, "observeNone", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeNone();
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 
 			ymParcelDef_AddFn(p, "observeInt", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeInt(ymObj_ToInt(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeInt", "value", "yama:Int");
@@ -183,6 +184,7 @@ namespace {
 			ymParcelDef_AddFn(p, "observeUInt", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeUInt(ymObj_ToUInt(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeUInt", "value", "yama:UInt");
@@ -190,6 +192,7 @@ namespace {
 			ymParcelDef_AddFn(p, "observeFloat", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeFloat(ymObj_ToFloat(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeFloat", "value", "yama:Float");
@@ -197,6 +200,7 @@ namespace {
 			ymParcelDef_AddFn(p, "observeBool", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeBool(ymObj_ToBool(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeBool", "value", "yama:Bool");
@@ -204,6 +208,7 @@ namespace {
 			ymParcelDef_AddFn(p, "observeRune", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeRune(ymObj_ToRune(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeRune", "value", "yama:Rune");
@@ -211,6 +216,7 @@ namespace {
 			ymParcelDef_AddFn(p, "observeType", "yama:None",
 				[](YmCtx* ctx, YmType* type, void*) {
 					sidefx.observeType(ymObj_ToType(ymCtx_Arg(ctx, 0, YM_BORROW), nullptr));
+					ymCtx_RetObj(ctx, ymCtx_NewNone(ctx), YM_TAKE);
 				},
 				nullptr);
 			ymParcelDef_AddParam(p, "observeType", "value", "yama:Type");

@@ -31,62 +31,73 @@ public:
     }
 
 
-    bool verify() const;
-
     bool addStruct(
         const std::string& name,
-        _ym::KindEx k = _ym::KindEx::Struct);
+        _ym::KindEx k = _ym::KindEx::Struct,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addProtocol(
-        const std::string& name);
+        const std::string& name,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addFn(
         const std::string& name,
         const std::string& returnTypeSymbol,
-        _ym::CallBhvrCallbackInfo callBehaviour);
+        _ym::CallBhvrCallbackInfo callBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addReadOnlyStoredVar(
         const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo initBehaviour);
+        const std::string& typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addStoredVar(
         const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo initBehaviour);
+        const std::string& typeSymbol,
+        _ym::CallBhvrCallbackInfo initBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addReadOnlyComputedVar(
         const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getBehaviour);
+        const std::string& typeSymbol,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addComputedVar(
         const std::string& name,
-        std::string typeSymbol,
+        const std::string& typeSymbol,
         _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::CallBhvrCallbackInfo setBehaviour);
+        _ym::CallBhvrCallbackInfo setBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addMethod(
         const std::string& ownerName,
         const std::string& name,
-        std::string returnTypeSymbol,
-        _ym::CallBhvrCallbackInfo callBehaviour);
+        const std::string& returnTypeSymbol,
+        _ym::CallBhvrCallbackInfo callBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addMethodReq(
         const std::string& ownerName,
         const std::string& name,
-        std::string returnTypeSymbol);
+        const std::string& returnTypeSymbol,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addReadOnlyStoredProperty(
         const std::string& ownerName,
         const std::string& name,
-        std::string typeSymbol);
+        const std::string& typeSymbol,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addStoredProperty(
         const std::string& ownerName,
         const std::string& name,
-        std::string typeSymbol);
+        const std::string& typeSymbol,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addReadOnlyComputedProperty(
         const std::string& ownerName,
         const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getBehaviour);
+        const std::string& typeSymbol,
+        _ym::CallBhvrCallbackInfo getBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
     bool addComputedProperty(
         const std::string& ownerName,
         const std::string& name,
-        std::string typeSymbol,
+        const std::string& typeSymbol,
         _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::CallBhvrCallbackInfo setBehaviour);
+        _ym::CallBhvrCallbackInfo setBehaviour,
+        _ym::ConstTableInfo initial = _ym::ConstTableInfo{});
 
     std::optional<YmTypeParamIndex> addTypeParam(
         std::string typeName,
@@ -102,41 +113,32 @@ public:
         std::string typeName,
         std::string symbol);
 
+    bool bindBCode(
+        const std::string& localName,
+        _ym::BCode code,
+        _ym::BCodeDbgSyms syms = _ym::BCodeDbgSyms{});
 
-private:
-    bool _addReadOnlyVar(
-        const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo initBehaviour,
-        _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::KindEx getK);
-    bool _addVar(
-        const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo initBehaviour,
-        _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::CallBhvrCallbackInfo setBehaviour,
-        _ym::KindEx getK,
-        _ym::KindEx setK);
-    bool _addMethod(
-        const std::string& ownerName,
-        const std::string& name,
-        std::string returnTypeSymbol,
-        _ym::CallBhvrCallbackInfo callBehaviour,
-        _ym::KindEx k);
-    bool _addReadOnlyProperty(
-        const std::string& ownerName,
-        const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::KindEx getK);
-    bool _addProperty(
-        const std::string& ownerName,
-        const std::string& name,
-        std::string typeSymbol,
-        _ym::CallBhvrCallbackInfo getBehaviour,
-        _ym::CallBhvrCallbackInfo setBehaviour,
-        _ym::KindEx getK,
-        _ym::KindEx setK);
+    // NOTE: Remember, constant table info is impl details!
+    // NOTE: These are mainly for helping our unit tests.
+
+    inline std::optional<size_t> pullRefConst(
+        const std::string& localname, const std::string& symbol, size_t sizeLimit = size_t(-1)) {
+        if (auto t = info->type(localname)) {
+            if (auto result = t->consts.pullRef(_ym::Spec::type(symbol), sizeLimit)) {
+                return (size_t)*result;
+            }
+        }
+        return std::nullopt;
+    }
+    template<typename T>
+    inline std::optional<size_t> pullValConst(
+        const std::string& localname, const T& v, size_t sizeLimit = size_t(-1)) {
+        if (auto t = info->type(localname)) {
+            if (auto result = t->consts.pullVal(v, sizeLimit)) {
+                return (size_t)*result;
+            }
+        }
+        return std::nullopt;
+    }
 };
 

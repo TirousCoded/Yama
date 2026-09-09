@@ -19,6 +19,13 @@ namespace ym {
             ? &*x
             : nullptr;
     }
+    template<typename Iter>
+    inline auto& pointer(const Iter& it, const Iter& end) noexcept {
+        return
+            it == end
+            ? nullptr
+            : &*it;
+    }
 
     template<Dereferenceable T>
     inline auto&& deref(T&& x) noexcept {

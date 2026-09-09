@@ -57,11 +57,11 @@ namespace ym {
             Context(Safe(ymCtx_Create(Safe<YmDm>(dm))), false) {
         }
         // Increments resource's ref count if secure == true.
-        inline Context(Safe<YmCtx> resource, bool secure) noexcept :
+        inline Context(Safe<YmCtx> resource, bool secure = true) noexcept :
             Handle(resource, secure) {
         }
         // Increments resource's ref count if secure == true.
-        inline static std::optional<Context> maybe(YmCtx* resource, bool secure) noexcept {
+        inline static std::optional<Context> maybe(YmCtx* resource, bool secure = true) noexcept {
             return
                 resource
                 ? std::make_optional(Context(*resource, secure))
@@ -197,6 +197,18 @@ namespace ym {
             YmLocal returnTo = YM_PUSH) noexcept {
             return fn && call(*fn, argsN, argNames, returnTo);
         }
+        inline bool call(
+            const Type& fn,
+            YmUInt16 argsN,
+            YmLocal returnTo = YM_PUSH) noexcept {
+            return call(fn, argsN, "", returnTo);
+        }
+        inline bool call(
+            const std::optional<Type>& fn,
+            YmUInt16 argsN,
+            YmLocal returnTo = YM_PUSH) noexcept {
+            return call(fn, argsN, "", returnTo);
+        }
         // Discards return value.
         // argNames is expected to be null-terminated.
         inline bool calld(
@@ -212,6 +224,18 @@ namespace ym {
             YmUInt16 argsN,
             std::convertible_to<std::string_view> auto const& argNames) noexcept {
             return call(fn, argsN, argNames, YM_DISCARD);
+        }
+        // Discards return value.
+        inline bool calld(
+            const Type& fn,
+            YmUInt16 argsN) noexcept {
+            return calld(fn, argsN, "");
+        }
+        // Discards return value.
+        inline bool calld(
+            const std::optional<Type>& fn,
+            YmUInt16 argsN) noexcept {
+            return calld(fn, argsN, "");
         }
         inline void retObj(const Object& what) noexcept { ymCtx_RetObj(get(), what.get(), YM_BORROW); }
         inline void retObj(const std::optional<Object>& what) noexcept { if (what) retObj(*what); }

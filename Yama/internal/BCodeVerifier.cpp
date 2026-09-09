@@ -3,15 +3,15 @@
 #include "BCodeVerifier.h"
 
 
-#define _TRACE_SYMEXEC true
+#define _TRACE_SYMEXEC false
 
 #if _TRACE_SYMEXEC
 #include "../yama++/print.h"
 #endif
 
 
-_ym::BCodeVerifier::BCodeVerifier(YmCtx& ctx) noexcept :
-	_ctx(ctx) {
+_ym::BCodeVerifier::BCodeVerifier(BuiltinsCache fast) noexcept :
+	fast(fast) {
 }
 
 bool _ym::BCodeVerifier::verify(
@@ -343,7 +343,7 @@ bool _ym::BCodeVerifier::_symbolicExecStep(size_t i, _Block& block, const _StkSt
 			)) {
 			return false;
 		}
-		s.putLocal(instr.A, _ctx->ldNone());
+		s.putLocal(instr.A, *fast.none);
 	}
 	break;
 	case Opcode::putConst:
@@ -354,14 +354,7 @@ bool _ym::BCodeVerifier::_symbolicExecStep(size_t i, _Block& block, const _StkSt
 			)) {
 			return false;
 		}
-		auto c = _getType().consts()[instr.A];
-		if (c.is<YmInt>())					s.putLocal(instr.B, _ctx->ldInt());
-		else if (c.is<YmUInt>())			s.putLocal(instr.B, _ctx->ldUInt());
-		else if (c.is<YmFloat>())			s.putLocal(instr.B, _ctx->ldFloat());
-		else if (c.is<YmBool>())			s.putLocal(instr.B, _ctx->ldBool());
-		else if (c.is<YmRune>())			s.putLocal(instr.B, _ctx->ldRune());
-		else if (c.is<ym::Safe<YmType>>())	s.putLocal(instr.B, _ctx->ldType());
-		else								YM_DEADEND;
+		s.putLocal(instr.B, ym::deref(_constToType(_getType().consts()[instr.A])));
 	}
 	break;
 	case Opcode::putArg:
@@ -541,7 +534,7 @@ bool _ym::BCodeVerifier::_symbolicExecStep(size_t i, _Block& block, const _StkSt
 	{
 		if (!(
 			_checkLocalsPresent(block, i, 1) &&
-			_checkLocalCanConvertToType(block, i, s.locals.size() - 1, _ctx->ldBool())
+			_checkLocalCanConvertToType(block, i, s.locals.size() - 1, *fast.bool0)
 			)) {
 			return false;
 		}
@@ -552,7 +545,7 @@ bool _ym::BCodeVerifier::_symbolicExecStep(size_t i, _Block& block, const _StkSt
 	{
 		if (!(
 			_checkLocalsPresent(block, i, 1) &&
-			_checkLocalCanConvertToType(block, i, s.locals.size() - 1, _ctx->ldBool())
+			_checkLocalCanConvertToType(block, i, s.locals.size() - 1, *fast.bool0)
 			)) {
 			return false;
 		}
@@ -814,6 +807,16 @@ bool _ym::BCodeVerifier::_checkLocalCanConvertToType(_Block& block, size_t i, si
 		return false;
 	}
 	return true;
+}
+
+YmType* _ym::BCodeVerifier::_constToType(const Const& c) const noexcept {
+	if (c.is<YmInt>())					return fast.int0;
+	else if (c.is<YmUInt>())			return fast.uint;
+	else if (c.is<YmFloat>())			return fast.float0;
+	else if (c.is<YmBool>())			return fast.bool0;
+	else if (c.is<YmRune>())			return fast.rune;
+	else if (c.is<ym::Safe<YmType>>())	return fast.type;
+	else								return nullptr;
 }
 
 bool _ym::BCodeVerifier::_Block::finalInstrIsBranch() const noexcept {

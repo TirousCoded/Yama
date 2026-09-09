@@ -34,11 +34,11 @@ namespace ym {
             ParcelDef(Safe(ymParcelDef_Create()), false) {
         }
         // Increments resource's ref count if secure == true.
-        inline explicit ParcelDef(Safe<YmParcelDef> resource, bool secure) noexcept :
+        inline explicit ParcelDef(Safe<YmParcelDef> resource, bool secure = true) noexcept :
             Handle(resource, secure) {
         }
         // Increments resource's ref count if secure == true.
-        inline static std::optional<ParcelDef> maybe(YmParcelDef* resource, bool secure) noexcept {
+        inline static std::optional<ParcelDef> maybe(YmParcelDef* resource, bool secure = true) noexcept {
             return
                 resource
                 ? std::make_optional(ParcelDef(*resource, secure))

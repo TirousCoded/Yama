@@ -4,10 +4,11 @@
 
 #include <taul/unicode.h>
 
+#include "../yama++/general.h"
 #include "general.h"
 #include "SpecSolver.h"
-#include "../yama++/general.h"
 
+#include "BCodeExec.h"
 #include "YmObj.h" // <- Needed for YmCtx impl.
 
 
@@ -63,6 +64,13 @@ void _ym::methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     YM_DEADEND;
 }
 
+void _ym::bcodeExecCallBhvr(YmCtx* ctx, YmType* type, void* user) {
+    if (ctx && type) {
+        BCodeExec(*ctx, *type->info->bcode())();
+    }
+    else YM_DEADEND;
+}
+
 void _ym::storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->put(YM_PUSH, ctx->arg(0));
     ctx->getProperty(type, YM_PUSH);
@@ -87,7 +95,12 @@ void _ym::storedVarSetCallBhvr(YmCtx* ctx, YmType* type, void* user) {
     ctx->retObj(ctx->newNone(false));
 }
 
-_ym::TypeInfo::TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localName) :
+_ym::TypeInfo::TypeInfo(
+    ParcelInfo& parcel,
+    KindEx k,
+    const std::string& localName,
+    ConstTableInfo initial) :
+    consts(std::move(initial)),
     _parcel(&parcel),
     _k(k),
     _localName(localName) {
@@ -449,10 +462,24 @@ bool _ym::TypeInfo::checkIsRefSlot(Slots index) const noexcept {
 }
 
 std::optional<_ym::Slots> _ym::TypeInfo::storedPropertySlot() const noexcept {
+    if (_call) {
+        return _call->slot;
+    }
+    return std::nullopt;
+}
+
+const _ym::BCode* _ym::TypeInfo::bcode() const noexcept {
     return
-        _call
-        ? std::make_optional(_call->slot)
-        : std::nullopt;
+        _bcode
+        ? &_bcode->code
+        : nullptr;
+}
+
+const _ym::BCodeDbgSyms* _ym::TypeInfo::bsyms() const noexcept {
+    return
+        _bcode
+        ? &_bcode->syms
+        : nullptr;
 }
 
 _ym::Slots _ym::TypeInfo::nextSlot() noexcept {
@@ -545,54 +572,53 @@ std::optional<YmRef> _ym::TypeInfo::addRef(std::string symbol) {
     return std::nullopt;
 }
 
-std::optional<size_t> _ym::TypeInfo::checkedRef(const std::string& symbol) {
-    return consts.pullRef(normalizeRefSym(symbol, "Cannot add type; invalid type symbol"));
-}
-
-size_t _ym::TypeInfo::uncheckedRef(std::string normalizedSymbol) {
-    return consts.pullRef(Spec::typeFast(std::move(normalizedSymbol))).value();
-}
-
-std::optional<size_t> _ym::TypeInfo::uncheckedRefOpt(std::string normalizedSymbol) {
-    return uncheckedRef(std::move(normalizedSymbol));
-}
-
 bool _ym::TypeInfo::setupCall(
     CallBhvrCallbackInfo callBehaviour,
     const std::string& returnTypeSymbol,
     Slots slot,
     bool hasAssigner) {
     ymAssert(hasCallSig());
-    auto returnType = checkedRef(returnTypeSymbol);
-    if (!returnType) {
-        return false;
+    if (auto returnType = _checkedRef(returnTypeSymbol)) {
+        _initCall(
+            callBehaviour,
+            hasAssigner
+            ? _uncheckedRefOpt(
+                isOwner()
+                ? std::format("%here:{}$assigner", localName())
+                : std::format("$Self::{}$assigner", memberName()))
+            : std::nullopt,
+            *returnType,
+            slot);
+        return true;
     }
-    // TODO: Refactor how we check max stored properties.
-    if (isStoredPropertyGet() && slot > YM_MAX_STORED_PROPERTIES) {
-
-    }
-    _initCall(
-        callBehaviour,
-        hasAssigner
-        ? uncheckedRefOpt(
-            isOwner()
-            ? std::format("%here:{}$assigner", localName())
-            : std::format("$Self::{}$assigner", memberName()))
-        : std::nullopt,
-        *returnType,
-        slot);
-    return true;
+    return false;
 }
 
 bool _ym::TypeInfo::setupVar(
     bool hasInitializer) {
-    _initVar(
-        hasInitializer
-        ? uncheckedRefOpt(
-            isOwner()
-            ? std::format("%here:{}$init", localName())
-            : std::format("$Self::{}$init", memberName()))
-        : std::nullopt);
+    if (!_var) {
+        _var = std::unique_ptr<_Var>(new _Var{
+            .initializerConst =
+                hasInitializer
+                ? _uncheckedRefOpt(
+                    isOwner()
+                    ? std::format("%here:{}$init", localName())
+                    : std::format("$Self::{}$init", memberName()))
+                : std::nullopt,
+            });
+    }
+    return true;
+}
+
+bool _ym::TypeInfo::setupBCode(
+    BCode code,
+    BCodeDbgSyms syms) {
+    if (!_bcode) {
+        _bcode = std::unique_ptr<_BCode>(new _BCode{
+            .code = std::move(code),
+            .syms = std::move(syms),
+            });
+    }
     return true;
 }
 
@@ -616,7 +642,7 @@ void _ym::TypeInfo::_initMembership() {
             .memberName = _extractMemberName(localName()),
             .owner = ym::Safe(parcel().type(ownerName)),
             // $Self here nicely accounts for things like generics.
-            .ownerConst = uncheckedRef("$Self"),
+            .ownerConst = _uncheckedRef("$Self"),
             });
     }
 }
@@ -640,8 +666,8 @@ void _ym::TypeInfo::_initAssigner() {
         _assigner = std::unique_ptr<_Assigner>(new _Assigner{
             .assigneeConst =
                 isVarAssigner()
-                ? uncheckedRefFmt("%here:{}", _extractAssigneeLocalName(localName()))
-                : uncheckedRefFmt("$Self::{}", _extractMemberName(_extractAssigneeLocalName(localName()))),
+                ? _uncheckedRefFmt("%here:{}", _extractAssigneeLocalName(localName()))
+                : _uncheckedRefFmt("$Self::{}", _extractMemberName(_extractAssigneeLocalName(localName()))),
             });
     }
 }
@@ -661,13 +687,16 @@ void _ym::TypeInfo::_initCall(
     }
 }
 
-void _ym::TypeInfo::_initVar(
-    std::optional<ConstIndex> initializerConst) {
-    if (!_var) {
-        _var = std::unique_ptr<_Var>(new _Var{
-            .initializerConst = initializerConst,
-            });
-    }
+std::optional<size_t> _ym::TypeInfo::_checkedRef(const std::string& symbol) {
+    return consts.pullRef(normalizeRefSym(symbol, "Cannot add type; invalid type symbol"));
+}
+
+size_t _ym::TypeInfo::_uncheckedRef(std::string normalizedSymbol) {
+    return consts.pullRef(Spec::typeFast(std::move(normalizedSymbol))).value();
+}
+
+std::optional<size_t> _ym::TypeInfo::_uncheckedRefOpt(std::string normalizedSymbol) {
+    return _uncheckedRef(std::move(normalizedSymbol));
 }
 
 std::string _ym::TypeInfo::_extractOwnerName(const std::string& localName) noexcept {
@@ -827,137 +856,245 @@ void _ym::TypeInfo::_Call::beginNamedParams() noexcept {
     definingNamed = true;
 }
 
-bool _ym::ParcelInfo::verify() const {
-    bool success = true;
-    for (const auto& type : _types) {
-        continue; // TODO: Add verif. checks when needed.
-        success = false;
-    }
-    return success;
-}
-
 size_t _ym::ParcelInfo::types() const noexcept {
     return _types.size();
 }
 
 _ym::TypeInfo* _ym::ParcelInfo::type(const std::string& localName) noexcept {
-    const auto it = _lookup.find(localName);
+    const auto it = _types.find(localName);
     return
-        it != _lookup.end()
-        ? _types[it->second].get()
+        it != _types.end()
+        ? it->second.get()
         : nullptr;
 }
 
 const _ym::TypeInfo* _ym::ParcelInfo::type(const std::string& localName) const noexcept {
-    const auto it = _lookup.find(localName);
+    const auto it = _types.find(localName);
     return
-        it != _lookup.end()
-        ? _types[it->second].get()
+        it != _types.end()
+        ? it->second.get()
         : nullptr;
 }
 
-std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::mkNonMember(
+bool _ym::ParcelInfo::addStruct(
+    const std::string& name,
     KindEx k,
-    const std::string& localName,
-    bool skipLocalNameLegalityCheck) {
-    if (!_checkNameLegality(localName, "Cannot add type", skipLocalNameLegalityCheck)) {
-        return nullptr;
-    }
-    if (type(localName)) {
-        Global::raiseErr(
-            YmErrCode_NameConflict,
-            "Cannot add type; name \"{}\" already taken!",
-            localName);
-        return nullptr;
-    }
-    return std::make_unique<TypeInfo>(*this, k, localName);
+    ConstTableInfo initial) {
+    _newNonMember(mustBe<YmKind_Struct>(k), name, false, std::move(initial));
+    return _submit();
 }
 
-std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::mkMember(
-    KindEx k,
+bool _ym::ParcelInfo::addProtocol(
+    const std::string& name,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::Protocol, name, false, std::move(initial));
+    return _submit();
+}
+
+bool _ym::ParcelInfo::addFn(
+    const std::string& name,
+    const std::string& returnTypeSymbol,
+    _ym::CallBhvrCallbackInfo callBehaviour,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::Fn, name, false, std::move(initial));
+    _setupCall(callBehaviour, returnTypeSymbol, -1, false);
+    return _submit();
+}
+
+bool _ym::ParcelInfo::addReadOnlyStoredVar(
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo initBehaviour,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::StoredVarGet, name, false, std::move(initial));
+    _setupCall(CallBhvrCallbackInfo::mk(storedVarGetCallBhvr), typeSymbol, -1, false);
+    _setupVar(true);
+    if (_submit()) {
+        _newNonMember(KindEx::Fn, std::format("{}$init", name), true);
+        _setupCall(initBehaviour, typeSymbol, -1, false);
+        _mustSucceed();
+        _submit();
+        return true;
+    }
+    return false;
+}
+
+bool _ym::ParcelInfo::addStoredVar(
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo initBehaviour,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::StoredVarGet, name, false, std::move(initial));
+    _setupCall(CallBhvrCallbackInfo::mk(storedVarGetCallBhvr), typeSymbol, -1, true);
+    _setupVar(true);
+    if (_submit()) {
+        _newNonMember(KindEx::StoredVarSet, std::format("{}$assigner", name), true);
+        _setupCall(CallBhvrCallbackInfo::mk(storedVarSetCallBhvr), "yama:None", -1, false);
+        _mustSucceed();
+        if (auto assigner = _submit()) {
+            (void)assigner->addParam("x", typeSymbol, true).value();
+        }
+
+        _newNonMember(KindEx::Fn, std::format("{}$init", name), true);
+        _setupCall(initBehaviour, typeSymbol, -1, false);
+        _mustSucceed();
+        _submit();
+
+        return true;
+    }
+    return false;
+}
+
+bool _ym::ParcelInfo::addReadOnlyComputedVar(
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo getBehaviour,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::Var, name, false, std::move(initial));
+    _setupCall(getBehaviour, typeSymbol, -1, false);
+    _setupVar(false);
+    return _submit();
+}
+
+bool _ym::ParcelInfo::addComputedVar(
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo getBehaviour,
+    _ym::CallBhvrCallbackInfo setBehaviour,
+    ConstTableInfo initial) {
+    _newNonMember(KindEx::Var, name, false, std::move(initial));
+    _setupCall(getBehaviour, typeSymbol, -1, true);
+    _setupVar(false);
+    if (_submit()) {
+        _newNonMember(KindEx::VarAssigner, std::format("{}$assigner", name), true);
+        _setupCall(setBehaviour, "yama:None", -1, false);
+        _mustSucceed();
+        if (auto assigner = _submit()) {
+            (void)assigner->addParam("x", typeSymbol, true).value();
+        }
+        return true;
+    }
+    return false;
+}
+
+bool _ym::ParcelInfo::addMethod(
     const std::string& ownerName,
-    const std::string& memberName,
-    bool skipLocalNameLegalityCheck) {
-    // TODO: This _checkNameLegality's error msgs will only detail the memberName, rather
-    //       than the whole local name, which is somewhat suboptimal.
-    if (!_checkNameLegality(memberName, "Cannot add type", skipLocalNameLegalityCheck)) {
-        return nullptr;
-    }
-    auto ownerTypePtr = type(ownerName);
-    if (!ownerTypePtr) {
-        Global::raiseErr(
-            YmErrCode_TypeNotFound,
-            "Cannot add type; owner {} not found!",
-            ownerName);
-        return nullptr;
-    }
-    auto& ownerType = ym::deref(ownerTypePtr);
-    if (!_checkNoMemberLevelNameConflict(ownerType, memberName, "Cannot add type")) {
-        return nullptr;
-    }
-    if (!ownerType.canHaveMembers()) {
-        Global::raiseErr(
-            YmErrCode_TypeCannotHaveMembers,
-            "Cannot add type; owner {} is a {} which cannot have members!",
-            ownerType.localName(),
-            ymKind_Fmt(ownerType.kind()));
-        return nullptr;
-    }
-    if (kindOf(k) == YmKind_Method) {
-        if (!isProtocolReq(k) && ownerType.isProtocol()) {
-            Global::raiseErr(
-                YmErrCode_ProtocolType,
-                // NOTE: Doesn't refer to KindEx notion of 'regular'.
-                "Cannot add regular method to {} type {}!",
-                ymKind_Fmt(ownerType.kind()),
-                ownerType.localName());
-            return nullptr;
-        }
-        else if (isProtocolReq(k) && !ownerType.isProtocol()) {
-            Global::raiseErr(
-                YmErrCode_NonProtocolType,
-                "Cannot add method req. to {} type {}!",
-                ymKind_Fmt(ownerType.kind()),
-                ownerType.localName());
-            return nullptr;
-        }
-    }
-    if (kindOf(k) == YmKind_Property) {
-        if (ownerType.isProtocol()) {
-            Global::raiseErr(
-                YmErrCode_ProtocolType,
-                // NOTE: Doesn't refer to KindEx notion of 'regular'.
-                "Cannot add regular property to {} type {}!",
-                ymKind_Fmt(ownerType.kind()),
-                ownerType.localName());
-            return nullptr;
-        }
-        if (k == KindEx::StoredPropertyGet && ownerType.slots() >= YM_MAX_STORED_PROPERTIES) {
-            Global::raiseErr(
-                YmErrCode_LimitReached,
-                "Cannot add stored property to {} type {}; would exceed {} limit!",
-                ymKind_Fmt(ownerType.kind()),
-                ownerType.localName(),
-                YM_MAX_STORED_PROPERTIES);
-            return nullptr;
-        }
-    }
-    return std::make_unique<TypeInfo>(*this, k,
-        std::format("{}::{}", ownerType.localName(), memberName));
+    const std::string& name,
+    const std::string& returnTypeSymbol,
+    _ym::CallBhvrCallbackInfo callBehaviour,
+    ConstTableInfo initial) {
+    _newMember(KindEx::Method, ownerName, name, false, std::move(initial));
+    _setupCall(callBehaviour, returnTypeSymbol, -1, false);
+    return _submit();
 }
 
-bool _ym::ParcelInfo::registerType(
-    std::unique_ptr<TypeInfo> t,
-    bool assertSucceeds) {
-    if (!t) {
-        ymAssert(!assertSucceeds);
-        return false;
+bool _ym::ParcelInfo::addMethodReq(
+    const std::string& ownerName,
+    const std::string& name,
+    const std::string& returnTypeSymbol,
+    ConstTableInfo initial) {
+    _newMember(KindEx::MethodReq, ownerName, name, false, std::move(initial));
+    _setupCall(CallBhvrCallbackInfo::mk(methodReqCallBhvr, (void*)_getNextMemberIndex(ownerName)), returnTypeSymbol, -1, false);
+    return _submit();
+}
+
+bool _ym::ParcelInfo::addReadOnlyStoredProperty(
+    const std::string& ownerName,
+    const std::string& name,
+    const std::string& typeSymbol,
+    ConstTableInfo initial) {
+    _newMember(KindEx::StoredPropertyGet, ownerName, name, false, std::move(initial));
+    if (_curr) {
+        auto& owner = ym::deref(_curr->owner());
+        auto slot = owner.nextSlot();
+        _setupCall(
+            CallBhvrCallbackInfo::mk(storedPropertyGetCallBhvr),
+            typeSymbol,
+            slot,
+            false);
+        if (auto t = _submit()) {
+            (void)t->addParam("self", "$Self", true).value();
+            return true;
+        }
+        else owner.unwindSlots();
     }
-    auto& result = *t;
-    _types.push_back(std::move(t));
-    _lookup.try_emplace(result.localName(), _types.size() - 1);
-    result.registerMembershipWithOwner();
-    return true;
+    return false;
+}
+
+bool _ym::ParcelInfo::addStoredProperty(
+    const std::string& ownerName,
+    const std::string& name,
+    const std::string& typeSymbol,
+    ConstTableInfo initial) {
+    _newMember(KindEx::StoredPropertyGet, ownerName, name, false, std::move(initial));
+    if (_curr) {
+        auto& owner = ym::deref(_curr->owner());
+        auto slot = owner.nextSlot();
+        _setupCall(
+            CallBhvrCallbackInfo::mk(storedPropertyGetCallBhvr),
+            typeSymbol,
+            slot,
+            true);
+        if (auto t = _submit()) {
+            (void)t->addParam("self", "$Self", true).value();
+
+            _newMember(KindEx::StoredPropertySet, ownerName, std::format("{}$assigner", name), true);
+            _setupCall(
+                CallBhvrCallbackInfo::mk(storedPropertySetCallBhvr),
+                "yama:None",
+                -1,
+                false);
+            _mustSucceed();
+            if (auto assigner = _submit()) {
+                (void)assigner->addParam("self", "$Self", true).value();
+                (void)assigner->addParam("x", typeSymbol, true).value();
+            }
+
+            return true;
+        }
+        else owner.unwindSlots();
+    }
+    return false;
+}
+
+bool _ym::ParcelInfo::addReadOnlyComputedProperty(
+    const std::string& ownerName,
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo getBehaviour,
+    ConstTableInfo initial) {
+    _newMember(KindEx::Property, ownerName, name, false, std::move(initial));
+    _setupCall(getBehaviour, typeSymbol, -1, false);
+    if (auto t = _submit()) {
+        (void)t->addParam("self", "$Self", true).value();
+        return true;
+    }
+    return false;
+}
+
+bool _ym::ParcelInfo::addComputedProperty(
+    const std::string& ownerName,
+    const std::string& name,
+    const std::string& typeSymbol,
+    _ym::CallBhvrCallbackInfo getBehaviour,
+    _ym::CallBhvrCallbackInfo setBehaviour,
+    ConstTableInfo initial) {
+    _newMember(KindEx::Property, ownerName, name, false, std::move(initial));
+    _setupCall(getBehaviour, typeSymbol, -1, true);
+    if (auto t = _submit()) {
+        (void)t->addParam("self", "$Self", true).value();
+
+        _newMember(KindEx::PropertyAssigner, ownerName, std::format("{}$assigner", name), true);
+        _setupCall(setBehaviour, "yama:None", -1, false);
+        _mustSucceed();
+        if (auto assigner = _submit()) {
+            (void)assigner->addParam("self", "$Self", true).value();
+            (void)assigner->addParam("x", typeSymbol, true).value();
+        }
+
+        return true;
+    }
+    return false;
 }
 
 std::optional<YmTypeParamIndex> _ym::ParcelInfo::addTypeParam(
@@ -1017,6 +1154,16 @@ std::optional<YmRef> _ym::ParcelInfo::addRef(
         info
         ? info->addRef(std::move(symbol))
         : std::nullopt;
+}
+
+bool _ym::ParcelInfo::bindBCode(
+    const std::string& localName,
+    BCode code,
+    BCodeDbgSyms syms) {
+    if (auto info = type(localName)) {
+        return info->setupBCode(std::move(code), std::move(syms));
+    }
+    return false;
 }
 
 _ym::TypeInfo* _ym::ParcelInfo::_expectType(
@@ -1164,5 +1311,168 @@ bool _ym::ParcelInfo::_checkCanHaveTypeParams(const TypeInfo& t, std::string_vie
         return false;
     }
     return true;
+}
+
+std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::_mkNonMember(
+    KindEx k,
+    const std::string& localName,
+    bool skipLocalNameLegalityCheck,
+    ConstTableInfo initial) {
+    if (!_checkNameLegality(localName, "Cannot add type", skipLocalNameLegalityCheck)) {
+        return nullptr;
+    }
+    if (type(localName)) {
+        Global::raiseErr(
+            YmErrCode_NameConflict,
+            "Cannot add type; name \"{}\" already taken!",
+            localName);
+        return nullptr;
+    }
+    return std::make_unique<TypeInfo>(*this, k, localName, std::move(initial));
+}
+
+std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::_mkMember(
+    KindEx k,
+    const std::string& ownerName,
+    const std::string& memberName,
+    bool skipLocalNameLegalityCheck,
+    ConstTableInfo initial) {
+    // TODO: This _checkNameLegality's error msgs will only detail the memberName, rather
+    //       than the whole local name, which is somewhat suboptimal.
+    if (!_checkNameLegality(memberName, "Cannot add type", skipLocalNameLegalityCheck)) {
+        return nullptr;
+    }
+    auto ownerTypePtr = type(ownerName);
+    if (!ownerTypePtr) {
+        Global::raiseErr(
+            YmErrCode_TypeNotFound,
+            "Cannot add type; owner {} not found!",
+            ownerName);
+        return nullptr;
+    }
+    auto& ownerType = ym::deref(ownerTypePtr);
+    if (!_checkNoMemberLevelNameConflict(ownerType, memberName, "Cannot add type")) {
+        return nullptr;
+    }
+    if (!ownerType.canHaveMembers()) {
+        Global::raiseErr(
+            YmErrCode_TypeCannotHaveMembers,
+            "Cannot add type; owner {} is a {} which cannot have members!",
+            ownerType.localName(),
+            ymKind_Fmt(ownerType.kind()));
+        return nullptr;
+    }
+    if (kindOf(k) == YmKind_Method) {
+        if (!isProtocolReq(k) && ownerType.isProtocol()) {
+            Global::raiseErr(
+                YmErrCode_ProtocolType,
+                // NOTE: Doesn't refer to KindEx notion of 'regular'.
+                "Cannot add regular method to {} type {}!",
+                ymKind_Fmt(ownerType.kind()),
+                ownerType.localName());
+            return nullptr;
+        }
+        else if (isProtocolReq(k) && !ownerType.isProtocol()) {
+            Global::raiseErr(
+                YmErrCode_NonProtocolType,
+                "Cannot add method req. to {} type {}!",
+                ymKind_Fmt(ownerType.kind()),
+                ownerType.localName());
+            return nullptr;
+        }
+    }
+    if (kindOf(k) == YmKind_Property) {
+        if (ownerType.isProtocol()) {
+            Global::raiseErr(
+                YmErrCode_ProtocolType,
+                // NOTE: Doesn't refer to KindEx notion of 'regular'.
+                "Cannot add regular property to {} type {}!",
+                ymKind_Fmt(ownerType.kind()),
+                ownerType.localName());
+            return nullptr;
+        }
+        if (k == KindEx::StoredPropertyGet && ownerType.slots() >= YM_MAX_STORED_PROPERTIES) {
+            Global::raiseErr(
+                YmErrCode_LimitReached,
+                "Cannot add stored property to {} type {}; would exceed {} limit!",
+                ymKind_Fmt(ownerType.kind()),
+                ownerType.localName(),
+                YM_MAX_STORED_PROPERTIES);
+            return nullptr;
+        }
+    }
+    return std::make_unique<TypeInfo>(*this, k,
+        std::format("{}::{}", ownerType.localName(), memberName),
+        std::move(initial));
+}
+
+_ym::TypeInfo* _ym::ParcelInfo::_registerType(std::unique_ptr<TypeInfo> t) {
+    if (!t) {
+        return nullptr;
+    }
+    auto& result = *t;
+    _types.try_emplace(result.localName(), std::move(t));
+    result.registerMembershipWithOwner();
+    return &result;
+}
+
+thread_local std::unique_ptr<_ym::TypeInfo> _ym::ParcelInfo::_curr = nullptr;
+
+void _ym::ParcelInfo::_newNonMember(
+    KindEx k,
+    const std::string& localName,
+    bool skipLocalNameLegalityCheck,
+    ConstTableInfo initial) {
+    _curr = _mkNonMember(k, localName, skipLocalNameLegalityCheck, std::move(initial));
+}
+
+void _ym::ParcelInfo::_newMember(
+    KindEx k,
+    const std::string& ownerName,
+    const std::string& memberName,
+    bool skipLocalNameLegalityCheck,
+    ConstTableInfo initial) {
+    _curr = _mkMember(k, ownerName, memberName, skipLocalNameLegalityCheck, std::move(initial));
+}
+
+void _ym::ParcelInfo::_setupCall(
+    CallBhvrCallbackInfo callBehaviour,
+    const std::string& returnTypeSymbol,
+    Slots slot,
+    bool hasAssigner) {
+    if (_curr) {
+        if (!_curr->setupCall(callBehaviour, returnTypeSymbol, slot, hasAssigner)) {
+            _curr.reset();
+        }
+    }
+}
+
+void _ym::ParcelInfo::_setupVar(bool hasInitializer) {
+    if (_curr) {
+        if (!_curr->setupVar(hasInitializer)) {
+            _curr.reset();
+        }
+    }
+}
+
+void _ym::ParcelInfo::_bindBCode(BCode code, BCodeDbgSyms syms) {
+    if (_curr) {
+        if (!_curr->setupBCode(std::move(code), std::move(syms))) {
+            _curr.reset();
+        }
+    }
+}
+
+void _ym::ParcelInfo::_mustSucceed() {
+    ymVerify(_curr != nullptr);
+}
+
+_ym::TypeInfo* _ym::ParcelInfo::_submit() {
+    return _registerType(std::move(_curr));
+}
+
+uintptr_t _ym::ParcelInfo::_getNextMemberIndex(const std::string& ownerName) const noexcept {
+    auto owner = type(ownerName);
+    return owner ? owner->members() : -1;
 }
 

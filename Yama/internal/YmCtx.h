@@ -70,6 +70,9 @@ public:
     YmCallStackHeight callStkHeight() const noexcept;
     std::string fmtCallStk(YmCallStackHeight skip = 0) const;
 
+    YmType* fn() const noexcept; // Returns the fn of the current call.
+    std::optional<_ym::TempRef> fromConst(size_t index);
+
     bool isUser() const noexcept; // Returns if in user pseudo-call.
     YmUInt16 args() const noexcept;
     YmLocals locals() const noexcept;

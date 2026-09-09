@@ -13,8 +13,9 @@
 #include "../yama++/scalar.h"
 #include "../yama++/Variant.h"
 
-#include "kinds.h"
+#include "bcode.h"
 #include "ConstTableInfo.h"
+#include "kinds.h"
 #include "SpecSolver.h"
 
 
@@ -31,6 +32,7 @@ namespace _ym {
     bool checkNonProtocolMember(const TypeInfo& type, std::string_view msg);
 
     void methodReqCallBhvr(YmCtx* ctx, YmType* type, void* user);
+    void bcodeExecCallBhvr(YmCtx* ctx, YmType* type, void* user);
     void storedPropertyGetCallBhvr(YmCtx* ctx, YmType* type, void* user);
     void storedPropertySetCallBhvr(YmCtx* ctx, YmType* type, void* user);
     void storedVarGetCallBhvr(YmCtx* ctx, YmType* type, void* user);
@@ -66,7 +68,11 @@ namespace _ym {
         std::vector<ConstIndex> refs;
 
 
-        TypeInfo(ParcelInfo& parcel, KindEx k, const std::string& localName);
+        TypeInfo(
+            ParcelInfo& parcel,
+            KindEx k,
+            const std::string& localName,
+            ConstTableInfo initial);
 
 
         ParcelInfo& parcel() const noexcept;
@@ -173,6 +179,10 @@ namespace _ym {
         bool checkIsRefSlot(Slots index) const noexcept;
         std::optional<Slots> storedPropertySlot() const noexcept;
 
+        // Fails if type either doesn't have, or semantically doesn't use, bcode.
+        const BCode* bcode() const noexcept;
+        const BCodeDbgSyms* bsyms() const noexcept;
+
 
         Slots nextSlot() noexcept;
         // Unwinds nextSlot incrs.
@@ -183,18 +193,6 @@ namespace _ym {
         void beginNamedParams();
         std::optional<YmRef> addRef(std::string symbol);
 
-        std::optional<size_t> checkedRef(const std::string& symbol);
-        size_t uncheckedRef(std::string normalizedSymbol);
-        std::optional<size_t> uncheckedRefOpt(std::string normalizedSymbol);
-        template<typename... Args>
-        inline auto checkedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
-            return checkedRef(std::format(fmt, std::forward<Args>(args)...));
-        }
-        template<typename... Args>
-        inline auto uncheckedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
-            return uncheckedRef(std::format(fmt, std::forward<Args>(args)...));
-        }
-
         bool setupCall(
             CallBhvrCallbackInfo callBehaviour,
             const std::string& returnTypeSymbol,
@@ -202,6 +200,9 @@ namespace _ym {
             bool hasAssigner);
         bool setupVar(
             bool hasInitializer);
+        bool setupBCode(
+            BCode code,
+            BCodeDbgSyms syms);
 
         void registerMember(const std::string& name);
 
@@ -265,6 +266,10 @@ namespace _ym {
         struct _Assigner final {
             ConstIndex assigneeConst;
         };
+        struct _BCode final {
+            BCode code;
+            BCodeDbgSyms syms;
+        };
 
 
         ParcelInfo* _parcel;
@@ -278,6 +283,7 @@ namespace _ym {
         std::unique_ptr<_Call> _call;
         std::unique_ptr<_Var> _var;
         std::unique_ptr<_Assigner> _assigner;
+        std::unique_ptr<_BCode> _bcode;
 
 
         void _initMembership();
@@ -290,8 +296,18 @@ namespace _ym {
             std::optional<ConstIndex> assignerConst,
             ConstIndex returnTypeConst,
             Slots slot);
-        void _initVar(
-            std::optional<ConstIndex> initializerConst);
+
+        std::optional<size_t> _checkedRef(const std::string& symbol);
+        size_t _uncheckedRef(std::string normalizedSymbol);
+        std::optional<size_t> _uncheckedRefOpt(std::string normalizedSymbol);
+        template<typename... Args>
+        inline auto _checkedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
+            return _checkedRef(std::format(fmt, std::forward<Args>(args)...));
+        }
+        template<typename... Args>
+        inline auto _uncheckedRefFmt(std::format_string<Args...> fmt, Args&&... args) {
+            return _uncheckedRef(std::format(fmt, std::forward<Args>(args)...));
+        }
 
         static std::string _extractOwnerName(const std::string& localName) noexcept;
         static std::string _extractMemberName(const std::string& localName) noexcept;
@@ -304,24 +320,77 @@ namespace _ym {
         ParcelInfo() = default;
 
 
-        bool verify() const;
-
         size_t types() const noexcept;
         TypeInfo* type(const std::string& localName) noexcept;
         const TypeInfo* type(const std::string& localName) const noexcept;
 
-        std::unique_ptr<TypeInfo> mkNonMember(
+        bool addStruct(
+            const std::string& name,
             KindEx k,
-            const std::string& localName,
-            bool skipLocalNameLegalityCheck);
-        std::unique_ptr<TypeInfo> mkMember(
-            KindEx k,
+            ConstTableInfo initial);
+        bool addProtocol(
+            const std::string& name,
+            ConstTableInfo initial);
+        bool addFn(
+            const std::string& name,
+            const std::string& returnTypeSymbol,
+            CallBhvrCallbackInfo callBehaviour,
+            ConstTableInfo initial);
+        bool addReadOnlyStoredVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo initBehaviour,
+            ConstTableInfo initial);
+        bool addStoredVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo initBehaviour,
+            ConstTableInfo initial);
+        bool addReadOnlyComputedVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo getBehaviour,
+            ConstTableInfo initial);
+        bool addComputedVar(
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo getBehaviour,
+            CallBhvrCallbackInfo setBehaviour,
+            ConstTableInfo initial);
+        bool addMethod(
             const std::string& ownerName,
-            const std::string& memberName,
-            bool skipLocalNameLegalityCheck);
-        bool registerType(
-            std::unique_ptr<TypeInfo> t,
-            bool assertSucceeds = false);
+            const std::string& name,
+            const std::string& returnTypeSymbol,
+            CallBhvrCallbackInfo callBehaviour,
+            ConstTableInfo initial);
+        bool addMethodReq(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& returnTypeSymbol,
+            ConstTableInfo initial);
+        bool addReadOnlyStoredProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            ConstTableInfo initial);
+        bool addStoredProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            ConstTableInfo initial);
+        bool addReadOnlyComputedProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo getBehaviour,
+            ConstTableInfo initial);
+        bool addComputedProperty(
+            const std::string& ownerName,
+            const std::string& name,
+            const std::string& typeSymbol,
+            CallBhvrCallbackInfo getBehaviour,
+            CallBhvrCallbackInfo setBehaviour,
+            ConstTableInfo initial);
 
         std::optional<YmTypeParamIndex> addTypeParam(
             std::string typeName,
@@ -338,19 +407,73 @@ namespace _ym {
             std::string typeName,
             std::string symbol);
 
+        bool bindBCode(
+            const std::string& localName,
+            BCode code,
+            BCodeDbgSyms syms = BCodeDbgSyms{});
+
 
     private:
-        std::vector<std::unique_ptr<TypeInfo>> _types;
-        std::unordered_map<std::string, size_t> _lookup;
+        std::unordered_map<std::string, std::unique_ptr<TypeInfo>> _types;
 
 
-        _ym::TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
+        TypeInfo* _expectType(const std::string& typeName, std::string_view msg);
         bool _checkNameLegality(const std::string& name, std::string_view msg, bool skipLocalNameLegalityCheck = false);
         bool _checkNoMemberLevelNameConflict(const TypeInfo& owner, const std::string& name, std::string_view msg);
         bool _checkIsntPropertyOrAssigner(const TypeInfo& t, std::string_view msg);
         bool _checkHasCallSig(const TypeInfo& t, std::string_view msg);
         bool _checkHasUserDefinedCallSig(const TypeInfo& t, std::string_view msg);
         bool _checkCanHaveTypeParams(const TypeInfo& t, std::string_view msg);
+
+        std::unique_ptr<TypeInfo> _mkNonMember(
+            KindEx k,
+            const std::string& localName,
+            bool skipLocalNameLegalityCheck,
+            ConstTableInfo initial);
+        std::unique_ptr<TypeInfo> _mkMember(
+            KindEx k,
+            const std::string& ownerName,
+            const std::string& memberName,
+            bool skipLocalNameLegalityCheck,
+            ConstTableInfo initial);
+        TypeInfo* _registerType(
+            std::unique_ptr<TypeInfo> t);
+
+        static thread_local std::unique_ptr<TypeInfo> _curr;
+
+        // Creates new _curr type.
+        // Drops _curr on fail.
+        void _newNonMember(
+            KindEx k,
+            const std::string& localName,
+            bool skipLocalNameLegalityCheck = false,
+            ConstTableInfo initial = ConstTableInfo{});
+        // Creates new _curr type.
+        // Drops _curr on fail.
+        void _newMember(
+            KindEx k,
+            const std::string& ownerName,
+            const std::string& memberName,
+            bool skipLocalNameLegalityCheck = false,
+            ConstTableInfo initial = ConstTableInfo{});
+        // Drops _curr on fail.
+        void _setupCall(
+            CallBhvrCallbackInfo callBehaviour,
+            const std::string& returnTypeSymbol,
+            Slots slot,
+            bool hasAssigner);
+        // Drops _curr on fail.
+        void _setupVar(bool hasInitializer);
+        // Drops _curr on fail.
+        void _bindBCode(
+            BCode code,
+            BCodeDbgSyms syms);
+        void _mustSucceed();
+        // Submits registers _curr type, if successful.
+        // Returns nullptr on fail.
+        TypeInfo* _submit();
+
+        uintptr_t _getNextMemberIndex(const std::string& ownerName) const noexcept;
     };
 }
 

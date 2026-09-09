@@ -20,11 +20,11 @@ namespace ym {
             Domain(Safe(ymDm_Create()), false) {
         }
         // Increments resource's ref count if secure == true.
-        inline Domain(Safe<YmDm> resource, bool secure) noexcept :
+        inline Domain(Safe<YmDm> resource, bool secure = true) noexcept :
             Handle(resource, secure) {
         }
         // Increments resource's ref count if secure == true.
-        inline static std::optional<Domain> maybe(YmDm* resource, bool secure) noexcept {
+        inline static std::optional<Domain> maybe(YmDm* resource, bool secure = true) noexcept {
             return
                 resource
                 ? std::make_optional(Domain(*resource, secure))

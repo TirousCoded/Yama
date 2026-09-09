@@ -56,31 +56,31 @@ std::shared_ptr<YmType> YmCtx::load(const std::string& fullname) {
 }
 
 YmType& YmCtx::ldNone() const noexcept {
-    return loader->ldNone();
+    return loader->fast->none.value();
 }
 
 YmType& YmCtx::ldInt() const noexcept {
-    return loader->ldInt();
+    return loader->fast->int0.value();
 }
 
 YmType& YmCtx::ldUInt() const noexcept {
-    return loader->ldUInt();
+    return loader->fast->uint.value();
 }
 
 YmType& YmCtx::ldFloat() const noexcept {
-    return loader->ldFloat();
+    return loader->fast->float0.value();
 }
 
 YmType& YmCtx::ldBool() const noexcept {
-    return loader->ldBool();
+    return loader->fast->bool0.value();
 }
 
 YmType& YmCtx::ldRune() const noexcept {
-    return loader->ldRune();
+    return loader->fast->rune.value();
 }
 
 YmType& YmCtx::ldType() const noexcept {
-    return loader->ldType();
+    return loader->fast->type.value();
 }
 
 void YmCtx::setObjDestroyCallback(YmObjDestroyCallbackFn fn, void* user) noexcept {
@@ -148,6 +148,26 @@ YmCallStackHeight YmCtx::callStkHeight() const noexcept {
 
 std::string YmCtx::fmtCallStk(YmCallStackHeight skip) const {
     return _stk.fmtCallStk(skip);
+}
+
+YmType* YmCtx::fn() const noexcept {
+    return
+        !isUser()
+        ? _stk.cf().fn
+        : nullptr;
+}
+
+std::optional<_ym::TempRef> YmCtx::fromConst(size_t index) {
+    if (auto t = fn(); t && index < t->consts().size()) {
+        auto v = t->consts()[index];
+        if (v.is<YmInt>())			    return newInt(v.as<YmInt>(), false);
+        if (v.is<YmUInt>())			    return newUInt(v.as<YmUInt>(), false);
+        if (v.is<YmFloat>())			return newFloat(v.as<YmFloat>(), false);
+        if (v.is<YmBool>())			    return newBool(v.as<YmBool>(), false);
+        if (v.is<YmRune>())			    return newRune(v.as<YmRune>(), false);
+        if (v.is<ym::Safe<YmType>>())	return newType(*v.as<ym::Safe<YmType>>(), false);
+    }
+    return std::nullopt;
 }
 
 bool YmCtx::isUser() const noexcept {

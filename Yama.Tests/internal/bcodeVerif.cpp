@@ -2,16 +2,17 @@
 
 #include <gtest/gtest.h>
 #include <yama/yama.h>
-#include <yama++/general.h>
-#include <yama++/print.h>
-#include <yama++/Domain.h>
 #include <yama++/Context.h>
+#include <yama++/Domain.h>
+#include <yama++/general.h>
 #include <yama++/ParcelDef.h>
+#include <yama++/print.h>
 
 #include "../utils/utils.h"
 
 #include <yama/../internal/bcode.h>
 #include <yama/../internal/BCodeVerifier.h>
+#include <yama/../internal/YmCtx.h>
 #include <yama/../internal/YmParcelDef.h>
 
 
@@ -34,26 +35,16 @@ public:
 	}
 
 
-	std::optional<YmUInt8> pullRefConst(std::string localname, std::string symbol) {
-		if (auto info = pdef.get()->info->type(localname)) {
-			auto result = info->consts.pullRef(_ym::Spec::type(symbol), YM_MAX_UINT8);
-			EXPECT_TRUE(result) << std::format("-- pullRefConst({}, {})\n", localname, symbol);
-			if (result) {
-				return (YmUInt8)*result;
-			}
-		}
-		return std::nullopt;
+	std::optional<YmUInt8> pullRefConst(const std::string& localname, const std::string& symbol) {
+		auto result = pdef.get()->pullRefConst(localname, symbol, YM_MAX_UINT8);
+		EXPECT_TRUE(result) << std::format("localname=={}, symbol=={}\n", localname, symbol);
+		return (std::optional<YmUInt8>)result;
 	}
 	template<typename T>
-	std::optional<YmUInt8> pullValConst(std::string localname, const T& v) {
-		if (auto info = pdef.get()->info->type(localname)) {
-			auto result = info->consts.pullVal(v, YM_MAX_UINT8);
-			EXPECT_TRUE(result) << std::format("-- pullValConst({}, {})\n", localname, ym::fmt(v));
-			if (result) {
-				return (YmUInt8)*result;
-			}
-		}
-		return std::nullopt;
+	std::optional<YmUInt8> pullValConst(const std::string& localname, const T& v) {
+		auto result = pdef.get()->pullValConst(localname, v, YM_MAX_UINT8);
+		EXPECT_TRUE(result) << std::format("localname=={}, v=={}\n", localname, ym::fmt(v));
+		return (std::optional<YmUInt8>)result;
 	}
 
 	void addFn(
@@ -96,7 +87,7 @@ private:
 		ym::Context ctx(dm);
 		dm.bind("p", pdef);
 		auto f = ctx.load(fullname).value();
-		return _ym::BCodeVerifier(*ctx.get()).verify(*f.get(), code);
+		return _ym::BCodeVerifier(*ctx.get()->loader->fast).verify(*f.get(), code);
 	}
 	bool _test(std::string fullname) {
 		auto code = bcode.done();

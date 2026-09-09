@@ -16,6 +16,7 @@
 #include "Redirects.h"
 #include "YmType.h"
 #include "YmParcel.h"
+#include "BCodeVerifier.h"
 
 
 namespace _ym {
@@ -94,25 +95,26 @@ namespace _ym {
         mutable std::shared_mutex _accessLock; // Protects _commits.
         mutable std::mutex _updateLock; // Protects _staging/_binds/_redirects/_ldrState.
 
+        std::optional<_ym::BCodeVerifier> _verif;
+
 
         void _bindYamaParcel();
+        bool _checkStagedTypeBCode();
     };
 
     // Thread-unsafe loader used by contexts, existing downstream of domain loaders.
     class CtxLoader final : public UnsynchronizedLoader {
     public:
+        // TODO: Maybe move fast to YmCtx?
+
+        // Fast access to certain builtin types.
+        std::optional<BuiltinsCache> fast;
+
+
         CtxLoader(const std::shared_ptr<Loader>& upstream);
 
 
         std::shared_ptr<Loader> upstream() const;
-
-        YmType& ldNone() const noexcept;
-        YmType& ldInt() const noexcept;
-        YmType& ldUInt() const noexcept;
-        YmType& ldFloat() const noexcept;
-        YmType& ldBool() const noexcept;
-        YmType& ldRune() const noexcept;
-        YmType& ldType() const noexcept;
 
         void reset() noexcept override;
         std::shared_ptr<YmParcel> fetchParcel(const Spec& path) const noexcept override;
@@ -123,17 +125,8 @@ namespace _ym {
 
 
     private:
-        struct _Builtins final {
-            ym::Safe<YmType> none, int0, uint, float0, bool0, rune, type;
-        };
-
-
-        std::optional<_Builtins> _builtins;
         std::weak_ptr<Loader> _upstream;
         Area _commits;
-
-
-        void _preloadBuiltins();
     };
 }
 

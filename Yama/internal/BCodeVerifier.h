@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "bcode.h"
-#include "YmCtx.h"
+#include "BuiltinsCache.h"
 #include "YmType.h"
 
 
@@ -48,7 +48,10 @@ namespace _ym {
 	// Used to verify bytecode binaries in the presence of linkage information.
 	class BCodeVerifier final {
 	public:
-		BCodeVerifier(YmCtx& ctx) noexcept;
+		BuiltinsCache fast;
+
+
+		BCodeVerifier(BuiltinsCache fast) noexcept;
 
 
 		bool verify(
@@ -109,7 +112,6 @@ namespace _ym {
 		using _CFG = std::map<size_t, _Block>;
 
 
-		ym::Safe<YmCtx> _ctx;
 		YmType* _t = nullptr;
 		const BCode* _bcode = nullptr;
 		const BCodeDbgSyms* _bsyms = nullptr;
@@ -176,6 +178,8 @@ namespace _ym {
 		bool _checkLocalsArePositionalParamTypes(_Block& block, size_t i, YmType& called) const;
 		bool _checkLocalIsCorrectType(_Block& block, size_t i, size_t where, YmType& type) const;
 		bool _checkLocalCanConvertToType(_Block& block, size_t i, size_t where, YmType& target) const;
+
+		YmType* _constToType(const Const& c) const noexcept;
 	};
 }
 

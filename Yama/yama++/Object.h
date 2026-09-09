@@ -20,11 +20,11 @@ namespace ym {
     class Object final : public Handle<YmObj> {
     public:
         // Increments resource's ref count if secure == true.
-        inline explicit Object(Safe<YmObj> resource, bool secure) noexcept :
+        inline explicit Object(Safe<YmObj> resource, bool secure = true) noexcept :
             Handle(resource, secure) {
         }
         // Increments resource's ref count if secure == true.
-        inline static std::optional<Object> maybe(YmObj* resource, bool secure) noexcept {
+        inline static std::optional<Object> maybe(YmObj* resource, bool secure = true) noexcept {
             return
                 resource
                 ? std::make_optional(Object(*resource, secure))

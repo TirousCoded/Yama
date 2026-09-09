@@ -465,7 +465,20 @@ std::string YmType::fmtConsts() const {
     result += std::format("YmType Consts ({}; {} Consts)", fullname(), consts().size());
     size_t i = 0;
     for (const auto& c : consts()) {
-        result += std::format("\n   [{}] {}", i, c);
+        auto ct = _ym::constTypeOf(info->consts.at(i));
+        result += std::format("\n   [{}] {} {}",
+            i,
+            _ym::fmt(ct),
+            [&]() -> std::string {
+                if (ct != _ym::ConstType::Ref) {
+                    return std::format("{}", c);
+                }
+                else {
+                    return std::format("{} ({})",
+                        info->consts.at(i).as<_ym::RefInfo>().sym,
+                        c.as<ym::Safe<YmType>>()->fullname());
+                }
+            }());
         i++;
     }
     return result;

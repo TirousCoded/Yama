@@ -202,31 +202,31 @@ YmType* ymCtx_Load(YmCtx* ctx, YmFullname fullname) {
 }
 
 YmType* ymCtx_LdNone(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldNone();
+    return &Safe(ctx)->ldNone();
 }
 
 YmType* ymCtx_LdInt(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldInt();
+    return &Safe(ctx)->ldInt();
 }
 
 YmType* ymCtx_LdUInt(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldUInt();
+    return &Safe(ctx)->ldUInt();
 }
 
 YmType* ymCtx_LdFloat(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldFloat();
+    return &Safe(ctx)->ldFloat();
 }
 
 YmType* ymCtx_LdBool(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldBool();
+    return &Safe(ctx)->ldBool();
 }
 
 YmType* ymCtx_LdRune(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldRune();
+    return &Safe(ctx)->ldRune();
 }
 
 YmType* ymCtx_LdType(YmCtx* ctx) {
-    return &Safe(ctx)->loader->ldType();
+    return &Safe(ctx)->ldType();
 }
 
 void ymCtx_SetObjDestroyCallback(YmCtx* ctx, YmObjDestroyCallbackFn fn, void* user) {

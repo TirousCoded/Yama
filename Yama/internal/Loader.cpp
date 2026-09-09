@@ -15,6 +15,7 @@ _ym::DmLoader::DmLoader() :
     _ldr(_staging, _binds, _redirects) {
     _staging.setUpstream(&_commits);
     _bindYamaParcel();
+    _verif.emplace(BuiltinsCache::mk(*this));
 }
 
 bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef> parceldef, bool bindIsForYamaParcel) {
@@ -23,9 +24,6 @@ bool _ym::DmLoader::bindParcelDef(const std::string& path, ym::Safe<YmParcelDef>
             _ym::Global::raiseErr(
                 YmErrCode_PathBindError,
                 "Cannot bind parcel def.; would overwrite \"yama\" parcel!");
-            return false;
-        }
-        if (!parceldef->verify()) {
             return false;
         }
         std::scoped_lock lk(_updateLock);
@@ -141,6 +139,9 @@ std::shared_ptr<YmType> _ym::DmLoader::load(const Spec& fullname) {
     }
     std::scoped_lock lk(_updateLock);
     auto result = _ldr.load(fullname.removeCallSuff());
+    if (result && !_checkStagedTypeBCode()) {
+        return nullptr;
+    }
     if (result && !result->checkCallSuff(fullname.callsuff())) {
         // TODO: Improve this error!
         _ym::Global::raiseErr(
@@ -168,47 +169,31 @@ void _ym::DmLoader::_bindYamaParcel() {
     p->addStruct("Rune", KindEx::Rune);
     p->addStruct("Type", KindEx::Type);
     p->addProtocol("Any");
-    if (!bindParcelDef("yama", *p, true)) YM_DEADEND;
+    ymVerify(bindParcelDef("yama", *p, true));
+}
+
+bool _ym::DmLoader::_checkStagedTypeBCode() {
+    bool success = true;
+    for (auto& type : _staging.types) {
+        if (auto bcode = type.info->bcode()) {
+            if (!_verif->verify(type, *bcode, type.info->bsyms())) {
+                success = false;
+            }
+        }
+    }
+    return success;
 }
 
 _ym::CtxLoader::CtxLoader(const std::shared_ptr<Loader>& upstream) :
     UnsynchronizedLoader(),
     _upstream(upstream) {
-    _preloadBuiltins();
+    fast = BuiltinsCache::mk(*this);
 }
 
 std::shared_ptr<_ym::Loader> _ym::CtxLoader::upstream() const {
     auto result = _upstream.lock();
     ymAssert(result != nullptr);
     return result;
-}
-
-YmType& _ym::CtxLoader::ldNone() const noexcept {
-    return *_builtins.value().none;
-}
-
-YmType& _ym::CtxLoader::ldInt() const noexcept {
-    return *_builtins.value().int0;
-}
-
-YmType& _ym::CtxLoader::ldUInt() const noexcept {
-    return *_builtins.value().uint;
-}
-
-YmType& _ym::CtxLoader::ldFloat() const noexcept {
-    return *_builtins.value().float0;
-}
-
-YmType& _ym::CtxLoader::ldBool() const noexcept {
-    return *_builtins.value().bool0;
-}
-
-YmType& _ym::CtxLoader::ldRune() const noexcept {
-    return *_builtins.value().rune;
-}
-
-YmType& _ym::CtxLoader::ldType() const noexcept {
-    return *_builtins.value().type;
 }
 
 void _ym::CtxLoader::reset() noexcept {
@@ -264,17 +249,5 @@ std::shared_ptr<YmType> _ym::CtxLoader::load(const Spec& fullname) {
 
 const _ym::Area& _ym::CtxLoader::commits() const {
     return _commits;
-}
-
-void _ym::CtxLoader::_preloadBuiltins() {
-    _builtins = _Builtins{
-        .none = ym::deref(load(Spec::typeFast("yama:None"))),
-        .int0 = ym::deref(load(Spec::typeFast("yama:Int"))),
-        .uint = ym::deref(load(Spec::typeFast("yama:UInt"))),
-        .float0 = ym::deref(load(Spec::typeFast("yama:Float"))),
-        .bool0 = ym::deref(load(Spec::typeFast("yama:Bool"))),
-        .rune = ym::deref(load(Spec::typeFast("yama:Rune"))),
-        .type = ym::deref(load(Spec::typeFast("yama:Type"))),
-    };
 }
 
